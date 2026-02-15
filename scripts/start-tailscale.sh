@@ -18,6 +18,7 @@ tailscaled \
   --socks5-server=localhost:$PROXY_PORT \
   --outbound-http-proxy-listen=localhost:$PROXY_PORT \
   > "$SOCKET_DIR/tailscaled.log" 2>&1 &
+TAILSCALED_PID=$!
 
 # Wait for socket
 echo "Waiting for Tailscale socket..."
@@ -31,6 +32,16 @@ while [ ! -S "$SOCKET_PATH" ]; do
   fi
 done
 
+# Cleanup function to always log out of Tailscale (removing the ephemeral node)
+cleanup() {
+  echo "Stopping Tailscale..."
+  tailscale --socket="$SOCKET_PATH" logout
+  kill -SIGTERM $TAILSCALED_PID
+  wait $TAILSCALED_PID
+}
+# Trap exit signals to ensure cleanup runs
+trap cleanup SIGINT SIGTERM EXIT
+
 # Authenticate if key provided
 if [ ! -z "$TS_AUTHKEY" ]; then
   echo "Authenticating Tailscale..."
@@ -38,8 +49,9 @@ if [ ! -z "$TS_AUTHKEY" ]; then
   tailscale --socket="$SOCKET_PATH" up --authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-mission-control}"
   
   echo "Configuring Tailscale Serve..."
-  # Serve HTTP on port 80 via Tailscale, proxying to localhost:${PORT:-3000}
-  tailscale --socket="$SOCKET_PATH" serve --bg --http=80 localhost:${PORT:-3000}
+  # Serve HTTP on port 80 via Tailscale, proxying to 127.0.0.1:${PORT:-3000}
+  # Use 127.0.0.1 to avoid potential localhost IPv6 resolution issues
+  tailscale --socket="$SOCKET_PATH" serve --bg --http=80 127.0.0.1:${PORT:-3000}
 
   # Configure proxy variables for outbound connections (so mission-control can reach Claw)
   # Only set these when Tailscale is active to avoid breaking non-Tailscale deployments
