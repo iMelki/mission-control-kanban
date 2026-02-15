@@ -38,8 +38,8 @@ if [ ! -z "$TS_AUTHKEY" ]; then
   tailscale --socket="$SOCKET_PATH" up --authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-mission-control}"
   
   echo "Configuring Tailscale Serve..."
-  # Serve HTTP on port 80 via Tailscale, proxying to localhost:3000
-  tailscale --socket="$SOCKET_PATH" serve --bg --http=80 localhost:3000
+  # Serve HTTP on port 80 via Tailscale, proxying to localhost:${PORT:-3000}
+  tailscale --socket="$SOCKET_PATH" serve --bg --http=80 localhost:${PORT:-3000}
 
   # Configure proxy variables for outbound connections (so mission-control can reach Claw)
   # Only set these when Tailscale is active to avoid breaking non-Tailscale deployments
