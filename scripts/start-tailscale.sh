@@ -34,7 +34,9 @@ done
 # Authenticate if key provided
 if [ ! -z "$TS_AUTHKEY" ]; then
   echo "Authenticating Tailscale..."
-  tailscale --socket="$SOCKET_PATH" up --authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-mission-control}"
+  # Use --ephemeral to delete the device from Tailscale when it disconnects
+  # This prevents "zombie" machines from piling up in the admin console on every deploy
+  tailscale --socket="$SOCKET_PATH" up --authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-mission-control}" --ephemeral
   
   echo "Configuring Tailscale Serve..."
   # Serve HTTP on port 80 via Tailscale, proxying to localhost:3000
