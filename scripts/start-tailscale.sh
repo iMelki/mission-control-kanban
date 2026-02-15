@@ -4,17 +4,17 @@
 SOCKET_DIR="/app/tailscale"
 mkdir -p "$SOCKET_DIR"
 SOCKET_PATH="$SOCKET_DIR/tailscaled.sock"
-STATE_PATH="$SOCKET_DIR/tailscaled.state"
 PROXY_PORT=1055
 
 echo "Starting Tailscale (Userspace Mode)..."
 # Start tailscaled in background
 # --tun=userspace-networking: allows running without /dev/net/tun
 # --socket: explicit socket path accessible by user
+# --state=mem: ensures the node is ephemeral and removed on disconnect
 tailscaled \
   --tun=userspace-networking \
   --socket="$SOCKET_PATH" \
-  --state="$STATE_PATH" \
+  --state=mem: \
   --socks5-server=localhost:$PROXY_PORT \
   --outbound-http-proxy-listen=localhost:$PROXY_PORT \
   > "$SOCKET_DIR/tailscaled.log" 2>&1 &
@@ -34,9 +34,8 @@ done
 # Authenticate if key provided
 if [ ! -z "$TS_AUTHKEY" ]; then
   echo "Authenticating Tailscale..."
-  # Use --ephemeral to delete the device from Tailscale when it disconnects
-  # This prevents "zombie" machines from piling up in the admin console on every deploy
-  tailscale --socket="$SOCKET_PATH" up --authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-mission-control}" --ephemeral
+  # Note: --ephemeral is implied by --state=mem: on the daemon
+  tailscale --socket="$SOCKET_PATH" up --authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-mission-control}"
   
   echo "Configuring Tailscale Serve..."
   # Serve HTTP on port 80 via Tailscale, proxying to localhost:3000
