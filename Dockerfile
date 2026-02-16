@@ -25,8 +25,8 @@ FROM node:22-bookworm
 
 WORKDIR /app
 
-# Install Tailscale dependencies
-RUN apt-get update && apt-get install -y curl ca-certificates gnupg \
+# Install Tailscale dependencies and gosu
+RUN apt-get update && apt-get install -y curl ca-certificates gnupg gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Tailscale
@@ -50,7 +50,8 @@ RUN chmod +x /app/scripts/start-tailscale.sh
 # Ensure nextjs user owns the app directory
 RUN chown -R nextjs:nodejs /app
 
-USER nextjs
+# Start as root so entrypoint can fix permissions
+# USER nextjs
 
 EXPOSE 3000
 

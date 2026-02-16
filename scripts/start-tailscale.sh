@@ -1,9 +1,15 @@
 #!/bin/bash
 
 # Define socket path
+# Fix permissions on volume (since we start as root)
+echo "Fixing permissions on /app/data..."
+mkdir -p /app/data
+chown -R nextjs:nodejs /app/data
+
 # Define paths for persistent storage
 SOCKET_DIR="/app/data/tailscale"
 mkdir -p "$SOCKET_DIR"
+chown -R nextjs:nodejs "$SOCKET_DIR"
 SOCKET_PATH="$SOCKET_DIR/tailscaled.sock"
 STATE_PATH="$SOCKET_DIR/tailscaled.state"
 PROXY_PORT=1055
@@ -78,6 +84,6 @@ fi
 # Export socket for subsequent commands
 export TS_SOCKET="$SOCKET_PATH"
 
-# Run the main command (Next.js standalone server)
-echo "Starting Mission Control..."
-exec "$@"
+# Run the main command as nextjs user
+echo "Starting Mission Control as nextjs user..."
+exec gosu nextjs "$@"
