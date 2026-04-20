@@ -1,0 +1,20 @@
+wing: agents
+source: mine
+rooms:
+  - name: frontend
+    description: Next.js UI, kanban board, components
+    keywords: [kanban, board, card, task, column, ui, next, react, component]
+  - name: backend
+    description: API routes, database, server logic
+    keywords: [api, route, database, server, sqlite, prisma, endpoint]
+  - name: realtime
+    description: Real-time updates, websockets, sync
+    keywords: [realtime, websocket, sync, live, update, sse]
+  - name: deploy
+    description: Docker, deployment, environment config
+    keywords: [docker, deploy, env, config, railway, production]
+  - name: docs
+    description: Documentation, setup guides, changelog
+    keywords: [doc, readme, changelog, guide, quickstart, setup]
+  - name: general
+    description: Everything else
