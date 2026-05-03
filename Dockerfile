@@ -12,7 +12,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 # Rebuild better-sqlite3 for the current architecture
-RUN npm install better-sqlite3
+RUN npm rebuild better-sqlite3
 
 # Copy the rest of the source
 COPY . .
@@ -29,8 +29,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y curl ca-certificates gnupg gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Tailscale
-RUN curl -fsSL https://tailscale.com/install.sh | sh
+# Install Tailscale securely
+RUN mkdir -p /usr/share/keyrings \
+    && curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg \
+    && curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.tailscale-keyring.list -o /etc/apt/sources.list.d/tailscale.list \
+    && apt-get update \
+    && apt-get install -y tailscale \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV production
 

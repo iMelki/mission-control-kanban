@@ -17,7 +17,7 @@ Format (JSONL): `{"from":"sender","to":"recipient","message":"...","ts":17388000
 ### Spawn Prompt Template
 ```
 You can communicate with other agents:
-- Send: echo '{"from":"YOUR_LABEL","to":"PEER_LABEL","message":"MSG","ts":'$(date +%s)'}' >> /tmp/openclaw-mailbox/PEER_LABEL.jsonl
+- Send: mkdir -p /tmp/openclaw-mailbox && FROM="YOUR_LABEL" TO="PEER_LABEL" MSG="MSG" python3 -c 'import json, os, time; print(json.dumps({"from": os.environ["FROM"], "to": os.environ["TO"], "message": os.environ["MSG"], "ts": int(time.time())}, ensure_ascii=False))' >> /tmp/openclaw-mailbox/PEER_LABEL.jsonl
 - Recv: cat /tmp/openclaw-mailbox/YOUR_LABEL.jsonl 2>/dev/null
-- mkdir -p /tmp/openclaw-mailbox first
+- The send command uses Python JSON serialization so quotes/newlines in MSG are escaped correctly.
 ```

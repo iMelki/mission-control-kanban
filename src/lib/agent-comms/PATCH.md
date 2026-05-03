@@ -5,11 +5,19 @@
 
 ## Apply Patch
 ```bash
-cd /Users/charlie/.npm-global/lib/node_modules/openclaw
+OPENCLAW_DIR="$(npm root -g)/openclaw"
+cd "$OPENCLAW_DIR"
 for f in dist/extensionAPI.js dist/commands-DSjmdo4s.js dist/pi-tools.policy-B0NP2v9o.js; do
   cp "$f" "$f.bak"
-  sed -i '' 's/"sessions_send",//g' "$f"
-  sed -i '' 's/"sessions_list",//g' "$f"
+  node -e '
+const fs = require("fs");
+const file = process.argv[1];
+const source = fs.readFileSync(file, "utf8");
+const patched = source
+  .replace(/"sessions_send",/g, "")
+  .replace(/"sessions_list",/g, "");
+fs.writeFileSync(file, patched);
+' "$f"
 done
 # Restart gateway after patching
 ```

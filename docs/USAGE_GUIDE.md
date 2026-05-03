@@ -27,9 +27,9 @@ graph LR
 
 1.  **Mission Control Env Vars**:
     Ensure Mission Control has the **FULL URL**.
-    *   `OPENCLAW_GATEWAY_URL`: `ws://claw.railway.internal:18789`
-    
-    > **Important**: You **MUST** include `ws://` and `:18789`. If you only put `claw.railway.internal`, the code will crash because it expects a valid URL string.
+    *   `OPENCLAW_GATEWAY_URL`: `ws://claw:18789`
+
+    > **Important**: You **MUST** include `ws://` and `:18789`. If you only put `claw`, the code will crash because it expects a valid URL string.
     > (The arrow on Railway's dashboard just means the variable *exists*, not that it's correct!)
 
     *   `OPENCLAW_GATEWAY_TOKEN`: (Optional, but good practice)
@@ -55,7 +55,7 @@ Since Railway containers are ephemeral (they reset on deploy), you **must** add 
 2.  **Update Env Vars** to save files to that volume:
     *   `DATABASE_PATH`: `/app/data/mission-control.db`
     *   `PROJECTS_PATH`: `/app/data/projects`
-    
+
 **Without this, all your tasks and created files will be deleted every time you redeploy!**
 
 
@@ -65,22 +65,22 @@ Once connected:
 
 1.  **Create a Task**: Click `+ New Task` in the UI.
 2.  **Planning**: Click the task in the "Planning" column.
-    *   Mission Control will send a request to your Local Gateway.
-    *   The Gateway (via your local LLM key) will generate questions.
+    *   Mission Control will send a request to the OpenClaw Gateway running on Railway.
+    *   The Gateway will generate questions using its configured LLM credentials/environment.
     *   Answer them in the UI.
 3.  **Execution**:
     *   Once planning is done, Mission Control tells the Gateway to spawn an Agent.
-    *   You should see activity logs in the UI and (if watching your terminal) logs in your `openclaw gateway` window.
-    *   The Agent will generate files in your configured `workspace` directory locally.
+    *   You should see activity logs in the UI and in your Railway service logs for Mission Control / OpenClaw Gateway.
+    *   The Agent will generate files inside the configured project/data path in the Railway environment (persist them with a Volume if you need them to survive redeploys).
 
 ## ❓ Troubleshooting
 
 *   **Status stays OFFLINE**:
-    *   Check if Mission Control (Railway) can reach your Local Machine.
-    *   Ensure your Railway service is actually on the Tailscale network (e.g., using a sidecar or the Railway Tailscale integration).
-    *   Verify the port (18789) is open/allowed on your local firewall (though Tailscale usually handles NAT traversal).
+    *   Check that both Mission Control and OpenClaw Gateway are deployed and healthy on Railway.
+    *   Verify Mission Control is using the correct internal Gateway URL/port (for example `ws://claw:18789`, matching your Railway service name).
+    *   Review Railway networking/service logs to confirm the two services can reach each other.
 *   **Planning hangs**:
-    *   This means the API call from MC -> Gateway failed or the Gateway couldn't talk to the LLM. Check `openclaw gateway` logs.
+    *   This usually means the API call from Mission Control -> Gateway failed or the Gateway could not talk to the configured LLM. Check the Railway logs for the OpenClaw Gateway service and verify its LLM-related environment variables are set correctly.
 
 ## 📂 Reference
 *   `tools/mission-control/README.md`: General overview.
