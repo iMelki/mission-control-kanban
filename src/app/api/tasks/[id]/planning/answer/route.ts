@@ -42,14 +42,14 @@ async function getMessagesFromOpenClaw(sessionKey: string): Promise<Array<{ role
     if (!client.isConnected()) {
       await client.connect();
     }
-    
+
     const result = await client.call<{ messages: Array<{ role: string; content: Array<{ type: string; text?: string }> }> }>('chat.history', {
       sessionKey,
       limit: 50,
     });
-    
+
     const messages: Array<{ role: string; content: string }> = [];
-    
+
     for (const msg of result.messages || []) {
       if (msg.role === 'assistant') {
         const textContent = msg.content?.find((c) => c.type === 'text');
@@ -58,7 +58,7 @@ async function getMessagesFromOpenClaw(sessionKey: string): Promise<Array<{ role
         }
       }
     }
-    
+
     return messages;
   } catch (err) {
     console.error('[Planning] Failed to get messages from OpenClaw:', err);
@@ -99,7 +99,7 @@ export async function POST(
     }
 
     // Build the answer message
-    const answerText = answer === 'other' && otherText 
+    const answerText = answer === 'other' && otherText
       ? `Other: ${otherText}`
       : answer;
 
@@ -169,13 +169,13 @@ If planning is complete, respond with JSON:
     let response = null;
     const initialMessages = await getMessagesFromOpenClaw(task.planning_session_key!);
     const initialMsgCount = initialMessages.length;
-    
+
     for (let i = 0; i < 30; i++) {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const transcriptMessages = await getMessagesFromOpenClaw(task.planning_session_key!);
       console.log('[Planning] Answer poll - API messages:', transcriptMessages.length, 'initial:', initialMsgCount);
-      
+
       // Check if there's a new assistant message
       if (transcriptMessages.length > initialMsgCount) {
         const lastAssistant = [...transcriptMessages].reverse().find(m => m.role === 'assistant');
@@ -209,8 +209,8 @@ If planning is complete, respond with JSON:
         // Check if planning is complete
         if (parsed.status === 'complete') {
           getDb().prepare(`
-            UPDATE tasks 
-            SET planning_messages = ?, 
+            UPDATE tasks
+            SET planning_messages = ?,
                 planning_complete = 1,
                 planning_spec = ?,
                 planning_agents = ?,
@@ -225,7 +225,7 @@ If planning is complete, respond with JSON:
 
           // Create the agents in the workspace and track first agent for auto-assign
           let firstAgentId: string | null = null;
-          
+
           if (parsed.agents && parsed.agents.length > 0) {
             const insertAgent = getDb().prepare(`
               INSERT INTO agents (id, workspace_id, name, role, description, avatar_emoji, status, soul_md, created_at, updated_at)
@@ -235,7 +235,7 @@ If planning is complete, respond with JSON:
             for (const agent of parsed.agents) {
               const agentId = crypto.randomUUID();
               if (!firstAgentId) firstAgentId = agentId;
-              
+
               insertAgent.run(
                 agentId,
                 taskId,
@@ -260,13 +260,13 @@ If planning is complete, respond with JSON:
             // Trigger dispatch - use localhost since we're in the same process
             const dispatchUrl = `http://localhost:${process.env.PORT || 3000}/api/tasks/${taskId}/dispatch`;
             console.log(`[Planning] Triggering dispatch: ${dispatchUrl}`);
-            
+
             try {
               const dispatchRes = await fetch(dispatchUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
               });
-              
+
               if (dispatchRes.ok) {
                 const dispatchData = await dispatchRes.json();
                 console.log(`[Planning] Dispatch successful:`, dispatchData);
@@ -302,7 +302,7 @@ If planning is complete, respond with JSON:
           });
         }
       }
-      
+
       // Response wasn't valid JSON or didn't have expected structure
       getDb().prepare(`
         UPDATE tasks SET planning_messages = ? WHERE id = ?

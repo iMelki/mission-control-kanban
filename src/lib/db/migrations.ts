@@ -1,6 +1,6 @@
 /**
  * Database Migrations System
- * 
+ *
  * Handles schema changes in a production-safe way:
  * 1. Tracks which migrations have been applied
  * 2. Runs new migrations automatically on startup
@@ -31,7 +31,7 @@ const migrations: Migration[] = [
     name: 'add_workspaces',
     up: (db) => {
       console.log('[Migration 002] Adding workspaces table and columns...');
-      
+
       // Create workspaces table if not exists
       db.exec(`
         CREATE TABLE IF NOT EXISTS workspaces (
@@ -44,13 +44,13 @@ const migrations: Migration[] = [
           updated_at TEXT DEFAULT (datetime('now'))
         );
       `);
-      
+
       // Insert default workspace if not exists
       db.exec(`
-        INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon) 
+        INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon)
         VALUES ('default', 'Default Workspace', 'default', 'Default workspace', '🏠');
       `);
-      
+
       // Add workspace_id to tasks if not exists
       const tasksInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
       if (!tasksInfo.some(col => col.name === 'workspace_id')) {
@@ -58,7 +58,7 @@ const migrations: Migration[] = [
         db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id)`);
         console.log('[Migration 002] Added workspace_id to tasks');
       }
-      
+
       // Add workspace_id to agents if not exists
       const agentsInfo = db.prepare("PRAGMA table_info(agents)").all() as { name: string }[];
       if (!agentsInfo.some(col => col.name === 'workspace_id')) {
@@ -73,7 +73,7 @@ const migrations: Migration[] = [
     name: 'add_planning_tables',
     up: (db) => {
       console.log('[Migration 003] Adding planning tables...');
-      
+
       // Create planning_questions table if not exists
       db.exec(`
         CREATE TABLE IF NOT EXISTS planning_questions (
@@ -89,7 +89,7 @@ const migrations: Migration[] = [
           created_at TEXT DEFAULT (datetime('now'))
         );
       `);
-      
+
       // Create planning_specs table if not exists
       db.exec(`
         CREATE TABLE IF NOT EXISTS planning_specs (
@@ -101,10 +101,10 @@ const migrations: Migration[] = [
           created_at TEXT DEFAULT (datetime('now'))
         );
       `);
-      
+
       // Create index
       db.exec(`CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order)`);
-      
+
       // Update tasks status check constraint to include 'planning'
       // SQLite doesn't support ALTER CONSTRAINT, so we check if it's needed
       const taskSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get() as { sql: string } | undefined;
@@ -118,33 +118,33 @@ const migrations: Migration[] = [
     name: 'add_planning_session_columns',
     up: (db) => {
       console.log('[Migration 004] Adding planning session columns to tasks...');
-      
+
       const tasksInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
-      
+
       // Add planning_session_key column
       if (!tasksInfo.some(col => col.name === 'planning_session_key')) {
         db.exec(`ALTER TABLE tasks ADD COLUMN planning_session_key TEXT`);
         console.log('[Migration 004] Added planning_session_key');
       }
-      
+
       // Add planning_messages column (stores JSON array of messages)
       if (!tasksInfo.some(col => col.name === 'planning_messages')) {
         db.exec(`ALTER TABLE tasks ADD COLUMN planning_messages TEXT`);
         console.log('[Migration 004] Added planning_messages');
       }
-      
+
       // Add planning_complete column
       if (!tasksInfo.some(col => col.name === 'planning_complete')) {
         db.exec(`ALTER TABLE tasks ADD COLUMN planning_complete INTEGER DEFAULT 0`);
         console.log('[Migration 004] Added planning_complete');
       }
-      
+
       // Add planning_spec column (stores final spec JSON)
       if (!tasksInfo.some(col => col.name === 'planning_spec')) {
         db.exec(`ALTER TABLE tasks ADD COLUMN planning_spec TEXT`);
         console.log('[Migration 004] Added planning_spec');
       }
-      
+
       // Add planning_agents column (stores generated agents JSON)
       if (!tasksInfo.some(col => col.name === 'planning_agents')) {
         db.exec(`ALTER TABLE tasks ADD COLUMN planning_agents TEXT`);
@@ -166,27 +166,27 @@ export function runMigrations(db: Database.Database): void {
       applied_at TEXT DEFAULT (datetime('now'))
     )
   `);
-  
+
   // Get already applied migrations
   const applied = new Set(
     (db.prepare('SELECT id FROM _migrations').all() as { id: string }[]).map(m => m.id)
   );
-  
+
   // Run pending migrations in order
   for (const migration of migrations) {
     if (applied.has(migration.id)) {
       continue;
     }
-    
+
     console.log(`[DB] Running migration ${migration.id}: ${migration.name}`);
-    
+
     try {
       // Run migration in a transaction
       db.transaction(() => {
         migration.up(db);
         db.prepare('INSERT INTO _migrations (id, name) VALUES (?, ?)').run(migration.id, migration.name);
       })();
-      
+
       console.log(`[DB] Migration ${migration.id} completed`);
     } catch (error) {
       console.error(`[DB] Migration ${migration.id} failed:`, error);

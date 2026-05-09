@@ -168,7 +168,7 @@ export interface TaskDeliverable {
 // Planning types
 export type PlanningQuestionType = 'multiple_choice' | 'text' | 'yes_no';
 
-export type PlanningCategory = 
+export type PlanningCategory =
   | 'goal'
   | 'audience'
   | 'scope'

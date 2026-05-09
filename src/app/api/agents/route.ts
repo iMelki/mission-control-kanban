@@ -7,7 +7,7 @@ import type { Agent, CreateAgentRequest } from '@/lib/types';
 export async function GET(request: NextRequest) {
   try {
     const workspaceId = request.nextUrl.searchParams.get('workspace_id');
-    
+
     let agents: Agent[];
     if (workspaceId) {
       agents = queryAll<Agent>(`

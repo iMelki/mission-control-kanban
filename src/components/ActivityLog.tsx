@@ -55,24 +55,24 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    
+
     // Less than 1 minute
     if (diff < 60000) {
       return 'just now';
     }
-    
+
     // Less than 1 hour
     if (diff < 3600000) {
       const mins = Math.floor(diff / 60000);
       return `${mins} min${mins > 1 ? 's' : ''} ago`;
     }
-    
+
     // Less than 24 hours
     if (diff < 86400000) {
       const hours = Math.floor(diff / 3600000);
       return `${hours} hour${hours > 1 ? 's' : ''} ago`;
     }
-    
+
     // More than 24 hours
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -131,8 +131,8 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
             {/* Metadata */}
             {activity.metadata && (
               <div className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-text-secondary font-mono">
-                {typeof activity.metadata === 'string' 
-                  ? activity.metadata 
+                {typeof activity.metadata === 'string'
+                  ? activity.metadata
                   : JSON.stringify(JSON.parse(activity.metadata), null, 2)}
               </div>
             )}

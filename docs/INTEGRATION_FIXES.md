@@ -1,13 +1,13 @@
 # Mission Control Integration Fixes
 
-**Date:** January 31, 2025  
+**Date:** January 31, 2025
 **Status:** ✅ COMPLETE
 
 ## Problems Fixed
 
 ### 1. ✅ Real-time Updates Not Working
-**Problem:** Tasks required page refresh to see updates  
-**Root Cause:** Dispatch endpoint wasn't broadcasting SSE events  
+**Problem:** Tasks required page refresh to see updates
+**Root Cause:** Dispatch endpoint wasn't broadcasting SSE events
 **Fix:** Added `broadcast()` call in `/api/tasks/[id]/dispatch` route after task status updates
 
 **Files Changed:**
@@ -18,9 +18,9 @@
 ---
 
 ### 2. ✅ Agent Counter Shows 0
-**Problem:** Sidebar showed "0 agents" even when sub-agents were working  
-**Root Cause:** Header and sidebar weren't querying `openclaw_sessions` for active sub-agents  
-**Fix:** 
+**Problem:** Sidebar showed "0 agents" even when sub-agents were working
+**Root Cause:** Header and sidebar weren't querying `openclaw_sessions` for active sub-agents
+**Fix:**
 - Added sub-agent count query in `AgentsSidebar` (already existed)
 - Added sub-agent count query in `Header` component
 - Combined working agents + active sub-agents in header stats
@@ -33,8 +33,8 @@
 ---
 
 ### 3. ✅ Activities/Deliverables/Sessions Empty
-**Problem:** No transparency into what sub-agents are doing  
-**Root Cause:** Charlie's orchestration workflow wasn't posting to activity/deliverable endpoints  
+**Problem:** No transparency into what sub-agents are doing
+**Root Cause:** Charlie's orchestration workflow wasn't posting to activity/deliverable endpoints
 **Fix:** Created comprehensive orchestration helper library
 
 **Files Created:**
@@ -55,8 +55,8 @@
 ---
 
 ### 4. ✅ Review Workflow Missing
-**Problem:** Tasks auto-moved to REVIEW but no verification before DONE  
-**Root Cause:** No validation that deliverables exist before approval  
+**Problem:** Tasks auto-moved to REVIEW but no verification before DONE
+**Root Cause:** No validation that deliverables exist before approval
 **Fix:** Added deliverables check in PATCH endpoint
 
 **Files Changed:**
@@ -83,8 +83,8 @@ if (deliverables.length === 0) {
 ---
 
 ### 5. ✅ Header Stats Wrong
-**Problem:** "0 agents active, 4 tasks" didn't match reality  
-**Root Cause:** 
+**Problem:** "0 agents active, 4 tasks" didn't match reality
+**Root Cause:**
 - Agent count didn't include sub-agents
 - Task count included completed/review tasks
 
@@ -102,7 +102,7 @@ if (deliverables.length === 0) {
 ## Additional Improvements
 
 ### Session Status Updates
-**Problem:** No way to mark sub-agent sessions as complete  
+**Problem:** No way to mark sub-agent sessions as complete
 **Fix:** Added PATCH endpoint for updating session status
 
 **Files Changed:**
@@ -115,14 +115,14 @@ Body: { status: 'completed', ended_at: '2025-01-31T...' }
 ```
 
 ### ESLint Configuration
-**Problem:** Build failed due to missing TypeScript ESLint rules  
+**Problem:** Build failed due to missing TypeScript ESLint rules
 **Fix:** Updated `.eslintrc.json` to extend TypeScript config
 
 **Files Changed:**
 - `.eslintrc.json`
 
 ### Dependencies
-**Problem:** Missing `source-map-js` dependency  
+**Problem:** Missing `source-map-js` dependency
 **Fix:** Added to package.json
 
 ---
@@ -215,8 +215,8 @@ See `docs/CHARLIE_WORKFLOW.md` for complete details.
 
 ## Build Status
 
-✅ TypeScript compilation: PASSED  
-✅ Next.js build: PASSED  
+✅ TypeScript compilation: PASSED
+✅ Next.js build: PASSED
 ✅ ESLint: PASSED (with warnings, non-blocking)
 
 Ready for production deployment.

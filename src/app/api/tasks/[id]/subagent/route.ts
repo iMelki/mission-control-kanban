@@ -18,7 +18,7 @@ export async function POST(
   try {
     const taskId = params.id;
     const body = await request.json();
-    
+
     const { openclaw_session_id, agent_name } = body;
 
     if (!openclaw_session_id) {
@@ -34,11 +34,11 @@ export async function POST(
     // Create a placeholder agent if agent_name is provided
     // Otherwise, we'll need to link to an existing agent
     let agentId = null;
-    
+
     if (agent_name) {
       // Check if agent already exists
       const existingAgent = db.prepare('SELECT id FROM agents WHERE name = ?').get(agent_name) as any;
-      
+
       if (existingAgent) {
         agentId = existingAgent.id;
       } else {
@@ -59,7 +59,7 @@ export async function POST(
 
     // Insert OpenClaw session record
     db.prepare(`
-      INSERT INTO openclaw_sessions 
+      INSERT INTO openclaw_sessions
         (id, agent_id, openclaw_session_id, session_type, task_id, status)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(
@@ -109,7 +109,7 @@ export async function GET(
     const db = getDb();
 
     const sessions = db.prepare(`
-      SELECT 
+      SELECT
         s.*,
         a.name as agent_name,
         a.avatar_emoji as agent_avatar_emoji

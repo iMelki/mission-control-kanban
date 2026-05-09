@@ -1,9 +1,9 @@
 /**
  * Database Schema for Mission Control
- * 
+ *
  * This defines the current desired schema state.
  * For existing databases, migrations handle schema updates.
- * 
+ *
  * IMPORTANT: When adding new tables or columns:
  * 1. Add them here for new databases
  * 2. Create a migration in migrations.ts for existing databases

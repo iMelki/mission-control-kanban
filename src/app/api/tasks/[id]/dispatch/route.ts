@@ -12,7 +12,7 @@ interface RouteParams {
 
 /**
  * POST /api/tasks/[id]/dispatch
- * 
+ *
  * Dispatches a task to its assigned agent's OpenClaw session.
  * Creates session if needed, sends task details to agent.
  */
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Create session record
       const sessionId = uuidv4();
       const openclawSessionId = `mission-control-${agent.name.toLowerCase().replace(/\s+/g, '-')}`;
-      
+
       run(
         `INSERT INTO openclaw_sessions (id, agent_id, openclaw_session_id, channel, status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,

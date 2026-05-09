@@ -179,7 +179,7 @@ sqlite3 mission-control.db
 2. **Charlie triages and assigns:**
    ```bash
    TASK_ID="..." # from step 1
-   
+
    # Log triage activity
    curl -X POST http://localhost:3000/api/tasks/$TASK_ID/activities \
      -H "Content-Type: application/json" \
@@ -187,7 +187,7 @@ sqlite3 mission-control.db
        "activity_type": "updated",
        "message": "Task triaged and assigned to Developer agent"
      }'
-   
+
    # Update status to assigned
    curl -X PATCH http://localhost:3000/api/tasks/$TASK_ID \
      -H "Content-Type: application/json" \
@@ -203,7 +203,7 @@ sqlite3 mission-control.db
        "openclaw_session_id": "agent:main:subagent:dev-auth",
        "agent_name": "Developer Sub-Agent"
      }'
-   
+
    # Log spawn activity
    curl -X POST http://localhost:3000/api/tasks/$TASK_ID/activities \
      -H "Content-Type: application/json" \
@@ -224,7 +224,7 @@ sqlite3 mission-control.db
        "path": "~/project/src/auth.ts",
        "description": "JWT authentication implementation"
      }'
-   
+
    # Log file creation
    curl -X POST http://localhost:3000/api/tasks/$TASK_ID/activities \
      -H "Content-Type: application/json" \
@@ -243,7 +243,7 @@ sqlite3 mission-control.db
        "activity_type": "completed",
        "message": "Sub-agent completed task in 45 seconds"
      }'
-   
+
    # Move to review
    curl -X PATCH http://localhost:3000/api/tasks/$TASK_ID \
      -H "Content-Type: application/json" \

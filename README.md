@@ -43,7 +43,7 @@ Mission Control is a task management system that lets you create tasks, plan the
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Mission Control** = The dashboard you interact with (this project)  
+**Mission Control** = The dashboard you interact with (this project)
 **OpenClaw Gateway** = The AI runtime that actually executes tasks (separate project)
 
 ---

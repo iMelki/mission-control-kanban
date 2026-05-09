@@ -54,7 +54,7 @@ ALTER TABLE openclaw_sessions ADD COLUMN ended_at TEXT;
 
 #### Events to broadcast
 ```typescript
-type WSEvent = 
+type WSEvent =
   | { type: 'task_updated', payload: Task }
   | { type: 'task_created', payload: Task }
   | { type: 'activity_logged', payload: TaskActivity }
@@ -119,7 +119,7 @@ const ws = new WebSocket('ws://localhost:3000/api/ws');
 // Listen for events
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  
+
   switch (data.type) {
     case 'task_updated':
       // Update task in UI
@@ -241,12 +241,12 @@ export async function GET(request: NextRequest) {
     start(controller) {
       // Register client
       clients.add(controller);
-      
+
       // Send keep-alive
       const interval = setInterval(() => {
         controller.enqueue(encoder.encode(': keep-alive\n\n'));
       }, 30000);
-      
+
       // Cleanup on close
       request.signal.addEventListener('abort', () => {
         clearInterval(interval);
@@ -254,7 +254,7 @@ export async function GET(request: NextRequest) {
       });
     }
   });
-  
+
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',

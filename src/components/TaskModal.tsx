@@ -83,7 +83,7 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
                 updateTask({ ...savedTask, status: 'planning' });
               })
               .catch(console.error);
-            
+
             // Log the planning start
             addEvent({
               id: crypto.randomUUID(),
@@ -212,8 +212,8 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
                     Enable Planning Mode
                   </span>
                   <p className="text-xs text-mc-text-secondary mt-1">
-                    Best for complex projects that need detailed requirements. 
-                    You&apos;ll answer a few questions to define scope, goals, and constraints 
+                    Best for complex projects that need detailed requirements.
+                    You&apos;ll answer a few questions to define scope, goals, and constraints
                     before work begins. Skip this for quick, straightforward tasks.
                   </p>
                 </div>
@@ -296,8 +296,8 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
 
           {/* Planning Tab */}
           {activeTab === 'planning' && task && (
-            <PlanningTab 
-              taskId={task.id} 
+            <PlanningTab
+              taskId={task.id}
               onSpecLocked={() => {
                 // Refresh task data when spec is locked
                 window.location.reload();

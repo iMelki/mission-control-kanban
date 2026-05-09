@@ -86,13 +86,13 @@ export function WorkspaceDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {workspaces.map((workspace) => (
-              <WorkspaceCard 
-                key={workspace.id} 
-                workspace={workspace} 
+              <WorkspaceCard
+                key={workspace.id}
+                workspace={workspace}
                 onDelete={(id) => setWorkspaces(workspaces.filter(w => w.id !== id))}
               />
             ))}
-            
+
             {/* Add workspace card */}
             <button
               onClick={() => setShowCreateModal(true)}
@@ -109,7 +109,7 @@ export function WorkspaceDashboard() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <CreateWorkspaceModal 
+        <CreateWorkspaceModal
           onClose={() => setShowCreateModal(false)}
           onCreated={() => {
             setShowCreateModal(false);
@@ -144,7 +144,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
       setShowDeleteConfirm(false);
     }
   };
-  
+
   return (
     <>
     <Link href={`/workspace/${workspace.slug}`}>
@@ -204,16 +204,16 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
               <p className="text-sm text-mc-text-secondary">This action cannot be undone</p>
             </div>
           </div>
-          
+
           <p className="text-mc-text-secondary mb-6">
-            Are you sure you want to delete <strong>{workspace.name}</strong>? 
+            Are you sure you want to delete <strong>{workspace.name}</strong>?
             {workspace.taskCounts.total > 0 && (
               <span className="block mt-2 text-mc-accent-red">
                 ⚠️ This workspace has {workspace.taskCounts.total} task(s). Delete them first.
               </span>
             )}
           </p>
-          
+
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setShowDeleteConfirm(false)}
@@ -289,8 +289,8 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
                   type="button"
                   onClick={() => setIcon(i)}
                   className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-colors ${
-                    icon === i 
-                      ? 'bg-mc-accent/20 border-2 border-mc-accent' 
+                    icon === i
+                      ? 'bg-mc-accent/20 border-2 border-mc-accent'
                       : 'bg-mc-bg border border-mc-border hover:border-mc-accent/50'
                   }`}
                 >

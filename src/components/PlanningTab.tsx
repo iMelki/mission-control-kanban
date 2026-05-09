@@ -63,7 +63,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
       if (res.ok) {
         const data = await res.json();
         setState(data);
-        
+
         if (data.isComplete && onSpecLocked) {
           onSpecLocked();
         }
@@ -84,11 +84,11 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
   const startPlanning = async () => {
     setStarting(true);
     setError(null);
-    
+
     try {
       const res = await fetch(`/api/tasks/${taskId}/planning`, { method: 'POST' });
       const data = await res.json();
-      
+
       if (res.ok) {
         setState(prev => ({
           ...prev!,
@@ -110,10 +110,10 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
   // Submit answer
   const submitAnswer = async () => {
     if (!selectedOption) return;
-    
+
     setSubmitting(true);
     setError(null);
-    
+
     try {
       const res = await fetch(`/api/tasks/${taskId}/planning/answer`, {
         method: 'POST',
@@ -123,13 +123,13 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
           otherText: selectedOption === 'other' ? otherText : undefined,
         }),
       });
-      
+
       const data = await res.json();
-      
+
       if (res.ok) {
         setSelectedOption(null);
         setOtherText('');
-        
+
         if (data.complete) {
           setState(prev => ({
             ...prev!,
@@ -139,7 +139,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
             messages: data.messages,
             currentQuestion: undefined,
           }));
-          
+
           if (onSpecLocked) {
             onSpecLocked();
           }
@@ -177,12 +177,12 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
           <Lock className="w-5 h-5" />
           <span className="font-medium">Planning Complete</span>
         </div>
-        
+
         {/* Spec Summary */}
         <div className="bg-mc-bg border border-mc-border rounded-lg p-4">
           <h3 className="font-medium mb-2">{state.spec.title}</h3>
           <p className="text-sm text-mc-text-secondary mb-4">{state.spec.summary}</p>
-          
+
           {state.spec.deliverables?.length > 0 && (
             <div className="mb-3">
               <h4 className="text-sm font-medium mb-1">Deliverables:</h4>
@@ -193,7 +193,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
               </ul>
             </div>
           )}
-          
+
           {state.spec.success_criteria?.length > 0 && (
             <div>
               <h4 className="text-sm font-medium mb-1">Success Criteria:</h4>
@@ -205,7 +205,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
             </div>
           )}
         </div>
-        
+
         {/* Generated Agents */}
         {state.agents && state.agents.length > 0 && (
           <div>
@@ -234,18 +234,18 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
         <div className="text-center">
           <h3 className="text-lg font-medium mb-2">Start Planning</h3>
           <p className="text-mc-text-secondary text-sm max-w-md">
-            I&apos;ll ask you a few questions to understand exactly what you need. 
+            I&apos;ll ask you a few questions to understand exactly what you need.
             All questions are multiple choice — just click to answer.
           </p>
         </div>
-        
+
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm">
             <AlertCircle className="w-4 h-4" />
             {error}
           </div>
         )}
-        
+
         <button
           onClick={startPlanning}
           disabled={starting}

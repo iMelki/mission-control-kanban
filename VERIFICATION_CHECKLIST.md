@@ -110,6 +110,6 @@ Previous stable commit: (check `git log` before deployment)
 
 ---
 
-**Verified by:** _____________  
-**Date:** _____________  
+**Verified by:** _____________
+**Date:** _____________
 **Status:** _____________
