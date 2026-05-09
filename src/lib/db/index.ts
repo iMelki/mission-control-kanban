@@ -11,7 +11,7 @@ let db: Database.Database | null = null;
 export function getDb(): Database.Database {
   if (!db) {
     const isNewDb = !fs.existsSync(DB_PATH);
-    
+
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
@@ -22,7 +22,7 @@ export function getDb(): Database.Database {
     // Run migrations for schema updates
     // This handles both new and existing databases
     runMigrations(db);
-    
+
     if (isNewDb) {
       console.log('[DB] New database created at:', DB_PATH);
     }

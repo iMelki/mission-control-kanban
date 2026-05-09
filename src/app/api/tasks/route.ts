@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     const workspaceId = (body as { workspace_id?: string }).workspace_id || 'default';
     const status = (body as { status?: string }).status || 'inbox';
-    
+
     run(
       `INSERT INTO tasks (id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
        WHERE t.id = ?`,
       [id]
     );
-    
+
     // Broadcast task creation via SSE
     if (task) {
       broadcast({
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
         payload: task,
       });
     }
-    
+
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
     console.error('Failed to create task:', error);

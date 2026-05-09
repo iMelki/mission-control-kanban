@@ -5,14 +5,14 @@ import type { Task, Agent, OpenClawSession } from '@/lib/types';
 
 /**
  * POST /api/webhooks/agent-completion
- * 
+ *
  * Receives completion notifications from agents.
  * Expected payload:
  * {
  *   "session_id": "mission-control-engineering",
  *   "message": "TASK_COMPLETE: Built the authentication system"
  * }
- * 
+ *
  * Or can be called with task_id directly:
  * {
  *   "task_id": "uuid",
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
         `SELECT t.*, a.name as assigned_agent_name
          FROM tasks t
          LEFT JOIN agents a ON t.assigned_agent_id = a.id
-         WHERE t.assigned_agent_id = ? 
+         WHERE t.assigned_agent_id = ?
            AND t.status IN ('assigned', 'in_progress')
          ORDER BY t.updated_at DESC
          LIMIT 1`,
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/webhooks/agent-completion
- * 
+ *
  * Returns webhook status and recent completions
  */
 export async function GET() {

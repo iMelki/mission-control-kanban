@@ -22,7 +22,7 @@ export async function GET(
 
     // Get activities with agent info
     const activities = db.prepare(`
-      SELECT 
+      SELECT
         a.*,
         ag.id as agent_id,
         ag.name as agent_name,
@@ -77,7 +77,7 @@ export async function POST(
   try {
     const taskId = params.id;
     const body = await request.json();
-    
+
     const { activity_type, message, agent_id, metadata } = body;
 
     if (!activity_type || !message) {
@@ -105,7 +105,7 @@ export async function POST(
 
     // Get the created activity with agent info
     const activity = db.prepare(`
-      SELECT 
+      SELECT
         a.*,
         ag.id as agent_id,
         ag.name as agent_name,

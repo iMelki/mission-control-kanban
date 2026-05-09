@@ -11,16 +11,16 @@ This document describes how OpenClaw agents interact with Mission Control.
 2. **Agent receives task notification**
    ```
    🔵 **NEW TASK ASSIGNED**
-   
+
    **Title:** Build authentication system
    **Description:** Implement JWT-based auth with refresh tokens
    **Priority:** HIGH
    **Due:** 2026-02-05
    **Task ID:** abc-123-def
-   
+
    Please work on this task. When complete, reply with:
    `TASK_COMPLETE: [brief summary of what you did]`
-   
+
    If you need help or clarification, ask me (Charlie).
    ```
 

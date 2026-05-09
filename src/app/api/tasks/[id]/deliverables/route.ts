@@ -50,7 +50,7 @@ export async function POST(
   try {
     const taskId = params.id;
     const body = await request.json();
-    
+
     const { deliverable_type, title, path, description } = body;
 
     if (!deliverable_type || !title) {

@@ -1,9 +1,9 @@
 /**
  * Configuration Management
- * 
+ *
  * Handles user-configurable settings for Mission Control.
  * Settings are stored in localStorage for client-side access.
- * 
+ *
  * NEVER commit hardcoded IPs, paths, or sensitive data!
  */
 
@@ -11,13 +11,13 @@ export interface MissionControlConfig {
   // Workspace settings
   workspaceBasePath: string; // e.g., ~/Documents/Shared
   projectsPath: string; // e.g., ${workspaceBasePath}/projects
-  
+
   // Mission Control API URL (for Charlie orchestration)
   missionControlUrl: string; // Auto-detected or manually set
-  
+
   // OpenClaw Gateway settings (these come from .env on server)
   // Client-side only needs to know if it's configured
-  
+
   // Project defaults
   defaultProjectName: string; // 'mission-control' or custom
 }

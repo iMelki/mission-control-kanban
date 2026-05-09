@@ -5,12 +5,12 @@ import type { PlanningQuestion, PlanningCategory } from '@/lib/types';
 // Generate markdown spec from answered questions
 function generateSpecMarkdown(task: { title: string; description?: string }, questions: PlanningQuestion[]): string {
   const lines: string[] = [];
-  
+
   lines.push(`# ${task.title}`);
   lines.push('');
   lines.push('**Status:** SPEC LOCKED ✅');
   lines.push('');
-  
+
   if (task.description) {
     lines.push('## Original Request');
     lines.push(task.description);
@@ -90,7 +90,7 @@ export async function POST(
     // Check if all questions are answered
     const unanswered = questions.filter(q => !q.answer);
     if (unanswered.length > 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'All questions must be answered before locking',
         unanswered: unanswered.length
       }, { status: 400 });
@@ -114,7 +114,7 @@ export async function POST(
 
     // Update task description with spec and move to inbox
     getDb().prepare(`
-      UPDATE tasks 
+      UPDATE tasks
       SET description = ?, status = 'inbox', updated_at = datetime('now')
       WHERE id = ?
     `).run(specMarkdown, taskId);

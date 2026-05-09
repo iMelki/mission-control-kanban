@@ -187,7 +187,7 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
         <h4 className="text-sm font-medium leading-snug line-clamp-2 mb-3">
           {task.title}
         </h4>
-        
+
         {/* Planning mode indicator */}
         {isPlanning && (
           <div className="flex items-center gap-2 mb-3 py-2 px-3 bg-purple-500/10 rounded-md border border-purple-500/20">

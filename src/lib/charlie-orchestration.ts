@@ -1,9 +1,9 @@
 /**
  * Charlie's Orchestration Helper
- * 
+ *
  * This module provides helper functions for Charlie (master agent) to properly
  * log activities, deliverables, and manage sub-agent sessions when orchestrating tasks.
- * 
+ *
  * Usage from Charlie's context:
  * - Log activities as sub-agents work
  * - Track deliverables created
@@ -233,10 +233,10 @@ export async function onSubAgentCompleted(params: {
 
 /**
  * Example usage template for Charlie:
- * 
+ *
  * ```typescript
  * import * as charlie from '@/lib/charlie-orchestration';
- * 
+ *
  * // When spawning a sub-agent:
  * await charlie.onSubAgentSpawned({
  *   taskId: 'task-123',
@@ -244,14 +244,14 @@ export async function onSubAgentCompleted(params: {
  *   agentName: 'mission-control-integration-fixes',
  *   description: 'Fix Mission Control real-time updates',
  * });
- * 
+ *
  * // During work:
  * await charlie.logActivity({
  *   taskId: 'task-123',
  *   activityType: 'updated',
  *   message: 'Fixed SSE broadcast in dispatch endpoint',
  * });
- * 
+ *
  * // When complete:
  * await charlie.onSubAgentCompleted({
  *   taskId: 'task-123',
@@ -263,7 +263,7 @@ export async function onSubAgentCompleted(params: {
  *     { type: 'file', title: 'Orchestration helper', path: 'src/lib/charlie-orchestration.ts' },
  *   ],
  * });
- * 
+ *
  * // Before approving (review -> done):
  * const hasDeliverables = await charlie.verifyTaskHasDeliverables('task-123');
  * if (!hasDeliverables) {

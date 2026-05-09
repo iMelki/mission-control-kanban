@@ -16,20 +16,20 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = getDb();
-    
+
     if (includeStats) {
       // Get workspaces with task counts and agent counts
       const workspaces = db.prepare('SELECT * FROM workspaces ORDER BY name').all() as Workspace[];
-      
+
       const stats: WorkspaceStats[] = workspaces.map(workspace => {
         // Get task counts by status
         const taskCounts = db.prepare(`
-          SELECT status, COUNT(*) as count 
-          FROM tasks 
-          WHERE workspace_id = ? 
+          SELECT status, COUNT(*) as count
+          FROM tasks
+          WHERE workspace_id = ?
           GROUP BY status
         `).all(workspace.id) as { status: TaskStatus; count: number }[];
-        
+
         const counts: WorkspaceStats['taskCounts'] = {
           planning: 0,
           inbox: 0,
@@ -40,17 +40,17 @@ export async function GET(request: NextRequest) {
           done: 0,
           total: 0
         };
-        
+
         taskCounts.forEach(tc => {
           counts[tc.status] = tc.count;
           counts.total += tc.count;
         });
-        
+
         // Get agent count
         const agentCount = db.prepare(
           'SELECT COUNT(*) as count FROM agents WHERE workspace_id = ?'
         ).get(workspace.id) as { count: number };
-        
+
         return {
           id: workspace.id,
           name: workspace.name,
@@ -60,10 +60,10 @@ export async function GET(request: NextRequest) {
           agentCount: agentCount.count
         };
       });
-      
+
       return NextResponse.json(stats);
     }
-    
+
     const workspaces = db.prepare('SELECT * FROM workspaces ORDER BY name').all();
     return NextResponse.json(workspaces);
   } catch (error) {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     const db = getDb();
     const id = crypto.randomUUID();
     const slug = generateSlug(name);
-    
+
     // Check if slug already exists
     const existing = db.prepare('SELECT id FROM workspaces WHERE slug = ?').get(slug);
     if (existing) {
