@@ -1,5 +1,12 @@
 // Core types for Mission Control
 
+import type {
+  DispatchMetadata,
+  DispatchReadiness,
+  DispatchReviewMode,
+  DispatchRiskLevel,
+} from './dispatch-contract';
+
 export type AgentStatus = 'standby' | 'working' | 'offline';
 
 export type TaskStatus = 'planning' | 'inbox' | 'assigned' | 'in_progress' | 'testing' | 'review' | 'done';
@@ -49,6 +56,9 @@ export interface Task {
   due_date?: string;
   created_at: string;
   updated_at: string;
+  dispatch_metadata?: DispatchMetadata;
+  dispatch_ready?: boolean;
+  dispatch_blockers?: string[];
   // Joined fields
   assigned_agent?: Agent;
   created_by_agent?: Agent;
@@ -240,6 +250,7 @@ export interface CreateTaskRequest {
   created_by_agent_id?: string;
   business_id?: string;
   due_date?: string;
+  dispatch_metadata?: DispatchMetadata;
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
@@ -305,3 +316,5 @@ export interface SSEEvent {
     id: string;  // For task_deleted events
   };
 }
+
+export type { DispatchMetadata, DispatchReadiness, DispatchReviewMode, DispatchRiskLevel };
