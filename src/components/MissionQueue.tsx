@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, ChevronRight, GripVertical } from 'lucide-react';
+import { Plus, ChevronRight, GripVertical, AlertTriangle } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
+import { READINESS_LABELS, REVIEW_MODE_LABELS, RISK_LEVEL_LABELS } from '@/lib/dispatch-contract';
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { formatDistanceToNow } from 'date-fns';
@@ -64,7 +65,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           id: crypto.randomUUID(),
           type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
           task_id: draggedTask.id,
-          message: `Task "${draggedTask.title}" moved to ${targetStatus}`,
+          message: `Task \"${draggedTask.title}\" moved to ${targetStatus}`,
           created_at: new Date().toISOString(),
         });
       }
@@ -166,6 +167,23 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
   };
 
   const isPlanning = task.status === 'planning';
+  const blockers = task.dispatch_blockers ?? [];
+  const readiness = task.dispatch_metadata?.readiness;
+  const reviewMode = task.dispatch_metadata?.review_mode;
+  const riskLevel = task.dispatch_metadata?.risk_level;
+
+  const pillClass = (tone: 'ready' | 'warn' | 'risk' | 'neutral') => {
+    switch (tone) {
+      case 'ready':
+        return 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30';
+      case 'warn':
+        return 'bg-amber-500/10 text-amber-300 border border-amber-500/30';
+      case 'risk':
+        return 'bg-rose-500/10 text-rose-300 border border-rose-500/30';
+      default:
+        return 'bg-mc-bg-tertiary text-mc-text-secondary border border-mc-border/50';
+    }
+  };
 
   return (
     <div
@@ -202,6 +220,36 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
             <span className="text-base">{(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji}</span>
             <span className="text-xs text-mc-text-secondary truncate">
               {(task.assigned_agent as unknown as { name: string }).name}
+            </span>
+          </div>
+        )}
+
+        {(readiness || reviewMode || riskLevel) && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {readiness && (
+              <span className={`px-2 py-1 rounded text-[10px] font-medium ${task.dispatch_ready ? pillClass('ready') : pillClass('warn')}`}>
+                {READINESS_LABELS[readiness]}
+              </span>
+            )}
+            {reviewMode && (
+              <span className={`px-2 py-1 rounded text-[10px] font-medium ${pillClass('neutral')}`}>
+                {REVIEW_MODE_LABELS[reviewMode]}
+              </span>
+            )}
+            {riskLevel && (
+              <span className={`px-2 py-1 rounded text-[10px] font-medium ${['high', 'critical'].includes(riskLevel) ? pillClass('risk') : pillClass('warn')}`}>
+                {RISK_LEVEL_LABELS[riskLevel]}
+              </span>
+            )}
+          </div>
+        )}
+
+        {blockers.length > 0 && (
+          <div className="flex items-start gap-2 mb-3 py-2 px-2.5 rounded-md border border-rose-500/20 bg-rose-500/10">
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-300 flex-shrink-0 mt-0.5" />
+            <span className="text-[11px] text-rose-200 line-clamp-2">
+              {blockers[0]}
+              {blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}
             </span>
           </div>
         )}
