@@ -16,3 +16,12 @@ repos:
     rev: v8.24.0
     hooks:
       - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: markdown-link-check
+        name: Markdown link check
+        entry: pwsh -NoProfile -File scripts/check-markdown-links.ps1
+        language: system
+        pass_filenames: false
+        types: [markdown]
