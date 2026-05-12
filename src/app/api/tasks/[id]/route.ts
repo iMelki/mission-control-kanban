@@ -1,9 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, run, queryAll } from '@/lib/db';
+import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
-import type { Task, UpdateTaskRequest, Agent, TaskDeliverable } from '@/lib/types';
+import { parseDispatchMetadata, serializeDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
+import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
+
+type TaskRow = Task & {
+  assigned_agent_name?: string;
+  assigned_agent_emoji?: string;
+  created_by_agent_name?: string;
+  created_by_agent_emoji?: string;
+  dispatch_metadata?: string | null;
+};
+
+function decorateTask(task: TaskRow) {
+  const dispatchMetadata = parseDispatchMetadata(task.dispatch_metadata);
+  const validation = validateDispatchMetadata(dispatchMetadata);
+
+  return {
+    ...task,
+    dispatch_metadata: dispatchMetadata,
+    dispatch_ready: validation.canDispatch,
+    dispatch_blockers: validation.blockers,
+  };
+}
 
 // GET /api/tasks/[id] - Get a single task
 export async function GET(
@@ -12,7 +33,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const task = queryOne<Task>(
+    const task = queryOne<TaskRow>(
       `SELECT t.*,
         aa.name as assigned_agent_name,
         aa.avatar_emoji as assigned_agent_emoji
@@ -26,7 +47,7 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    return NextResponse.json(task);
+    return NextResponse.json(decorateTask(task));
   } catch (error) {
     console.error('Failed to fetch task:', error);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
@@ -42,7 +63,7 @@ export async function PATCH(
     const { id } = await params;
     const body: UpdateTaskRequest & { updated_by_agent_id?: string } = await request.json();
 
-    const existing = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [id]);
+    const existing = queryOne<TaskRow>('SELECT * FROM tasks WHERE id = ?', [id]);
     if (!existing) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
@@ -84,6 +105,10 @@ export async function PATCH(
       updates.push('due_date = ?');
       values.push(body.due_date);
     }
+    if (body.dispatch_metadata !== undefined) {
+      updates.push('dispatch_metadata = ?');
+      values.push(serializeDispatchMetadata(body.dispatch_metadata));
+    }
 
     // Track if we need to dispatch task
     let shouldDispatch = false;
@@ -103,7 +128,7 @@ export async function PATCH(
       run(
         `INSERT INTO events (id, type, task_id, message, created_at)
          VALUES (?, ?, ?, ?, ?)`,
-        [uuidv4(), eventType, id, `Task "${existing.title}" moved to ${body.status}`, now]
+        [uuidv4(), eventType, id, `Task \"${existing.title}\" moved to ${body.status}`, now]
       );
     }
 
@@ -118,7 +143,7 @@ export async function PATCH(
           run(
             `INSERT INTO events (id, type, agent_id, task_id, message, created_at)
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [uuidv4(), 'task_assigned', body.assigned_agent_id, id, `"${existing.title}" assigned to ${agent.name}`, now]
+            [uuidv4(), 'task_assigned', body.assigned_agent_id, id, `\"${existing.title}\" assigned to ${agent.name}`, now]
           );
 
           // Auto-dispatch if already in assigned status or being assigned now
@@ -140,7 +165,7 @@ export async function PATCH(
     run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
 
     // Fetch updated task with all joined fields
-    const task = queryOne<Task>(
+    const task = queryOne<TaskRow>(
       `SELECT t.*,
         aa.name as assigned_agent_name,
         aa.avatar_emoji as assigned_agent_emoji,
@@ -153,27 +178,46 @@ export async function PATCH(
       [id]
     );
 
+    const decoratedTask = task ? decorateTask(task) : null;
+
     // Broadcast task update via SSE
-    if (task) {
+    if (decoratedTask) {
       broadcast({
         type: 'task_updated',
-        payload: task,
+        payload: decoratedTask,
       });
     }
 
     // Trigger auto-dispatch if needed
-    if (shouldDispatch) {
-      // Call dispatch endpoint asynchronously (don't wait for response)
-      const missionControlUrl = getMissionControlUrl();
-      fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      }).catch(err => {
-        console.error('Auto-dispatch failed:', err);
-      });
+    if (shouldDispatch && decoratedTask) {
+      const validation = validateDispatchMetadata(decoratedTask.dispatch_metadata);
+
+      if (!validation.canDispatch) {
+        run(
+          `INSERT INTO events (id, type, task_id, message, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            uuidv4(),
+            'system',
+            id,
+            `Dispatch blocked for \"${decoratedTask.title}\": ${validation.blockers.join('; ')}`,
+            JSON.stringify({ blockers: validation.blockers }),
+            now,
+          ]
+        );
+      } else {
+        // Call dispatch endpoint asynchronously (don't wait for response)
+        const missionControlUrl = getMissionControlUrl();
+        fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(err => {
+          console.error('Auto-dispatch failed:', err);
+        });
+      }
     }
 
-    return NextResponse.json(task);
+    return NextResponse.json(decoratedTask);
   } catch (error) {
     console.error('Failed to update task:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
