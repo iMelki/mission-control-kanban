@@ -151,6 +151,19 @@ const migrations: Migration[] = [
         console.log('[Migration 004] Added planning_agents');
       }
     }
+  },
+  {
+    id: '005',
+    name: 'add_dispatch_metadata',
+    up: (db) => {
+      console.log('[Migration 005] Adding dispatch metadata to tasks...');
+
+      const tasksInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
+      if (!tasksInfo.some(col => col.name === 'dispatch_metadata')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN dispatch_metadata TEXT`);
+        console.log('[Migration 005] Added dispatch_metadata');
+      }
+    }
   }
 ];
 
