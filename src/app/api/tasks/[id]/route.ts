@@ -210,7 +210,8 @@ export async function PATCH(
         const missionControlUrl = getMissionControlUrl();
         fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ task: decoratedTask }),
         }).catch(err => {
           console.error('Auto-dispatch failed:', err);
         });
