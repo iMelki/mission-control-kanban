@@ -2,7 +2,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
+import { parseDispatchMetadata, serializeDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
 import type { Task, CreateTaskRequest, Agent } from '@/lib/types';
+
+type TaskRow = Task & {
+  assigned_agent_name?: string;
+  assigned_agent_emoji?: string;
+  created_by_agent_name?: string;
+  dispatch_metadata?: string | null;
+};
+
+function decorateTask(task: TaskRow) {
+  const dispatchMetadata = parseDispatchMetadata(task.dispatch_metadata);
+  const validation = validateDispatchMetadata(dispatchMetadata);
+
+  return {
+    ...task,
+    dispatch_metadata: dispatchMetadata,
+    dispatch_ready: validation.canDispatch,
+    dispatch_blockers: validation.blockers,
+    assigned_agent: task.assigned_agent_id
+      ? {
+          id: task.assigned_agent_id,
+          name: task.assigned_agent_name,
+          avatar_emoji: task.assigned_agent_emoji,
+        }
+      : undefined,
+  };
+}
 
 // GET /api/tasks - List all tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -52,21 +79,8 @@ export async function GET(request: NextRequest) {
 
     sql += ' ORDER BY t.created_at DESC';
 
-    const tasks = queryAll<Task & { assigned_agent_name?: string; assigned_agent_emoji?: string; created_by_agent_name?: string }>(sql, params);
-
-    // Transform to include nested agent info
-    const transformedTasks = tasks.map((task) => ({
-      ...task,
-      assigned_agent: task.assigned_agent_id
-        ? {
-            id: task.assigned_agent_id,
-            name: task.assigned_agent_name,
-            avatar_emoji: task.assigned_agent_emoji,
-          }
-        : undefined,
-    }));
-
-    return NextResponse.json(transformedTasks);
+    const tasks = queryAll<TaskRow>(sql, params);
+    return NextResponse.json(tasks.map(decorateTask));
   } catch (error) {
     console.error('Failed to fetch tasks:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
@@ -89,10 +103,11 @@ export async function POST(request: NextRequest) {
 
     const workspaceId = (body as { workspace_id?: string }).workspace_id || 'default';
     const status = (body as { status?: string }).status || 'inbox';
+    const dispatchMetadata = serializeDispatchMetadata(body.dispatch_metadata);
 
     run(
-      `INSERT INTO tasks (id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tasks (id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date, dispatch_metadata, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         body.title,
@@ -104,6 +119,7 @@ export async function POST(request: NextRequest) {
         workspaceId,
         body.business_id || 'default',
         body.due_date || null,
+        dispatchMetadata,
         now,
         now,
       ]
@@ -125,7 +141,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Fetch created task with all joined fields
-    const task = queryOne<Task>(
+    const task = queryOne<TaskRow>(
       `SELECT t.*,
         aa.name as assigned_agent_name,
         aa.avatar_emoji as assigned_agent_emoji,
@@ -138,15 +154,17 @@ export async function POST(request: NextRequest) {
       [id]
     );
 
+    const decoratedTask = task ? decorateTask(task) : null;
+
     // Broadcast task creation via SSE
-    if (task) {
+    if (decoratedTask) {
       broadcast({
         type: 'task_created',
-        payload: task,
+        payload: decoratedTask,
       });
     }
 
-    return NextResponse.json(task, { status: 201 });
+    return NextResponse.json(decoratedTask, { status: 201 });
   } catch (error) {
     console.error('Failed to create task:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
