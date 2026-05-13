@@ -1,11 +1,15 @@
 # mission-control-kanban Open Tasks
 
-Last updated: 2026-05-10
+Last updated: 2026-05-12
 
 GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues as the canonical task records and keep this file as the local index.
 
 ## Active Issues
 
+- [#7 - Use relevant skills for market research, competitor analysis, and monetization planning](https://github.com/iMelki/mission-control-kanban/issues/7)
+  - Goal: map competitors, ICPs, monetization options, and positioning for mission-control-kanban.
+- [#8 - Design and build a landing page](https://github.com/iMelki/mission-control-kanban/issues/8)
+  - Goal: define and implement a landing page with clear audience, value proposition, proof, and CTA.
 - [#3 - Fix build-time dynamic route and OpenClaw side-effect logs](https://github.com/iMelki/mission-control-kanban/issues/3)
   - Goal: make `npm run build` complete without dynamic-route or OpenClaw connection error logs.
 - [#4 - Resolve baseline validation lint warnings](https://github.com/iMelki/mission-control-kanban/issues/4)
