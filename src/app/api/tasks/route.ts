@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { parseDispatchMetadata, serializeDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
+import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import type { Task, CreateTaskRequest, Agent } from '@/lib/types';
 
 type TaskRow = Task & {
@@ -10,14 +11,36 @@ type TaskRow = Task & {
   assigned_agent_emoji?: string;
   created_by_agent_name?: string;
   dispatch_metadata?: string | null;
+  source_repo_owner?: string | null;
+  source_repo_name?: string | null;
+  source_issue_number?: number | null;
+  source_issue_url?: string | null;
+  source_project_item_id?: string | null;
 };
 
 function decorateTask(task: TaskRow) {
+  const {
+    dispatch_metadata,
+    source_repo_owner,
+    source_repo_name,
+    source_issue_number,
+    source_issue_url,
+    source_project_item_id,
+    ...rest
+  } = task;
   const dispatchMetadata = parseDispatchMetadata(task.dispatch_metadata);
   const validation = validateDispatchMetadata(dispatchMetadata);
+  const githubSource = normalizeGitHubSourceIdentity({
+    repo_owner: source_repo_owner,
+    repo_name: source_repo_name,
+    issue_number: source_issue_number,
+    issue_url: source_issue_url,
+    project_item_id: source_project_item_id,
+  });
 
   return {
-    ...task,
+    ...rest,
+    github_source: githubSource,
     dispatch_metadata: dispatchMetadata,
     dispatch_ready: validation.canDispatch,
     dispatch_blockers: validation.blockers,
@@ -103,11 +126,34 @@ export async function POST(request: NextRequest) {
 
     const workspaceId = (body as { workspace_id?: string }).workspace_id || 'default';
     const status = (body as { status?: string }).status || 'inbox';
+    const githubSource = deriveGitHubSourceIdentity({
+      github_source: body.github_source,
+      dispatch_metadata: body.dispatch_metadata,
+    });
     const dispatchMetadata = serializeDispatchMetadata(body.dispatch_metadata);
 
+    if (githubSource) {
+      const duplicate = queryOne<Pick<Task, 'id' | 'title' | 'status' | 'priority' | 'created_at' | 'updated_at'>>(
+        `SELECT id, title, status, priority, created_at, updated_at
+         FROM tasks
+         WHERE source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ?`,
+        [githubSource.repo_owner, githubSource.repo_name, githubSource.issue_number]
+      );
+
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            error: `GitHub issue already imported as task ${duplicate.id}`,
+            existing_task: duplicate,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     run(
-      `INSERT INTO tasks (id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date, dispatch_metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tasks (id, title, description, status, priority, assigned_agent_id, created_by_agent_id, workspace_id, business_id, due_date, source_repo_owner, source_repo_name, source_issue_number, source_issue_url, source_project_item_id, dispatch_metadata, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         body.title,
@@ -119,6 +165,11 @@ export async function POST(request: NextRequest) {
         workspaceId,
         body.business_id || 'default',
         body.due_date || null,
+        githubSource?.repo_owner || null,
+        githubSource?.repo_name || null,
+        githubSource?.issue_number || null,
+        githubSource?.issue_url || null,
+        githubSource?.project_item_id || null,
         dispatchMetadata,
         now,
         now,

@@ -4,6 +4,7 @@ import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import { parseDispatchMetadata, serializeDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
+import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
 
 type TaskRow = Task & {
@@ -12,14 +13,36 @@ type TaskRow = Task & {
   created_by_agent_name?: string;
   created_by_agent_emoji?: string;
   dispatch_metadata?: string | null;
+  source_repo_owner?: string | null;
+  source_repo_name?: string | null;
+  source_issue_number?: number | null;
+  source_issue_url?: string | null;
+  source_project_item_id?: string | null;
 };
 
 function decorateTask(task: TaskRow) {
+  const {
+    dispatch_metadata,
+    source_repo_owner,
+    source_repo_name,
+    source_issue_number,
+    source_issue_url,
+    source_project_item_id,
+    ...rest
+  } = task;
   const dispatchMetadata = parseDispatchMetadata(task.dispatch_metadata);
   const validation = validateDispatchMetadata(dispatchMetadata);
+  const githubSource = normalizeGitHubSourceIdentity({
+    repo_owner: source_repo_owner,
+    repo_name: source_repo_name,
+    issue_number: source_issue_number,
+    issue_url: source_issue_url,
+    project_item_id: source_project_item_id,
+  });
 
   return {
-    ...task,
+    ...rest,
+    github_source: githubSource,
     dispatch_metadata: dispatchMetadata,
     dispatch_ready: validation.canDispatch,
     dispatch_blockers: validation.blockers,
@@ -108,6 +131,46 @@ export async function PATCH(
     if (body.dispatch_metadata !== undefined) {
       updates.push('dispatch_metadata = ?');
       values.push(serializeDispatchMetadata(body.dispatch_metadata));
+    }
+
+    const shouldClearGitHubSource = Object.prototype.hasOwnProperty.call(body, 'github_source') && body.github_source === null;
+    const derivedGitHubSource = shouldClearGitHubSource
+      ? null
+      : deriveGitHubSourceIdentity({
+          github_source: body.github_source,
+          dispatch_metadata: body.dispatch_metadata,
+        });
+
+    if (shouldClearGitHubSource || derivedGitHubSource) {
+      const duplicate = derivedGitHubSource
+        ? queryOne<Pick<Task, 'id' | 'title' | 'status' | 'priority' | 'created_at' | 'updated_at'>>(
+            `SELECT id, title, status, priority, created_at, updated_at
+             FROM tasks
+             WHERE source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ? AND id != ?`,
+            [derivedGitHubSource.repo_owner, derivedGitHubSource.repo_name, derivedGitHubSource.issue_number, id]
+          )
+        : undefined;
+
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            error: `GitHub issue already imported as task ${duplicate.id}`,
+            existing_task: duplicate,
+          },
+          { status: 409 }
+        );
+      }
+
+      updates.push('source_repo_owner = ?');
+      values.push(derivedGitHubSource?.repo_owner || null);
+      updates.push('source_repo_name = ?');
+      values.push(derivedGitHubSource?.repo_name || null);
+      updates.push('source_issue_number = ?');
+      values.push(derivedGitHubSource?.issue_number || null);
+      updates.push('source_issue_url = ?');
+      values.push(derivedGitHubSource?.issue_url || null);
+      updates.push('source_project_item_id = ?');
+      values.push(derivedGitHubSource?.project_item_id || null);
     }
 
     // Track if we need to dispatch task

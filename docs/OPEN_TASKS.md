@@ -1,6 +1,6 @@
 # mission-control-kanban Open Tasks
 
-Last updated: 2026-05-12
+Last updated: 2026-05-13
 
 GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues as the canonical task records and keep this file as the local index.
 
@@ -14,6 +14,10 @@ GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues
   - Goal: make `npm run build` complete without dynamic-route or OpenClaw connection error logs.
 - [#4 - Resolve baseline validation lint warnings](https://github.com/iMelki/mission-control-kanban/issues/4)
   - Goal: clear existing Next.js lint warnings while preserving runtime behavior.
+- [#12 - Add GitHub import preview and source identity mapping](https://github.com/iMelki/mission-control-kanban/issues/12)
+  - Goal: persist GitHub source identity on tasks and preview GitHub issue/project imports before creating local tasks.
+- [#13 - Add bounded GitHub write-back for Kanban workflow state](https://github.com/iMelki/mission-control-kanban/issues/13)
+  - Goal: write back only the approved workflow metadata after source identity and preview import are stable.
 
 ## Recently Completed
 

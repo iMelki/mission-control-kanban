@@ -1,0 +1,89 @@
+# GitHub Import Preview
+
+Last updated: 2026-05-13
+
+`mission-control-kanban#12` adds the first GitHub-native import slice without
+making Kanban the source of truth.
+
+## What This Slice Does
+
+- persists GitHub source identity on local tasks:
+  - `repo_owner`
+  - `repo_name`
+  - `issue_number`
+  - `issue_url`
+  - `project_item_id`
+- rejects duplicate imports for the same GitHub issue
+- exposes a dry-run preview endpoint before any local task is created
+- maps GitHub issue body sections and Project fields into the existing
+  dispatch contract
+
+## API
+
+`POST /api/github/import-preview`
+
+Request shape:
+
+```json
+{
+  "issue": {
+    "number": 25,
+    "title": "Implement dry-run GitHub issue classification workflow",
+    "body": "## Goal\n...",
+    "html_url": "https://github.com/iMelki/projects-ops/issues/25",
+    "labels": ["type:automation", "area:workflow"]
+  },
+  "repository": {
+    "full_name": "iMelki/projects-ops",
+    "name": "projects-ops",
+    "owner": { "login": "iMelki" }
+  },
+  "project_fields": {
+    "Repo": "iMelki/projects-ops",
+    "Project": "GitHub-native pipeline",
+    "Readiness": "Ready for Agent",
+    "Review Mode": "Human Required",
+    "Risk": "Medium",
+    "Priority": "High",
+    "Impact": "workflow automation",
+    "Project Item ID": "PVTI_mock_25"
+  }
+}
+```
+
+Response shape:
+
+- `source_identity`: normalized GitHub identity
+- `preview`: proposed local task payload
+- `blockers`: import blockers, including duplicate-import protection
+- `warnings`: non-blocking safety warnings
+- `dispatch_ready`: whether the dispatch contract is green
+- `dispatch_blockers`: dispatch-specific blockers
+- `existing_task`: populated when the issue was already imported
+
+## Body Section Mapping
+
+The preview mapper currently extracts these sections when present:
+
+- `Target Repo`
+- `Project / Workstream`
+- `Allowed File Scope`
+- `Acceptance Criteria`
+- `Test Requirements`
+- `Safety Rules`
+- `Rollback / Fallback Plan`
+
+The mapper also reads Project fields for `Repo`, `Project`, `Readiness`,
+`Review Mode`, `Risk`, `Priority`, `Impact`, and `Project Item ID`.
+
+## Current Limits
+
+- this slice does not write back to GitHub
+- this slice does not create the task automatically
+- this slice does not mutate issue bodies or scope fields
+- actual GitHub write-back remains `mission-control-kanban#13`
+
+## Related
+
+- `projects-ops/docs/operations/github-native-sync-contract.md`
+- `projects-ops/docs/operations/github-native-pipeline-slices.md`

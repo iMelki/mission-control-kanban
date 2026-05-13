@@ -164,6 +164,34 @@ const migrations: Migration[] = [
         console.log('[Migration 005] Added dispatch_metadata');
       }
     }
+  },
+  {
+    id: '006',
+    name: 'add_github_source_identity',
+    up: (db) => {
+      console.log('[Migration 006] Adding GitHub source identity columns to tasks...');
+
+      const tasksInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
+      const addColumnIfMissing = (columnName: string, sql: string) => {
+        if (!tasksInfo.some((col) => col.name === columnName)) {
+          db.exec(sql);
+          console.log(`[Migration 006] Added ${columnName}`);
+        }
+      };
+
+      addColumnIfMissing('source_repo_owner', 'ALTER TABLE tasks ADD COLUMN source_repo_owner TEXT');
+      addColumnIfMissing('source_repo_name', 'ALTER TABLE tasks ADD COLUMN source_repo_name TEXT');
+      addColumnIfMissing('source_issue_number', 'ALTER TABLE tasks ADD COLUMN source_issue_number INTEGER');
+      addColumnIfMissing('source_issue_url', 'ALTER TABLE tasks ADD COLUMN source_issue_url TEXT');
+      addColumnIfMissing('source_project_item_id', 'ALTER TABLE tasks ADD COLUMN source_project_item_id TEXT');
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_source_project_item_id ON tasks(source_project_item_id)');
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_github_issue_unique
+          ON tasks(source_repo_owner, source_repo_name, source_issue_number)
+          WHERE source_repo_owner IS NOT NULL AND source_repo_name IS NOT NULL AND source_issue_number IS NOT NULL
+      `);
+    }
   }
 ];
 

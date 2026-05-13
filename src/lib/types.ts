@@ -43,6 +43,14 @@ export interface Agent {
   updated_at: string;
 }
 
+export interface GitHubSourceIdentity {
+  repo_owner: string;
+  repo_name: string;
+  issue_number: number;
+  issue_url: string;
+  project_item_id?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -56,6 +64,7 @@ export interface Task {
   due_date?: string;
   created_at: string;
   updated_at: string;
+  github_source?: GitHubSourceIdentity;
   dispatch_metadata?: DispatchMetadata;
   dispatch_ready?: boolean;
   dispatch_blockers?: string[];
@@ -250,11 +259,13 @@ export interface CreateTaskRequest {
   created_by_agent_id?: string;
   business_id?: string;
   due_date?: string;
+  github_source?: GitHubSourceIdentity | null;
   dispatch_metadata?: DispatchMetadata;
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
   status?: TaskStatus;
+  github_source?: GitHubSourceIdentity | null;
 }
 
 export interface SendMessageRequest {
