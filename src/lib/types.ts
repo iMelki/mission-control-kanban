@@ -158,7 +158,13 @@ export interface OpenClawSession {
   updated_at: string;
 }
 
-export type ActivityType = 'spawned' | 'updated' | 'completed' | 'file_created' | 'status_changed';
+export type ActivityType =
+  | 'spawned'
+  | 'updated'
+  | 'completed'
+  | 'file_created'
+  | 'status_changed'
+  | 'github_writeback';
 
 export interface TaskActivity {
   id: string;
@@ -170,6 +176,22 @@ export interface TaskActivity {
   created_at: string;
   // Joined fields
   agent?: Agent;
+}
+
+export type GitHubWritebackMode = 'dry_run' | 'apply';
+export type GitHubWritebackStatus = 'planned' | 'applied' | 'skipped' | 'failed';
+
+export interface GitHubWritebackLog {
+  id: string;
+  task_id: string;
+  mode: GitHubWritebackMode;
+  status: GitHubWritebackStatus;
+  signature: string;
+  issue_comment_body?: string | null;
+  project_updates?: string | null;
+  response_payload?: string | null;
+  error_message?: string | null;
+  created_at: string;
 }
 
 export type DeliverableType = 'file' | 'url' | 'artifact';

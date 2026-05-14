@@ -192,6 +192,29 @@ const migrations: Migration[] = [
           WHERE source_repo_owner IS NOT NULL AND source_repo_name IS NOT NULL AND source_issue_number IS NOT NULL
       `);
     }
+  },
+  {
+    id: '007',
+    name: 'add_github_writeback_logs',
+    up: (db) => {
+      console.log('[Migration 007] Adding GitHub write-back logs...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS github_writeback_logs (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          mode TEXT NOT NULL CHECK (mode IN ('dry_run', 'apply')),
+          status TEXT NOT NULL CHECK (status IN ('planned', 'applied', 'skipped', 'failed')),
+          signature TEXT NOT NULL,
+          issue_comment_body TEXT,
+          project_updates TEXT,
+          response_payload TEXT,
+          error_message TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_github_writeback_logs_task ON github_writeback_logs(task_id, created_at DESC)');
+    }
   }
 ];
 
