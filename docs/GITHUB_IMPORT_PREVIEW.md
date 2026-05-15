@@ -1,6 +1,6 @@
 # GitHub Import Preview
 
-Last updated: 2026-05-13
+Last updated: 2026-05-15
 
 `mission-control-kanban#12` adds the first GitHub-native import slice without
 making Kanban the source of truth.
@@ -87,3 +87,15 @@ The mapper also reads Project fields for `Repo`, `Project`, `Readiness`,
 
 - `projects-ops/docs/operations/github-native-sync-contract.md`
 - `projects-ops/docs/operations/github-native-pipeline-slices.md`
+- `docs/GITHUB_WRITEBACK.md`
+
+## Repo-Owned Validation
+
+Run:
+
+```powershell
+npm run test:github-sync
+```
+
+The shared GitHub sync test file covers both the import-preview mapper and the
+bounded write-back planner so the two slices stay aligned.
