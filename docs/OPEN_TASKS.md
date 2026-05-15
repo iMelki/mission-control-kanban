@@ -24,6 +24,12 @@ GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues
 - [#13 - Add bounded GitHub write-back for Kanban workflow state](https://github.com/iMelki/mission-control-kanban/issues/13)
   - Completed on 2026-05-15.
   - Result: bounded GitHub write-back planning and apply routes are documented in [GITHUB_WRITEBACK.md](GITHUB_WRITEBACK.md), and repo-owned validation now runs through `npm run test:github-sync`.
+- [#11 - Sync GitHub issues/projects into Kanban and write workflow state back](https://github.com/iMelki/mission-control-kanban/issues/11)
+  - Completed on 2026-05-15.
+  - Result: the parent GitHub sync/write-back slice is now satisfied by the shipped import preview, persisted source identity, bounded write-back routes, and repo-owned validation/docs.
+- [#14 - Close governance baseline drift from 2026-05-15 modernization audit wave 1](https://github.com/iMelki/mission-control-kanban/issues/14)
+  - Completed on 2026-05-15.
+  - Result: the repo audit is now fully clean (`22/22` pass, `0` warn, `0` fail).
 
 ## Local Follow-Ups
 
