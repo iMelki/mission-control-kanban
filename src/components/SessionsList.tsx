@@ -32,22 +32,32 @@ export function SessionsList({ taskId }: SessionsListProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSessions();
-  }, [taskId]);
+    let cancelled = false;
 
-  const loadSessions = async () => {
-    try {
-      const res = await fetch(`/api/tasks/${taskId}/subagent`);
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
+    const loadSessions = async () => {
+      try {
+        const res = await fetch(`/api/tasks/${taskId}/subagent`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) {
+            setSessions(data);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load sessions:', error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    void loadSessions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -101,7 +111,11 @@ export function SessionsList({ taskId }: SessionsListProps) {
         }),
       });
       if (res.ok) {
-        loadSessions();
+        const refreshed = await fetch(`/api/tasks/${taskId}/subagent`);
+        if (refreshed.ok) {
+          const data = await refreshed.json();
+          setSessions(data);
+        }
       }
     } catch (error) {
       console.error('Failed to mark session complete:', error);
@@ -115,7 +129,11 @@ export function SessionsList({ taskId }: SessionsListProps) {
         method: 'DELETE',
       });
       if (res.ok) {
-        loadSessions();
+        const refreshed = await fetch(`/api/tasks/${taskId}/subagent`);
+        if (refreshed.ok) {
+          const data = await refreshed.json();
+          setSessions(data);
+        }
       }
     } catch (error) {
       console.error('Failed to delete session:', error);

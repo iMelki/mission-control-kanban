@@ -1,6 +1,6 @@
 # mission-control-kanban Open Tasks
 
-Last updated: 2026-05-15
+Last updated: 2026-05-16
 
 GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues as the canonical task records and keep this file as the local index.
 
@@ -10,14 +10,16 @@ GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues
   - Goal: map competitors, ICPs, monetization options, and positioning for mission-control-kanban.
 - [#8 - Design and build a landing page](https://github.com/iMelki/mission-control-kanban/issues/8)
   - Goal: define and implement a landing page with clear audience, value proposition, proof, and CTA.
-- [#3 - Fix build-time dynamic route and OpenClaw side-effect logs](https://github.com/iMelki/mission-control-kanban/issues/3)
-  - Goal: make `npm run build` complete without dynamic-route or OpenClaw connection error logs.
-- [#4 - Resolve baseline validation lint warnings](https://github.com/iMelki/mission-control-kanban/issues/4)
-  - Goal: clear existing Next.js lint warnings while preserving runtime behavior.
 ## Recently Completed
 
 - [projects-ops#9 - Track mission-control-kanban bootstrap baseline adoption](https://github.com/iMelki/projects-ops/issues/9)
   - Completed via [mission-control-kanban#2](https://github.com/iMelki/mission-control-kanban/pull/2).
+- [#3 - Fix build-time dynamic route and OpenClaw side-effect logs](https://github.com/iMelki/mission-control-kanban/issues/3)
+  - Completed on 2026-05-16.
+  - Result: the build-only API routes now force dynamic execution, so `npm run build` finishes without OpenClaw connection side effects or static-route warnings.
+- [#4 - Resolve baseline validation lint warnings](https://github.com/iMelki/mission-control-kanban/issues/4)
+  - Completed on 2026-05-16.
+  - Result: the remaining hook/dependency and custom-font lint warnings were removed without changing runtime behavior.
 - [#12 - Add GitHub import preview and source identity mapping](https://github.com/iMelki/mission-control-kanban/issues/12)
   - Completed on 2026-05-15.
   - Result: local tasks now persist GitHub source identity, duplicate imports are blocked, and the preview endpoint is documented in [GITHUB_IMPORT_PREVIEW.md](GITHUB_IMPORT_PREVIEW.md).

@@ -19,22 +19,32 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDeliverables();
-  }, [taskId]);
+    let cancelled = false;
 
-  const loadDeliverables = async () => {
-    try {
-      const res = await fetch(`/api/tasks/${taskId}/deliverables`);
-      if (res.ok) {
-        const data = await res.json();
-        setDeliverables(data);
+    const loadDeliverables = async () => {
+      try {
+        const res = await fetch(`/api/tasks/${taskId}/deliverables`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) {
+            setDeliverables(data);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load deliverables:', error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Failed to load deliverables:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    void loadDeliverables();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
 
   const getDeliverableIcon = (type: string) => {
     switch (type) {
