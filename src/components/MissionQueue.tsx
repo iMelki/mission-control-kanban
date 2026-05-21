@@ -273,10 +273,17 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
         {blockers.length > 0 && (
           <div className="flex items-start gap-2 mb-3 py-2 px-2.5 rounded-md border border-rose-500/20 bg-rose-500/10">
             <AlertTriangle className="size-3.5 text-rose-300 flex-shrink-0 mt-0.5" />
-            <span className="text-[11px] text-rose-200 line-clamp-2">
-              {blockers[0]}
-              {blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}
-            </span>
+            <div className="space-y-1">
+              <span className="block text-[11px] text-rose-200 line-clamp-2">
+                {blockers[0]}
+                {blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}
+              </span>
+              {task.status === 'inbox' && (
+                <span className="block text-[10px] text-amber-200/90">
+                  Still in Inbox until the Dispatch Contract is complete. Open the task to fill scope, tests, and rollback.
+                </span>
+              )}
+            </div>
           </div>
         )}
 

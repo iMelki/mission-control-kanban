@@ -8,6 +8,7 @@ import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { AgentModal } from './AgentModal';
+import { GitHubWritebackPanel } from './GitHubWritebackPanel';
 import { READINESS_LABELS, REVIEW_MODE_LABELS, RISK_LEVEL_LABELS } from '@/lib/dispatch-contract';
 import type {
   Task,
@@ -252,6 +253,11 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
                 <AlertTriangle className="w-4 h-4 text-rose-300 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-rose-200">Dispatch is currently blocked</p>
+                  <p className="mt-1 text-xs text-rose-100">
+                    The task can stay in <strong>Inbox</strong>, but moving it into active states like
+                    <strong> Assigned</strong>, <strong>In Progress</strong>, <strong>Testing</strong>,
+                    <strong> Review</strong>, or <strong>Done</strong> is blocked until the dispatch contract below is complete.
+                  </p>
                   <ul className="mt-1 text-xs text-rose-100 space-y-1 list-disc list-inside">
                     {task.dispatch_blockers.map((blocker) => (
                       <li key={blocker}>{blocker}</li>
@@ -364,6 +370,12 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
               <p className="text-xs text-mc-text-secondary mt-1">
                 These fields mirror the GitHub-native readiness contract used to decide whether auto-dispatch is safe.
               </p>
+              {task?.status === 'inbox' && task.dispatch_blockers && task.dispatch_blockers.length > 0 && (
+                <p className="text-xs text-amber-200 mt-2">
+                  Why this task is still in Inbox: it is missing one or more required dispatch fields. Fill the scope,
+                  acceptance criteria, tests, review mode, impact, and rollback plan here, then save before moving it forward.
+                </p>
+              )}
             </div>
 
             <div>
@@ -504,6 +516,10 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
                 placeholder="How to contain or revert the change if dispatch goes wrong"
               />
             </div>
+
+            {task?.github_source && (
+              <GitHubWritebackPanel task={task} />
+            )}
           </div>
             </form>
           )}

@@ -1,6 +1,6 @@
 # GitHub Write-Back
 
-Last updated: 2026-05-15
+Last updated: 2026-05-21
 
 `mission-control-kanban#13` adds the bounded GitHub write-back slice for tasks
 that already carry persisted GitHub source identity.
@@ -46,6 +46,20 @@ Response highlights:
 
 Returns the latest local write-back log rows for the task.
 
+## Visible Operator UI
+
+The write-back flow is no longer API-only.
+
+For any task that has `github_source`, the task modal now shows a
+**GitHub Write-Back** panel with:
+
+- `Refresh`
+- `Dry Run`
+- `Apply`
+- the latest planned issue comment body
+- the current project-field update plan
+- warnings and recent write-back activity
+
 ## Safety Boundaries
 
 - GitHub issue bodies are never rewritten here.
@@ -59,12 +73,12 @@ Returns the latest local write-back log rows for the task.
 
 ## Recommended Operator Flow
 
-1. Use `POST /api/github/import-preview` to confirm source identity and dispatch
+1. Use the **Import GitHub** flow to confirm source identity and dispatch
    metadata mapping first.
 2. Create or update the local task only after the preview looks correct.
-3. Use `POST /api/tasks/{id}/github-writeback` in dry-run mode to inspect the
-   exact comment body and allowed field updates.
-4. Only then run `apply` mode with valid GitHub credentials.
+3. Open the task modal and use the **GitHub Write-Back** panel in dry-run mode
+   to inspect the exact comment body and allowed field updates.
+4. Only then run `Apply` with valid GitHub credentials.
 
 ## Repo-Owned Validation
 
@@ -80,6 +94,7 @@ This covers:
 - duplicate-import blocking
 - bounded write-back planning without live GitHub credentials
 - activity-message wording for dry-run versus apply flows
+- project-field-backed dispatch metadata, including safety and rollback fields
 
 ## Related
 

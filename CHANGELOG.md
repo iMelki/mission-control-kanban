@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Beginner-facing GitHub import flow in the Mission Queue UI with an
   **Import GitHub** modal for loading a GitHub issue URL before creating a
   linked local task
+- Visible **GitHub Write-Back** panel in the task modal with dry-run and apply
+  controls for GitHub-linked tasks
 - `POST /api/github/load-issue` for resolving issue data plus linked GitHub
   Project item field values through `gh api`
 - First-run operator documentation for the GitHub-native flow in
@@ -26,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Imported GitHub tasks are blocked from entering active work statuses until
   `Allowed File Scope`, `Acceptance Criteria`, `Test Requirements`, `Review
   Mode`, `Impact`, and `Rollback / Fallback Plan` are present
+- Imported task cards and the task modal now explain why a task remains in
+  `Inbox` instead of forcing the operator to infer that from a failed drag
 - GitHub write-back continues to fall back to `gh api` when direct Node fetches
   are unavailable in the local environment
 

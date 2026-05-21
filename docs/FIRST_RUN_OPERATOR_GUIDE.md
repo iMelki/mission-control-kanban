@@ -68,6 +68,11 @@ The preview shows:
 - whether the task is ready to enter active work states
 
 7. Click **Create Local Task** only when the preview looks right.
+8. Open the new task card. If it is still in `Inbox`, read the inline blocker
+   note on the card and the dispatch-blocker panel inside the task modal.
+9. Fill the dispatch-contract fields until the blocker list is empty.
+10. Open the **GitHub Write-Back** panel in the same modal and run
+   **Dry Run** before you apply anything upstream.
 
 ## What “Import Preview” Actually Does
 
@@ -134,9 +139,17 @@ If one of those is missing, MCK returns a `409` and keeps the task out of
 This is deliberate. The point is to stop “start work now, figure out scope
 later” drift.
 
+The UI now exposes that rule in two places:
+
+- the task card shows a short `Still in Inbox...` explainer
+- the task modal lists the exact blocking fields before you try to move it
+
 ## How GitHub Write-Back Fits In
 
 After a local task exists, MCK can prepare a GitHub write-back plan.
+
+The first-class operator path is now inside the task modal itself under the
+**GitHub Write-Back** panel.
 
 ### Dry run
 

@@ -60,7 +60,7 @@ export const RISK_LEVEL_LABELS: Record<DispatchRiskLevel, string> = {
 };
 
 export function requiresDispatchContractBeforeWorkStarts(status: string | undefined): boolean {
-  return Boolean(status) && ACTIVE_WORK_STATUSES.has(status);
+  return typeof status === 'string' && ACTIVE_WORK_STATUSES.has(status);
 }
 
 function normalizeString(value: unknown): string | undefined {

@@ -127,6 +127,7 @@ test('GitHub import preview can normalize required dispatch sections from GitHub
         'Acceptance Criteria': '- Import preview is available in the UI\n- Operators can create a local task from it',
         'Test Requirements': 'npm run test:github-sync\nManual import against localhost',
         'Rollback / Fallback Plan': 'Disable the new modal and keep API routes intact.',
+        'Safety Rules': '- Do not write back to GitHub before the operator reviews the plan',
       },
     },
   });
@@ -140,6 +141,9 @@ test('GitHub import preview can normalize required dispatch sections from GitHub
     'Manual import against localhost',
   ]);
   assert.match(response.preview.dispatch_metadata?.rollback_plan ?? '', /Disable the new modal/i);
+  assert.deepEqual(response.preview.dispatch_metadata?.safety_rules, [
+    'Do not write back to GitHub before the operator reviews the plan',
+  ]);
   assert.equal(response.dispatch_ready, true);
 });
 

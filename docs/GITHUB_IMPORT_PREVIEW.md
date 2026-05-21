@@ -47,6 +47,16 @@ This UI flow uses the same dry-run API described below; GitHub remains the
 source of truth and MCK only creates the linked local task after the preview is
 accepted.
 
+After the task exists locally, the Mission Queue card itself now explains why
+an imported task can remain in `Inbox`:
+
+- scope is still incomplete
+- tests are still unspecified
+- rollback/fallback is still missing
+
+That means the operator no longer has to guess whether the board is broken or
+whether the task contract is simply incomplete.
+
 Request shape:
 
 ```json
