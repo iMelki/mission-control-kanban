@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildGitHubImportPreviewResponse } from '../src/lib/github-task-import';
+import {
+  buildGitHubImportPreviewResponse,
+  buildTaskRefreshUpdateFromGitHubPreview,
+} from '../src/lib/github-task-import';
 import { requiresDispatchContractBeforeWorkStarts } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
@@ -212,4 +215,51 @@ test('Imported GitHub tasks require a complete dispatch contract before active w
   assert.equal(requiresDispatchContractBeforeWorkStarts('assigned'), true);
   assert.equal(requiresDispatchContractBeforeWorkStarts('in_progress'), true);
   assert.equal(requiresDispatchContractBeforeWorkStarts('done'), true);
+});
+
+test('GitHub refresh patch updates imported task metadata without forcing status churn', () => {
+  const patch = buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Old title',
+      description: 'Old description',
+      priority: 'normal',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'projects-ops',
+        issue_number: 1,
+        issue_url: 'https://github.com/iMelki/projects-ops/issues/1',
+      },
+      dispatch_metadata: {
+        target_repo: 'iMelki/projects-ops',
+        project_workstream: 'Old workstream',
+      },
+    },
+    {
+      title: 'Refreshed title',
+      description: 'Refreshed description',
+      priority: 'high',
+      status: 'inbox',
+      workspace_id: 'default',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'projects-ops',
+        issue_number: 1,
+        issue_url: 'https://github.com/iMelki/projects-ops/issues/1',
+        project_item_id: 'PVTI_refresh_1',
+      },
+      dispatch_metadata: {
+        target_repo: 'iMelki/projects-ops',
+        project_workstream: 'GitHub-native pipeline',
+        allowed_file_scope: ['projects-ops/docs/**'],
+      },
+    }
+  );
+
+  assert.equal(patch.title, 'Refreshed title');
+  assert.equal(patch.description, 'Refreshed description');
+  assert.equal(patch.priority, 'high');
+  assert.equal(patch.github_source?.project_item_id, 'PVTI_refresh_1');
+  assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, ['projects-ops/docs/**']);
+  assert.equal('status' in patch, false);
 });

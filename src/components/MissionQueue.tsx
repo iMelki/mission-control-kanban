@@ -29,6 +29,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [showGitHubImportModal, setShowGitHubImportModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const blockedInboxTasks = tasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0);
 
   const getTasksByStatus = (status: TaskStatus) =>
     tasks.filter((task) => task.status === status);
@@ -89,7 +90,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       {/* Header */}
       <div className="p-3 border-b border-mc-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
+          <ChevronRight className="size-4 text-mc-text-secondary" />
           <span className="text-sm font-medium uppercase tracking-wider">Mission Queue</span>
         </div>
         <div className="flex items-center gap-2">
@@ -97,18 +98,34 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             onClick={() => setShowGitHubImportModal(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-cyan text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-cyan/90"
           >
-            <Github className="w-4 h-4" />
+            <Github className="size-4" />
             Import GitHub
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="size-4" />
             New Task
           </button>
         </div>
       </div>
+
+      {blockedInboxTasks.length > 0 && (
+        <div className="mx-3 mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="size-4 mt-0.5 text-amber-300" />
+            <div>
+              <p className="font-medium">Inbox is acting as a safety gate for imported GitHub work.</p>
+              <p className="mt-1 text-xs text-amber-100/90">
+                {blockedInboxTasks.length} task{blockedInboxTasks.length === 1 ? '' : 's'} cannot move into
+                active columns yet because the dispatch contract is incomplete. Open the card and fill
+                allowed file scope, acceptance criteria, test requirements, impact, and rollback details.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Kanban Columns */}
       <div className="flex-1 flex gap-3 p-3 overflow-x-auto">

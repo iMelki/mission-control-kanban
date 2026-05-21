@@ -6,7 +6,14 @@ import {
   type DispatchRiskLevel,
   validateDispatchMetadata,
 } from './dispatch-contract';
-import type { CreateTaskRequest, GitHubSourceIdentity, Task, TaskPriority, TaskStatus } from './types';
+import type {
+  CreateTaskRequest,
+  GitHubSourceIdentity,
+  Task,
+  TaskPriority,
+  TaskStatus,
+  UpdateTaskRequest,
+} from './types';
 
 type GitHubLabel = string | { name?: string | null };
 
@@ -393,5 +400,18 @@ export function buildGitHubImportPreviewResponse(input: {
     dispatch_ready: validation.canDispatch,
     dispatch_blockers: validation.blockers,
     existing_task: input.existingTask,
+  };
+}
+
+export function buildTaskRefreshUpdateFromGitHubPreview(
+  currentTask: Pick<Task, 'title' | 'description' | 'priority' | 'github_source' | 'dispatch_metadata'>,
+  preview: GitHubImportPreviewTask
+): UpdateTaskRequest {
+  return {
+    title: preview.title || currentTask.title,
+    description: preview.description ?? currentTask.description,
+    priority: preview.priority ?? currentTask.priority,
+    github_source: preview.github_source ?? currentTask.github_source ?? null,
+    dispatch_metadata: preview.dispatch_metadata ?? currentTask.dispatch_metadata,
   };
 }

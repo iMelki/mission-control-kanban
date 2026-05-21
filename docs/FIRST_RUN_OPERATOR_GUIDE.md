@@ -70,9 +70,12 @@ The preview shows:
 7. Click **Create Local Task** only when the preview looks right.
 8. Open the new task card. If it is still in `Inbox`, read the inline blocker
    note on the card and the dispatch-blocker panel inside the task modal.
-9. Fill the dispatch-contract fields until the blocker list is empty.
-10. Open the **GitHub Write-Back** panel in the same modal and run
-   **Dry Run** before you apply anything upstream.
+9. Use **Refresh From GitHub** in the **GitHub Write-Back** panel if the issue
+   body or linked GitHub Project fields changed after the task was first
+   imported.
+10. Fill the dispatch-contract fields until the blocker list is empty.
+11. Open the **GitHub Write-Back** panel in the same modal and run
+    **Dry Run** before you apply anything upstream.
 
 ## What “Import Preview” Actually Does
 
@@ -141,6 +144,7 @@ later” drift.
 
 The UI now exposes that rule in two places:
 
+- the queue shows an inbox banner when imported tasks are still blocked
 - the task card shows a short `Still in Inbox...` explainer
 - the task modal lists the exact blocking fields before you try to move it
 
@@ -167,6 +171,20 @@ Apply is the real mutation step. It writes:
 - selected GitHub Project field changes
 
 Use dry run first. Apply only after the preview looks correct.
+
+### Refresh From GitHub
+
+Refresh From GitHub is the safe re-import path for an already-local task.
+
+Use it when:
+
+- someone edited the GitHub issue body after the task was imported
+- the linked GitHub Project item fields changed upstream
+- the dispatch contract was backfilled in GitHub and the local task should be
+  re-synced without changing the task status
+
+Refresh From GitHub updates local task metadata and dispatch fields but does
+not force a status change.
 
 ## How To Verify The Connections
 

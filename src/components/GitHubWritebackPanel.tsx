@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ExternalLink, Github, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { buildTaskRefreshUpdateFromGitHubPreview, type GitHubImportPreviewTask } from '@/lib/github-task-import';
 import type { GitHubWritebackLog, Task } from '@/lib/types';
 
 interface GitHubWritebackPanelProps {
   task: Task;
+  onTaskUpdated?: (task: Task) => void;
 }
 
 interface GitHubWritebackResponse {
@@ -25,6 +27,34 @@ interface GitHubWritebackResponse {
   }>;
   warnings?: string[];
   error_message?: string | null;
+}
+
+interface GitHubProjectItemOption {
+  id: string;
+  project_title: string;
+  project_number?: number;
+  project_fields: Record<string, unknown>;
+}
+
+interface GitHubLoadIssueResponse {
+  issue: {
+    number: number;
+    title: string;
+    body?: string;
+    html_url: string;
+    labels: Array<{ name: string }>;
+  };
+  repository: {
+    full_name: string;
+    name: string;
+    owner: { login: string };
+  };
+  project_items: GitHubProjectItemOption[];
+  default_project_item_id?: string;
+}
+
+interface GitHubImportPreviewResponse {
+  preview: GitHubImportPreviewTask;
 }
 
 function normalizeProjectUpdates(value: unknown): Array<{
@@ -69,11 +99,12 @@ function formatTimestamp(value: string | undefined): string {
   return parsed.toLocaleString();
 }
 
-export function GitHubWritebackPanel({ task }: GitHubWritebackPanelProps) {
+export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPanelProps) {
   const [logs, setLogs] = useState<GitHubWritebackLog[]>([]);
   const [result, setResult] = useState<GitHubWritebackResponse | null>(null);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isRunning, setIsRunning] = useState<'dry_run' | 'apply' | null>(null);
+  const [isRefreshingTask, setIsRefreshingTask] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const repoRef = task.github_source
@@ -146,6 +177,72 @@ export function GitHubWritebackPanel({ task }: GitHubWritebackPanelProps) {
     }
   };
 
+  const refreshFromGitHub = async () => {
+    if (!task.github_source?.issue_url) {
+      return;
+    }
+
+    setIsRefreshingTask(true);
+    setError(null);
+
+    try {
+      const loadRes = await fetch('/api/github/load-issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issue_url: task.github_source.issue_url }),
+      });
+      const loadPayload = await loadRes.json();
+      if (!loadRes.ok) {
+        throw new Error(loadPayload.error || 'Failed to refresh task from GitHub');
+      }
+
+      const sourceData = loadPayload as GitHubLoadIssueResponse;
+      const projectItemId = task.github_source.project_item_id
+        ?? sourceData.default_project_item_id
+        ?? sourceData.project_items[0]?.id;
+      const selectedProjectItem = sourceData.project_items.find((item) => item.id === projectItemId)
+        ?? sourceData.project_items[0];
+
+      const previewRes = await fetch('/api/github/import-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issue: sourceData.issue,
+          repository: sourceData.repository,
+          project_fields: selectedProjectItem?.project_fields,
+          workspace_id: task.workspace_id,
+          business_id: task.business_id,
+        }),
+      });
+      const previewPayload = await previewRes.json();
+      if (!previewRes.ok) {
+        throw new Error(previewPayload.error || 'Failed to rebuild the GitHub import preview');
+      }
+
+      const patchPayload = buildTaskRefreshUpdateFromGitHubPreview(
+        task,
+        (previewPayload as GitHubImportPreviewResponse).preview
+      );
+
+      const saveRes = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchPayload),
+      });
+      const savedTask = await saveRes.json();
+      if (!saveRes.ok) {
+        throw new Error(savedTask.error || 'Failed to update the local task from GitHub');
+      }
+
+      onTaskUpdated?.(savedTask as Task);
+      await loadLogs();
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : 'Failed to refresh task from GitHub');
+    } finally {
+      setIsRefreshingTask(false);
+    }
+  };
+
   if (!task.github_source || !repoRef) {
     return null;
   }
@@ -161,6 +258,7 @@ export function GitHubWritebackPanel({ task }: GitHubWritebackPanelProps) {
           <p className="text-xs text-mc-text-secondary">
             Dry run first, then apply only after the planned comment and field updates look correct.
             Save task edits before running write-back so GitHub receives the latest dispatch contract.
+            Use Refresh From GitHub when the issue body or project fields changed upstream and the local task should be re-synced.
           </p>
           <div className="flex flex-wrap items-center gap-2 text-xs text-mc-text-secondary">
             <a
@@ -181,17 +279,26 @@ export function GitHubWritebackPanel({ task }: GitHubWritebackPanelProps) {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => void refreshFromGitHub()}
+            disabled={isRefreshingTask || isLoadingLogs || isRunning !== null}
+            className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-secondary disabled:opacity-50"
+          >
+            {isRefreshingTask ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Refresh From GitHub
+          </button>
+          <button
+            type="button"
             onClick={() => void loadLogs()}
-            disabled={isLoadingLogs || isRunning !== null}
+            disabled={isRefreshingTask || isLoadingLogs || isRunning !== null}
             className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-secondary disabled:opacity-50"
           >
             {isLoadingLogs ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            Refresh
+            Refresh Logs
           </button>
           <button
             type="button"
             onClick={() => void runWriteback(true)}
-            disabled={isRunning !== null}
+            disabled={isRefreshingTask || isRunning !== null}
             className="inline-flex items-center gap-2 rounded bg-mc-accent-cyan px-3 py-2 text-sm font-medium text-mc-bg hover:bg-mc-accent-cyan/90 disabled:opacity-50"
           >
             {isRunning === 'dry_run' ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
@@ -200,7 +307,7 @@ export function GitHubWritebackPanel({ task }: GitHubWritebackPanelProps) {
           <button
             type="button"
             onClick={() => void runWriteback(false)}
-            disabled={isRunning !== null}
+            disabled={isRefreshingTask || isRunning !== null}
             className="inline-flex items-center gap-2 rounded bg-mc-accent px-3 py-2 text-sm font-medium text-mc-bg hover:bg-mc-accent/90 disabled:opacity-50"
           >
             {isRunning === 'apply' ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}

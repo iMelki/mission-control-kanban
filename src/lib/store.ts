@@ -119,9 +119,9 @@ export const useMissionControl = create<MissionControlState>((set) => ({
         debug.store('Task not found in store, adding', { id: updatedTask.id });
       }
       return {
-        tasks: state.tasks.map((task) =>
-          task.id === updatedTask.id ? updatedTask : task
-        ),
+        tasks: oldTask
+          ? state.tasks.map((task) => (task.id === updatedTask.id ? updatedTask : task))
+          : [updatedTask, ...state.tasks],
       };
     });
   },
