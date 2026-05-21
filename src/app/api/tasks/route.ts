@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
-import { parseDispatchMetadata, serializeDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
+import {
+  parseDispatchMetadata,
+  serializeDispatchMetadata,
+  validateDispatchMetadata,
+  requiresDispatchContractBeforeWorkStarts,
+} from '@/lib/dispatch-contract';
 import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import type { Task, CreateTaskRequest, Agent } from '@/lib/types';
 
@@ -131,8 +136,22 @@ export async function POST(request: NextRequest) {
       dispatch_metadata: body.dispatch_metadata,
     });
     const dispatchMetadata = serializeDispatchMetadata(body.dispatch_metadata);
+    const normalizedDispatchMetadata = parseDispatchMetadata(body.dispatch_metadata);
 
     if (githubSource) {
+      if (requiresDispatchContractBeforeWorkStarts(status)) {
+        const validation = validateDispatchMetadata(normalizedDispatchMetadata);
+        if (!validation.canDispatch) {
+          return NextResponse.json(
+            {
+              error: `Imported GitHub tasks cannot enter ${status} until the dispatch contract is complete`,
+              blockers: validation.blockers,
+            },
+            { status: 409 }
+          );
+        }
+      }
+
       const duplicate = queryOne<Pick<Task, 'id' | 'title' | 'status' | 'priority' | 'created_at' | 'updated_at'>>(
         `SELECT id, title, status, priority, created_at, updated_at
          FROM tasks

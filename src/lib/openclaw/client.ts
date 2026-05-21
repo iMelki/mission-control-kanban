@@ -3,8 +3,9 @@
 import { EventEmitter } from 'events';
 import type { OpenClawMessage, OpenClawSessionInfo } from '../types';
 
-const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'ws://127.0.0.1:18789';
+const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'ws://127.0.0.1:28789';
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
+const OPERATOR_SCOPES = ['operator.read', 'operator.write'];
 
 export class OpenClawClient extends EventEmitter {
   private ws: WebSocket | null = null;
@@ -120,6 +121,8 @@ export class OpenClawClient extends EventEmitter {
                     platform: 'web',
                     mode: 'ui'
                   },
+                  role: 'operator',
+                  scopes: OPERATOR_SCOPES,
                   auth: {
                     token: this.token
                   }

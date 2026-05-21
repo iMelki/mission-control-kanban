@@ -24,6 +24,8 @@ export interface DispatchValidationResult {
   warnings: string[];
 }
 
+const ACTIVE_WORK_STATUSES = new Set(['assigned', 'in_progress', 'testing', 'review', 'done']);
+
 const REQUIRED_FIELD_LABELS: Array<[keyof DispatchMetadata, string]> = [
   ['target_repo', 'target repo'],
   ['project_workstream', 'project/workstream'],
@@ -56,6 +58,10 @@ export const RISK_LEVEL_LABELS: Record<DispatchRiskLevel, string> = {
   high: 'High',
   critical: 'Critical',
 };
+
+export function requiresDispatchContractBeforeWorkStarts(status: string | undefined): boolean {
+  return Boolean(status) && ACTIVE_WORK_STATUSES.has(status);
+}
 
 function normalizeString(value: unknown): string | undefined {
   if (typeof value !== 'string') {

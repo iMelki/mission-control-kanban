@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildGitHubImportPreviewResponse } from '../src/lib/github-task-import';
+import { requiresDispatchContractBeforeWorkStarts } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
   planGitHubWriteback,
@@ -100,6 +101,48 @@ test('GitHub import preview reports duplicate-import blockers when an existing t
   assert.equal(response.existing_task?.id, 'task-123');
 });
 
+test('GitHub import preview can normalize required dispatch sections from GitHub Project fields', () => {
+  const response = buildGitHubImportPreviewResponse({
+    request: {
+      issue: {
+        number: 31,
+        title: 'Backfill operator onboarding in MCK',
+        body: '## Goal\nMake the import flow usable for first-time operators.',
+        html_url: 'https://github.com/iMelki/mission-control-kanban/issues/31',
+      },
+      repository: {
+        full_name: 'iMelki/mission-control-kanban',
+        name: 'mission-control-kanban',
+        owner: { login: 'iMelki' },
+      },
+      project_fields: {
+        Repo: 'iMelki/mission-control-kanban',
+        Project: 'GitHub-native pipeline',
+        Readiness: 'Ready for Agent',
+        'Review Mode': 'Human Required',
+        Risk: 'Medium',
+        Impact: 'operator UX',
+        'Project Item ID': 'PVTI_mock_31',
+        'Allowed File Scope': 'src/components/**\nsrc/app/api/github/**',
+        'Acceptance Criteria': '- Import preview is available in the UI\n- Operators can create a local task from it',
+        'Test Requirements': 'npm run test:github-sync\nManual import against localhost',
+        'Rollback / Fallback Plan': 'Disable the new modal and keep API routes intact.',
+      },
+    },
+  });
+
+  assert.deepEqual(response.preview.dispatch_metadata?.allowed_file_scope, [
+    'src/components/**',
+    'src/app/api/github/**',
+  ]);
+  assert.deepEqual(response.preview.dispatch_metadata?.test_requirements, [
+    'npm run test:github-sync',
+    'Manual import against localhost',
+  ]);
+  assert.match(response.preview.dispatch_metadata?.rollback_plan ?? '', /Disable the new modal/i);
+  assert.equal(response.dispatch_ready, true);
+});
+
 test('GitHub write-back plan stays bounded and dry-run friendly without live GitHub credentials', async () => {
   const previousGeneralToken = process.env.GH_GENERAL_TOKEN;
   const previousGitHubToken = process.env.GITHUB_TOKEN;
@@ -157,4 +200,12 @@ test('GitHub write-back activity messages stay explicit about dry-run versus app
     buildWritebackActivityMessage('apply', 'applied', 'iMelki/mission-control-kanban#13'),
     'GitHub write-back applied to iMelki/mission-control-kanban#13'
   );
+});
+
+test('Imported GitHub tasks require a complete dispatch contract before active work statuses', () => {
+  assert.equal(requiresDispatchContractBeforeWorkStarts('planning'), false);
+  assert.equal(requiresDispatchContractBeforeWorkStarts('inbox'), false);
+  assert.equal(requiresDispatchContractBeforeWorkStarts('assigned'), true);
+  assert.equal(requiresDispatchContractBeforeWorkStarts('in_progress'), true);
+  assert.equal(requiresDispatchContractBeforeWorkStarts('done'), true);
 });

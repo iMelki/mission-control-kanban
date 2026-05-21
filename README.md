@@ -8,6 +8,10 @@ Mission Control is a task management system that lets you create tasks, plan the
 
 > **🎉 v1.0.0 Released!** First official working build. See [CHANGELOG.md](CHANGELOG.md) for details.
 
+> **Workspace operator note:** for the current local-first GitHub and OpenClaw
+> workflow in this workspace, start with
+> [docs/FIRST_RUN_OPERATOR_GUIDE.md](docs/FIRST_RUN_OPERATOR_GUIDE.md).
+
 ![Mission Control Screenshot](mission-control.png)
 
 ---
@@ -32,7 +36,7 @@ Mission Control is a task management system that lets you create tasks, plan the
 │  ┌─────────────────┐         ┌─────────────────────────────┐   │
 │  │ Mission Control │ ◄─────► │     OpenClaw Gateway        │   │
 │  │   (Next.js)     │   WS    │  (AI Agent Runtime)         │   │
-│  │   Port 3002     │         │  Port 18789                 │   │
+│  │   Port 3002     │         │  Port 28789                 │   │
 │  └─────────────────┘         └─────────────────────────────┘   │
 │         │                              │                        │
 │         ▼                              ▼                        │
@@ -106,7 +110,7 @@ Open it in a text editor and add:
 
 ```env
 # OpenClaw Gateway Connection
-OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789
+OPENCLAW_GATEWAY_URL=ws://127.0.0.1:28789
 OPENCLAW_GATEWAY_TOKEN=your-openclaw-token-here
 
 # Workspace default port for Mission Control Kanban
@@ -117,7 +121,7 @@ PORT=3002
 
 | Variable | Where to find it |
 |----------|------------------|
-| `OPENCLAW_GATEWAY_URL` | The WebSocket URL where OpenClaw is running. Default is `ws://127.0.0.1:18789` for local. For remote, use `wss://your-server.example.com` |
+| `OPENCLAW_GATEWAY_URL` | The WebSocket URL where OpenClaw is running. Default is `ws://127.0.0.1:28789` for local. For remote, use `wss://your-server.example.com` |
 | `OPENCLAW_GATEWAY_TOKEN` | Found in your OpenClaw config file at `~/.openclaw/openclaw.json` under `gateway.token` |
 
 ### Step 4: Start OpenClaw (if not already running)
@@ -199,7 +203,7 @@ You can drag tasks between columns manually, or let the system auto-advance them
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `OPENCLAW_GATEWAY_URL` | Yes | `ws://127.0.0.1:18789` | WebSocket URL to OpenClaw Gateway |
+| `OPENCLAW_GATEWAY_URL` | Yes | `ws://127.0.0.1:28789` | WebSocket URL to OpenClaw Gateway |
 | `OPENCLAW_GATEWAY_TOKEN` | Yes | - | Authentication token for OpenClaw |
 | `PORT` | No | `3002` | Port for Mission Control Kanban web server in this workspace |
 
@@ -249,7 +253,7 @@ You can run Mission Control and OpenClaw on different computers.
 }
 ```
 
-2. Make sure port 18789 is accessible (firewall, etc.)
+2. Make sure port 28789 is accessible (firewall, etc.)
 
 3. Start OpenClaw:
 ```bash
@@ -260,7 +264,7 @@ openclaw gateway start
 
 1. Set the remote URL in `.env.local`:
 ```env
-OPENCLAW_GATEWAY_URL=ws://192.168.1.100:18789
+OPENCLAW_GATEWAY_URL=ws://192.168.1.100:28789
 OPENCLAW_GATEWAY_TOKEN=your-secret-token
 ```
 
@@ -317,7 +321,7 @@ SELECT * FROM tasks;
 1. Make sure OpenClaw is running: `openclaw gateway status`
 2. Check the URL in `.env.local` is correct
 3. Verify the token matches OpenClaw's config
-4. Check firewall isn't blocking port 18789
+4. Check firewall isn't blocking port 28789
 
 ### "Planning questions not loading"
 

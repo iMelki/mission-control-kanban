@@ -80,6 +80,18 @@ function normalizeListSection(value: string | undefined): string[] | undefined {
   return items.length > 0 ? items : undefined;
 }
 
+function normalizeListValue(value: unknown): string[] | undefined {
+  const normalized = normalizeString(typeof value === 'number' ? String(value) : value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  return normalized
+    .split(/\r?\n|,|;/)
+    .map((item) => item.replace(/^(?:\s*[-*]\s*\[[ xX]\]\s*|\s*[-*]\s*|\s*\d+\.\s*)/, '').trim())
+    .filter(Boolean);
+}
+
 function extractHeadingSection(body: string, headings: string[]): string | undefined {
   const lines = body.split(/\r?\n/);
   const normalizedHeadings = headings.map((heading) => heading.toLowerCase());
@@ -132,6 +144,20 @@ function projectFieldValue(projectFields: Record<string, unknown> | undefined, f
 
   const value = projectFields[matchingKey];
   return normalizeString(typeof value === 'number' ? String(value) : value);
+}
+
+function firstProjectFieldValue(
+  projectFields: Record<string, unknown> | undefined,
+  fieldNames: string[]
+): string | undefined {
+  for (const fieldName of fieldNames) {
+    const value = projectFieldValue(projectFields, fieldName);
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
 }
 
 function mapPriority(value: string | undefined, labels: string[]): TaskPriority {
@@ -283,17 +309,16 @@ export function buildGitHubImportPreview(input: GitHubImportPreviewRequest): Git
   const repoName = normalizeString(input.repository?.name) ?? repoFromFullName.repo;
   const issueUrl = normalizeString(input.issue.html_url);
   const issueNumber = input.issue.number ?? undefined;
-  const targetRepo = projectFieldValue(projectFields, 'Repo')
+  const targetRepo = firstProjectFieldValue(projectFields, ['Repo', 'Target Repo'])
     ?? extractInlineField(input.issue.body ?? '', [/^target repo\s*:\s*(.+)$/im, /^repo\s*:\s*(.+)$/im])
     ?? (repoOwner && repoName ? `${repoOwner}/${repoName}` : undefined);
-  const readiness = mapReadiness(projectFieldValue(projectFields, 'Readiness'))
+  const readiness = mapReadiness(firstProjectFieldValue(projectFields, ['Readiness']))
     ?? mapReadiness(labels.find((label) => label.startsWith('readiness:'))?.replace(/^readiness:/, ''));
-  const reviewMode = mapReviewMode(projectFieldValue(projectFields, 'Review Mode'));
-  const riskLevel = mapRisk(projectFieldValue(projectFields, 'Risk'))
+  const reviewMode = mapReviewMode(firstProjectFieldValue(projectFields, ['Review Mode', 'ReviewMode']));
+  const riskLevel = mapRisk(firstProjectFieldValue(projectFields, ['Risk']))
     ?? mapRisk(labels.find((label) => label.startsWith('risk:'))?.replace(/^risk:/, ''));
   const issueBody = normalizeString(input.issue.body) ?? '';
-  const projectWorkstream = projectFieldValue(projectFields, 'Project')
-    ?? projectFieldValue(projectFields, 'Project/Workstream')
+  const projectWorkstream = firstProjectFieldValue(projectFields, ['Project', 'Project/Workstream'])
     ?? extractInlineField(issueBody, [/^project(?:\/workstream)?\s*:\s*(.+)$/im]);
 
   const dispatchMetadata = normalizeDispatchMetadata({
@@ -302,21 +327,22 @@ export function buildGitHubImportPreview(input: GitHubImportPreviewRequest): Git
     project_workstream: projectWorkstream,
     allowed_file_scope: normalizeListSection(
       extractHeadingSection(issueBody, ['Allowed File Scope', 'Allowed Files', 'File Scope'])
-    ),
+    ) ?? normalizeListValue(firstProjectFieldValue(projectFields, ['Allowed File Scope', 'Allowed Files', 'File Scope', 'Scope'])),
     acceptance_criteria: normalizeListSection(
       extractHeadingSection(issueBody, ['Acceptance Criteria', 'Definition of Done', 'Success Criteria'])
-    ),
+    ) ?? normalizeListValue(firstProjectFieldValue(projectFields, ['Acceptance Criteria', 'Definition of Done', 'Success Criteria'])),
     test_requirements: normalizeListSection(
       extractHeadingSection(issueBody, ['Test Requirements', 'Validation', 'Verification'])
-    ),
+    ) ?? normalizeListValue(firstProjectFieldValue(projectFields, ['Test Requirements', 'Validation', 'Verification', 'Tests'])),
     risk_level: riskLevel,
     readiness,
     review_mode: reviewMode,
-    impact: projectFieldValue(projectFields, 'Impact'),
-    rollback_plan: extractHeadingSection(issueBody, ['Rollback', 'Rollback / Fallback Plan', 'Rollback / Fallback', 'Fallback Plan']),
+    impact: firstProjectFieldValue(projectFields, ['Impact']),
+    rollback_plan: extractHeadingSection(issueBody, ['Rollback', 'Rollback / Fallback Plan', 'Rollback / Fallback', 'Fallback Plan'])
+      ?? firstProjectFieldValue(projectFields, ['Rollback / Fallback Plan', 'Rollback / Fallback', 'Rollback', 'Fallback Plan', 'Fallback']),
     safety_rules: normalizeListSection(
       extractHeadingSection(issueBody, ['Safety Rules', 'Guardrails'])
-    ),
+    ) ?? normalizeListValue(firstProjectFieldValue(projectFields, ['Safety Rules', 'Guardrails'])),
   });
 
   const githubSource = issueUrl && issueNumber && repoOwner && repoName
@@ -325,7 +351,7 @@ export function buildGitHubImportPreview(input: GitHubImportPreviewRequest): Git
         repo_name: repoName,
         issue_number: issueNumber,
         issue_url: issueUrl,
-        project_item_id: projectFieldValue(projectFields, 'Project Item ID'),
+        project_item_id: firstProjectFieldValue(projectFields, ['Project Item ID']),
       })
     : undefined;
 

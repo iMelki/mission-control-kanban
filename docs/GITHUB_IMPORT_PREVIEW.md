@@ -1,6 +1,6 @@
 # GitHub Import Preview
 
-Last updated: 2026-05-15
+Last updated: 2026-05-21
 
 `mission-control-kanban#12` adds the first GitHub-native import slice without
 making Kanban the source of truth.
@@ -21,6 +21,31 @@ making Kanban the source of truth.
 ## API
 
 `POST /api/github/import-preview`
+
+## First-Run Operator Flow
+
+The app now exposes a workspace-level **Import GitHub** button.
+
+1. Open a workspace, not just the dashboard home.
+2. Click **Import GitHub** in the Mission Queue header.
+3. Paste a GitHub issue URL such as
+   `https://github.com/iMelki/projects-ops/issues/6`.
+4. Click **Load from GitHub**.
+5. If the issue is linked to one or more GitHub Project items, pick the correct
+   project item from the dropdown.
+6. Review the preview:
+   - proposed local task title
+   - GitHub Project fields captured by MCK
+   - allowed file scope
+   - acceptance criteria
+   - test requirements
+   - rollback / fallback plan
+   - import blockers and dispatch blockers
+7. Click **Create Local Task** only when the preview looks correct.
+
+This UI flow uses the same dry-run API described below; GitHub remains the
+source of truth and MCK only creates the linked local task after the preview is
+accepted.
 
 Request shape:
 
@@ -85,6 +110,7 @@ The mapper also reads Project fields for `Repo`, `Project`, `Readiness`,
 
 ## Related
 
+- `docs/FIRST_RUN_OPERATOR_GUIDE.md`
 - `projects-ops/docs/operations/github-native-sync-contract.md`
 - `projects-ops/docs/operations/github-native-pipeline-slices.md`
 - `docs/GITHUB_WRITEBACK.md`

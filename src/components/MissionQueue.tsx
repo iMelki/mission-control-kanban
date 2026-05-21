@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, ChevronRight, GripVertical, AlertTriangle } from 'lucide-react';
+import { Plus, ChevronRight, GripVertical, AlertTriangle, Github } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { READINESS_LABELS, REVIEW_MODE_LABELS, RISK_LEVEL_LABELS } from '@/lib/dispatch-contract';
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
+import { GitHubImportModal } from './GitHubImportModal';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MissionQueueProps {
@@ -25,6 +26,7 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
 export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const { tasks, updateTaskStatus, addEvent } = useMissionControl();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showGitHubImportModal, setShowGitHubImportModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
 
@@ -68,6 +70,10 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           message: `Task \"${draggedTask.title}\" moved to ${targetStatus}`,
           created_at: new Date().toISOString(),
         });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to move task');
+        updateTaskStatus(draggedTask.id, draggedTask.status);
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
@@ -86,13 +92,22 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
           <span className="text-sm font-medium uppercase tracking-wider">Mission Queue</span>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
-        >
-          <Plus className="w-4 h-4" />
-          New Task
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowGitHubImportModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-cyan text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-cyan/90"
+          >
+            <Github className="w-4 h-4" />
+            Import GitHub
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
+          >
+            <Plus className="w-4 h-4" />
+            New Task
+          </button>
+        </div>
       </div>
 
       {/* Kanban Columns */}
@@ -136,6 +151,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       {/* Modals */}
       {showCreateModal && (
         <TaskModal onClose={() => setShowCreateModal(false)} workspaceId={workspaceId} />
+      )}
+      {showGitHubImportModal && (
+        <GitHubImportModal onClose={() => setShowGitHubImportModal(false)} workspaceId={workspaceId} />
       )}
       {editingTask && (
         <TaskModal task={editingTask} onClose={() => setEditingTask(null)} workspaceId={workspaceId} />
@@ -190,14 +208,22 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
       draggable
       onDragStart={(e) => onDragStart(e, task)}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
       className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
-      {/* Drag handle bar */}
-      <div className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
-        <GripVertical className="w-4 h-4 text-mc-text-secondary/50 cursor-grab" />
-      </div>
+        {/* Drag handle bar */}
+        <div className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
+          <GripVertical className="size-4 text-mc-text-secondary/50 cursor-grab" />
+        </div>
 
       {/* Card content */}
       <div className="p-4">
@@ -209,7 +235,7 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
         {/* Planning mode indicator */}
         {isPlanning && (
           <div className="flex items-center gap-2 mb-3 py-2 px-3 bg-purple-500/10 rounded-md border border-purple-500/20">
-            <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse flex-shrink-0" />
+            <div className="size-2 bg-purple-500 rounded-full animate-pulse flex-shrink-0" />
             <span className="text-xs text-purple-400 font-medium">Continue planning</span>
           </div>
         )}
@@ -246,7 +272,7 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
 
         {blockers.length > 0 && (
           <div className="flex items-start gap-2 mb-3 py-2 px-2.5 rounded-md border border-rose-500/20 bg-rose-500/10">
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-300 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="size-3.5 text-rose-300 flex-shrink-0 mt-0.5" />
             <span className="text-[11px] text-rose-200 line-clamp-2">
               {blockers[0]}
               {blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}
@@ -257,12 +283,12 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
         {/* Footer: priority + timestamp */}
         <div className="flex items-center justify-between pt-2 border-t border-mc-border/20">
           <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${priorityDots[task.priority]}`} />
+            <div className={`size-1.5 rounded-full ${priorityDots[task.priority]}`} />
             <span className={`text-xs capitalize ${priorityStyles[task.priority]}`}>
               {task.priority}
             </span>
           </div>
-          <span className="text-[10px] text-mc-text-secondary/60">
+          <span className="text-[10px] text-mc-text-secondary/60" suppressHydrationWarning>
             {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
           </span>
         </div>

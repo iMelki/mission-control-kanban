@@ -3,7 +3,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
-import { parseDispatchMetadata, serializeDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
+import {
+  parseDispatchMetadata,
+  serializeDispatchMetadata,
+  validateDispatchMetadata,
+  requiresDispatchContractBeforeWorkStarts,
+} from '@/lib/dispatch-contract';
 import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
 
@@ -91,6 +96,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
+    const existingGitHubSource = normalizeGitHubSourceIdentity({
+      repo_owner: existing.source_repo_owner,
+      repo_name: existing.source_repo_name,
+      issue_number: existing.source_issue_number,
+      issue_url: existing.source_issue_url,
+      project_item_id: existing.source_project_item_id,
+    });
+
     const updates: string[] = [];
     const values: unknown[] = [];
     const now = new Date().toISOString();
@@ -171,6 +184,26 @@ export async function PATCH(
       values.push(derivedGitHubSource?.issue_url || null);
       updates.push('source_project_item_id = ?');
       values.push(derivedGitHubSource?.project_item_id || null);
+    }
+
+    const effectiveGitHubSource = shouldClearGitHubSource
+      ? null
+      : derivedGitHubSource ?? existingGitHubSource;
+    const effectiveDispatchMetadata = body.dispatch_metadata !== undefined
+      ? parseDispatchMetadata(body.dispatch_metadata)
+      : parseDispatchMetadata(existing.dispatch_metadata);
+
+    if (body.status !== undefined && requiresDispatchContractBeforeWorkStarts(body.status) && effectiveGitHubSource) {
+      const validation = validateDispatchMetadata(effectiveDispatchMetadata);
+      if (!validation.canDispatch) {
+        return NextResponse.json(
+          {
+            error: `Imported GitHub tasks cannot enter ${body.status} until the dispatch contract is complete`,
+            blockers: validation.blockers,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Track if we need to dispatch task

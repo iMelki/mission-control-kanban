@@ -41,7 +41,7 @@ Edit `.env.local` with your configuration:
 DATABASE_PATH=./mission-control.db
 
 # OpenClaw Gateway
-OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789
+OPENCLAW_GATEWAY_URL=ws://127.0.0.1:28789
 OPENCLAW_GATEWAY_TOKEN=your-token-here
 
 # Workspace Paths
@@ -87,7 +87,7 @@ Variables in `.env.local`:
 WORKSPACE_BASE_PATH=~/Documents/Shared
 PROJECTS_PATH=~/Documents/Shared/projects
 MISSION_CONTROL_URL=http://your-server-ip:3000
-OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789
+OPENCLAW_GATEWAY_URL=ws://127.0.0.1:28789
 ```
 
 ### Method 2: Settings UI
@@ -149,7 +149,7 @@ PROJECTS_PATH=~/Documents/Shared/projects
 
 ```bash
 # .env.local
-OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789
+OPENCLAW_GATEWAY_URL=ws://127.0.0.1:28789
 ```
 
 No token required for local connections.
@@ -257,7 +257,7 @@ ls -la mission-control.db
 1. Verify Gateway is running: `openclaw gateway status`
 2. Check `OPENCLAW_GATEWAY_URL` in `.env.local`
 3. For remote: Verify `OPENCLAW_GATEWAY_TOKEN` matches
-4. Test WebSocket connection: `wscat -c ws://127.0.0.1:18789`
+4. Test WebSocket connection: `wscat -c ws://127.0.0.1:28789`
 
 ### Deliverables Button Not Working
 
@@ -286,7 +286,7 @@ ls -la mission-control.db
 | `WORKSPACE_BASE_PATH` | `~/Documents/Shared` | Base directory for workspace |
 | `PROJECTS_PATH` | `~/Documents/Shared/projects` | Directory for project folders |
 | `MISSION_CONTROL_URL` | Auto-detected | API URL for agent orchestration |
-| `OPENCLAW_GATEWAY_URL` | `ws://127.0.0.1:18789` | Gateway WebSocket URL |
+| `OPENCLAW_GATEWAY_URL` | `ws://127.0.0.1:28789` | Gateway WebSocket URL |
 | `OPENCLAW_GATEWAY_TOKEN` | (empty) | Authentication token |
 
 ### Settings UI Fields

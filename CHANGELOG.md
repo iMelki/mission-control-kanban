@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Beginner-facing GitHub import flow in the Mission Queue UI with an
+  **Import GitHub** modal for loading a GitHub issue URL before creating a
+  linked local task
+- `POST /api/github/load-issue` for resolving issue data plus linked GitHub
+  Project item field values through `gh api`
+- First-run operator documentation for the GitHub-native flow in
+  `docs/GITHUB_IMPORT_PREVIEW.md`
+
+### Changed
+
+- GitHub import preview now normalizes required dispatch-contract fields from
+  GitHub Project fields as well as issue-body sections
+- Imported GitHub tasks are blocked from entering active work statuses until
+  `Allowed File Scope`, `Acceptance Criteria`, `Test Requirements`, `Review
+  Mode`, `Impact`, and `Rollback / Fallback Plan` are present
+- GitHub write-back continues to fall back to `gh api` when direct Node fetches
+  are unavailable in the local environment
+
+---
+
 ## [1.0.2] - 2026-02-04
 
 ### Fixed

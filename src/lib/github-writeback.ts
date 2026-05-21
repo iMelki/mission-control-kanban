@@ -1,4 +1,6 @@
+import { execFile } from 'child_process';
 import { createHash } from 'crypto';
+import { promisify } from 'util';
 import {
   READINESS_LABELS,
   REVIEW_MODE_LABELS,
@@ -13,6 +15,7 @@ import type {
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_GRAPHQL_URL = `${GITHUB_API_BASE}/graphql`;
+const execFileAsync = promisify(execFile);
 
 const ALLOWED_PROJECT_FIELDS = ['status', 'agent', 'readiness', 'reviewmode'] as const;
 
@@ -90,6 +93,99 @@ function getGitHubToken(): string | undefined {
   return normalizeString(process.env.GH_GENERAL_TOKEN) ?? normalizeString(process.env.GITHUB_TOKEN);
 }
 
+function buildGitHubCliEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  const token = getGitHubToken();
+
+  if (token) {
+    env.GH_TOKEN ??= token;
+    env.GITHUB_TOKEN ??= token;
+  }
+
+  return env;
+}
+
+function formatTransportError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return typeof error === 'string' ? error : 'unknown error';
+}
+
+function buildGitHubCliPath(url: string): string {
+  const relativePath = url.startsWith(GITHUB_API_BASE) ? url.slice(GITHUB_API_BASE.length) : url;
+  return relativePath.replace(/^\/+/, '');
+}
+
+async function githubGraphQLViaCli<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+  const args = ['api', 'graphql', '-f', `query=${query}`];
+
+  for (const [key, value] of Object.entries(variables)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    args.push('-f', `${key}=${String(value)}`);
+  }
+
+  const { stdout } = await execFileAsync('gh', args, {
+    env: buildGitHubCliEnv(),
+    maxBuffer: 10 * 1024 * 1024,
+  });
+
+  const payload = JSON.parse(stdout) as { data?: T; errors?: Array<{ message?: string }> };
+  if (payload.errors?.length) {
+    const errorMessage = payload.errors.map((error) => error.message).filter(Boolean).join('; ');
+    throw new Error(errorMessage || 'GitHub GraphQL CLI request failed');
+  }
+
+  if (!payload.data) {
+    throw new Error('GitHub GraphQL CLI response did not include data');
+  }
+
+  return payload.data;
+}
+
+async function githubRestViaCli<T>(url: string, init: RequestInit): Promise<T> {
+  const args = ['api', buildGitHubCliPath(url)];
+  const method = normalizeString(init.method)?.toUpperCase() ?? 'GET';
+
+  if (method !== 'GET') {
+    args.push('-X', method);
+  }
+
+  if (init.body !== undefined) {
+    if (typeof init.body !== 'string') {
+      throw new Error('GitHub CLI fallback only supports stringified JSON bodies');
+    }
+
+    const parsedBody = JSON.parse(init.body) as Record<string, unknown>;
+    if (!parsedBody || Array.isArray(parsedBody) || typeof parsedBody !== 'object') {
+      throw new Error('GitHub CLI fallback only supports JSON object bodies');
+    }
+
+    for (const [key, value] of Object.entries(parsedBody)) {
+      if (value === undefined || value === null) {
+        continue;
+      }
+
+      args.push('-f', `${key}=${typeof value === 'string' ? value : JSON.stringify(value)}`);
+    }
+  }
+
+  const { stdout } = await execFileAsync('gh', args, {
+    env: buildGitHubCliEnv(),
+    maxBuffer: 10 * 1024 * 1024,
+  });
+
+  if (!stdout.trim()) {
+    return undefined as T;
+  }
+
+  return JSON.parse(stdout) as T;
+}
+
 function formatBlockers(blockers: string[] | undefined): string {
   if (!blockers || blockers.length === 0) {
     return 'None';
@@ -164,29 +260,41 @@ async function githubGraphQL<T>(query: string, variables: Record<string, unknown
     throw new Error('Missing GH_GENERAL_TOKEN or GITHUB_TOKEN');
   }
 
-  const response = await fetch(GITHUB_GRAPHQL_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'mission-control-kanban',
-    },
-    body: JSON.stringify({ query, variables }),
-    cache: 'no-store',
-  });
+  try {
+    const response = await fetch(GITHUB_GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'mission-control-kanban',
+      },
+      body: JSON.stringify({ query, variables }),
+      cache: 'no-store',
+    });
 
-  const payload = await response.json() as { data?: T; errors?: Array<{ message?: string }> };
+    const payload = await response.json() as { data?: T; errors?: Array<{ message?: string }> };
 
-  if (!response.ok || payload.errors?.length) {
-    const errorMessage = payload.errors?.map((error) => error.message).filter(Boolean).join('; ') || response.statusText;
-    throw new Error(errorMessage || 'GitHub GraphQL request failed');
+    if (!response.ok || payload.errors?.length) {
+      const errorMessage = payload.errors?.map((error) => error.message).filter(Boolean).join('; ') || response.statusText;
+      throw new Error(errorMessage || 'GitHub GraphQL request failed');
+    }
+
+    if (!payload.data) {
+      throw new Error('GitHub GraphQL response did not include data');
+    }
+
+    return payload.data;
+  } catch (fetchError) {
+    console.warn(`[GitHub] GraphQL fetch failed, falling back to gh api: ${formatTransportError(fetchError)}`);
+
+    try {
+      return await githubGraphQLViaCli<T>(query, variables);
+    } catch (cliError) {
+      throw new Error(
+        `GitHub GraphQL request failed via fetch (${formatTransportError(fetchError)}) and gh api (${formatTransportError(cliError)})`
+      );
+    }
   }
-
-  if (!payload.data) {
-    throw new Error('GitHub GraphQL response did not include data');
-  }
-
-  return payload.data;
 }
 
 async function githubRest<T>(url: string, init: RequestInit): Promise<T> {
@@ -195,28 +303,40 @@ async function githubRest<T>(url: string, init: RequestInit): Promise<T> {
     throw new Error('Missing GH_GENERAL_TOKEN or GITHUB_TOKEN');
   }
 
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'mission-control-kanban',
-      'Content-Type': 'application/json',
-      ...(init.headers ?? {}),
-    },
-    cache: 'no-store',
-  });
+  try {
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'mission-control-kanban',
+        'Content-Type': 'application/json',
+        ...(init.headers ?? {}),
+      },
+      cache: 'no-store',
+    });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || response.statusText);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || response.statusText);
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return await response.json() as T;
+  } catch (fetchError) {
+    console.warn(`[GitHub] REST fetch failed, falling back to gh api: ${formatTransportError(fetchError)}`);
+
+    try {
+      return await githubRestViaCli<T>(url, init);
+    } catch (cliError) {
+      throw new Error(
+        `GitHub REST request failed via fetch (${formatTransportError(fetchError)}) and gh api (${formatTransportError(cliError)})`
+      );
+    }
   }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return await response.json() as T;
 }
 
 async function resolveProjectFields(githubSource: GitHubSourceIdentity): Promise<ProjectFieldResolution | undefined> {
