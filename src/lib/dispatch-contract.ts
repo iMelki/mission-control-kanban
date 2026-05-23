@@ -24,6 +24,17 @@ export interface DispatchValidationResult {
   warnings: string[];
 }
 
+export interface DispatchUiSummary {
+  state: 'ready' | 'blocked' | 'needs_grooming' | 'human_only';
+  headline: string;
+  tone: 'success' | 'warning' | 'danger';
+  blockers: string[];
+  warnings: string[];
+  readinessLabel: string;
+  reviewModeLabel?: string;
+  riskLevelLabel?: string;
+}
+
 const ACTIVE_WORK_STATUSES = new Set(['assigned', 'in_progress', 'testing', 'review', 'done']);
 
 const REQUIRED_FIELD_LABELS: Array<[keyof DispatchMetadata, string]> = [
@@ -175,5 +186,65 @@ export function validateDispatchMetadata(metadata: DispatchMetadata | undefined)
     missingFields,
     blockers,
     warnings,
+  };
+}
+
+export function summarizeDispatchContract(metadata: DispatchMetadata | undefined): DispatchUiSummary {
+  const normalized = normalizeDispatchMetadata(metadata);
+  const validation = validateDispatchMetadata(normalized);
+  const readiness = normalized?.readiness;
+  const reviewMode = normalized?.review_mode;
+  const riskLevel = normalized?.risk_level;
+
+  if (validation.canDispatch) {
+    return {
+      state: 'ready',
+      headline: riskLevel && ['high', 'critical'].includes(riskLevel)
+        ? 'Ready for agent dispatch, but keep human review in the loop'
+        : 'Ready for agent dispatch',
+      tone: riskLevel && ['high', 'critical'].includes(riskLevel) ? 'warning' : 'success',
+      blockers: [],
+      warnings: validation.warnings,
+      readinessLabel: readiness ? READINESS_LABELS[readiness] : 'Ready',
+      reviewModeLabel: reviewMode ? REVIEW_MODE_LABELS[reviewMode] : undefined,
+      riskLevelLabel: riskLevel ? RISK_LEVEL_LABELS[riskLevel] : undefined,
+    };
+  }
+
+  if (readiness === 'needs_human') {
+    return {
+      state: 'human_only',
+      headline: 'Human-only work; keep this out of agent dispatch',
+      tone: 'danger',
+      blockers: validation.blockers,
+      warnings: validation.warnings,
+      readinessLabel: READINESS_LABELS[readiness],
+      reviewModeLabel: reviewMode ? REVIEW_MODE_LABELS[reviewMode] : undefined,
+      riskLevelLabel: riskLevel ? RISK_LEVEL_LABELS[riskLevel] : undefined,
+    };
+  }
+
+  if (readiness === 'raw' || readiness === 'needs_grooming') {
+    return {
+      state: 'needs_grooming',
+      headline: 'Needs grooming before agent dispatch',
+      tone: 'warning',
+      blockers: validation.blockers,
+      warnings: validation.warnings,
+      readinessLabel: READINESS_LABELS[readiness],
+      reviewModeLabel: reviewMode ? REVIEW_MODE_LABELS[reviewMode] : undefined,
+      riskLevelLabel: riskLevel ? RISK_LEVEL_LABELS[riskLevel] : undefined,
+    };
+  }
+
+  return {
+    state: 'blocked',
+    headline: 'Dispatch blocked until the contract is complete',
+    tone: 'danger',
+    blockers: validation.blockers,
+    warnings: validation.warnings,
+    readinessLabel: readiness ? READINESS_LABELS[readiness] : 'Not Set',
+    reviewModeLabel: reviewMode ? REVIEW_MODE_LABELS[reviewMode] : undefined,
+    riskLevelLabel: riskLevel ? RISK_LEVEL_LABELS[riskLevel] : undefined,
   };
 }

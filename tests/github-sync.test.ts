@@ -5,7 +5,7 @@ import {
   buildGitHubImportPreviewResponse,
   buildTaskRefreshUpdateFromGitHubPreview,
 } from '../src/lib/github-task-import';
-import { requiresDispatchContractBeforeWorkStarts } from '../src/lib/dispatch-contract';
+import { requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
   planGitHubWriteback,
@@ -215,6 +215,47 @@ test('Imported GitHub tasks require a complete dispatch contract before active w
   assert.equal(requiresDispatchContractBeforeWorkStarts('assigned'), true);
   assert.equal(requiresDispatchContractBeforeWorkStarts('in_progress'), true);
   assert.equal(requiresDispatchContractBeforeWorkStarts('done'), true);
+});
+
+test('Dispatch summary distinguishes ready, grooming, and human-only work', () => {
+  const ready = summarizeDispatchContract({
+    target_repo: 'iMelki/mission-control-kanban',
+    project_workstream: 'dispatch-ui',
+    allowed_file_scope: ['src/components/**'],
+    acceptance_criteria: ['UI shows readiness state'],
+    test_requirements: ['npm run test:github-sync'],
+    risk_level: 'medium',
+    readiness: 'ready_for_agent',
+    review_mode: 'human_required',
+    impact: 'operator UX',
+    rollback_plan: 'Hide the new summary block',
+  });
+
+  const grooming = summarizeDispatchContract({
+    readiness: 'needs_grooming',
+    review_mode: 'human_required',
+    risk_level: 'medium',
+  });
+
+  const humanOnly = summarizeDispatchContract({
+    target_repo: 'iMelki/mission-control-kanban',
+    project_workstream: 'dispatch-ui',
+    allowed_file_scope: ['src/components/**'],
+    acceptance_criteria: ['Human handles the rollout'],
+    test_requirements: ['Manual review'],
+    risk_level: 'high',
+    readiness: 'needs_human',
+    review_mode: 'human_required',
+    impact: 'operator safety',
+    rollback_plan: 'Do not dispatch the task',
+  });
+
+  assert.equal(ready.state, 'ready');
+  assert.match(ready.headline, /Ready for agent dispatch/i);
+  assert.equal(grooming.state, 'needs_grooming');
+  assert.match(grooming.headline, /Needs grooming/i);
+  assert.equal(humanOnly.state, 'human_only');
+  assert.match(humanOnly.headline, /Human-only work/i);
 });
 
 test('GitHub refresh patch updates imported task metadata without forcing status churn', () => {

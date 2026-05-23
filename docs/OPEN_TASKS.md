@@ -1,11 +1,13 @@
 # mission-control-kanban Open Tasks
 
-Last updated: 2026-05-16
+Last updated: 2026-05-23
 
 GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues as the canonical task records and keep this file as the local index.
 
 ## Active Issues
 
+- [#6 - Surface readiness, review mode, risk, and dispatch blockers in the Kanban UI](https://github.com/iMelki/mission-control-kanban/issues/6)
+  - Goal: surface the repo and task dispatch signals operators need before they take write actions from the Kanban UI.
 - [#7 - Use relevant skills for market research, competitor analysis, and monetization planning](https://github.com/iMelki/mission-control-kanban/issues/7)
   - Goal: map competitors, ICPs, monetization options, and positioning for mission-control-kanban.
 - [#8 - Design and build a landing page](https://github.com/iMelki/mission-control-kanban/issues/8)

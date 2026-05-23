@@ -9,7 +9,12 @@ import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { AgentModal } from './AgentModal';
 import { GitHubWritebackPanel } from './GitHubWritebackPanel';
-import { READINESS_LABELS, REVIEW_MODE_LABELS, RISK_LEVEL_LABELS } from '@/lib/dispatch-contract';
+import {
+  READINESS_LABELS,
+  REVIEW_MODE_LABELS,
+  RISK_LEVEL_LABELS,
+  summarizeDispatchContract,
+} from '@/lib/dispatch-contract';
 import type {
   Task,
   TaskPriority,
@@ -73,6 +78,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   // Auto-switch to planning tab if task is in planning status
   const [activeTab, setActiveTab] = useState<TabType>(initialTask?.status === 'planning' ? 'planning' : 'overview');
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentTask(initialTask);
@@ -84,9 +90,33 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const dispatchPreview = summarizeDispatchContract({
+    source_issue_url: form.dispatch_source_issue_url,
+    target_repo: form.dispatch_target_repo,
+    project_workstream: form.dispatch_project_workstream,
+    allowed_file_scope: splitLines(form.dispatch_allowed_file_scope),
+    acceptance_criteria: splitLines(form.dispatch_acceptance_criteria),
+    test_requirements: splitLines(form.dispatch_test_requirements),
+    risk_level: form.dispatch_risk_level,
+    readiness: form.dispatch_readiness,
+    review_mode: form.dispatch_review_mode,
+    impact: form.dispatch_impact,
+    rollback_plan: form.dispatch_rollback_plan,
+    safety_rules: splitLines(form.dispatch_safety_rules),
+  });
+
+  const dispatchSummaryClass = dispatchPreview.tone === 'success'
+    ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-100'
+    : dispatchPreview.tone === 'warning'
+      ? 'border-amber-500/25 bg-amber-500/10 text-amber-100'
+      : 'border-rose-500/25 bg-rose-500/10 text-rose-100';
+  const fieldIdPrefix = currentTask?.id ? `task-modal-${currentTask.id}` : 'task-modal-new';
+  const inputId = (name: string) => `${fieldIdPrefix}-${name}`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       const url = currentTask ? `/api/tasks/${currentTask.id}` : '/api/tasks';
@@ -148,7 +178,18 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 // Update our local task reference and switch to planning tab
                 updateTask({ ...savedTask, status: 'planning' });
               })
-              .catch(console.error);
+              .catch((error) => {
+                console.error('Failed to start planning:', error);
+                const message = error instanceof Error ? error.message : 'Failed to start planning';
+                setSubmitError(message);
+                addEvent({
+                  id: crypto.randomUUID(),
+                  type: 'system',
+                  task_id: savedTask.id,
+                  message: `Planning start failed for \"${savedTask.title}\": ${message}`,
+                  created_at: new Date().toISOString(),
+                });
+              });
 
             // Log the planning start
             addEvent({
@@ -161,9 +202,17 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           }
           onClose();
         }
+      } else {
+        const payloadError = await res.json().catch(() => ({}));
+        const message = payloadError.error || 'Failed to save task';
+        const blockerText = Array.isArray(payloadError.blockers) && payloadError.blockers.length > 0
+          ? ` ${payloadError.blockers.join('; ')}`
+          : '';
+        setSubmitError(`${message}${blockerText}`);
       }
     } catch (error) {
       console.error('Failed to save task:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to save task');
     } finally {
       setIsSubmitting(false);
     }
@@ -172,6 +221,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   const handleDelete = async () => {
     if (!currentTask || !confirm(`Delete \"${currentTask.title}\"?`)) return;
 
+    setSubmitError(null);
+
     try {
       const res = await fetch(`/api/tasks/${currentTask.id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -179,9 +230,13 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           tasks: state.tasks.filter((t) => t.id !== currentTask.id),
         }));
         onClose();
+      } else {
+        const payloadError = await res.json().catch(() => ({}));
+        setSubmitError(payloadError.error || 'Failed to delete task');
       }
     } catch (error) {
       console.error('Failed to delete task:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to delete task');
     }
   };
 
@@ -208,10 +263,11 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             {currentTask ? currentTask.title : 'Create New Task'}
           </h2>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 hover:bg-mc-bg-tertiary rounded"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 
@@ -221,6 +277,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             {tabs.map((tab) => (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === tab.id
@@ -242,8 +299,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium mb-1">Title</label>
+            <label htmlFor={inputId('title')} className="block text-sm font-medium mb-1">Title</label>
             <input
+              id={inputId('title')}
               type="text"
               value={form.title}
               onChange={(e) => updateFormField('title', e.target.value)}
@@ -255,8 +313,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
+            <label htmlFor={inputId('description')} className="block text-sm font-medium mb-1">Description</label>
             <textarea
+              id={inputId('description')}
               value={form.description}
               onChange={(e) => updateFormField('description', e.target.value)}
               rows={3}
@@ -264,6 +323,18 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               placeholder="Add details..."
             />
           </div>
+
+          {submitError && (
+            <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="size-4 text-rose-300 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-rose-200">Task update failed</p>
+                  <p className="mt-1 text-xs text-rose-100">{submitError}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {currentTask?.dispatch_blockers && currentTask.dispatch_blockers.length > 0 && (
             <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10">
@@ -293,8 +364,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           {/* Planning Mode Toggle - only for new tasks */}
           {!currentTask && (
             <div className="p-3 bg-mc-bg rounded-lg border border-mc-border">
-              <label className="flex items-start gap-3 cursor-pointer">
+              <label htmlFor={inputId('planning-mode')} className="flex items-start gap-3 cursor-pointer">
                 <input
+                  id={inputId('planning-mode')}
                   type="checkbox"
                   checked={usePlanningMode}
                   onChange={(e) => setUsePlanningMode(e.target.checked)}
@@ -318,8 +390,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           <div className="grid grid-cols-2 gap-4">
             {/* Status */}
             <div>
-              <label className="block text-sm font-medium mb-1">Status</label>
+              <label htmlFor={inputId('status')} className="block text-sm font-medium mb-1">Status</label>
               <select
+                id={inputId('status')}
                 value={form.status}
                 onChange={(e) => updateFormField('status', e.target.value as TaskStatus)}
                 className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
@@ -334,8 +407,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
             {/* Priority */}
             <div>
-              <label className="block text-sm font-medium mb-1">Priority</label>
+              <label htmlFor={inputId('priority')} className="block text-sm font-medium mb-1">Priority</label>
               <select
+                id={inputId('priority')}
                 value={form.priority}
                 onChange={(e) => updateFormField('priority', e.target.value as TaskPriority)}
                 className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
@@ -351,8 +425,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
           {/* Assigned Agent */}
           <div>
-            <label className="block text-sm font-medium mb-1">Assign to</label>
+            <label htmlFor={inputId('assigned-agent')} className="block text-sm font-medium mb-1">Assign to</label>
             <select
+              id={inputId('assigned-agent')}
               value={form.assigned_agent_id}
               onChange={(e) => {
                 if (e.target.value === '__add_new__') {
@@ -377,8 +452,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
           {/* Due Date */}
           <div>
-            <label className="block text-sm font-medium mb-1">Due Date</label>
+            <label htmlFor={inputId('due-date')} className="block text-sm font-medium mb-1">Due Date</label>
             <input
+              id={inputId('due-date')}
               type="datetime-local"
               value={form.due_date}
               onChange={(e) => updateFormField('due_date', e.target.value)}
@@ -400,9 +476,44 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               )}
             </div>
 
+            <div className={`rounded-lg border px-3 py-3 ${dispatchSummaryClass}`}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">{dispatchPreview.headline}</p>
+                  <p className="mt-1 text-xs opacity-90">
+                    Readiness: {dispatchPreview.readinessLabel}
+                    {dispatchPreview.reviewModeLabel ? ` · Review: ${dispatchPreview.reviewModeLabel}` : ''}
+                    {dispatchPreview.riskLevelLabel ? ` · Risk: ${dispatchPreview.riskLevelLabel}` : ''}
+                  </p>
+                </div>
+                {dispatchPreview.state !== 'ready' && (
+                  <span className="text-[11px] font-medium uppercase tracking-wide opacity-90">
+                    Save after filling the missing contract fields
+                  </span>
+                )}
+              </div>
+
+              {dispatchPreview.blockers.length > 0 && (
+                <ul className="mt-3 space-y-1 text-xs list-disc list-inside">
+                  {dispatchPreview.blockers.slice(0, 4).map((blocker) => (
+                    <li key={blocker}>{blocker}</li>
+                  ))}
+                </ul>
+              )}
+
+              {dispatchPreview.warnings.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs list-disc list-inside opacity-90">
+                  {dispatchPreview.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             <div>
-              <label className="block text-sm font-medium mb-1">Source Issue URL</label>
+              <label htmlFor={inputId('source-issue-url')} className="block text-sm font-medium mb-1">Source Issue URL</label>
               <input
+                id={inputId('source-issue-url')}
                 type="url"
                 value={form.dispatch_source_issue_url}
                 onChange={(e) => updateFormField('dispatch_source_issue_url', e.target.value)}
@@ -413,8 +524,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Target Repo</label>
+                <label htmlFor={inputId('target-repo')} className="block text-sm font-medium mb-1">Target Repo</label>
                 <input
+                  id={inputId('target-repo')}
                   type="text"
                   value={form.dispatch_target_repo}
                   onChange={(e) => updateFormField('dispatch_target_repo', e.target.value)}
@@ -423,8 +535,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Project / Workstream</label>
+                <label htmlFor={inputId('project-workstream')} className="block text-sm font-medium mb-1">Project / Workstream</label>
                 <input
+                  id={inputId('project-workstream')}
                   type="text"
                   value={form.dispatch_project_workstream}
                   onChange={(e) => updateFormField('dispatch_project_workstream', e.target.value)}
@@ -436,8 +549,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Readiness</label>
+                <label htmlFor={inputId('readiness')} className="block text-sm font-medium mb-1">Readiness</label>
                 <select
+                  id={inputId('readiness')}
                   value={form.dispatch_readiness}
                   onChange={(e) => updateFormField('dispatch_readiness', e.target.value as DispatchReadiness)}
                   className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
@@ -448,8 +562,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Review Mode</label>
+                <label htmlFor={inputId('review-mode')} className="block text-sm font-medium mb-1">Review Mode</label>
                 <select
+                  id={inputId('review-mode')}
                   value={form.dispatch_review_mode}
                   onChange={(e) => updateFormField('dispatch_review_mode', e.target.value as DispatchReviewMode)}
                   className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
@@ -460,8 +575,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Risk Level</label>
+                <label htmlFor={inputId('risk-level')} className="block text-sm font-medium mb-1">Risk Level</label>
                 <select
+                  id={inputId('risk-level')}
                   value={form.dispatch_risk_level}
                   onChange={(e) => updateFormField('dispatch_risk_level', e.target.value as DispatchRiskLevel)}
                   className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
@@ -474,8 +590,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Impact</label>
+              <label htmlFor={inputId('impact')} className="block text-sm font-medium mb-1">Impact</label>
               <input
+                id={inputId('impact')}
                 type="text"
                 value={form.dispatch_impact}
                 onChange={(e) => updateFormField('dispatch_impact', e.target.value)}
@@ -485,8 +602,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Allowed File Scope</label>
+              <label htmlFor={inputId('allowed-file-scope')} className="block text-sm font-medium mb-1">Allowed File Scope</label>
               <textarea
+                id={inputId('allowed-file-scope')}
                 value={form.dispatch_allowed_file_scope}
                 onChange={(e) => updateFormField('dispatch_allowed_file_scope', e.target.value)}
                 rows={3}
@@ -496,8 +614,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Acceptance Criteria</label>
+              <label htmlFor={inputId('acceptance-criteria')} className="block text-sm font-medium mb-1">Acceptance Criteria</label>
               <textarea
+                id={inputId('acceptance-criteria')}
                 value={form.dispatch_acceptance_criteria}
                 onChange={(e) => updateFormField('dispatch_acceptance_criteria', e.target.value)}
                 rows={3}
@@ -507,8 +626,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Test Requirements</label>
+              <label htmlFor={inputId('test-requirements')} className="block text-sm font-medium mb-1">Test Requirements</label>
               <textarea
+                id={inputId('test-requirements')}
                 value={form.dispatch_test_requirements}
                 onChange={(e) => updateFormField('dispatch_test_requirements', e.target.value)}
                 rows={3}
@@ -518,8 +638,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Safety Rules</label>
+              <label htmlFor={inputId('safety-rules')} className="block text-sm font-medium mb-1">Safety Rules</label>
               <textarea
+                id={inputId('safety-rules')}
                 value={form.dispatch_safety_rules}
                 onChange={(e) => updateFormField('dispatch_safety_rules', e.target.value)}
                 rows={2}
@@ -529,8 +650,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Rollback / Fallback Plan</label>
+              <label htmlFor={inputId('rollback-plan')} className="block text-sm font-medium mb-1">Rollback / Fallback Plan</label>
               <textarea
+                id={inputId('rollback-plan')}
                 value={form.dispatch_rollback_plan}
                 onChange={(e) => updateFormField('dispatch_rollback_plan', e.target.value)}
                 rows={3}
@@ -606,6 +728,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"

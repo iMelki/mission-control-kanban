@@ -3,7 +3,14 @@
 import { useState } from 'react';
 import { Plus, ChevronRight, GripVertical, AlertTriangle, Github } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
-import { READINESS_LABELS, REVIEW_MODE_LABELS, RISK_LEVEL_LABELS } from '@/lib/dispatch-contract';
+import {
+  READINESS_LABELS,
+  REVIEW_MODE_LABELS,
+  RISK_LEVEL_LABELS,
+  requiresDispatchContractBeforeWorkStarts,
+  summarizeDispatchContract,
+  validateDispatchMetadata,
+} from '@/lib/dispatch-contract';
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
@@ -29,6 +36,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [showGitHubImportModal, setShowGitHubImportModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [dropError, setDropError] = useState<string | null>(null);
   const blockedInboxTasks = tasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0);
 
   const getTasksByStatus = (status: TaskStatus) =>
@@ -49,6 +57,27 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     if (!draggedTask || draggedTask.status === targetStatus) {
       setDraggedTask(null);
       return;
+    }
+
+    setDropError(null);
+
+    if (draggedTask.github_source && requiresDispatchContractBeforeWorkStarts(targetStatus)) {
+      const validation = validateDispatchMetadata(draggedTask.dispatch_metadata);
+      if (!validation.canDispatch) {
+        const summary = summarizeDispatchContract(draggedTask.dispatch_metadata);
+        const message = `${draggedTask.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
+
+        setDropError(`${message} ${validation.blockers.join('; ')}`.trim());
+        addEvent({
+          id: crypto.randomUUID(),
+          type: 'system',
+          task_id: draggedTask.id,
+          message,
+          created_at: new Date().toISOString(),
+        });
+        setDraggedTask(null);
+        return;
+      }
     }
 
     // Optimistic update
@@ -73,11 +102,12 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         });
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || 'Failed to move task');
+        setDropError(data.error || 'Failed to move task');
         updateTaskStatus(draggedTask.id, draggedTask.status);
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
+      setDropError(error instanceof Error ? error.message : 'Failed to update task status');
       // Revert on error
       updateTaskStatus(draggedTask.id, draggedTask.status);
     }
@@ -95,6 +125,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         </div>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setShowGitHubImportModal(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-cyan text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-cyan/90"
           >
@@ -102,6 +133,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             Import GitHub
           </button>
           <button
+            type="button"
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
           >
@@ -122,6 +154,18 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
                 active columns yet because the dispatch contract is incomplete. Open the card and fill
                 allowed file scope, acceptance criteria, test requirements, impact, and rollback details.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dropError && (
+        <div className="mx-3 mt-3 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="size-4 mt-0.5 text-rose-300" />
+            <div>
+              <p className="font-medium">Dispatch move blocked</p>
+              <p className="mt-1 text-xs text-rose-100/90">{dropError}</p>
             </div>
           </div>
         </div>
@@ -225,14 +269,6 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
       draggable
       onDragStart={(e) => onDragStart(e, task)}
       onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onClick();
-        }
-      }}
-      role="button"
-      tabIndex={0}
       className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
