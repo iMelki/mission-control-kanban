@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useReducer } from 'react';
 import { Plus, ChevronRight, GripVertical, AlertTriangle, Github } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import {
@@ -14,6 +14,7 @@ import {
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
+import { GitHubConnectionStatus } from './GitHubConnectionStatus';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MissionQueueProps {
@@ -30,20 +31,81 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: 'done', label: 'DONE', color: 'border-t-mc-accent-green' },
 ];
 
+interface MissionQueueUiState {
+  showCreateModal: boolean;
+  showGitHubImportModal: boolean;
+  editingTask: Task | null;
+  draggedTask: Task | null;
+  dropError: string | null;
+}
+
+type MissionQueueUiAction =
+  | { type: 'open_create_modal' }
+  | { type: 'close_create_modal' }
+  | { type: 'open_github_import_modal' }
+  | { type: 'close_github_import_modal' }
+  | { type: 'edit_task'; task: Task }
+  | { type: 'clear_editing_task' }
+  | { type: 'drag_task'; task: Task }
+  | { type: 'clear_dragged_task' }
+  | { type: 'set_drop_error'; error: string | null };
+
+const initialMissionQueueUiState: MissionQueueUiState = {
+  showCreateModal: false,
+  showGitHubImportModal: false,
+  editingTask: null,
+  draggedTask: null,
+  dropError: null,
+};
+
+function missionQueueUiReducer(
+  state: MissionQueueUiState,
+  action: MissionQueueUiAction,
+): MissionQueueUiState {
+  switch (action.type) {
+    case 'open_create_modal':
+      return { ...state, showCreateModal: true };
+    case 'close_create_modal':
+      return { ...state, showCreateModal: false };
+    case 'open_github_import_modal':
+      return { ...state, showGitHubImportModal: true };
+    case 'close_github_import_modal':
+      return { ...state, showGitHubImportModal: false };
+    case 'edit_task':
+      return { ...state, editingTask: action.task };
+    case 'clear_editing_task':
+      return { ...state, editingTask: null };
+    case 'drag_task':
+      return { ...state, draggedTask: action.task };
+    case 'clear_dragged_task':
+      return { ...state, draggedTask: null };
+    case 'set_drop_error':
+      return { ...state, dropError: action.error };
+    default:
+      return state;
+  }
+}
+
 export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const { tasks, updateTaskStatus, addEvent } = useMissionControl();
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showGitHubImportModal, setShowGitHubImportModal] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-  const [dropError, setDropError] = useState<string | null>(null);
+  const [uiState, dispatchUi] = useReducer(
+    missionQueueUiReducer,
+    initialMissionQueueUiState,
+  );
+  const {
+    showCreateModal,
+    showGitHubImportModal,
+    editingTask,
+    draggedTask,
+    dropError,
+  } = uiState;
   const blockedInboxTasks = tasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0);
 
   const getTasksByStatus = (status: TaskStatus) =>
     tasks.filter((task) => task.status === status);
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
-    setDraggedTask(task);
+    dispatchUi({ type: 'drag_task', task });
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -55,11 +117,11 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
     e.preventDefault();
     if (!draggedTask || draggedTask.status === targetStatus) {
-      setDraggedTask(null);
+      dispatchUi({ type: 'clear_dragged_task' });
       return;
     }
 
-    setDropError(null);
+    dispatchUi({ type: 'set_drop_error', error: null });
 
     if (draggedTask.github_source && requiresDispatchContractBeforeWorkStarts(targetStatus)) {
       const validation = validateDispatchMetadata(draggedTask.dispatch_metadata);
@@ -67,7 +129,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         const summary = summarizeDispatchContract(draggedTask.dispatch_metadata);
         const message = `${draggedTask.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
 
-        setDropError(`${message} ${validation.blockers.join('; ')}`.trim());
+        dispatchUi({ type: 'set_drop_error', error: `${message} ${validation.blockers.join('; ')}`.trim() });
         addEvent({
           id: crypto.randomUUID(),
           type: 'system',
@@ -75,7 +137,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           message,
           created_at: new Date().toISOString(),
         });
-        setDraggedTask(null);
+        dispatchUi({ type: 'clear_dragged_task' });
         return;
       }
     }
@@ -102,17 +164,20 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         });
       } else {
         const data = await res.json().catch(() => ({}));
-        setDropError(data.error || 'Failed to move task');
+        dispatchUi({ type: 'set_drop_error', error: data.error || 'Failed to move task' });
         updateTaskStatus(draggedTask.id, draggedTask.status);
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
-      setDropError(error instanceof Error ? error.message : 'Failed to update task status');
+      dispatchUi({
+        type: 'set_drop_error',
+        error: error instanceof Error ? error.message : 'Failed to update task status',
+      });
       // Revert on error
       updateTaskStatus(draggedTask.id, draggedTask.status);
     }
 
-    setDraggedTask(null);
+    dispatchUi({ type: 'clear_dragged_task' });
   };
 
   return (
@@ -124,9 +189,10 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <span className="text-sm font-medium uppercase tracking-wider">Mission Queue</span>
         </div>
         <div className="flex items-center gap-2">
+          <GitHubConnectionStatus />
           <button
             type="button"
-            onClick={() => setShowGitHubImportModal(true)}
+            onClick={() => dispatchUi({ type: 'open_github_import_modal' })}
             className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-cyan text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-cyan/90"
           >
             <Github className="size-4" />
@@ -134,7 +200,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           </button>
           <button
             type="button"
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => dispatchUi({ type: 'open_create_modal' })}
             className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
           >
             <Plus className="size-4" />
@@ -199,7 +265,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
                     key={task.id}
                     task={task}
                     onDragStart={handleDragStart}
-                    onClick={() => setEditingTask(task)}
+                    onClick={() => dispatchUi({ type: 'edit_task', task })}
                     isDragging={draggedTask?.id === task.id}
                   />
                 ))}
@@ -211,13 +277,13 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
       {/* Modals */}
       {showCreateModal && (
-        <TaskModal onClose={() => setShowCreateModal(false)} workspaceId={workspaceId} />
+        <TaskModal onClose={() => dispatchUi({ type: 'close_create_modal' })} workspaceId={workspaceId} />
       )}
       {showGitHubImportModal && (
-        <GitHubImportModal onClose={() => setShowGitHubImportModal(false)} workspaceId={workspaceId} />
+        <GitHubImportModal onClose={() => dispatchUi({ type: 'close_github_import_modal' })} workspaceId={workspaceId} />
       )}
       {editingTask && (
-        <TaskModal task={editingTask} onClose={() => setEditingTask(null)} workspaceId={workspaceId} />
+        <TaskModal task={editingTask} onClose={() => dispatchUi({ type: 'clear_editing_task' })} workspaceId={workspaceId} />
       )}
     </div>
   );
@@ -265,11 +331,12 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
   };
 
   return (
-    <div
+    <button
+      type="button"
       draggable
       onDragStart={(e) => onDragStart(e, task)}
       onClick={onClick}
-      className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 ${
+      className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-all hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
@@ -353,6 +420,6 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
           </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }

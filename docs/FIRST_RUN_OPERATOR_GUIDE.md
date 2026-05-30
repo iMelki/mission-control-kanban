@@ -191,12 +191,17 @@ not force a status change.
 ### GitHub issue read
 
 Import a known issue URL. If the modal shows the real issue title and body,
-GitHub issue read is working.
+GitHub issue read is working. The Mission Queue header also shows a GitHub
+diagnostics pill; it prefers `GH_GENERAL_TOKEN`, then falls back to
+`GITHUB_TOKEN`, and never displays the token value.
 
 ### GitHub Project read
 
 If the modal shows Project-linked fields such as `Status`, `Priority`, `Risk`,
-or `Readiness`, GitHub Project read is working.
+or `Readiness`, GitHub Project read is working. If the header says
+**GitHub limited**, issue reads may still work while Project field reads fail;
+refresh the token with `read:project`, restart MCK, and click **Check** in the
+diagnostics pill.
 
 ### OpenClaw connectivity
 

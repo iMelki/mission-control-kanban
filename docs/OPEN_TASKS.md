@@ -12,6 +12,13 @@ GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues
   - Goal: map competitors, ICPs, monetization options, and positioning for mission-control-kanban.
 - [#8 - Design and build a landing page](https://github.com/iMelki/mission-control-kanban/issues/8)
   - Goal: define and implement a landing page with clear audience, value proposition, proof, and CTA.
+
+## Latest Progress
+
+- 2026-05-31: continued the GitHub-native operator flow by adding a Mission
+  Queue diagnostics pill and `/api/github/diagnostics`. The UI now shows
+  whether MCK can see a GitHub token, authenticate the current viewer, and read
+  GitHub Projects before an operator starts the import/write-back loop.
 ## Recently Completed
 
 - [projects-ops#9 - Track mission-control-kanban bootstrap baseline adoption](https://github.com/iMelki/projects-ops/issues/9)

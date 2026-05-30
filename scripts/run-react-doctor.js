@@ -34,6 +34,11 @@ if (/No staged source files found\./i.test(normalizedOutput)) {
 
 const scoreMatch = normalizedOutput.match(/(\d+)\s*\/\s*100/);
 if (!scoreMatch) {
+  if (/No issues found!/i.test(normalizedOutput)) {
+    console.log("\nReact Doctor score unavailable, but no issues were found.");
+    process.exit(result.status ?? 0);
+  }
+
   console.error("\nCould not determine React Doctor score from output.");
   process.exit(1);
 }

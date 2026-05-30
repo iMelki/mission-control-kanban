@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   controls for GitHub-linked tasks
 - `POST /api/github/load-issue` for resolving issue data plus linked GitHub
   Project item field values through `gh api`
+- `GET /api/github/diagnostics` plus a Mission Queue diagnostics pill so
+  operators can verify token source, GitHub auth, and Project-read availability
+  before importing work
 - First-run operator documentation for the GitHub-native flow in
   `docs/GITHUB_IMPORT_PREVIEW.md`
 
@@ -32,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Inbox` instead of forcing the operator to infer that from a failed drag
 - GitHub write-back continues to fall back to `gh api` when direct Node fetches
   are unavailable in the local environment
+- The local React Doctor pre-commit wrapper now passes clean scans even when
+  the remote score API is temporarily unreachable
 
 ---
 
