@@ -1,6 +1,12 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { NextResponse } from 'next/server';
+import {
+  buildGitHubDiagnosticsError,
+  buildGitHubDiagnosticsPayload,
+  buildMissingTokenDiagnostics,
+  formatGitHubProbeError,
+} from '@/lib/github-diagnostics';
 
 const execFileAsync = promisify(execFile);
 
@@ -36,48 +42,64 @@ async function runGhJson<T>(args: string[]): Promise<T> {
 export async function GET() {
   const tokenSource = getGitHubTokenSource();
   if (!tokenSource) {
-    return NextResponse.json({
-      status: 'missing_token',
-      token_source: null,
-      authenticated: false,
-      project_read_available: false,
-      message: 'Set GH_GENERAL_TOKEN or GITHUB_TOKEN before using GitHub import and Project-field reads.',
-    });
+    return NextResponse.json(buildMissingTokenDiagnostics());
   }
 
   try {
     const viewer = await runGhJson<{ login?: string }>(['api', 'user']);
-    const projectProbe = await runGhJson<{
-      data?: { viewer?: { projectsV2?: { totalCount?: number } } };
-      errors?: Array<{ message?: string }>;
-    }>([
-      'api',
-      'graphql',
-      '--raw-field',
-      'query=query { viewer { projectsV2(first: 1) { totalCount } } }',
-    ]);
-    const projectReadAvailable = !projectProbe.errors?.length;
+    let projectReadAvailable = false;
+    let projectCountVisible: number | null = null;
+    let projectProbeError: string | undefined;
 
-    return NextResponse.json({
-      status: projectReadAvailable ? 'ok' : 'limited',
-      token_source: tokenSource,
-      authenticated: true,
-      viewer_login: viewer.login ?? 'unknown',
-      project_read_available: projectReadAvailable,
-      project_count_visible: projectProbe.data?.viewer?.projectsV2?.totalCount ?? null,
-      message: projectReadAvailable
-        ? 'GitHub issue and Project reads are available.'
-        : 'GitHub auth works, but Project reads failed. Check read:project scope.',
-    });
+    try {
+      const projectProbe = await runGhJson<{
+        data?: {
+          viewer?: {
+            projectsV2?: {
+              totalCount?: number;
+              nodes?: Array<{
+                id?: string;
+                title?: string;
+                fields?: {
+                  nodes?: Array<{
+                    id?: string;
+                    name?: string;
+                  }>;
+                };
+              }>;
+            };
+          };
+        };
+        errors?: Array<{ message?: string }>;
+      }>([
+        'api',
+        'graphql',
+        '--raw-field',
+        'query=query { viewer { projectsV2(first: 1) { totalCount nodes { id title fields(first: 1) { nodes { ... on ProjectV2FieldCommon { id name } } } } } } }',
+      ]);
+
+      projectCountVisible = projectProbe.data?.viewer?.projectsV2?.totalCount ?? null;
+      projectReadAvailable = !projectProbe.errors?.length;
+      if (projectProbe.errors?.length) {
+        projectProbeError = projectProbe.errors.map((error) => error.message).filter(Boolean).join('; ');
+      }
+    } catch (error) {
+      projectProbeError = formatGitHubProbeError(error);
+    }
+
+    return NextResponse.json(buildGitHubDiagnosticsPayload({
+      tokenSource,
+      viewerLogin: viewer.login,
+      projectReadAvailable,
+      projectCountVisible,
+      projectProbeError,
+    }));
   } catch (error) {
     return NextResponse.json(
-      {
-        status: 'error',
-        token_source: tokenSource,
-        authenticated: false,
-        project_read_available: false,
+      buildGitHubDiagnosticsError({
+        tokenSource,
         message: error instanceof Error ? error.message : 'GitHub diagnostics failed.',
-      },
+      }),
       { status: 500 },
     );
   }

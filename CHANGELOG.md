@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   import preview, dry-run write-back, and apply write-back availability
 - First-run operator documentation for the GitHub-native flow in
   `docs/GITHUB_IMPORT_PREVIEW.md`
+- Diagnostics now probe a real GitHub Project field read, so tokens that can
+  read issues but lack `read:project` report `limited` instead of a false
+  import/write-back-ready state
+- GitHub issue loading now degrades gracefully when Project fields are
+  unavailable, allowing issue-only imports while warning that Project-backed
+  sync is limited
 
 ### Changed
 

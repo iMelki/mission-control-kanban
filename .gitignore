@@ -48,3 +48,4 @@ next-env.d.ts
 /thoughts/
 .git-secrets.json
 /.logs/
+/tmp/

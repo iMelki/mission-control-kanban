@@ -11,6 +11,33 @@ import {
   planGitHubWriteback,
   type GitHubWritebackTaskSnapshot,
 } from '../src/lib/github-writeback';
+import { buildGitHubDiagnosticsPayload, buildMissingTokenDiagnostics } from '../src/lib/github-diagnostics';
+
+test('GitHub diagnostics treats missing tokens as blocked', () => {
+  const payload = buildMissingTokenDiagnostics();
+
+  assert.equal(payload.status, 'missing_token');
+  assert.equal(payload.authenticated, false);
+  assert.equal(payload.issue_read_available, false);
+  assert.equal(payload.project_read_available, false);
+});
+
+test('GitHub diagnostics reports limited when Project field reads need read:project', () => {
+  const payload = buildGitHubDiagnosticsPayload({
+    tokenSource: 'GH_GENERAL_TOKEN',
+    viewerLogin: 'iMelki',
+    projectReadAvailable: false,
+    projectCountVisible: null,
+    projectProbeError: "The 'id' field requires one of the following scopes: ['read:project']",
+  });
+
+  assert.equal(payload.status, 'limited');
+  assert.equal(payload.authenticated, true);
+  assert.equal(payload.issue_read_available, true);
+  assert.equal(payload.project_read_available, false);
+  assert.match(payload.message, /Project field reads failed/i);
+  assert.match(payload.project_probe_error ?? '', /read:project/);
+});
 
 test('GitHub import preview builds source identity and dispatch-ready preview from a groomed issue', () => {
   const response = buildGitHubImportPreviewResponse({

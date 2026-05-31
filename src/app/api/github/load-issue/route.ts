@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { NextRequest, NextResponse } from 'next/server';
+import { formatGitHubProbeError } from '@/lib/github-diagnostics';
 import { parseGitHubIssueUrl } from '@/lib/github-task-import';
 
 const execFileAsync = promisify(execFile);
@@ -164,37 +165,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Pull requests are not supported here; use a GitHub issue URL' }, { status: 400 });
     }
 
-    const projectData = await ghJson<{
-      data?: {
-        repository?: {
-          issue?: {
-            projectItems?: {
-              nodes?: GitHubProjectItemNode[];
+    let projectReadAvailable = true;
+    let projectError: string | undefined;
+    let projectItems: Array<{
+      id: string;
+      project_title: string;
+      project_number?: number;
+      project_fields: Record<string, unknown>;
+    }> = [];
+
+    try {
+      const projectData = await ghJson<{
+        data?: {
+          repository?: {
+            issue?: {
+              projectItems?: {
+                nodes?: GitHubProjectItemNode[];
+              };
             };
           };
         };
-      };
-    }>([
-      'api',
-      'graphql',
-      '--raw-field',
-      `query=${ISSUE_PROJECT_ITEMS_QUERY}`,
-      '-f',
-      `owner=${repoOwner}`,
-      '-f',
-      `repo=${repoName}`,
-      '-F',
-      `number=${issueNumber}`,
-    ]);
+      }>([
+        'api',
+        'graphql',
+        '--raw-field',
+        `query=${ISSUE_PROJECT_ITEMS_QUERY}`,
+        '-f',
+        `owner=${repoOwner}`,
+        '-f',
+        `repo=${repoName}`,
+        '-F',
+        `number=${issueNumber}`,
+      ]);
 
-    const projectItems = (projectData.data?.repository?.issue?.projectItems?.nodes ?? [])
-      .filter((item): item is GitHubProjectItemNode => Boolean(item?.id))
-      .map((item) => ({
-        id: item.id as string,
-        project_title: item.project?.title ?? 'Unnamed Project',
-        project_number: item.project?.number ?? undefined,
-        project_fields: normalizeProjectFields(repoOwner, repoName, item),
-      }));
+      projectItems = (projectData.data?.repository?.issue?.projectItems?.nodes ?? [])
+        .filter((item): item is GitHubProjectItemNode => Boolean(item?.id))
+        .map((item) => ({
+          id: item.id as string,
+          project_title: item.project?.title ?? 'Unnamed Project',
+          project_number: item.project?.number ?? undefined,
+          project_fields: normalizeProjectFields(repoOwner, repoName, item),
+        }));
+    } catch (error) {
+      projectReadAvailable = false;
+      projectError = formatGitHubProbeError(error);
+    }
 
     return NextResponse.json({
       issue: {
@@ -211,6 +226,8 @@ export async function POST(request: NextRequest) {
       },
       project_items: projectItems,
       default_project_item_id: projectItems[0]?.id,
+      project_read_available: projectReadAvailable,
+      project_error: projectError,
     });
   } catch (error) {
     console.error('Failed to load GitHub issue:', error);

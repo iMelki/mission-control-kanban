@@ -7,9 +7,11 @@ interface GitHubDiagnostics {
   status: 'ok' | 'limited' | 'missing_token' | 'error';
   token_source: 'GH_GENERAL_TOKEN' | 'GITHUB_TOKEN' | null;
   authenticated: boolean;
+  issue_read_available?: boolean;
   viewer_login?: string;
   project_read_available: boolean;
   project_count_visible?: number | null;
+  project_probe_error?: string;
   message: string;
 }
 
@@ -28,6 +30,7 @@ export function GitHubConnectionStatus() {
         status: 'error',
         token_source: null,
         authenticated: false,
+        issue_read_available: false,
         project_read_available: false,
         message: error instanceof Error ? error.message : 'Unable to read GitHub diagnostics.',
       });
@@ -70,7 +73,7 @@ export function GitHubConnectionStatus() {
             onClick={() => void refresh()}
             disabled={loading}
             className="rounded border border-mc-border px-2 py-0.5 text-[11px] hover:bg-mc-bg disabled:opacity-50"
-            title={diagnostics?.message}
+            title={diagnostics?.project_probe_error ?? diagnostics?.message}
           >
             {loading ? 'Checking' : 'Check'}
           </button>

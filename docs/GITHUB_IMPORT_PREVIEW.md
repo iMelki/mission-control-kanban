@@ -30,14 +30,16 @@ The app now exposes a workspace-level **Import GitHub** button.
 2. Check the **GitHub import/write-back readiness** card under the Mission
    Queue header.
 3. Confirm **Import preview** is `ready`. `limited` means issue reads work but
-   GitHub Project fields may be incomplete; `blocked` means the local token or
-   GitHub CLI path needs repair first.
+   GitHub Project fields may be incomplete; MCK can still create an issue-only
+   local task and will show the Project-field warning in the import modal.
+   `blocked` means the local token or GitHub CLI path needs repair first.
 4. Click **Import GitHub** in the Mission Queue header.
 5. Paste a GitHub issue URL such as
    `https://github.com/iMelki/projects-ops/issues/6`.
 6. Click **Load from GitHub**.
-7. If the issue is linked to one or more GitHub Project items, pick the correct
-   project item from the dropdown.
+7. If the issue is linked to one or more GitHub Project items and the token has
+   Project read scope, pick the correct project item from the dropdown. If the
+   card says `limited`, continue only when an issue-only import is acceptable.
 8. Review the preview:
    - proposed local task title
    - GitHub Project fields captured by MCK

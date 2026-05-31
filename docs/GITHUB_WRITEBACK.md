@@ -66,6 +66,9 @@ For any task that has `github_source`, the task modal now shows a
 - Acceptance criteria, rollback plans, and file-scope rules remain owned by
   GitHub issue definition, not by Kanban.
 - `apply` mode requires `GH_GENERAL_TOKEN` or `GITHUB_TOKEN`.
+- Project field updates require a token with GitHub Project read/write scope.
+  The readiness card reports `limited` when issue comments can work but Project
+  field reads are unavailable.
 - If no GitHub Project item ID is linked, the route still plans/comments safely
   but skips project-field mutation.
 - Duplicate apply requests with the same signature are skipped instead of being

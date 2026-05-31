@@ -7,9 +7,11 @@ interface GitHubDiagnostics {
   status: 'ok' | 'limited' | 'missing_token' | 'error';
   token_source: 'GH_GENERAL_TOKEN' | 'GITHUB_TOKEN' | null;
   authenticated: boolean;
+  issue_read_available?: boolean;
   viewer_login?: string;
   project_read_available: boolean;
   project_count_visible?: number | null;
+  project_probe_error?: string;
   message: string;
 }
 
@@ -120,6 +122,7 @@ export function GitHubReadinessCard() {
         status: 'error',
         token_source: null,
         authenticated: false,
+        issue_read_available: false,
         project_read_available: false,
         message: error instanceof Error ? error.message : 'Unable to read GitHub diagnostics.',
       });
@@ -146,6 +149,9 @@ export function GitHubReadinessCard() {
               {diagnostics?.viewer_login ? `Using @${diagnostics.viewer_login}` : diagnostics?.token_source ?? 'No token detected'} · {readyCount}/3 lanes ready
             </p>
             <p className="mt-1 text-xs">{diagnostics?.message ?? 'Checking GitHub connectivity and Project field access.'}</p>
+            {diagnostics?.project_probe_error ? (
+              <p className="mt-1 text-xs text-amber-200">{diagnostics.project_probe_error}</p>
+            ) : null}
           </div>
         </div>
         <button

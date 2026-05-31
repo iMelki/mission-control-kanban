@@ -26,6 +26,8 @@ interface GitHubLoadIssueResponse {
   };
   project_items: GitHubProjectItemOption[];
   default_project_item_id?: string;
+  project_read_available?: boolean;
+  project_error?: string;
 }
 
 interface GitHubImportPreviewResponse {
@@ -302,6 +304,15 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
                 <p className="mt-3 text-sm text-mc-text-secondary">
                   This issue is not currently linked to a GitHub Project item. MCK can still import it, but project-field sync will be skipped.
                 </p>
+              )}
+              {sourceData.project_read_available === false && (
+                <div className="mt-3 flex items-start gap-2 rounded border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                  <AlertTriangle className="mt-0.5 size-4" />
+                  <div>
+                    <div className="font-medium">GitHub Project fields unavailable</div>
+                    <p className="mt-1 text-xs">{sourceData.project_error || 'Check read:project scope before relying on Project-backed sync.'}</p>
+                  </div>
+                </div>
               )}
             </div>
           )}
