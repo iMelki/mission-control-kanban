@@ -15,6 +15,7 @@ import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
 import { GitHubConnectionStatus } from './GitHubConnectionStatus';
+import { GitHubReadinessCard } from './GitHubReadinessCard';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MissionQueueProps {
@@ -208,6 +209,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           </button>
         </div>
       </div>
+
+      <GitHubReadinessCard />
 
       {blockedInboxTasks.length > 0 && (
         <div className="mx-3 mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">

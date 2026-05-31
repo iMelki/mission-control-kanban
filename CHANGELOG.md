@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GET /api/github/diagnostics` plus a Mission Queue diagnostics pill so
   operators can verify token source, GitHub auth, and Project-read availability
   before importing work
+- Mission Queue GitHub readiness card that maps the same diagnostics into
+  import preview, dry-run write-back, and apply write-back availability
 - First-run operator documentation for the GitHub-native flow in
   `docs/GITHUB_IMPORT_PREVIEW.md`
 

@@ -1,6 +1,6 @@
 # GitHub Import Preview
 
-Last updated: 2026-05-21
+Last updated: 2026-05-31
 
 `mission-control-kanban#12` adds the first GitHub-native import slice without
 making Kanban the source of truth.
@@ -27,13 +27,18 @@ making Kanban the source of truth.
 The app now exposes a workspace-level **Import GitHub** button.
 
 1. Open a workspace, not just the dashboard home.
-2. Click **Import GitHub** in the Mission Queue header.
-3. Paste a GitHub issue URL such as
+2. Check the **GitHub import/write-back readiness** card under the Mission
+   Queue header.
+3. Confirm **Import preview** is `ready`. `limited` means issue reads work but
+   GitHub Project fields may be incomplete; `blocked` means the local token or
+   GitHub CLI path needs repair first.
+4. Click **Import GitHub** in the Mission Queue header.
+5. Paste a GitHub issue URL such as
    `https://github.com/iMelki/projects-ops/issues/6`.
-4. Click **Load from GitHub**.
-5. If the issue is linked to one or more GitHub Project items, pick the correct
+6. Click **Load from GitHub**.
+7. If the issue is linked to one or more GitHub Project items, pick the correct
    project item from the dropdown.
-6. Review the preview:
+8. Review the preview:
    - proposed local task title
    - GitHub Project fields captured by MCK
    - allowed file scope
@@ -41,7 +46,7 @@ The app now exposes a workspace-level **Import GitHub** button.
    - test requirements
    - rollback / fallback plan
    - import blockers and dispatch blockers
-7. Click **Create Local Task** only when the preview looks correct.
+9. Click **Create Local Task** only when the preview looks correct.
 
 This UI flow uses the same dry-run API described below; GitHub remains the
 source of truth and MCK only creates the linked local task after the preview is
