@@ -105,6 +105,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isRunning, setIsRunning] = useState<'dry_run' | 'apply' | null>(null);
   const [isRefreshingTask, setIsRefreshingTask] = useState(false);
+  const [showApplyConfirmation, setShowApplyConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const repoRef = task.github_source
@@ -140,20 +141,19 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
     void loadLogs();
   }, [loadLogs]);
 
-  const runWriteback = async (dryRun: boolean) => {
+  const runWriteback = async (dryRun: boolean, options?: { bypassApplyConfirmation?: boolean }) => {
     if (!task.github_source) {
       return;
     }
 
-    if (!dryRun) {
-      const confirmed = window.confirm(
-        'Apply GitHub write-back now?\n\nThis will post the prepared comment to the linked issue and update the allowed GitHub Project fields.'
-      );
-      if (!confirmed) {
-        return;
-      }
+    if (dryRun) {
+      setShowApplyConfirmation(false);
+    } else if (!options?.bypassApplyConfirmation) {
+      setShowApplyConfirmation(true);
+      return;
     }
 
+    setShowApplyConfirmation(false);
     setIsRunning(dryRun ? 'dry_run' : 'apply');
     setError(null);
 
@@ -182,6 +182,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
       return;
     }
 
+    setShowApplyConfirmation(false);
     setIsRefreshingTask(true);
     setError(null);
 
@@ -315,6 +316,36 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
           </button>
         </div>
       </div>
+
+      {showApplyConfirmation && (
+        <div className="flex flex-col gap-3 rounded border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-sm text-amber-50 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <p className="font-medium">Apply GitHub write-back now?</p>
+            <p className="text-xs text-amber-100/80">
+              This will post the prepared comment to the linked issue and update the allowed GitHub Project fields.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowApplyConfirmation(false)}
+              disabled={isRefreshingTask || isRunning !== null}
+              className="rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-secondary disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void runWriteback(false, { bypassApplyConfirmation: true })}
+              disabled={isRefreshingTask || isRunning !== null}
+              className="inline-flex items-center gap-2 rounded bg-amber-400 px-3 py-2 text-sm font-medium text-mc-bg hover:bg-amber-300 disabled:opacity-50"
+            >
+              <Github className="size-4" />
+              Confirm apply
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-start gap-2 rounded border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">

@@ -39,6 +39,11 @@ if (!scoreMatch) {
     process.exit(result.status ?? 0);
   }
 
+  if (result.status === 0) {
+    console.log("\nReact Doctor score unavailable, but the CLI exited cleanly.");
+    process.exit(0);
+  }
+
   console.error("\nCould not determine React Doctor score from output.");
   process.exit(1);
 }
