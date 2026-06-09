@@ -16,13 +16,14 @@ export async function POST(request: NextRequest) {
 
     const initialPreview = buildGitHubImportPreviewResponse({ request: body });
     const source = initialPreview.source_identity;
+    const workspaceId = body.workspace_id ?? 'default';
 
     const existingTask = source
       ? queryOne<ExistingTaskPreview>(
           `SELECT id, title, status, priority, created_at, updated_at
            FROM tasks
-           WHERE source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ?`,
-          [source.repo_owner, source.repo_name, source.issue_number]
+           WHERE workspace_id = ? AND source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ?`,
+          [workspaceId, source.repo_owner, source.repo_name, source.issue_number]
         )
       : undefined;
 

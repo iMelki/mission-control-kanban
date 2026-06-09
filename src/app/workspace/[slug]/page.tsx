@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { MissionQueue } from '@/components/MissionQueue';
@@ -29,6 +29,57 @@ export default function WorkspacePage() {
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [githubSyncState, setGitHubSyncState] = useState<{
+    state: 'idle' | 'syncing' | 'success' | 'error';
+    message?: string;
+  }>({ state: 'idle' });
+  const autoSyncedWorkspaceRef = useRef<string | null>(null);
+
+  const loadWorkspaceTasks = useCallback(async (workspaceIdToLoad: string) => {
+    const tasksRes = await fetch(`/api/tasks?workspace_id=${workspaceIdToLoad}`);
+    if (tasksRes.ok) {
+      const tasksData = await tasksRes.json();
+      debug.api('Loaded tasks', { count: tasksData.length });
+      setTasks(tasksData);
+    }
+  }, [setTasks]);
+
+  const runGitHubProjectSync = useCallback(async (
+    workspaceToSync: Workspace,
+    trigger: 'auto' | 'manual'
+  ) => {
+    if (!workspaceToSync.github_project_owner || !workspaceToSync.github_project_number) {
+      return;
+    }
+
+    setGitHubSyncState({
+      state: 'syncing',
+      message: trigger === 'auto' ? 'Auto-refreshing from GitHub Project...' : 'Refreshing from GitHub Project...',
+    });
+
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceToSync.id}/github-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: false }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error || 'GitHub Project refresh failed');
+      }
+
+      await loadWorkspaceTasks(workspaceToSync.id);
+      setGitHubSyncState({
+        state: 'success',
+        message: `GitHub Project refreshed: ${payload.imported} imported, ${payload.updated} updated, ${payload.moved} moved.`,
+      });
+    } catch (error) {
+      setGitHubSyncState({
+        state: 'error',
+        message: error instanceof Error ? error.message : 'GitHub Project refresh failed',
+      });
+    }
+  }, [loadWorkspaceTasks]);
 
   // Connect to SSE for real-time updates
   useSSE();
@@ -61,6 +112,7 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (!workspace) return;
 
+    const currentWorkspace = workspace;
     const workspaceId = workspace.id;
 
     async function loadData() {
@@ -68,23 +120,28 @@ export default function WorkspacePage() {
         debug.api('Loading workspace data...', { workspaceId });
 
         // Fetch workspace-scoped data
-        const [agentsRes, tasksRes, eventsRes] = await Promise.all([
+        const [agentsRes, eventsRes] = await Promise.all([
           fetch(`/api/agents?workspace_id=${workspaceId}`),
-          fetch(`/api/tasks?workspace_id=${workspaceId}`),
           fetch('/api/events'),
         ]);
 
         if (agentsRes.ok) setAgents(await agentsRes.json());
-        if (tasksRes.ok) {
-          const tasksData = await tasksRes.json();
-          debug.api('Loaded tasks', { count: tasksData.length });
-          setTasks(tasksData);
-        }
+        await loadWorkspaceTasks(workspaceId);
         if (eventsRes.ok) setEvents(await eventsRes.json());
       } catch (error) {
         console.error('Failed to load data:', error);
       } finally {
         setIsLoading(false);
+      }
+
+      if (
+        currentWorkspace.github_project_auto_refresh &&
+        currentWorkspace.github_project_owner &&
+        currentWorkspace.github_project_number &&
+        autoSyncedWorkspaceRef.current !== workspaceId
+      ) {
+        autoSyncedWorkspaceRef.current = workspaceId;
+        void runGitHubProjectSync(currentWorkspace, 'auto');
       }
     }
 
@@ -163,7 +220,7 @@ export default function WorkspacePage() {
       clearInterval(connectionCheck);
       clearInterval(taskPoll);
     };
-  }, [workspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading]);
+  }, [workspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading, loadWorkspaceTasks, runGitHubProjectSync]);
 
   if (notFound) {
     return (
@@ -200,6 +257,42 @@ export default function WorkspacePage() {
   return (
     <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
       <Header workspace={workspace} />
+
+      {workspace.github_project_owner && workspace.github_project_number && (
+        <div className="border-b border-mc-border bg-mc-bg-secondary px-4 py-2">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
+              {githubSyncState.state === 'syncing' ? (
+                <Loader2 className="size-4 animate-spin text-mc-accent-cyan" />
+              ) : githubSyncState.state === 'error' ? (
+                <AlertTriangle className="size-4 text-rose-300" />
+              ) : githubSyncState.state === 'success' ? (
+                <CheckCircle2 className="size-4 text-emerald-300" />
+              ) : (
+                <RefreshCw className="size-4 text-mc-accent-cyan" />
+              )}
+              <span>
+                GitHub Project #{workspace.github_project_number}
+                {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
+              </span>
+              {githubSyncState.message && (
+                <span className={githubSyncState.state === 'error' ? 'text-rose-200' : 'text-mc-text-secondary'}>
+                  {githubSyncState.message}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => void runGitHubProjectSync(workspace, 'manual')}
+              disabled={githubSyncState.state === 'syncing'}
+              className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-1.5 text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
+            >
+              {githubSyncState.state === 'syncing' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              Refresh Project
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* Agents Sidebar */}

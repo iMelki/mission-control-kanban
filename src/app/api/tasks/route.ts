@@ -155,8 +155,8 @@ export async function POST(request: NextRequest) {
       const duplicate = queryOne<Pick<Task, 'id' | 'title' | 'status' | 'priority' | 'created_at' | 'updated_at'>>(
         `SELECT id, title, status, priority, created_at, updated_at
          FROM tasks
-         WHERE source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ?`,
-        [githubSource.repo_owner, githubSource.repo_name, githubSource.issue_number]
+         WHERE workspace_id = ? AND source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ?`,
+        [workspaceId, githubSource.repo_owner, githubSource.repo_name, githubSource.issue_number]
       );
 
       if (duplicate) {

@@ -123,6 +123,11 @@ export interface Workspace {
   slug: string;
   description?: string;
   icon: string;
+  github_project_owner?: string | null;
+  github_project_number?: number | null;
+  github_project_title?: string | null;
+  github_project_url?: string | null;
+  github_project_auto_refresh?: boolean | number | null;
   created_at: string;
   updated_at: string;
 }
@@ -132,6 +137,12 @@ export interface WorkspaceStats {
   name: string;
   slug: string;
   icon: string;
+  description?: string;
+  github_project_owner?: string | null;
+  github_project_number?: number | null;
+  github_project_title?: string | null;
+  github_project_url?: string | null;
+  github_project_auto_refresh?: boolean | number | null;
   taskCounts: {
     planning: number;
     inbox: number;

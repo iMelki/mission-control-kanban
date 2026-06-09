@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub issue loading now degrades gracefully when Project fields are
   unavailable, allowing issue-only imports while warning that Project-backed
   sync is limited
+- Project-backed workspace mappings for Assistants, MemSys, and Content
+  Factory, including a local GitHub Project refresh API and workspace banner
+  control
 
 ### Changed
 
@@ -45,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are unavailable in the local environment
 - The local React Doctor pre-commit wrapper now passes clean scans even when
   the remote score API is temporarily unreachable
+- Project-backed workspaces now auto-refresh from their mapped GitHub Project
+  on open while preserving GitHub as the source of truth and avoiding local
+  workflow status churn
 
 ---
 

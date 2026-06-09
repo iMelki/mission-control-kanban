@@ -215,6 +215,114 @@ const migrations: Migration[] = [
       `);
       db.exec('CREATE INDEX IF NOT EXISTS idx_github_writeback_logs_task ON github_writeback_logs(task_id, created_at DESC)');
     }
+  },
+  {
+    id: '008',
+    name: 'add_github_project_workspaces',
+    up: (db) => {
+      console.log('[Migration 008] Adding GitHub Project-backed workspaces...');
+
+      const workspacesInfo = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+      const addColumnIfMissing = (columnName: string, sql: string) => {
+        if (!workspacesInfo.some((col) => col.name === columnName)) {
+          db.exec(sql);
+          console.log(`[Migration 008] Added ${columnName}`);
+        }
+      };
+
+      addColumnIfMissing('github_project_owner', 'ALTER TABLE workspaces ADD COLUMN github_project_owner TEXT');
+      addColumnIfMissing('github_project_number', 'ALTER TABLE workspaces ADD COLUMN github_project_number INTEGER');
+      addColumnIfMissing('github_project_title', 'ALTER TABLE workspaces ADD COLUMN github_project_title TEXT');
+      addColumnIfMissing('github_project_url', 'ALTER TABLE workspaces ADD COLUMN github_project_url TEXT');
+      addColumnIfMissing('github_project_auto_refresh', 'ALTER TABLE workspaces ADD COLUMN github_project_auto_refresh INTEGER DEFAULT 0');
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_github_project ON workspaces(github_project_owner, github_project_number)');
+
+      const projectWorkspaces = [
+        {
+          id: 'assistants',
+          name: 'Assistants',
+          slug: 'assistants',
+          description: 'Operator cockpit mapped to GitHub Project #13.',
+          icon: 'A',
+          owner: 'iMelki',
+          number: 13,
+          title: 'Assistants',
+          url: 'https://github.com/users/iMelki/projects/13',
+        },
+        {
+          id: 'memsys',
+          name: 'MemSys',
+          slug: 'memsys',
+          description: 'Memory-system cockpit mapped to GitHub Project #12.',
+          icon: 'M',
+          owner: 'iMelki',
+          number: 12,
+          title: 'MemSys',
+          url: 'https://github.com/users/iMelki/projects/12',
+        },
+        {
+          id: 'content-factory',
+          name: 'Content Factory',
+          slug: 'content-factory',
+          description: 'Content Factory cockpit mapped to GitHub Project #14.',
+          icon: 'C',
+          owner: 'iMelki',
+          number: 14,
+          title: 'Content Factory',
+          url: 'https://github.com/users/iMelki/projects/14',
+        },
+      ];
+
+      for (const workspace of projectWorkspaces) {
+        db.prepare(`
+          INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(workspace.id, workspace.name, workspace.slug, workspace.description, workspace.icon);
+
+        db.prepare(`
+          UPDATE workspaces
+          SET name = ?,
+              description = ?,
+              icon = ?,
+              github_project_owner = ?,
+              github_project_number = ?,
+              github_project_title = ?,
+              github_project_url = ?,
+              github_project_auto_refresh = 1,
+              updated_at = datetime('now')
+          WHERE slug = ?
+        `).run(
+          workspace.name,
+          workspace.description,
+          workspace.icon,
+          workspace.owner,
+          workspace.number,
+          workspace.title,
+          workspace.url,
+          workspace.slug
+        );
+      }
+    }
+  },
+  {
+    id: '009',
+    name: 'scope_github_issue_uniqueness_to_workspace',
+    up: (db) => {
+      console.log('[Migration 009] Scoping GitHub issue uniqueness to workspaces...');
+
+      db.exec('DROP INDEX IF EXISTS idx_tasks_github_issue_unique');
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_github_issue_unique
+          ON tasks(workspace_id, source_repo_owner, source_repo_name, source_issue_number)
+          WHERE source_repo_owner IS NOT NULL AND source_repo_name IS NOT NULL AND source_issue_number IS NOT NULL
+      `);
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_github_project_item_unique
+          ON tasks(source_project_item_id)
+          WHERE source_project_item_id IS NOT NULL
+      `);
+    }
   }
 ];
 

@@ -17,6 +17,11 @@ CREATE TABLE IF NOT EXISTS workspaces (
   slug TEXT NOT NULL UNIQUE,
   description TEXT,
   icon TEXT DEFAULT '📁',
+  github_project_owner TEXT,
+  github_project_number INTEGER,
+  github_project_title TEXT,
+  github_project_url TEXT,
+  github_project_auto_refresh INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -188,8 +193,11 @@ CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_source_project_item_id ON tasks(source_project_item_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_github_issue_unique
-  ON tasks(source_repo_owner, source_repo_name, source_issue_number)
+  ON tasks(workspace_id, source_repo_owner, source_repo_name, source_issue_number)
   WHERE source_repo_owner IS NOT NULL AND source_repo_name IS NOT NULL AND source_issue_number IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_github_project_item_unique
+  ON tasks(source_project_item_id)
+  WHERE source_project_item_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_agents_workspace ON agents(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);

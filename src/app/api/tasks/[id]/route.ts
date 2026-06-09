@@ -159,8 +159,19 @@ export async function PATCH(
         ? queryOne<Pick<Task, 'id' | 'title' | 'status' | 'priority' | 'created_at' | 'updated_at'>>(
             `SELECT id, title, status, priority, created_at, updated_at
              FROM tasks
-             WHERE source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ? AND id != ?`,
-            [derivedGitHubSource.repo_owner, derivedGitHubSource.repo_name, derivedGitHubSource.issue_number, id]
+             WHERE id != ?
+               AND (
+                 (workspace_id = ? AND source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ?)
+                 OR (source_project_item_id IS NOT NULL AND source_project_item_id = ?)
+               )`,
+            [
+              id,
+              existing.workspace_id,
+              derivedGitHubSource.repo_owner,
+              derivedGitHubSource.repo_name,
+              derivedGitHubSource.issue_number,
+              derivedGitHubSource.project_item_id ?? '',
+            ]
           )
         : undefined;
 

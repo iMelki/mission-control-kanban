@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle, Github } from 'lucide-react';
 import Link from 'next/link';
 import type { WorkspaceStats } from '@/lib/types';
 
@@ -65,7 +65,7 @@ export function WorkspaceDashboard() {
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-2">All Workspaces</h2>
           <p className="text-mc-text-secondary">
-            Select a workspace to view its mission queue and agents
+            Select a cockpit workspace. Project-backed workspaces mirror GitHub Projects into local MCK tasks.
           </p>
         </div>
 
@@ -160,7 +160,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {workspace.id !== 'default' && (
+            {workspace.id !== 'default' && !workspace.github_project_number && (
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -188,6 +188,20 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
             <span>{workspace.agentCount} agents</span>
           </div>
         </div>
+
+        {workspace.github_project_owner && workspace.github_project_number && (
+          <div className="mt-4 rounded border border-mc-border/70 bg-mc-bg px-3 py-2 text-xs text-mc-text-secondary">
+            <div className="flex items-center gap-2">
+              <Github className="size-3.5 text-mc-accent-cyan" />
+              <span className="font-medium text-mc-text">
+                GitHub Project #{workspace.github_project_number}
+              </span>
+            </div>
+            <p className="mt-1">
+              Auto-refreshes from {workspace.github_project_title || workspace.name}; GitHub remains the task source of truth.
+            </p>
+          </div>
+        )}
       </div>
     </Link>
 

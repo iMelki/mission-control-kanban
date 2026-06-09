@@ -5,6 +5,7 @@ import {
   buildGitHubImportPreviewResponse,
   buildTaskRefreshUpdateFromGitHubPreview,
 } from '../src/lib/github-task-import';
+import { GITHUB_PROJECT_WORKSPACE_MAPPINGS } from '../src/lib/github-project-sync';
 import { requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
@@ -20,6 +21,20 @@ test('GitHub diagnostics treats missing tokens as blocked', () => {
   assert.equal(payload.authenticated, false);
   assert.equal(payload.issue_read_available, false);
   assert.equal(payload.project_read_available, false);
+});
+
+test('GitHub Project workspace mappings cover the operator boards without duplicating source of truth', () => {
+  const mappings = new Map(GITHUB_PROJECT_WORKSPACE_MAPPINGS.map((mapping) => [mapping.slug, mapping]));
+
+  assert.equal(mappings.get('assistants')?.github_project_number, 13);
+  assert.equal(mappings.get('memsys')?.github_project_number, 12);
+  assert.equal(mappings.get('content-factory')?.github_project_number, 14);
+
+  for (const mapping of GITHUB_PROJECT_WORKSPACE_MAPPINGS) {
+    assert.equal(mapping.github_project_owner, 'iMelki');
+    assert.equal(mapping.github_project_auto_refresh, true);
+    assert.match(mapping.description, /mapped to GitHub Project/i);
+  }
 });
 
 test('GitHub diagnostics reports limited when Project field reads need read:project', () => {
