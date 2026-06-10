@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project-backed workspace mappings for Assistants, MemSys, and Content
   Factory, including a local GitHub Project refresh API and workspace banner
   control
+- Durable n8n MCK sync run-history API at `/api/n8n/mck-sync-status` plus a
+  workspace banner status line for the last scheduled sync result and alert
+  state
+- `npm run dev:n8n` for running local MCK on `0.0.0.0:3002` so Docker-backed
+  n8n workflows can reach the app consistently
 
 ### Changed
 

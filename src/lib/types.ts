@@ -205,6 +205,44 @@ export interface GitHubWritebackLog {
   created_at: string;
 }
 
+export type MckN8nSyncAlertLevel = 'ok' | 'warning' | 'error' | 'unknown';
+
+export interface MckN8nSyncSummary {
+  scanned_items?: number;
+  imported?: number;
+  updated?: number;
+  moved?: number;
+  skipped?: number;
+  skipped_closed?: number;
+  errors?: number;
+  failed?: number;
+  [key: string]: unknown;
+}
+
+export interface MckN8nSyncRun {
+  id: string;
+  workflow_id: string;
+  workflow_name: string;
+  mode: string;
+  dry_run: boolean;
+  ok: boolean;
+  alert_level: MckN8nSyncAlertLevel;
+  alert_message?: string | null;
+  base_url?: string | null;
+  workspaces: string[];
+  summary?: MckN8nSyncSummary | null;
+  results?: unknown[] | null;
+  raw_payload?: Record<string, unknown> | null;
+  received_at: string;
+  created_at: string;
+}
+
+export interface MckN8nSyncStatusResponse {
+  ok: boolean;
+  latest: MckN8nSyncRun | null;
+  history: MckN8nSyncRun[];
+}
+
 export type DeliverableType = 'file' | 'url' | 'artifact';
 
 export interface TaskDeliverable {
