@@ -37,6 +37,21 @@ function formatSyncCount(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatSyncCadence(status: MckN8nSyncStatusResponse['latest']): string {
+  const cadence = status?.raw_payload?.scheduleCadence;
+  if (!cadence || typeof cadence !== 'object' || Array.isArray(cadence)) {
+    return 'configured schedule';
+  }
+
+  const cadenceRecord = cadence as Record<string, unknown>;
+  const schedule = Array.isArray(cadenceRecord.schedule)
+    ? cadenceRecord.schedule.map((item) => String(item)).join(', ')
+    : '';
+  const timezone = typeof cadenceRecord.timezone === 'string' ? cadenceRecord.timezone : '';
+
+  return [schedule, timezone].filter(Boolean).join(' ') || 'configured schedule';
+}
+
 export default function WorkspacePage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -350,8 +365,11 @@ export default function WorkspacePage() {
                   n8n sync: {latestN8nSync ? (n8nSyncHasAlert ? 'attention needed' : 'ok') : 'waiting for first scheduled run'}
                 </span>
                 <span>
-                  Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - cadence twice daily
+                  Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - {formatSyncCadence(latestN8nSync)}
                 </span>
+                <Link href="/n8n-sync-history" className="text-mc-accent-cyan hover:text-mc-accent">
+                  View history
+                </Link>
                 {latestN8nSync?.alert_message && n8nSyncHasAlert && (
                   <span>{latestN8nSync.alert_message}</span>
                 )}

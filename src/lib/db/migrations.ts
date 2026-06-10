@@ -351,6 +351,47 @@ const migrations: Migration[] = [
       `);
       db.exec('CREATE INDEX IF NOT EXISTS idx_n8n_sync_runs_created ON n8n_sync_runs(created_at DESC)');
     }
+  },
+  {
+    id: '011',
+    name: 'add_mck_sync_test_workspace',
+    up: (db) => {
+      console.log('[Migration 011] Adding guarded MCK sync test workspace...');
+
+      db.prepare(`
+        INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        'mck-sync-test-assistants',
+        'MCK Sync Test - Assistants',
+        'mck-sync-test-assistants',
+        'Temporary guarded workspace for non-dry-run n8n sync validation against GitHub Project #13.',
+        'T'
+      );
+
+      db.prepare(`
+        UPDATE workspaces
+        SET name = ?,
+            description = ?,
+            icon = ?,
+            github_project_owner = ?,
+            github_project_number = ?,
+            github_project_title = ?,
+            github_project_url = ?,
+            github_project_auto_refresh = 0,
+            updated_at = datetime('now')
+        WHERE slug = ?
+      `).run(
+        'MCK Sync Test - Assistants',
+        'Temporary guarded workspace for non-dry-run n8n sync validation against GitHub Project #13.',
+        'T',
+        'iMelki',
+        13,
+        'Assistants',
+        'https://github.com/users/iMelki/projects/13',
+        'mck-sync-test-assistants'
+      );
+    }
   }
 ];
 
