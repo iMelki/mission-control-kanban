@@ -320,8 +320,36 @@ const migrations: Migration[] = [
       db.exec(`
         CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_github_project_item_unique
           ON tasks(source_project_item_id)
-          WHERE source_project_item_id IS NOT NULL
+        WHERE source_project_item_id IS NOT NULL
       `);
+    }
+  },
+  {
+    id: '010',
+    name: 'add_n8n_sync_runs',
+    up: (db) => {
+      console.log('[Migration 010] Adding n8n MCK sync run history...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS n8n_sync_runs (
+          id TEXT PRIMARY KEY,
+          workflow_id TEXT NOT NULL,
+          workflow_name TEXT NOT NULL,
+          mode TEXT NOT NULL,
+          dry_run INTEGER NOT NULL DEFAULT 1,
+          ok INTEGER NOT NULL DEFAULT 0,
+          alert_level TEXT NOT NULL DEFAULT 'unknown',
+          alert_message TEXT,
+          base_url TEXT,
+          workspaces TEXT NOT NULL,
+          summary TEXT,
+          results TEXT,
+          raw_payload TEXT NOT NULL,
+          received_at TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_n8n_sync_runs_created ON n8n_sync_runs(created_at DESC)');
     }
   }
 ];

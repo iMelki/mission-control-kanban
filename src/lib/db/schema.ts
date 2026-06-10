@@ -187,6 +187,25 @@ CREATE TABLE IF NOT EXISTS github_writeback_logs (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- n8n MCK sync run history (local automation health trail)
+CREATE TABLE IF NOT EXISTS n8n_sync_runs (
+  id TEXT PRIMARY KEY,
+  workflow_id TEXT NOT NULL,
+  workflow_name TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  dry_run INTEGER NOT NULL DEFAULT 1,
+  ok INTEGER NOT NULL DEFAULT 0,
+  alert_level TEXT NOT NULL DEFAULT 'unknown',
+  alert_message TEXT,
+  base_url TEXT,
+  workspaces TEXT NOT NULL,
+  summary TEXT,
+  results TEXT,
+  raw_payload TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
@@ -207,4 +226,5 @@ CREATE INDEX IF NOT EXISTS idx_deliverables_task ON task_deliverables(task_id);
 CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_github_writeback_logs_task ON github_writeback_logs(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_n8n_sync_runs_created ON n8n_sync_runs(created_at DESC);
 `;

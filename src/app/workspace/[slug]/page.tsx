@@ -12,7 +12,30 @@ import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
-import type { Task, Workspace } from '@/lib/types';
+import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
+
+function formatSyncTimestamp(value?: string): string {
+  if (!value) {
+    return 'never';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'unknown time';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsed);
+}
+
+function formatSyncCount(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export default function WorkspacePage() {
   const params = useParams();
@@ -33,6 +56,7 @@ export default function WorkspacePage() {
     state: 'idle' | 'syncing' | 'success' | 'error';
     message?: string;
   }>({ state: 'idle' });
+  const [n8nSyncStatus, setN8nSyncStatus] = useState<MckN8nSyncStatusResponse | null>(null);
   const autoSyncedWorkspaceRef = useRef<string | null>(null);
 
   const loadWorkspaceTasks = useCallback(async (workspaceIdToLoad: string) => {
@@ -81,6 +105,19 @@ export default function WorkspacePage() {
     }
   }, [loadWorkspaceTasks]);
 
+  const loadN8nSyncStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/n8n/mck-sync-status?limit=5');
+      if (!res.ok) {
+        return;
+      }
+
+      setN8nSyncStatus(await res.json());
+    } catch (error) {
+      console.error('Failed to load n8n sync status:', error);
+    }
+  }, []);
+
   // Connect to SSE for real-time updates
   useSSE();
 
@@ -128,6 +165,9 @@ export default function WorkspacePage() {
         if (agentsRes.ok) setAgents(await agentsRes.json());
         await loadWorkspaceTasks(workspaceId);
         if (eventsRes.ok) setEvents(await eventsRes.json());
+        if (currentWorkspace.github_project_owner && currentWorkspace.github_project_number) {
+          void loadN8nSyncStatus();
+        }
       } catch (error) {
         console.error('Failed to load data:', error);
       } finally {
@@ -215,12 +255,21 @@ export default function WorkspacePage() {
       }
     }, 30000);
 
+    const n8nStatusPoll = currentWorkspace.github_project_owner && currentWorkspace.github_project_number
+      ? setInterval(() => {
+        void loadN8nSyncStatus();
+      }, 60000)
+      : null;
+
     return () => {
       clearInterval(eventPoll);
       clearInterval(connectionCheck);
       clearInterval(taskPoll);
+      if (n8nStatusPoll) {
+        clearInterval(n8nStatusPoll);
+      }
     };
-  }, [workspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading, loadWorkspaceTasks, runGitHubProjectSync]);
+  }, [workspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading, loadWorkspaceTasks, runGitHubProjectSync, loadN8nSyncStatus]);
 
   if (notFound) {
     return (
@@ -254,6 +303,15 @@ export default function WorkspacePage() {
     );
   }
 
+  const latestN8nSync = n8nSyncStatus?.latest ?? null;
+  const n8nSummary = (latestN8nSync?.summary ?? {}) as Record<string, unknown>;
+  const n8nSyncHasAlert = Boolean(
+    latestN8nSync && (!latestN8nSync.ok || latestN8nSync.alert_level === 'error')
+  );
+  const n8nSyncCounts = latestN8nSync
+    ? `${formatSyncCount(n8nSummary.scanned_items)} scanned, ${formatSyncCount(n8nSummary.updated)} updated, ${formatSyncCount(n8nSummary.errors)} errors`
+    : 'no recorded runs yet';
+
   return (
     <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
       <Header workspace={workspace} />
@@ -261,25 +319,43 @@ export default function WorkspacePage() {
       {workspace.github_project_owner && workspace.github_project_number && (
         <div className="border-b border-mc-border bg-mc-bg-secondary px-4 py-2">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
-              {githubSyncState.state === 'syncing' ? (
-                <Loader2 className="size-4 animate-spin text-mc-accent-cyan" />
-              ) : githubSyncState.state === 'error' ? (
-                <AlertTriangle className="size-4 text-rose-300" />
-              ) : githubSyncState.state === 'success' ? (
-                <CheckCircle2 className="size-4 text-emerald-300" />
-              ) : (
-                <RefreshCw className="size-4 text-mc-accent-cyan" />
-              )}
-              <span>
-                GitHub Project #{workspace.github_project_number}
-                {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
-              </span>
-              {githubSyncState.message && (
-                <span className={githubSyncState.state === 'error' ? 'text-rose-200' : 'text-mc-text-secondary'}>
-                  {githubSyncState.message}
+            <div className="flex flex-col gap-1 text-sm text-mc-text-secondary">
+              <div className="flex flex-wrap items-center gap-2">
+                {githubSyncState.state === 'syncing' ? (
+                  <Loader2 className="size-4 animate-spin text-mc-accent-cyan" />
+                ) : githubSyncState.state === 'error' ? (
+                  <AlertTriangle className="size-4 text-rose-300" />
+                ) : githubSyncState.state === 'success' ? (
+                  <CheckCircle2 className="size-4 text-emerald-300" />
+                ) : (
+                  <RefreshCw className="size-4 text-mc-accent-cyan" />
+                )}
+                <span>
+                  GitHub Project #{workspace.github_project_number}
+                  {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
                 </span>
-              )}
+                {githubSyncState.message && (
+                  <span className={githubSyncState.state === 'error' ? 'text-rose-200' : 'text-mc-text-secondary'}>
+                    {githubSyncState.message}
+                  </span>
+                )}
+              </div>
+              <div className={n8nSyncHasAlert ? 'flex flex-wrap items-center gap-2 text-rose-200' : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
+                {n8nSyncHasAlert ? (
+                  <AlertTriangle className="size-4 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
+                )}
+                <span>
+                  n8n sync: {latestN8nSync ? (n8nSyncHasAlert ? 'attention needed' : 'ok') : 'waiting for first scheduled run'}
+                </span>
+                <span>
+                  Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - cadence twice daily
+                </span>
+                {latestN8nSync?.alert_message && n8nSyncHasAlert && (
+                  <span>{latestN8nSync.alert_message}</span>
+                )}
+              </div>
             </div>
             <button
               type="button"

@@ -13,6 +13,7 @@ import {
   type GitHubWritebackTaskSnapshot,
 } from '../src/lib/github-writeback';
 import { buildGitHubDiagnosticsPayload, buildMissingTokenDiagnostics } from '../src/lib/github-diagnostics';
+import { normalizeMckN8nSyncPayload } from '../src/lib/n8n-sync-status';
 
 test('GitHub diagnostics treats missing tokens as blocked', () => {
   const payload = buildMissingTokenDiagnostics();
@@ -35,6 +36,40 @@ test('GitHub Project workspace mappings cover the operator boards without duplic
     assert.equal(mapping.github_project_auto_refresh, true);
     assert.match(mapping.description, /mapped to GitHub Project/i);
   }
+});
+
+test('MCK n8n sync payload normalization records alert state and run scope', () => {
+  const normalized = normalizeMckN8nSyncPayload(
+    {
+      ok: false,
+      dryRun: false,
+      receivedAt: '2026-06-10T07:00:00.000Z',
+      mode: 'local-mck-sync',
+      baseUrl: 'http://mck.host:3002',
+      workspaces: ['assistants', 'memsys'],
+      summary: {
+        scanned_items: 90,
+        updated: 10,
+        errors: 1,
+      },
+      alert: {
+        level: 'error',
+        message: 'MCK sync returned 1 error.',
+      },
+      results: [
+        { workspace: 'assistants', ok: true },
+        { workspace: 'memsys', ok: false },
+      ],
+    },
+    new Date('2026-06-10T07:00:01.000Z')
+  );
+
+  assert.equal(normalized.dry_run, false);
+  assert.equal(normalized.ok, false);
+  assert.equal(normalized.alert_level, 'error');
+  assert.equal(normalized.alert_message, 'MCK sync returned 1 error.');
+  assert.deepEqual(normalized.workspaces, ['assistants', 'memsys']);
+  assert.equal(normalized.received_at, '2026-06-10T07:00:00.000Z');
 });
 
 test('GitHub diagnostics reports limited when Project field reads need read:project', () => {
