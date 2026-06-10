@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Beginner-facing GitHub import flow in the Mission Queue UI with an
+  **Import GitHub** modal for loading a GitHub issue URL before creating a
+  linked local task
+- Visible **GitHub Write-Back** panel in the task modal with dry-run and apply
+  controls for GitHub-linked tasks
+- `POST /api/github/load-issue` for resolving issue data plus linked GitHub
+  Project item field values through `gh api`
+- `GET /api/github/diagnostics` plus a Mission Queue diagnostics pill so
+  operators can verify token source, GitHub auth, and Project-read availability
+  before importing work
+- Mission Queue GitHub readiness card that maps the same diagnostics into
+  import preview, dry-run write-back, and apply write-back availability
+- First-run operator documentation for the GitHub-native flow in
+  `docs/GITHUB_IMPORT_PREVIEW.md`
+- Diagnostics now probe a real GitHub Project field read, so tokens that can
+  read issues but lack `read:project` report `limited` instead of a false
+  import/write-back-ready state
+- GitHub issue loading now degrades gracefully when Project fields are
+  unavailable, allowing issue-only imports while warning that Project-backed
+  sync is limited
+- Project-backed workspace mappings for Assistants, MemSys, and Content
+  Factory, including a local GitHub Project refresh API and workspace banner
+  control
+
+### Changed
+
+- GitHub import preview now normalizes required dispatch-contract fields from
+  GitHub Project fields as well as issue-body sections
+- Imported GitHub tasks are blocked from entering active work statuses until
+  `Allowed File Scope`, `Acceptance Criteria`, `Test Requirements`, `Review
+  Mode`, `Impact`, and `Rollback / Fallback Plan` are present
+- Imported task cards and the task modal now explain why a task remains in
+  `Inbox` instead of forcing the operator to infer that from a failed drag
+- GitHub write-back continues to fall back to `gh api` when direct Node fetches
+  are unavailable in the local environment
+- The local React Doctor pre-commit wrapper now passes clean scans even when
+  the remote score API is temporarily unreachable
+- Project-backed workspaces now auto-refresh from their mapped GitHub Project
+  on open while preserving GitHub as the source of truth and avoiding local
+  workflow status churn
+
+---
+
 ## [1.0.2] - 2026-02-04
 
 ### Fixed

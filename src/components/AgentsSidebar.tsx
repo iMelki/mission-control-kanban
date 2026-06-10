@@ -22,13 +22,15 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
 
   // Load OpenClaw session status for all agents on mount
   useEffect(() => {
+    let cancelled = false;
+
     const loadOpenClawSessions = async () => {
       for (const agent of agents) {
         try {
           const res = await fetch(`/api/agents/${agent.id}/openclaw`);
           if (res.ok) {
             const data = await res.json();
-            if (data.linked && data.session) {
+            if (!cancelled && data.linked && data.session) {
               setAgentOpenClawSession(agent.id, data.session as OpenClawSession);
             }
           }
@@ -37,10 +39,15 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
         }
       }
     };
+
     if (agents.length > 0) {
-      loadOpenClawSessions();
+      void loadOpenClawSessions();
     }
-  }, [agents.length]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [agents, setAgentOpenClawSession]);
 
   // Load active sub-agent count
   useEffect(() => {

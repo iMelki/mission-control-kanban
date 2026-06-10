@@ -1,5 +1,12 @@
 // Core types for Mission Control
 
+import type {
+  DispatchMetadata,
+  DispatchReadiness,
+  DispatchReviewMode,
+  DispatchRiskLevel,
+} from './dispatch-contract';
+
 export type AgentStatus = 'standby' | 'working' | 'offline';
 
 export type TaskStatus = 'planning' | 'inbox' | 'assigned' | 'in_progress' | 'testing' | 'review' | 'done';
@@ -36,6 +43,14 @@ export interface Agent {
   updated_at: string;
 }
 
+export interface GitHubSourceIdentity {
+  repo_owner: string;
+  repo_name: string;
+  issue_number: number;
+  issue_url: string;
+  project_item_id?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -49,6 +64,10 @@ export interface Task {
   due_date?: string;
   created_at: string;
   updated_at: string;
+  github_source?: GitHubSourceIdentity;
+  dispatch_metadata?: DispatchMetadata;
+  dispatch_ready?: boolean;
+  dispatch_blockers?: string[];
   // Joined fields
   assigned_agent?: Agent;
   created_by_agent?: Agent;
@@ -104,6 +123,11 @@ export interface Workspace {
   slug: string;
   description?: string;
   icon: string;
+  github_project_owner?: string | null;
+  github_project_number?: number | null;
+  github_project_title?: string | null;
+  github_project_url?: string | null;
+  github_project_auto_refresh?: boolean | number | null;
   created_at: string;
   updated_at: string;
 }
@@ -113,6 +137,12 @@ export interface WorkspaceStats {
   name: string;
   slug: string;
   icon: string;
+  description?: string;
+  github_project_owner?: string | null;
+  github_project_number?: number | null;
+  github_project_title?: string | null;
+  github_project_url?: string | null;
+  github_project_auto_refresh?: boolean | number | null;
   taskCounts: {
     planning: number;
     inbox: number;
@@ -139,7 +169,13 @@ export interface OpenClawSession {
   updated_at: string;
 }
 
-export type ActivityType = 'spawned' | 'updated' | 'completed' | 'file_created' | 'status_changed';
+export type ActivityType =
+  | 'spawned'
+  | 'updated'
+  | 'completed'
+  | 'file_created'
+  | 'status_changed'
+  | 'github_writeback';
 
 export interface TaskActivity {
   id: string;
@@ -151,6 +187,22 @@ export interface TaskActivity {
   created_at: string;
   // Joined fields
   agent?: Agent;
+}
+
+export type GitHubWritebackMode = 'dry_run' | 'apply';
+export type GitHubWritebackStatus = 'planned' | 'applied' | 'skipped' | 'failed';
+
+export interface GitHubWritebackLog {
+  id: string;
+  task_id: string;
+  mode: GitHubWritebackMode;
+  status: GitHubWritebackStatus;
+  signature: string;
+  issue_comment_body?: string | null;
+  project_updates?: string | null;
+  response_payload?: string | null;
+  error_message?: string | null;
+  created_at: string;
 }
 
 export type DeliverableType = 'file' | 'url' | 'artifact';
@@ -240,10 +292,13 @@ export interface CreateTaskRequest {
   created_by_agent_id?: string;
   business_id?: string;
   due_date?: string;
+  github_source?: GitHubSourceIdentity | null;
+  dispatch_metadata?: DispatchMetadata;
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
   status?: TaskStatus;
+  github_source?: GitHubSourceIdentity | null;
 }
 
 export interface SendMessageRequest {
@@ -305,3 +360,5 @@ export interface SSEEvent {
     id: string;  // For task_deleted events
   };
 }
+
+export type { DispatchMetadata, DispatchReadiness, DispatchReviewMode, DispatchRiskLevel };

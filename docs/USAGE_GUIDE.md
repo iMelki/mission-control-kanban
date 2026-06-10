@@ -9,7 +9,7 @@ Both **Mission Control** and **OpenClaw Gateway** are running on Railway. They t
 ```mermaid
 graph LR
     User[User] -- Browser --> MC[Mission Control (Railway)];
-    MC -- "Internal DNS (ws://claw:18789)" --> Gateway[OpenClaw Gateway (Railway)];
+    MC -- "Internal DNS (ws://claw:28789)" --> Gateway[OpenClaw Gateway (Railway)];
     Gateway -- Spawns --> Agent[AI Agent (Ephemeral)];
     Agent -- Edits --> Files[Container Filesystem];
 ```
@@ -27,15 +27,15 @@ graph LR
 
 1.  **Mission Control Env Vars**:
     Ensure Mission Control has the **FULL URL**.
-    *   `OPENCLAW_GATEWAY_URL`: `ws://claw:18789`
+    *   `OPENCLAW_GATEWAY_URL`: `ws://claw:28789`
 
-    > **Important**: You **MUST** include `ws://` and `:18789`. If you only put `claw`, the code will crash because it expects a valid URL string.
+    > **Important**: You **MUST** include `ws://` and `:28789`. If you only put `claw`, the code will crash because it expects a valid URL string.
     > (The arrow on Railway's dashboard just means the variable *exists*, not that it's correct!)
 
     *   `OPENCLAW_GATEWAY_TOKEN`: (Optional, but good practice)
 
 2.  **OpenClaw Gateway Env Vars**:
-    Ensure the Gateway service has `PORT` set to `18789` (or maps 18789 to the internal port).
+    Ensure the Gateway service has `PORT` set to `28789` (or maps 28789 to the internal port).
 
 ## 🎮 "What Now?" - How to Use
 
@@ -77,7 +77,7 @@ Once connected:
 
 *   **Status stays OFFLINE**:
     *   Check that both Mission Control and OpenClaw Gateway are deployed and healthy on Railway.
-    *   Verify Mission Control is using the correct internal Gateway URL/port (for example `ws://claw:18789`, matching your Railway service name).
+    *   Verify Mission Control is using the correct internal Gateway URL/port (for example `ws://claw:28789`, matching your Railway service name).
     *   Review Railway networking/service logs to confirm the two services can reach each other.
 *   **Planning hangs**:
     *   This usually means the API call from Mission Control -> Gateway failed or the Gateway could not talk to the configured LLM. Check the Railway logs for the OpenClaw Gateway service and verify its LLM-related environment variables are set correctly.

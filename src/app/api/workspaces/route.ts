@@ -55,7 +55,13 @@ export async function GET(request: NextRequest) {
           id: workspace.id,
           name: workspace.name,
           slug: workspace.slug,
+          description: workspace.description,
           icon: workspace.icon,
+          github_project_owner: workspace.github_project_owner,
+          github_project_number: workspace.github_project_number,
+          github_project_title: workspace.github_project_title,
+          github_project_url: workspace.github_project_url,
+          github_project_auto_refresh: workspace.github_project_auto_refresh,
           taskCounts: counts,
           agentCount: agentCount.count
         };

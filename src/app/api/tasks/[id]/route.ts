@@ -1,9 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, run, queryAll } from '@/lib/db';
+import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
-import type { Task, UpdateTaskRequest, Agent, TaskDeliverable } from '@/lib/types';
+import {
+  parseDispatchMetadata,
+  serializeDispatchMetadata,
+  validateDispatchMetadata,
+  requiresDispatchContractBeforeWorkStarts,
+} from '@/lib/dispatch-contract';
+import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
+import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
+
+type TaskRow = Task & {
+  assigned_agent_name?: string;
+  assigned_agent_emoji?: string;
+  created_by_agent_name?: string;
+  created_by_agent_emoji?: string;
+  dispatch_metadata?: string | null;
+  source_repo_owner?: string | null;
+  source_repo_name?: string | null;
+  source_issue_number?: number | null;
+  source_issue_url?: string | null;
+  source_project_item_id?: string | null;
+};
+
+function decorateTask(task: TaskRow) {
+  const {
+    dispatch_metadata,
+    source_repo_owner,
+    source_repo_name,
+    source_issue_number,
+    source_issue_url,
+    source_project_item_id,
+    ...rest
+  } = task;
+  const dispatchMetadata = parseDispatchMetadata(task.dispatch_metadata);
+  const validation = validateDispatchMetadata(dispatchMetadata);
+  const githubSource = normalizeGitHubSourceIdentity({
+    repo_owner: source_repo_owner,
+    repo_name: source_repo_name,
+    issue_number: source_issue_number,
+    issue_url: source_issue_url,
+    project_item_id: source_project_item_id,
+  });
+
+  return {
+    ...rest,
+    github_source: githubSource,
+    dispatch_metadata: dispatchMetadata,
+    dispatch_ready: validation.canDispatch,
+    dispatch_blockers: validation.blockers,
+  };
+}
 
 // GET /api/tasks/[id] - Get a single task
 export async function GET(
@@ -12,7 +61,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const task = queryOne<Task>(
+    const task = queryOne<TaskRow>(
       `SELECT t.*,
         aa.name as assigned_agent_name,
         aa.avatar_emoji as assigned_agent_emoji
@@ -26,7 +75,7 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    return NextResponse.json(task);
+    return NextResponse.json(decorateTask(task));
   } catch (error) {
     console.error('Failed to fetch task:', error);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
@@ -42,10 +91,18 @@ export async function PATCH(
     const { id } = await params;
     const body: UpdateTaskRequest & { updated_by_agent_id?: string } = await request.json();
 
-    const existing = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [id]);
+    const existing = queryOne<TaskRow>('SELECT * FROM tasks WHERE id = ?', [id]);
     if (!existing) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
+
+    const existingGitHubSource = normalizeGitHubSourceIdentity({
+      repo_owner: existing.source_repo_owner,
+      repo_name: existing.source_repo_name,
+      issue_number: existing.source_issue_number,
+      issue_url: existing.source_issue_url,
+      project_item_id: existing.source_project_item_id,
+    });
 
     const updates: string[] = [];
     const values: unknown[] = [];
@@ -84,6 +141,81 @@ export async function PATCH(
       updates.push('due_date = ?');
       values.push(body.due_date);
     }
+    if (body.dispatch_metadata !== undefined) {
+      updates.push('dispatch_metadata = ?');
+      values.push(serializeDispatchMetadata(body.dispatch_metadata));
+    }
+
+    const shouldClearGitHubSource = Object.prototype.hasOwnProperty.call(body, 'github_source') && body.github_source === null;
+    const derivedGitHubSource = shouldClearGitHubSource
+      ? null
+      : deriveGitHubSourceIdentity({
+          github_source: body.github_source,
+          dispatch_metadata: body.dispatch_metadata,
+        });
+
+    if (shouldClearGitHubSource || derivedGitHubSource) {
+      const duplicate = derivedGitHubSource
+        ? queryOne<Pick<Task, 'id' | 'title' | 'status' | 'priority' | 'created_at' | 'updated_at'>>(
+            `SELECT id, title, status, priority, created_at, updated_at
+             FROM tasks
+             WHERE id != ?
+               AND (
+                 (workspace_id = ? AND source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ?)
+                 OR (source_project_item_id IS NOT NULL AND source_project_item_id = ?)
+               )`,
+            [
+              id,
+              existing.workspace_id,
+              derivedGitHubSource.repo_owner,
+              derivedGitHubSource.repo_name,
+              derivedGitHubSource.issue_number,
+              derivedGitHubSource.project_item_id ?? '',
+            ]
+          )
+        : undefined;
+
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            error: `GitHub issue already imported as task ${duplicate.id}`,
+            existing_task: duplicate,
+          },
+          { status: 409 }
+        );
+      }
+
+      updates.push('source_repo_owner = ?');
+      values.push(derivedGitHubSource?.repo_owner || null);
+      updates.push('source_repo_name = ?');
+      values.push(derivedGitHubSource?.repo_name || null);
+      updates.push('source_issue_number = ?');
+      values.push(derivedGitHubSource?.issue_number || null);
+      updates.push('source_issue_url = ?');
+      values.push(derivedGitHubSource?.issue_url || null);
+      updates.push('source_project_item_id = ?');
+      values.push(derivedGitHubSource?.project_item_id || null);
+    }
+
+    const effectiveGitHubSource = shouldClearGitHubSource
+      ? null
+      : derivedGitHubSource ?? existingGitHubSource;
+    const effectiveDispatchMetadata = body.dispatch_metadata !== undefined
+      ? parseDispatchMetadata(body.dispatch_metadata)
+      : parseDispatchMetadata(existing.dispatch_metadata);
+
+    if (body.status !== undefined && requiresDispatchContractBeforeWorkStarts(body.status) && effectiveGitHubSource) {
+      const validation = validateDispatchMetadata(effectiveDispatchMetadata);
+      if (!validation.canDispatch) {
+        return NextResponse.json(
+          {
+            error: `Imported GitHub tasks cannot enter ${body.status} until the dispatch contract is complete`,
+            blockers: validation.blockers,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     // Track if we need to dispatch task
     let shouldDispatch = false;
@@ -103,7 +235,7 @@ export async function PATCH(
       run(
         `INSERT INTO events (id, type, task_id, message, created_at)
          VALUES (?, ?, ?, ?, ?)`,
-        [uuidv4(), eventType, id, `Task "${existing.title}" moved to ${body.status}`, now]
+        [uuidv4(), eventType, id, `Task \"${existing.title}\" moved to ${body.status}`, now]
       );
     }
 
@@ -118,7 +250,7 @@ export async function PATCH(
           run(
             `INSERT INTO events (id, type, agent_id, task_id, message, created_at)
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [uuidv4(), 'task_assigned', body.assigned_agent_id, id, `"${existing.title}" assigned to ${agent.name}`, now]
+            [uuidv4(), 'task_assigned', body.assigned_agent_id, id, `\"${existing.title}\" assigned to ${agent.name}`, now]
           );
 
           // Auto-dispatch if already in assigned status or being assigned now
@@ -140,7 +272,7 @@ export async function PATCH(
     run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
 
     // Fetch updated task with all joined fields
-    const task = queryOne<Task>(
+    const task = queryOne<TaskRow>(
       `SELECT t.*,
         aa.name as assigned_agent_name,
         aa.avatar_emoji as assigned_agent_emoji,
@@ -153,27 +285,47 @@ export async function PATCH(
       [id]
     );
 
+    const decoratedTask = task ? decorateTask(task) : null;
+
     // Broadcast task update via SSE
-    if (task) {
+    if (decoratedTask) {
       broadcast({
         type: 'task_updated',
-        payload: task,
+        payload: decoratedTask,
       });
     }
 
     // Trigger auto-dispatch if needed
-    if (shouldDispatch) {
-      // Call dispatch endpoint asynchronously (don't wait for response)
-      const missionControlUrl = getMissionControlUrl();
-      fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      }).catch(err => {
-        console.error('Auto-dispatch failed:', err);
-      });
+    if (shouldDispatch && decoratedTask) {
+      const validation = validateDispatchMetadata(decoratedTask.dispatch_metadata);
+
+      if (!validation.canDispatch) {
+        run(
+          `INSERT INTO events (id, type, task_id, message, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            uuidv4(),
+            'system',
+            id,
+            `Dispatch blocked for \"${decoratedTask.title}\": ${validation.blockers.join('; ')}`,
+            JSON.stringify({ blockers: validation.blockers }),
+            now,
+          ]
+        );
+      } else {
+        // Call dispatch endpoint asynchronously (don't wait for response)
+        const missionControlUrl = getMissionControlUrl();
+        fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ task: decoratedTask }),
+        }).catch(err => {
+          console.error('Auto-dispatch failed:', err);
+        });
+      }
     }
 
-    return NextResponse.json(task);
+    return NextResponse.json(decoratedTask);
   } catch (error) {
     console.error('Failed to update task:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });

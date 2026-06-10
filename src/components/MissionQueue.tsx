@@ -1,10 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, ChevronRight, GripVertical } from 'lucide-react';
+import { useReducer } from 'react';
+import { Plus, ChevronRight, GripVertical, AlertTriangle, Github } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
+import {
+  READINESS_LABELS,
+  REVIEW_MODE_LABELS,
+  RISK_LEVEL_LABELS,
+  requiresDispatchContractBeforeWorkStarts,
+  summarizeDispatchContract,
+  validateDispatchMetadata,
+} from '@/lib/dispatch-contract';
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
+import { GitHubImportModal } from './GitHubImportModal';
+import { GitHubConnectionStatus } from './GitHubConnectionStatus';
+import { GitHubReadinessCard } from './GitHubReadinessCard';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MissionQueueProps {
@@ -21,17 +32,81 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: 'done', label: 'DONE', color: 'border-t-mc-accent-green' },
 ];
 
+interface MissionQueueUiState {
+  showCreateModal: boolean;
+  showGitHubImportModal: boolean;
+  editingTask: Task | null;
+  draggedTask: Task | null;
+  dropError: string | null;
+}
+
+type MissionQueueUiAction =
+  | { type: 'open_create_modal' }
+  | { type: 'close_create_modal' }
+  | { type: 'open_github_import_modal' }
+  | { type: 'close_github_import_modal' }
+  | { type: 'edit_task'; task: Task }
+  | { type: 'clear_editing_task' }
+  | { type: 'drag_task'; task: Task }
+  | { type: 'clear_dragged_task' }
+  | { type: 'set_drop_error'; error: string | null };
+
+const initialMissionQueueUiState: MissionQueueUiState = {
+  showCreateModal: false,
+  showGitHubImportModal: false,
+  editingTask: null,
+  draggedTask: null,
+  dropError: null,
+};
+
+function missionQueueUiReducer(
+  state: MissionQueueUiState,
+  action: MissionQueueUiAction,
+): MissionQueueUiState {
+  switch (action.type) {
+    case 'open_create_modal':
+      return { ...state, showCreateModal: true };
+    case 'close_create_modal':
+      return { ...state, showCreateModal: false };
+    case 'open_github_import_modal':
+      return { ...state, showGitHubImportModal: true };
+    case 'close_github_import_modal':
+      return { ...state, showGitHubImportModal: false };
+    case 'edit_task':
+      return { ...state, editingTask: action.task };
+    case 'clear_editing_task':
+      return { ...state, editingTask: null };
+    case 'drag_task':
+      return { ...state, draggedTask: action.task };
+    case 'clear_dragged_task':
+      return { ...state, draggedTask: null };
+    case 'set_drop_error':
+      return { ...state, dropError: action.error };
+    default:
+      return state;
+  }
+}
+
 export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const { tasks, updateTaskStatus, addEvent } = useMissionControl();
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [uiState, dispatchUi] = useReducer(
+    missionQueueUiReducer,
+    initialMissionQueueUiState,
+  );
+  const {
+    showCreateModal,
+    showGitHubImportModal,
+    editingTask,
+    draggedTask,
+    dropError,
+  } = uiState;
+  const blockedInboxTasks = tasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0);
 
   const getTasksByStatus = (status: TaskStatus) =>
     tasks.filter((task) => task.status === status);
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
-    setDraggedTask(task);
+    dispatchUi({ type: 'drag_task', task });
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -43,8 +118,29 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
     e.preventDefault();
     if (!draggedTask || draggedTask.status === targetStatus) {
-      setDraggedTask(null);
+      dispatchUi({ type: 'clear_dragged_task' });
       return;
+    }
+
+    dispatchUi({ type: 'set_drop_error', error: null });
+
+    if (draggedTask.github_source && requiresDispatchContractBeforeWorkStarts(targetStatus)) {
+      const validation = validateDispatchMetadata(draggedTask.dispatch_metadata);
+      if (!validation.canDispatch) {
+        const summary = summarizeDispatchContract(draggedTask.dispatch_metadata);
+        const message = `${draggedTask.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
+
+        dispatchUi({ type: 'set_drop_error', error: `${message} ${validation.blockers.join('; ')}`.trim() });
+        addEvent({
+          id: crypto.randomUUID(),
+          type: 'system',
+          task_id: draggedTask.id,
+          message,
+          created_at: new Date().toISOString(),
+        });
+        dispatchUi({ type: 'clear_dragged_task' });
+        return;
+      }
     }
 
     // Optimistic update
@@ -64,17 +160,25 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           id: crypto.randomUUID(),
           type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
           task_id: draggedTask.id,
-          message: `Task "${draggedTask.title}" moved to ${targetStatus}`,
+          message: `Task \"${draggedTask.title}\" moved to ${targetStatus}`,
           created_at: new Date().toISOString(),
         });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        dispatchUi({ type: 'set_drop_error', error: data.error || 'Failed to move task' });
+        updateTaskStatus(draggedTask.id, draggedTask.status);
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
+      dispatchUi({
+        type: 'set_drop_error',
+        error: error instanceof Error ? error.message : 'Failed to update task status',
+      });
       // Revert on error
       updateTaskStatus(draggedTask.id, draggedTask.status);
     }
 
-    setDraggedTask(null);
+    dispatchUi({ type: 'clear_dragged_task' });
   };
 
   return (
@@ -82,17 +186,59 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       {/* Header */}
       <div className="p-3 border-b border-mc-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ChevronRight className="w-4 h-4 text-mc-text-secondary" />
+          <ChevronRight className="size-4 text-mc-text-secondary" />
           <span className="text-sm font-medium uppercase tracking-wider">Mission Queue</span>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
-        >
-          <Plus className="w-4 h-4" />
-          New Task
-        </button>
+        <div className="flex items-center gap-2">
+          <GitHubConnectionStatus />
+          <button
+            type="button"
+            onClick={() => dispatchUi({ type: 'open_github_import_modal' })}
+            className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-cyan text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-cyan/90"
+          >
+            <Github className="size-4" />
+            Import GitHub
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatchUi({ type: 'open_create_modal' })}
+            className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
+          >
+            <Plus className="size-4" />
+            New Task
+          </button>
+        </div>
       </div>
+
+      <GitHubReadinessCard />
+
+      {blockedInboxTasks.length > 0 && (
+        <div className="mx-3 mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="size-4 mt-0.5 text-amber-300" />
+            <div>
+              <p className="font-medium">Inbox is acting as a safety gate for imported GitHub work.</p>
+              <p className="mt-1 text-xs text-amber-100/90">
+                {blockedInboxTasks.length} task{blockedInboxTasks.length === 1 ? '' : 's'} cannot move into
+                active columns yet because the dispatch contract is incomplete. Open the card and fill
+                allowed file scope, acceptance criteria, test requirements, impact, and rollback details.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dropError && (
+        <div className="mx-3 mt-3 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="size-4 mt-0.5 text-rose-300" />
+            <div>
+              <p className="font-medium">Dispatch move blocked</p>
+              <p className="mt-1 text-xs text-rose-100/90">{dropError}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Kanban Columns */}
       <div className="flex-1 flex gap-3 p-3 overflow-x-auto">
@@ -122,7 +268,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
                     key={task.id}
                     task={task}
                     onDragStart={handleDragStart}
-                    onClick={() => setEditingTask(task)}
+                    onClick={() => dispatchUi({ type: 'edit_task', task })}
                     isDragging={draggedTask?.id === task.id}
                   />
                 ))}
@@ -134,10 +280,13 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
       {/* Modals */}
       {showCreateModal && (
-        <TaskModal onClose={() => setShowCreateModal(false)} workspaceId={workspaceId} />
+        <TaskModal onClose={() => dispatchUi({ type: 'close_create_modal' })} workspaceId={workspaceId} />
+      )}
+      {showGitHubImportModal && (
+        <GitHubImportModal onClose={() => dispatchUi({ type: 'close_github_import_modal' })} workspaceId={workspaceId} />
       )}
       {editingTask && (
-        <TaskModal task={editingTask} onClose={() => setEditingTask(null)} workspaceId={workspaceId} />
+        <TaskModal task={editingTask} onClose={() => dispatchUi({ type: 'clear_editing_task' })} workspaceId={workspaceId} />
       )}
     </div>
   );
@@ -166,20 +315,38 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
   };
 
   const isPlanning = task.status === 'planning';
+  const blockers = task.dispatch_blockers ?? [];
+  const readiness = task.dispatch_metadata?.readiness;
+  const reviewMode = task.dispatch_metadata?.review_mode;
+  const riskLevel = task.dispatch_metadata?.risk_level;
+
+  const pillClass = (tone: 'ready' | 'warn' | 'risk' | 'neutral') => {
+    switch (tone) {
+      case 'ready':
+        return 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30';
+      case 'warn':
+        return 'bg-amber-500/10 text-amber-300 border border-amber-500/30';
+      case 'risk':
+        return 'bg-rose-500/10 text-rose-300 border border-rose-500/30';
+      default:
+        return 'bg-mc-bg-tertiary text-mc-text-secondary border border-mc-border/50';
+    }
+  };
 
   return (
-    <div
+    <button
+      type="button"
       draggable
       onDragStart={(e) => onDragStart(e, task)}
       onClick={onClick}
-      className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 ${
+      className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-all hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
-      {/* Drag handle bar */}
-      <div className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
-        <GripVertical className="w-4 h-4 text-mc-text-secondary/50 cursor-grab" />
-      </div>
+        {/* Drag handle bar */}
+        <div className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
+          <GripVertical className="size-4 text-mc-text-secondary/50 cursor-grab" />
+        </div>
 
       {/* Card content */}
       <div className="p-4">
@@ -191,7 +358,7 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
         {/* Planning mode indicator */}
         {isPlanning && (
           <div className="flex items-center gap-2 mb-3 py-2 px-3 bg-purple-500/10 rounded-md border border-purple-500/20">
-            <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse flex-shrink-0" />
+            <div className="size-2 bg-purple-500 rounded-full animate-pulse flex-shrink-0" />
             <span className="text-xs text-purple-400 font-medium">Continue planning</span>
           </div>
         )}
@@ -206,19 +373,56 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
           </div>
         )}
 
+        {(readiness || reviewMode || riskLevel) && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {readiness && (
+              <span className={`px-2 py-1 rounded text-[10px] font-medium ${task.dispatch_ready ? pillClass('ready') : pillClass('warn')}`}>
+                {READINESS_LABELS[readiness]}
+              </span>
+            )}
+            {reviewMode && (
+              <span className={`px-2 py-1 rounded text-[10px] font-medium ${pillClass('neutral')}`}>
+                {REVIEW_MODE_LABELS[reviewMode]}
+              </span>
+            )}
+            {riskLevel && (
+              <span className={`px-2 py-1 rounded text-[10px] font-medium ${['high', 'critical'].includes(riskLevel) ? pillClass('risk') : pillClass('warn')}`}>
+                {RISK_LEVEL_LABELS[riskLevel]}
+              </span>
+            )}
+          </div>
+        )}
+
+        {blockers.length > 0 && (
+          <div className="flex items-start gap-2 mb-3 py-2 px-2.5 rounded-md border border-rose-500/20 bg-rose-500/10">
+            <AlertTriangle className="size-3.5 text-rose-300 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="block text-[11px] text-rose-200 line-clamp-2">
+                {blockers[0]}
+                {blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}
+              </span>
+              {task.status === 'inbox' && (
+                <span className="block text-[10px] text-amber-200/90">
+                  Still in Inbox until the Dispatch Contract is complete. Open the task to fill scope, tests, and rollback.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Footer: priority + timestamp */}
         <div className="flex items-center justify-between pt-2 border-t border-mc-border/20">
           <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${priorityDots[task.priority]}`} />
+            <div className={`size-1.5 rounded-full ${priorityDots[task.priority]}`} />
             <span className={`text-xs capitalize ${priorityStyles[task.priority]}`}>
               {task.priority}
             </span>
           </div>
-          <span className="text-[10px] text-mc-text-secondary/60">
+          <span className="text-[10px] text-mc-text-secondary/60" suppressHydrationWarning>
             {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
           </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }

@@ -25,3 +25,10 @@ repos:
         language: system
         pass_filenames: false
         types: [markdown]
+
+      - id: react-doctor
+        name: React Doctor
+        entry: node scripts/run-react-doctor.js
+        language: system
+        pass_filenames: false
+        files: ^(src|app|components|lib|hooks)/.*\.(ts|tsx|js|jsx|mjs|cjs)$

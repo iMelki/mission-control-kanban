@@ -17,6 +17,11 @@ CREATE TABLE IF NOT EXISTS workspaces (
   slug TEXT NOT NULL UNIQUE,
   description TEXT,
   icon TEXT DEFAULT '📁',
+  github_project_owner TEXT,
+  github_project_number INTEGER,
+  github_project_title TEXT,
+  github_project_url TEXT,
+  github_project_auto_refresh INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -50,6 +55,12 @@ CREATE TABLE IF NOT EXISTS tasks (
   workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
   business_id TEXT DEFAULT 'default',
   due_date TEXT,
+  source_repo_owner TEXT,
+  source_repo_name TEXT,
+  source_issue_number INTEGER,
+  source_issue_url TEXT,
+  source_project_item_id TEXT,
+  dispatch_metadata TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -162,10 +173,31 @@ CREATE TABLE IF NOT EXISTS task_deliverables (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- GitHub write-back logs (bounded sync audit trail)
+CREATE TABLE IF NOT EXISTS github_writeback_logs (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL CHECK (mode IN ('dry_run', 'apply')),
+  status TEXT NOT NULL CHECK (status IN ('planned', 'applied', 'skipped', 'failed')),
+  signature TEXT NOT NULL,
+  issue_comment_body TEXT,
+  project_updates TEXT,
+  response_payload TEXT,
+  error_message TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_source_project_item_id ON tasks(source_project_item_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_github_issue_unique
+  ON tasks(workspace_id, source_repo_owner, source_repo_name, source_issue_number)
+  WHERE source_repo_owner IS NOT NULL AND source_repo_name IS NOT NULL AND source_issue_number IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_github_project_item_unique
+  ON tasks(source_project_item_id)
+  WHERE source_project_item_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_agents_workspace ON agents(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
@@ -174,4 +206,5 @@ CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, creat
 CREATE INDEX IF NOT EXISTS idx_deliverables_task ON task_deliverables(task_id);
 CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_github_writeback_logs_task ON github_writeback_logs(task_id, created_at DESC);
 `;
