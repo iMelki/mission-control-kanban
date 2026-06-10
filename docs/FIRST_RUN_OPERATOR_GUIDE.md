@@ -212,6 +212,26 @@ Check:
 
 If `connected: true` is returned, MCK can currently talk to OpenClaw.
 
+### Build validation while MCK is running
+
+`npm run build` is the right production-build check for this repo, but do not
+leave an existing `next dev` process running afterward. Next uses `.next` for
+both build output and the development server cache. Running a build while the
+local dev server is live can replace chunks that the dev server still expects,
+which shows up as `_document` or `Cannot find module './<chunk>.js'` runtime
+errors.
+
+After any local build check, restart MCK:
+
+```powershell
+$env:GH_GENERAL_TOKEN=$env:GH_GENERAL_TOKEN
+$env:GITHUB_TOKEN=$env:GH_GENERAL_TOKEN
+npm run dev:n8n
+```
+
+Then confirm `http://127.0.0.1:3002/api/github/diagnostics` reports
+`status: ok` before running an import, refresh, or n8n sync.
+
 ## How To Access OpenClaw Directly
 
 You do not normally talk to OpenClaw by typing raw WebSocket messages.

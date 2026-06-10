@@ -13,7 +13,11 @@ import {
   type GitHubWritebackTaskSnapshot,
 } from '../src/lib/github-writeback';
 import { buildGitHubDiagnosticsPayload, buildMissingTokenDiagnostics } from '../src/lib/github-diagnostics';
-import { normalizeMckN8nSyncPayload } from '../src/lib/n8n-sync-status';
+import {
+  getMckN8nSyncHistoryLimit,
+  normalizeMckN8nSyncPayload,
+  shouldNotifyMckN8nSyncAlert,
+} from '../src/lib/n8n-sync-status';
 
 test('GitHub diagnostics treats missing tokens as blocked', () => {
   const payload = buildMissingTokenDiagnostics();
@@ -70,6 +74,37 @@ test('MCK n8n sync payload normalization records alert state and run scope', () 
   assert.equal(normalized.alert_message, 'MCK sync returned 1 error.');
   assert.deepEqual(normalized.workspaces, ['assistants', 'memsys']);
   assert.equal(normalized.received_at, '2026-06-10T07:00:00.000Z');
+});
+
+test('MCK n8n sync history limit stays configurable and bounded', () => {
+  const previousLimit = process.env.MCK_N8N_SYNC_HISTORY_LIMIT;
+
+  try {
+    process.env.MCK_N8N_SYNC_HISTORY_LIMIT = '12';
+    assert.equal(getMckN8nSyncHistoryLimit(), 12);
+
+    process.env.MCK_N8N_SYNC_HISTORY_LIMIT = '9999';
+    assert.equal(getMckN8nSyncHistoryLimit(), 500);
+
+    process.env.MCK_N8N_SYNC_HISTORY_LIMIT = '0';
+    assert.equal(getMckN8nSyncHistoryLimit(), 1);
+
+    process.env.MCK_N8N_SYNC_HISTORY_LIMIT = 'not-a-number';
+    assert.equal(getMckN8nSyncHistoryLimit(), 100);
+  } finally {
+    if (previousLimit === undefined) {
+      delete process.env.MCK_N8N_SYNC_HISTORY_LIMIT;
+    } else {
+      process.env.MCK_N8N_SYNC_HISTORY_LIMIT = previousLimit;
+    }
+  }
+});
+
+test('MCK n8n sync alerts notify only on failed or error-level runs', () => {
+  assert.equal(shouldNotifyMckN8nSyncAlert({ ok: true, alert_level: 'ok' }), false);
+  assert.equal(shouldNotifyMckN8nSyncAlert({ ok: true, alert_level: 'warning' }), false);
+  assert.equal(shouldNotifyMckN8nSyncAlert({ ok: false, alert_level: 'warning' }), true);
+  assert.equal(shouldNotifyMckN8nSyncAlert({ ok: true, alert_level: 'error' }), true);
 });
 
 test('GitHub diagnostics reports limited when Project field reads need read:project', () => {

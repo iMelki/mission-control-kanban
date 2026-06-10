@@ -37,8 +37,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Durable n8n MCK sync run-history API at `/api/n8n/mck-sync-status` plus a
   workspace banner status line for the last scheduled sync result and alert
   state
+- MCK n8n sync alert notifications through `MCK_N8N_ALERT_WEBHOOK_URL` and a
+  local ignored JSONL alert log for failed/error sync runs
+- Bounded MCK n8n sync history retention through
+  `MCK_N8N_SYNC_HISTORY_LIMIT`, defaulting to the latest `100` rows
+- n8n sync history page at `/n8n-sync-history`, linked from Project-backed
+  workspace banners
+- Guarded `mck-sync-test-assistants` workspace for non-dry-run n8n sync smoke
+  tests without touching canonical operator workspaces
+- Baseline `.git-secrets-ignore` for local secret-scan exclusions
+- Root `OPEN_TASKS.md` index for current GitHub issue tracking
 - `npm run dev:n8n` for running local MCK on `0.0.0.0:3002` so Docker-backed
   n8n workflows can reach the app consistently
+- Operator guidance for restarting local `next dev` after `npm run build` so
+  stale `.next` chunks do not trigger `_document` runtime failures
 
 ### Changed
 

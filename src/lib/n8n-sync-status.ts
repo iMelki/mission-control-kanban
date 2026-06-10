@@ -1,4 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
+import { mkdir, appendFile } from 'fs/promises';
+import { dirname, resolve } from 'path';
 import { queryAll, queryOne, run } from './db';
 import type {
   MckN8nSyncAlertLevel,
@@ -9,6 +11,9 @@ import type {
 
 const DEFAULT_WORKFLOW_ID = 'PrjOpsMckSync001';
 const DEFAULT_WORKFLOW_NAME = 'Projects Ops - MCK Project Workspace Sync';
+const DEFAULT_HISTORY_LIMIT = 100;
+const MAX_HISTORY_LIMIT = 500;
+const DEFAULT_ALERT_LOG_PATH = '.logs/mck-n8n-sync-alerts.jsonl';
 
 interface N8nSyncRunRow {
   id: string;
@@ -149,6 +154,19 @@ function normalizeAlertLevel(value: unknown, ok: boolean): MckN8nSyncAlertLevel 
   return ok ? 'ok' : 'error';
 }
 
+export function getMckN8nSyncHistoryLimit(): number {
+  const rawLimit = Number(process.env.MCK_N8N_SYNC_HISTORY_LIMIT ?? DEFAULT_HISTORY_LIMIT);
+  if (!Number.isFinite(rawLimit)) {
+    return DEFAULT_HISTORY_LIMIT;
+  }
+
+  return Math.max(1, Math.min(MAX_HISTORY_LIMIT, Math.floor(rawLimit)));
+}
+
+export function shouldNotifyMckN8nSyncAlert(run: Pick<MckN8nSyncRun, 'ok' | 'alert_level'>): boolean {
+  return !run.ok || run.alert_level === 'error';
+}
+
 export function normalizeMckN8nSyncPayload(payload: unknown, now = new Date()): NormalizedMckN8nSyncPayload {
   const raw = cloneJson(asRecord(payload));
   const summary = cloneJson(asRecord(raw.summary)) as MckN8nSyncSummary;
@@ -178,6 +196,71 @@ export function normalizeMckN8nSyncPayload(payload: unknown, now = new Date()): 
     raw_payload: raw,
     received_at: normalizeTimestamp(raw.receivedAt ?? raw.received_at, now),
   };
+}
+
+function pruneMckN8nSyncHistory(): void {
+  run(
+    `
+      DELETE FROM n8n_sync_runs
+      WHERE id NOT IN (
+        SELECT id
+        FROM n8n_sync_runs
+        ORDER BY datetime(created_at) DESC, received_at DESC
+        LIMIT ?
+      )
+    `,
+    [getMckN8nSyncHistoryLimit()]
+  );
+}
+
+function getAlertLogPath(): string | null {
+  const configured = process.env.MCK_N8N_ALERT_LOG_PATH;
+  if (configured && ['off', 'none', 'disabled'].includes(configured.trim().toLowerCase())) {
+    return null;
+  }
+
+  return resolve(process.cwd(), configured?.trim() || DEFAULT_ALERT_LOG_PATH);
+}
+
+export async function notifyMckN8nSyncAlert(run: MckN8nSyncRun): Promise<void> {
+  if (!shouldNotifyMckN8nSyncAlert(run)) {
+    return;
+  }
+
+  const payload = {
+    event: 'mck_n8n_sync_alert',
+    emitted_at: new Date().toISOString(),
+    run,
+  };
+  const webhookUrl = process.env.MCK_N8N_ALERT_WEBHOOK_URL?.trim();
+
+  if (webhookUrl) {
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        console.error(`MCK n8n alert webhook returned HTTP ${response.status}.`);
+      }
+    } catch (error) {
+      console.error('Failed to send MCK n8n alert webhook:', error);
+    }
+  }
+
+  const alertLogPath = getAlertLogPath();
+  if (!alertLogPath) {
+    return;
+  }
+
+  try {
+    await mkdir(dirname(alertLogPath), { recursive: true });
+    await appendFile(alertLogPath, `${JSON.stringify(payload)}\n`, 'utf8');
+  } catch (error) {
+    console.error('Failed to write MCK n8n alert log:', error);
+  }
 }
 
 function mapRun(row: N8nSyncRunRow): MckN8nSyncRun {
@@ -241,6 +324,8 @@ export function recordMckN8nSyncPayload(payload: unknown): MckN8nSyncRun {
       normalized.received_at,
     ]
   );
+
+  pruneMckN8nSyncHistory();
 
   const row = queryOne<N8nSyncRunRow>('SELECT * FROM n8n_sync_runs WHERE id = ?', [id]);
   if (!row) {

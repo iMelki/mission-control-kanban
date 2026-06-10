@@ -1,11 +1,15 @@
 # mission-control-kanban Open Tasks
 
-Last updated: 2026-05-23
+Last updated: 2026-06-11
 
 GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues as the canonical task records and keep this file as the local index.
 
 ## Active Issues
 
+- [#18 - Choose and activate MCK n8n alert notification destination](https://github.com/iMelki/mission-control-kanban/issues/18)
+  - Goal: choose the operator-facing webhook or local notification destination
+    for MCK n8n sync errors while keeping the local ignored JSONL alert log as
+    a fallback audit trail.
 - [#6 - Surface readiness, review mode, risk, and dispatch blockers in the Kanban UI](https://github.com/iMelki/mission-control-kanban/issues/6)
   - Goal: surface the repo and task dispatch signals operators need before they take write actions from the Kanban UI.
 - [#7 - Use relevant skills for market research, competitor analysis, and monetization planning](https://github.com/iMelki/mission-control-kanban/issues/7)

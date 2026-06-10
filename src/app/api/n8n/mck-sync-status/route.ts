@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMckN8nSyncStatus, recordMckN8nSyncPayload } from '@/lib/n8n-sync-status';
+import { getMckN8nSyncStatus, notifyMckN8nSyncAlert, recordMckN8nSyncPayload } from '@/lib/n8n-sync-status';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
     const latest = recordMckN8nSyncPayload(payload);
+    await notifyMckN8nSyncAlert(latest);
 
     return NextResponse.json({
       ok: true,
