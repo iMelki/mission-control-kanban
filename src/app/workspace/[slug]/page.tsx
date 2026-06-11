@@ -93,7 +93,7 @@ export default function WorkspacePage() {
 
     setGitHubSyncState({
       state: 'syncing',
-      message: trigger === 'auto' ? 'Auto-refreshing from GitHub Project...' : 'Refreshing from GitHub Project...',
+      message: trigger === 'auto' ? 'Auto-syncing workspace from GitHub Project...' : 'Syncing workspace now...',
     });
 
     try {
@@ -110,7 +110,7 @@ export default function WorkspacePage() {
       await loadWorkspaceTasks(workspaceToSync.id);
       setGitHubSyncState({
         state: 'success',
-        message: `GitHub Project refreshed: ${payload.imported} imported, ${payload.updated} updated, ${payload.moved} moved.`,
+        message: `Workspace sync complete: ${payload.imported} imported, ${payload.updated} updated, ${payload.moved} moved.`,
       });
     } catch (error) {
       setGitHubSyncState({
@@ -379,10 +379,12 @@ export default function WorkspacePage() {
               type="button"
               onClick={() => void runGitHubProjectSync(workspace, 'manual')}
               disabled={githubSyncState.state === 'syncing'}
+              aria-label="Sync workspace now from GitHub Project"
+              title="Sync workspace now from GitHub Project"
               className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-1.5 text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
             >
               {githubSyncState.state === 'syncing' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-              Refresh Project
+              Sync now
             </button>
           </div>
         </div>
