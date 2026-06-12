@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project-backed workspaces now auto-refresh from their mapped GitHub Project
   on open while preserving GitHub as the source of truth and avoiding local
   workflow status churn
+- The project-backed workspace banner now labels the manual refresh control as
+  **Sync now** and reports workspace-level sync results explicitly
 
 ---
 

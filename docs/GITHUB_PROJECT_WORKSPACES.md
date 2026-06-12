@@ -38,8 +38,8 @@ The sync does not write to GitHub, dispatch agents, or rewrite issue bodies.
 It preserves local workflow status so refreshes do not silently move work across
 MCK columns.
 
-Use the visible **Refresh Project** control in the workspace banner to run the
-same sync manually. Pass `{ "dry_run": true }` to the API route to preview
+Use the visible **Sync now** control in the workspace banner to run the same
+workspace-level sync manually. Pass `{ "dry_run": true }` to the API route to preview
 create/update/move counts without changing the local database.
 
 ## Required Token
