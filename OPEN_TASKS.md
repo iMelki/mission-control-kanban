@@ -6,16 +6,21 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#20 - Clarify workspace-level manual sync control](https://github.com/iMelki/mission-control-kanban/issues/20)
-  - Goal: make the project-backed workspace banner expose a clear **Sync now**
-    control for workspace-level GitHub Project syncs.
-  - Current implementation: banner label, tooltip, accessibility label, and
-    sync-result text now describe the workspace sync explicitly.
+- No repo-local MCK implementation issue is currently active in this index.
+  Check GitHub issues and the Assistants Project for newly groomed work.
 
+## Recently Completed
+
+- [#20 - Clarify workspace-level manual sync control](https://github.com/iMelki/mission-control-kanban/issues/20)
+  - Completed via PR #21. The project-backed workspace banner now labels the
+    manual refresh control as **Sync now** and reports workspace-level sync
+    results explicitly.
 - [#18 - Choose and activate MCK n8n alert notification destination](https://github.com/iMelki/mission-control-kanban/issues/18)
-  - Goal: choose the operator-facing webhook or local notification destination
-    for MCK n8n sync errors while keeping the local ignored JSONL alert log as
-    a fallback audit trail.
+  - Completed by selecting projects-ops Workflow Pack 1 alert intake as the
+    local destination:
+    `http://127.0.0.1:5678/webhook/projects-ops/mck-sync-alert`.
+  - MCK still writes the ignored `.logs/mck-n8n-sync-alerts.jsonl` fallback log
+    when failed/error sync runs occur.
 
 ## Legacy Index
 

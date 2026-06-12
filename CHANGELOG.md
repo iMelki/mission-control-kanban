@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   state
 - MCK n8n sync alert notifications through `MCK_N8N_ALERT_WEBHOOK_URL` and a
   local ignored JSONL alert log for failed/error sync runs
+- Documented the selected local alert destination:
+  `http://127.0.0.1:5678/webhook/projects-ops/mck-sync-alert`
 - Bounded MCK n8n sync history retention through
   `MCK_N8N_SYNC_HISTORY_LIMIT`, defaulting to the latest `100` rows
 - n8n sync history page at `/n8n-sync-history`, linked from Project-backed

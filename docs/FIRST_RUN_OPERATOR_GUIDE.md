@@ -232,6 +232,20 @@ npm run dev:n8n
 Then confirm `http://127.0.0.1:3002/api/github/diagnostics` reports
 `status: ok` before running an import, refresh, or n8n sync.
 
+### n8n Sync Alerts
+
+Set `MCK_N8N_ALERT_WEBHOOK_URL` in `.env.local` when failed/error MCK sync runs
+should notify n8n in addition to the local ignored JSONL fallback log. The
+selected local projects-ops destination is:
+
+```text
+MCK_N8N_ALERT_WEBHOOK_URL=http://127.0.0.1:5678/webhook/projects-ops/mck-sync-alert
+```
+
+That endpoint is owned by projects-ops Workflow Pack 1 runtime workflow
+`PrjOpsMckAlert001`. It records alert receipt in n8n execution history and does
+not mutate GitHub, dispatch agents, or change MCK state.
+
 ## How To Access OpenClaw Directly
 
 You do not normally talk to OpenClaw by typing raw WebSocket messages.

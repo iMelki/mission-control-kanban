@@ -6,10 +6,6 @@ GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues
 
 ## Active Issues
 
-- [#18 - Choose and activate MCK n8n alert notification destination](https://github.com/iMelki/mission-control-kanban/issues/18)
-  - Goal: choose the operator-facing webhook or local notification destination
-    for MCK n8n sync errors while keeping the local ignored JSONL alert log as
-    a fallback audit trail.
 - [#6 - Surface readiness, review mode, risk, and dispatch blockers in the Kanban UI](https://github.com/iMelki/mission-control-kanban/issues/6)
   - Goal: surface the repo and task dispatch signals operators need before they take write actions from the Kanban UI.
 - [#7 - Use relevant skills for market research, competitor analysis, and monetization planning](https://github.com/iMelki/mission-control-kanban/issues/7)
@@ -25,6 +21,16 @@ GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues
   GitHub Projects before an operator starts the import/write-back loop.
 ## Recently Completed
 
+- [#18 - Choose and activate MCK n8n alert notification destination](https://github.com/iMelki/mission-control-kanban/issues/18)
+  - Completed by selecting projects-ops Workflow Pack 1 alert intake as the
+    local destination:
+    `http://127.0.0.1:5678/webhook/projects-ops/mck-sync-alert`.
+  - MCK still writes the ignored `.logs/mck-n8n-sync-alerts.jsonl` fallback log
+    when failed/error sync runs occur.
+- [#20 - Clarify workspace-level manual sync control](https://github.com/iMelki/mission-control-kanban/issues/20)
+  - Completed via PR #21.
+  - Result: the project-backed workspace banner now labels the manual refresh
+    control as **Sync now** and reports workspace-level sync results explicitly.
 - [projects-ops#9 - Track mission-control-kanban bootstrap baseline adoption](https://github.com/iMelki/projects-ops/issues/9)
   - Completed via [mission-control-kanban#2](https://github.com/iMelki/mission-control-kanban/pull/2).
 - [#3 - Fix build-time dynamic route and OpenClaw side-effect logs](https://github.com/iMelki/mission-control-kanban/issues/3)
