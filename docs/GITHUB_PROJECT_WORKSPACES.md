@@ -29,18 +29,37 @@ The route reads the linked GitHub Project with the local GitHub token and:
 - imports open GitHub issue items that are not already local tasks
 - refreshes local title, description, priority, GitHub source identity, and
   dispatch metadata for existing imported tasks
+- reconciles existing imported tasks to local `done` when the GitHub issue is
+  closed or the Project `Status` field is `Done`
 - moves an existing local task into the mapped workspace when its GitHub Project
   item belongs there
-- skips archived items, draft items, pull requests, and closed issues that were
-  never imported locally
+- skips archived items, draft items, pull requests, closed issues, and Project
+  `Done` items that were never imported locally
 
 The sync does not write to GitHub, dispatch agents, or rewrite issue bodies.
-It preserves local workflow status so refreshes do not silently move work across
-MCK columns.
+It preserves local workflow status for ordinary metadata refreshes so active
+work is not churned backward just because the Project item is still `Ready`.
+Completion status is the exception: GitHub closed/Project `Done` is allowed to
+move local imported work to `done`.
+
+## Status Mapping
+
+| GitHub Project or issue state | MCK behavior |
+| --- | --- |
+| Issue closed | Existing local task becomes `done`; fresh imports are skipped. |
+| Project `Status = Done` | Existing local task becomes `done`; fresh imports are skipped. |
+| Project `Status = Review` | Existing non-done local task moves to `review`. |
+| Project `Status = Ready` | Planning imports can move into the local `inbox` gate; already-started local work is not pulled backward. |
+| Project `Status = Blocked` | Local status is preserved and the sync returns an upstream drift warning because MCK does not yet have a first-class `blocked` column. |
+
+The workspace banner shows status reconciliations and upstream drift warnings
+after a manual or auto sync. n8n sync history and recurring projects-ops health
+reports also carry `status_reconciled` and `upstream_drift_warnings` counts so
+local/GitHub status mismatches are not hidden inside raw sync payloads.
 
 Use the visible **Sync now** control in the workspace banner to run the same
 workspace-level sync manually. Pass `{ "dry_run": true }` to the API route to preview
-create/update/move counts without changing the local database.
+create/update/move/reconciliation counts without changing the local database.
 
 ## Required Token
 

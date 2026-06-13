@@ -74,6 +74,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   workflow status churn
 - The project-backed workspace banner now labels the manual refresh control as
   **Sync now** and reports workspace-level sync results explicitly
+- Project-backed workspace sync now reconciles closed GitHub issues and Project
+  `Done` items to local `done`, maps Project `Review` to the local review
+  column, hydrates readiness/review/risk/impact from issue-body headings, and
+  surfaces status reconciliation/drift notes in the workspace banner
 
 ---
 

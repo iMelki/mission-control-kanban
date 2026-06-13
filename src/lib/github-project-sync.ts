@@ -8,7 +8,7 @@ import {
   buildTaskRefreshUpdateFromGitHubPreview,
   normalizeGitHubSourceIdentity,
 } from './github-task-import';
-import type { Task, TaskPriority } from './types';
+import type { Task, TaskPriority, TaskStatus } from './types';
 
 const execFileAsync = promisify(execFile);
 
@@ -122,7 +122,7 @@ interface ProjectItemsPage {
   };
 }
 
-interface ExistingTaskRow extends Pick<Task, 'id' | 'title' | 'description' | 'priority' | 'workspace_id' | 'business_id'> {
+interface ExistingTaskRow extends Pick<Task, 'id' | 'title' | 'description' | 'status' | 'priority' | 'workspace_id' | 'business_id'> {
   dispatch_metadata?: string | null;
   source_repo_owner?: string | null;
   source_repo_name?: string | null;
@@ -144,9 +144,11 @@ export interface GitHubProjectWorkspaceSyncResult {
   moved: number;
   skipped: number;
   skipped_closed: number;
+  status_reconciled: number;
+  upstream_drift_warnings: number;
   errors: string[];
   details: Array<{
-    action: 'import' | 'update' | 'move' | 'skip' | 'error';
+    action: 'import' | 'update' | 'move' | 'skip' | 'status_reconcile' | 'drift' | 'error';
     issue?: string;
     task_id?: string;
     reason?: string;
@@ -354,7 +356,7 @@ function findExistingTask(
   issueNumber: number
 ): ExistingTaskRow | undefined {
   return queryOne<ExistingTaskRow>(
-    `SELECT id, title, description, priority, workspace_id, business_id, dispatch_metadata,
+    `SELECT id, title, description, status, priority, workspace_id, business_id, dispatch_metadata,
             source_repo_owner, source_repo_name, source_issue_number, source_issue_url, source_project_item_id
      FROM tasks
      WHERE (source_project_item_id IS NOT NULL AND source_project_item_id = ?)
@@ -365,6 +367,119 @@ function findExistingTask(
 
 function buildIssueRef(owner: string, repo: string, issueNumber: number): string {
   return `${owner}/${repo}#${issueNumber}`;
+}
+
+export type GitHubProjectStatusKind = 'ready' | 'review' | 'blocked' | 'done' | 'other';
+
+export interface GitHubProjectStatusReconciliation {
+  upstream_status?: GitHubProjectStatusKind;
+  local_status?: TaskStatus;
+  reason?: string;
+  drift_warning?: string;
+}
+
+function normalizeStatusText(value: unknown): string | undefined {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return undefined;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+export function normalizeGitHubProjectStatus(value: unknown): GitHubProjectStatusKind | undefined {
+  const normalized = normalizeStatusText(value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (['done', 'complete', 'completed', 'closed'].includes(normalized)) {
+    return 'done';
+  }
+
+  if (['review', 'in review', 'needs review', 'ready for review'].includes(normalized)) {
+    return 'review';
+  }
+
+  if (['ready', 'ready for agent', 'ready for work', 'to do', 'todo', 'inbox'].includes(normalized)) {
+    return 'ready';
+  }
+
+  if (['blocked', 'on hold', 'waiting', 'waiting on', 'waiting for'].includes(normalized)) {
+    return 'blocked';
+  }
+
+  return 'other';
+}
+
+function projectStatusFieldValue(projectFields: Record<string, unknown>): unknown {
+  const matchingKey = Object.keys(projectFields).find((key) => key.trim().toLowerCase() === 'status');
+  return matchingKey ? projectFields[matchingKey] : undefined;
+}
+
+export function reconcileGitHubProjectStatus(input: {
+  currentStatus: TaskStatus;
+  issueClosed?: boolean | null;
+  projectStatus?: unknown;
+}): GitHubProjectStatusReconciliation {
+  const upstreamStatus = normalizeGitHubProjectStatus(input.projectStatus);
+
+  if (input.issueClosed) {
+    return {
+      upstream_status: 'done',
+      local_status: 'done',
+      reason: 'GitHub issue is closed, so the local MCK task should be Done.',
+    };
+  }
+
+  if (upstreamStatus === 'done') {
+    return {
+      upstream_status: upstreamStatus,
+      local_status: 'done',
+      reason: 'GitHub Project Status is Done, so the local MCK task should be Done.',
+    };
+  }
+
+  if (input.currentStatus === 'done') {
+    if (upstreamStatus) {
+      return {
+        upstream_status: upstreamStatus,
+        drift_warning: `Local task is Done while GitHub Project Status is ${input.projectStatus}.`,
+      };
+    }
+
+    return { upstream_status: upstreamStatus };
+  }
+
+  if (upstreamStatus === 'review') {
+    return {
+      upstream_status: upstreamStatus,
+      local_status: 'review',
+      reason: 'GitHub Project Status Review maps to the local Review column.',
+    };
+  }
+
+  if (upstreamStatus === 'ready' && input.currentStatus === 'planning') {
+    return {
+      upstream_status: upstreamStatus,
+      local_status: 'inbox',
+      reason: 'GitHub Project Status Ready maps planning imports into the local Inbox gate.',
+    };
+  }
+
+  if (upstreamStatus === 'blocked') {
+    return {
+      upstream_status: upstreamStatus,
+      drift_warning: 'GitHub Project Status Blocked has no first-class MCK column yet; local status is preserved.',
+    };
+  }
+
+  return { upstream_status: upstreamStatus };
 }
 
 export async function syncGitHubProjectWorkspace(
@@ -398,6 +513,8 @@ export async function syncGitHubProjectWorkspace(
     moved: 0,
     skipped: 0,
     skipped_closed: 0,
+    status_reconciled: 0,
+    upstream_drift_warnings: 0,
     errors: [],
     details: [],
   };
@@ -426,12 +543,20 @@ export async function syncGitHubProjectWorkspace(
     const projectItemId = typeof projectFields['Project Item ID'] === 'string'
       ? projectFields['Project Item ID']
       : undefined;
+    const projectStatus = projectStatusFieldValue(projectFields);
+    const upstreamStatus = normalizeGitHubProjectStatus(projectStatus);
     const existing = findExistingTask(workspace.id, projectItemId, owner, repo, issueNumber);
 
-    if (content.closed && !existing) {
+    if ((content.closed || upstreamStatus === 'done') && !existing) {
       result.skipped += 1;
       result.skipped_closed += 1;
-      result.details.push({ action: 'skip', issue: issueRef, reason: 'closed issue is not imported into a fresh workspace' });
+      result.details.push({
+        action: 'skip',
+        issue: issueRef,
+        reason: content.closed
+          ? 'closed issue is not imported into a fresh workspace'
+          : 'Project Done item is not imported into a fresh workspace',
+      });
       continue;
     }
     const previewResponse = buildGitHubImportPreviewResponse({
@@ -465,11 +590,38 @@ export async function syncGitHubProjectWorkspace(
 
     if (options.dryRun) {
       if (existing) {
+        const reconciliation = reconcileGitHubProjectStatus({
+          currentStatus: existing.status,
+          issueClosed: content.closed,
+          projectStatus,
+        });
+        const reconciledStatusChanged = Boolean(
+          reconciliation.local_status && reconciliation.local_status !== existing.status
+        );
+
         result.updated += 1;
         if (existing.workspace_id !== workspace.id) {
           result.moved += 1;
         }
         result.details.push({ action: existing.workspace_id === workspace.id ? 'update' : 'move', issue: issueRef, task_id: existing.id });
+        if (reconciledStatusChanged) {
+          result.status_reconciled += 1;
+          result.details.push({
+            action: 'status_reconcile',
+            issue: issueRef,
+            task_id: existing.id,
+            reason: `would move local status from ${existing.status} to ${reconciliation.local_status}: ${reconciliation.reason ?? 'upstream status reconciliation'}`,
+          });
+        }
+        if (reconciliation.drift_warning) {
+          result.upstream_drift_warnings += 1;
+          result.details.push({
+            action: 'drift',
+            issue: issueRef,
+            task_id: existing.id,
+            reason: reconciliation.drift_warning,
+          });
+        }
       } else {
         result.imported += 1;
         result.details.push({ action: 'import', issue: issueRef });
@@ -482,6 +634,13 @@ export async function syncGitHubProjectWorkspace(
         const now = new Date().toISOString();
 
         if (existing) {
+          const reconciliation = reconcileGitHubProjectStatus({
+            currentStatus: existing.status,
+            issueClosed: content.closed,
+            projectStatus,
+          });
+          const reconciledStatus = reconciliation.local_status ?? existing.status;
+          const reconciledStatusChanged = reconciledStatus !== existing.status;
           const patch = buildTaskRefreshUpdateFromGitHubPreview(
             {
               title: existing.title,
@@ -512,6 +671,7 @@ export async function syncGitHubProjectWorkspace(
                  source_issue_url = ?,
                  source_project_item_id = ?,
                  dispatch_metadata = ?,
+                 status = ?,
                  updated_at = ?
              WHERE id = ?`,
             [
@@ -526,10 +686,49 @@ export async function syncGitHubProjectWorkspace(
               source.issue_url,
               source.project_item_id ?? null,
               serializeDispatchMetadata(patch.dispatch_metadata),
+              reconciledStatus,
               now,
               existing.id,
             ]
           );
+
+          if (reconciledStatusChanged) {
+            run(
+              `INSERT INTO events (id, type, task_id, message, metadata, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [
+                uuidv4(),
+                reconciledStatus === 'done' ? 'task_completed' : 'task_status_changed',
+                existing.id,
+                `GitHub Project sync reconciled ${issueRef} from ${existing.status} to ${reconciledStatus}.`,
+                JSON.stringify({
+                  project_owner: workspace.github_project_owner,
+                  project_number: workspace.github_project_number,
+                  source: issueRef,
+                  upstream_status: reconciliation.upstream_status ?? null,
+                  reason: reconciliation.reason ?? null,
+                }),
+                now,
+              ]
+            );
+            result.status_reconciled += 1;
+            result.details.push({
+              action: 'status_reconcile',
+              issue: issueRef,
+              task_id: existing.id,
+              reason: `moved local status from ${existing.status} to ${reconciledStatus}: ${reconciliation.reason ?? 'upstream status reconciliation'}`,
+            });
+          }
+
+          if (reconciliation.drift_warning) {
+            result.upstream_drift_warnings += 1;
+            result.details.push({
+              action: 'drift',
+              issue: issueRef,
+              task_id: existing.id,
+              reason: reconciliation.drift_warning,
+            });
+          }
 
           if (existing.workspace_id !== workspace.id) {
             result.moved += 1;

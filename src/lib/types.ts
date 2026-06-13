@@ -214,6 +214,8 @@ export interface MckN8nSyncSummary {
   moved?: number;
   skipped?: number;
   skipped_closed?: number;
+  status_reconciled?: number;
+  upstream_drift_warnings?: number;
   errors?: number;
   failed?: number;
   [key: string]: unknown;
