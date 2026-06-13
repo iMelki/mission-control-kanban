@@ -99,6 +99,11 @@ function normalizeListValue(value: unknown): string[] | undefined {
     .filter(Boolean);
 }
 
+function normalizeScalarSection(value: string | undefined): string | undefined {
+  const items = normalizeListSection(value);
+  return items?.[0] ?? normalizeString(value);
+}
+
 function extractHeadingSection(body: string, headings: string[]): string | undefined {
   const lines = body.split(/\r?\n/);
   const normalizedHeadings = headings.map((heading) => heading.toLowerCase());
@@ -316,17 +321,32 @@ export function buildGitHubImportPreview(input: GitHubImportPreviewRequest): Git
   const repoName = normalizeString(input.repository?.name) ?? repoFromFullName.repo;
   const issueUrl = normalizeString(input.issue.html_url);
   const issueNumber = input.issue.number ?? undefined;
-  const targetRepo = firstProjectFieldValue(projectFields, ['Repo', 'Target Repo'])
-    ?? extractInlineField(input.issue.body ?? '', [/^target repo\s*:\s*(.+)$/im, /^repo\s*:\s*(.+)$/im])
-    ?? (repoOwner && repoName ? `${repoOwner}/${repoName}` : undefined);
-  const readiness = mapReadiness(firstProjectFieldValue(projectFields, ['Readiness']))
-    ?? mapReadiness(labels.find((label) => label.startsWith('readiness:'))?.replace(/^readiness:/, ''));
-  const reviewMode = mapReviewMode(firstProjectFieldValue(projectFields, ['Review Mode', 'ReviewMode']));
-  const riskLevel = mapRisk(firstProjectFieldValue(projectFields, ['Risk']))
-    ?? mapRisk(labels.find((label) => label.startsWith('risk:'))?.replace(/^risk:/, ''));
   const issueBody = normalizeString(input.issue.body) ?? '';
+  const targetRepo = firstProjectFieldValue(projectFields, ['Repo', 'Target Repo'])
+    ?? extractInlineField(issueBody, [/^target repo\s*:\s*(.+)$/im, /^repo\s*:\s*(.+)$/im])
+    ?? (repoOwner && repoName ? `${repoOwner}/${repoName}` : undefined);
+  const bodyReadiness = normalizeScalarSection(
+    extractHeadingSection(issueBody, ['Readiness', 'Dispatch Readiness'])
+  ) ?? extractInlineField(issueBody, [/^readiness\s*:\s*(.+)$/im, /^dispatch readiness\s*:\s*(.+)$/im]);
+  const bodyReviewMode = normalizeScalarSection(
+    extractHeadingSection(issueBody, ['Review Mode', 'Review'])
+  ) ?? extractInlineField(issueBody, [/^review mode\s*:\s*(.+)$/im, /^review\s*:\s*(.+)$/im]);
+  const bodyRisk = normalizeScalarSection(
+    extractHeadingSection(issueBody, ['Risk', 'Risk Level'])
+  ) ?? extractInlineField(issueBody, [/^risk(?: level)?\s*:\s*(.+)$/im]);
+  const readiness = mapReadiness(firstProjectFieldValue(projectFields, ['Readiness']))
+    ?? mapReadiness(bodyReadiness)
+    ?? mapReadiness(labels.find((label) => label.startsWith('readiness:'))?.replace(/^readiness:/, ''));
+  const reviewMode = mapReviewMode(firstProjectFieldValue(projectFields, ['Review Mode', 'ReviewMode']))
+    ?? mapReviewMode(bodyReviewMode);
+  const riskLevel = mapRisk(firstProjectFieldValue(projectFields, ['Risk']))
+    ?? mapRisk(bodyRisk)
+    ?? mapRisk(labels.find((label) => label.startsWith('risk:'))?.replace(/^risk:/, ''));
   const projectWorkstream = firstProjectFieldValue(projectFields, ['Project', 'Project/Workstream'])
     ?? extractInlineField(issueBody, [/^project(?:\/workstream)?\s*:\s*(.+)$/im]);
+  const impact = firstProjectFieldValue(projectFields, ['Impact'])
+    ?? normalizeString(extractHeadingSection(issueBody, ['Impact', 'Expected Impact']))
+    ?? extractInlineField(issueBody, [/^impact\s*:\s*(.+)$/im]);
 
   const dispatchMetadata = normalizeDispatchMetadata({
     source_issue_url: issueUrl,
@@ -344,7 +364,7 @@ export function buildGitHubImportPreview(input: GitHubImportPreviewRequest): Git
     risk_level: riskLevel,
     readiness,
     review_mode: reviewMode,
-    impact: firstProjectFieldValue(projectFields, ['Impact']),
+    impact,
     rollback_plan: extractHeadingSection(issueBody, ['Rollback', 'Rollback / Fallback Plan', 'Rollback / Fallback', 'Fallback Plan'])
       ?? firstProjectFieldValue(projectFields, ['Rollback / Fallback Plan', 'Rollback / Fallback', 'Rollback', 'Fallback Plan', 'Fallback']),
     safety_rules: normalizeListSection(

@@ -17,6 +17,9 @@ the local operator entrypoint; historical task notes remain in
     manually.
   - Validation target: `npm run test:github-sync` plus a focused live
     workspace sync against `http://127.0.0.1:3002/api/workspaces/assistants/github-sync`.
+  - Latest implementation: added issue-body dispatch metadata hydration,
+    Project/issue status reconciliation, workspace-banner drift notes, and
+    focused unit coverage for Ready/Review/Blocked/Done mapping.
 
 ## Recently Completed
 

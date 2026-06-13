@@ -5,7 +5,11 @@ import {
   buildGitHubImportPreviewResponse,
   buildTaskRefreshUpdateFromGitHubPreview,
 } from '../src/lib/github-task-import';
-import { GITHUB_PROJECT_WORKSPACE_MAPPINGS } from '../src/lib/github-project-sync';
+import {
+  GITHUB_PROJECT_WORKSPACE_MAPPINGS,
+  normalizeGitHubProjectStatus,
+  reconcileGitHubProjectStatus,
+} from '../src/lib/github-project-sync';
 import { requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
@@ -40,6 +44,43 @@ test('GitHub Project workspace mappings cover the operator boards without duplic
     assert.equal(mapping.github_project_auto_refresh, true);
     assert.match(mapping.description, /mapped to GitHub Project/i);
   }
+});
+
+test('GitHub Project status mapping reconciles upstream Done without inventing a Blocked column', () => {
+  assert.equal(normalizeGitHubProjectStatus('Ready for Agent'), 'ready');
+  assert.equal(normalizeGitHubProjectStatus('Review'), 'review');
+  assert.equal(normalizeGitHubProjectStatus('Blocked'), 'blocked');
+  assert.equal(normalizeGitHubProjectStatus('Done'), 'done');
+
+  assert.deepEqual(
+    reconcileGitHubProjectStatus({ currentStatus: 'inbox', issueClosed: true, projectStatus: 'Ready' }),
+    {
+      upstream_status: 'done',
+      local_status: 'done',
+      reason: 'GitHub issue is closed, so the local MCK task should be Done.',
+    }
+  );
+
+  assert.equal(
+    reconcileGitHubProjectStatus({ currentStatus: 'review', projectStatus: 'Done' }).local_status,
+    'done'
+  );
+  assert.equal(
+    reconcileGitHubProjectStatus({ currentStatus: 'in_progress', projectStatus: 'Review' }).local_status,
+    'review'
+  );
+  assert.equal(
+    reconcileGitHubProjectStatus({ currentStatus: 'planning', projectStatus: 'Ready' }).local_status,
+    'inbox'
+  );
+  assert.equal(
+    reconcileGitHubProjectStatus({ currentStatus: 'in_progress', projectStatus: 'Ready' }).local_status,
+    undefined
+  );
+  assert.match(
+    reconcileGitHubProjectStatus({ currentStatus: 'in_progress', projectStatus: 'Blocked' }).drift_warning ?? '',
+    /no first-class MCK column/i
+  );
 });
 
 test('MCK n8n sync payload normalization records alert state and run scope', () => {
@@ -260,6 +301,71 @@ test('GitHub import preview can normalize required dispatch sections from GitHub
     'Do not write back to GitHub before the operator reviews the plan',
   ]);
   assert.equal(response.dispatch_ready, true);
+});
+
+test('GitHub import preview hydrates dispatch metadata from issue body headings', () => {
+  const response = buildGitHubImportPreviewResponse({
+    request: {
+      issue: {
+        number: 24,
+        title: 'Reconcile Project Done into local MCK Done',
+        body: [
+          'Project/Workstream: project workspace sync',
+          '',
+          '## Readiness',
+          'Ready for Agent',
+          '',
+          '## Review Mode',
+          'Human Required',
+          '',
+          '## Risk',
+          'Medium',
+          '',
+          '## Impact',
+          'Stops stale active MCK cards when GitHub is already closed or Done.',
+          '',
+          '## Allowed File Scope',
+          '- src/lib/github-project-sync.ts',
+          '- src/app/workspace/[slug]/page.tsx',
+          '- tests/github-sync.test.ts',
+          '',
+          '## Acceptance Criteria',
+          '- Closed GitHub issues reconcile to local Done.',
+          '- Project Done items reconcile to local Done.',
+          '',
+          '## Test Requirements',
+          '- npm run test:github-sync',
+          '',
+          '## Rollback / Fallback Plan',
+          'Disable status reconciliation and keep metadata refresh only.',
+          '',
+          '## Safety Rules',
+          '- Do not write back to GitHub from workspace sync.',
+        ].join('\n'),
+        html_url: 'https://github.com/iMelki/mission-control-kanban/issues/24',
+        labels: [{ name: 'type:automation' }],
+      },
+      repository: {
+        full_name: 'iMelki/mission-control-kanban',
+        name: 'mission-control-kanban',
+        owner: { login: 'iMelki' },
+      },
+      project_fields: {
+        'Project Item ID': 'PVTI_mock_24',
+      },
+    },
+  });
+
+  assert.equal(response.dispatch_ready, true);
+  assert.equal(response.preview.dispatch_metadata?.readiness, 'ready_for_agent');
+  assert.equal(response.preview.dispatch_metadata?.review_mode, 'human_required');
+  assert.equal(response.preview.dispatch_metadata?.risk_level, 'medium');
+  assert.match(response.preview.dispatch_metadata?.impact ?? '', /stale active MCK cards/i);
+  assert.deepEqual(response.preview.dispatch_metadata?.allowed_file_scope, [
+    'src/lib/github-project-sync.ts',
+    'src/app/workspace/[slug]/page.tsx',
+    'tests/github-sync.test.ts',
+  ]);
 });
 
 test('GitHub write-back plan stays bounded and dry-run friendly without live GitHub credentials', async () => {

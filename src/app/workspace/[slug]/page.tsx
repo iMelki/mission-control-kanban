@@ -37,6 +37,21 @@ function formatSyncCount(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function extractGitHubSyncStatusNotes(payload: Record<string, unknown>): string[] {
+  const details = Array.isArray(payload.details) ? payload.details : [];
+
+  return details
+    .filter((detail): detail is Record<string, unknown> => Boolean(detail) && typeof detail === 'object')
+    .filter((detail) => detail.action === 'status_reconcile' || detail.action === 'drift')
+    .map((detail) => {
+      const issue = typeof detail.issue === 'string' ? `${detail.issue}: ` : '';
+      const reason = typeof detail.reason === 'string' ? detail.reason : String(detail.action);
+      return `${issue}${reason}`;
+    })
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
 function formatSyncCadence(status: MckN8nSyncStatusResponse['latest']): string {
   const cadence = status?.raw_payload?.scheduleCadence;
   if (!cadence || typeof cadence !== 'object' || Array.isArray(cadence)) {
@@ -70,6 +85,7 @@ export default function WorkspacePage() {
   const [githubSyncState, setGitHubSyncState] = useState<{
     state: 'idle' | 'syncing' | 'success' | 'error';
     message?: string;
+    statusNotes?: string[];
   }>({ state: 'idle' });
   const [n8nSyncStatus, setN8nSyncStatus] = useState<MckN8nSyncStatusResponse | null>(null);
   const autoSyncedWorkspaceRef = useRef<string | null>(null);
@@ -107,10 +123,21 @@ export default function WorkspacePage() {
         throw new Error(payload.error || 'GitHub Project refresh failed');
       }
 
+      const syncPayload = payload as Record<string, unknown>;
+      const imported = formatSyncCount(syncPayload.imported);
+      const updated = formatSyncCount(syncPayload.updated);
+      const moved = formatSyncCount(syncPayload.moved);
+      const statusReconciled = formatSyncCount(syncPayload.status_reconciled);
+      const driftWarnings = formatSyncCount(syncPayload.upstream_drift_warnings);
+      const statusSuffix = statusReconciled > 0 || driftWarnings > 0
+        ? ` ${statusReconciled} status reconciled, ${driftWarnings} upstream drift warning${driftWarnings === 1 ? '' : 's'}.`
+        : '';
+
       await loadWorkspaceTasks(workspaceToSync.id);
       setGitHubSyncState({
         state: 'success',
-        message: `Workspace sync complete: ${payload.imported} imported, ${payload.updated} updated, ${payload.moved} moved.`,
+        message: `Workspace sync complete: ${imported} imported, ${updated} updated, ${moved} moved.${statusSuffix}`,
+        statusNotes: extractGitHubSyncStatusNotes(syncPayload),
       });
     } catch (error) {
       setGitHubSyncState({
@@ -355,6 +382,17 @@ export default function WorkspacePage() {
                   </span>
                 )}
               </div>
+              {githubSyncState.statusNotes && githubSyncState.statusNotes.length > 0 && (
+                <div className="flex items-start gap-2 text-amber-200">
+                  <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+                  <div className="space-y-0.5">
+                    <span className="block">GitHub/MCK status reconciliation is visible for this sync.</span>
+                    {githubSyncState.statusNotes.map((note) => (
+                      <span key={note} className="block text-xs text-amber-100/90">{note}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className={n8nSyncHasAlert ? 'flex flex-wrap items-center gap-2 text-rose-200' : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
                 {n8nSyncHasAlert ? (
                   <AlertTriangle className="size-4 shrink-0" />
