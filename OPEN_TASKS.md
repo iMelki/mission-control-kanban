@@ -1,13 +1,22 @@
 # Mission Control Kanban Open Tasks
 
+Last updated: 2026-06-13
+
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
 
-- No repo-local MCK implementation issue is currently active in this index.
-  Check GitHub issues and the Assistants Project for newly groomed work.
+- [#24 - Reconcile closed GitHub/Project Done items to local MCK done state](https://github.com/iMelki/mission-control-kanban/issues/24)
+  - Status: Ready in the Assistants Project.
+  - Goal: keep project-backed MCK workspaces from showing older imported tasks
+    as active after GitHub is closed and the GitHub Project item is Done.
+  - Trigger: while closing `agent-settings#65`, the live sync updated the local
+    task but left it in `inbox` until the dispatch contract was filled
+    manually.
+  - Validation target: `npm run test:github-sync` plus a focused live
+    workspace sync against `http://127.0.0.1:3002/api/workspaces/assistants/github-sync`.
 
 ## Recently Completed
 
