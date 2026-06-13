@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-06-13
+Last updated: 2026-06-14
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -8,21 +8,18 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#24 - Reconcile closed GitHub/Project Done items to local MCK done state](https://github.com/iMelki/mission-control-kanban/issues/24)
-  - Status: Ready in the Assistants Project.
-  - Goal: keep project-backed MCK workspaces from showing older imported tasks
-    as active after GitHub is closed and the GitHub Project item is Done.
-  - Trigger: while closing `agent-settings#65`, the live sync updated the local
-    task but left it in `inbox` until the dispatch contract was filled
-    manually.
-  - Validation target: `npm run test:github-sync` plus a focused live
-    workspace sync against `http://127.0.0.1:3002/api/workspaces/assistants/github-sync`.
-  - Latest implementation: added issue-body dispatch metadata hydration,
-    Project/issue status reconciliation, workspace-banner drift notes, and
-    focused unit coverage for Ready/Review/Blocked/Done mapping.
+- No active repo-local task entries at this time.
 
 ## Recently Completed
 
+- [#24 - Reconcile closed GitHub/Project Done items to local MCK done state](https://github.com/iMelki/mission-control-kanban/issues/24)
+  - Completed via PR #26 and closed on 2026-06-14.
+  - Result: added issue-body dispatch metadata hydration, Project/issue status
+    reconciliation, workspace-banner drift notes, and focused unit coverage for
+    Ready/Review/Blocked/Done mapping.
+  - Validation: `pre-commit run --all-files`, `npm run test:github-sync`,
+    `npm run build`, and a live Assistants workspace sync against
+    `http://127.0.0.1:3002/api/workspaces/assistants/github-sync`.
 - [#20 - Clarify workspace-level manual sync control](https://github.com/iMelki/mission-control-kanban/issues/20)
   - Completed via PR #21. The project-backed workspace banner now labels the
     manual refresh control as **Sync now** and reports workspace-level sync
