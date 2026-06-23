@@ -8,7 +8,12 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- No active repo-local task entries at this time.
+- [#29 - Build static Local Control panel cards](https://github.com/iMelki/mission-control-kanban/issues/29)
+  - Goal: implement the first safe home-page Local Control area from
+    [docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md](docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md).
+  - Guardrail: cards may open known URLs and consume MCK-owned health endpoints,
+    but must not start, stop, restart, shell out, call Railway, mutate GitHub,
+    or expose secrets.
 
 ## Recently Completed
 
@@ -18,9 +23,7 @@ the local operator entrypoint; historical task notes remain in
     [docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md](docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md)
     to define MCK as the local cockpit/handoff surface while Command Center and
     the shared Dev Service Manager own safe launch and process-control paths.
-  - Next implementation should be a narrow static control-card slice with
-    MCK-owned health probes only; no start/stop/restart/Railway/GitHub mutation
-    belongs in the first build.
+  - Next implementation: [#29 - Build static Local Control panel cards](https://github.com/iMelki/mission-control-kanban/issues/29).
 
 - [#24 - Reconcile closed GitHub/Project Done items to local MCK done state](https://github.com/iMelki/mission-control-kanban/issues/24)
   - Completed via PR #26 and closed on 2026-06-14.

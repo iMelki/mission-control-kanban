@@ -106,8 +106,9 @@ Each card should expose:
 
 ## Follow-Up Issues
 
-- Build slice: create a narrow implementation issue for the static local-control
-  panel and MCK-owned health cards.
+- [#29 - Build static Local Control panel cards](https://github.com/iMelki/mission-control-kanban/issues/29):
+  narrow implementation issue for the static local-control panel and MCK-owned
+  health cards.
 - Optional later slice: integrate a display-safe Command Center surface registry
   API after that API exists.
 - Optional later slice: expose projects-ops health reports through a reviewed
