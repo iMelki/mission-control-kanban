@@ -11,6 +11,9 @@ the local operator entrypoint; historical task notes remain in
 - [#29 - Build static Local Control panel cards](https://github.com/iMelki/mission-control-kanban/issues/29)
   - Goal: implement the first safe home-page Local Control area from
     [docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md](docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md).
+  - Runtime note: `3002` is the repo development default; the current managed
+    local workspace and Docker-backed n8n sync route use `3021` /
+    `http://mck.host:3021`.
   - Guardrail: cards may open known URLs and consume MCK-owned health endpoints,
     but must not start, stop, restart, shell out, call Railway, mutate GitHub,
     or expose secrets.

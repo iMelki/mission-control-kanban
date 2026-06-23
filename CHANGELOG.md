@@ -60,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Clarified the MCK local URL split: `3002` remains the repo development
+  default, while `3021` / `mck.host:3021` is the current managed MCK/n8n sync
+  route for local operations.
 - GitHub Actions workflows now opt JavaScript actions into the Node 24 runtime
   to clear the Node 20 deprecation warning before GitHub's removal date.
 - GitHub import preview now normalizes required dispatch-contract fields from
