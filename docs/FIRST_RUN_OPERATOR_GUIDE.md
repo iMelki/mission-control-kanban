@@ -273,5 +273,6 @@ As of 2026-05-21:
 
 ## Related Docs
 
+- `docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md`
 - `docs/GITHUB_IMPORT_PREVIEW.md`
 - `docs/GITHUB_WRITEBACK.md`

@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-06-14
+Last updated: 2026-06-23
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -11,6 +11,16 @@ the local operator entrypoint; historical task notes remain in
 - No active repo-local task entries at this time.
 
 ## Recently Completed
+
+- [#22 - Plan main local control panel for app launch and UI handoff](https://github.com/iMelki/mission-control-kanban/issues/22)
+  - Completed on 2026-06-23.
+  - Result: added
+    [docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md](docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md)
+    to define MCK as the local cockpit/handoff surface while Command Center and
+    the shared Dev Service Manager own safe launch and process-control paths.
+  - Next implementation should be a narrow static control-card slice with
+    MCK-owned health probes only; no start/stop/restart/Railway/GitHub mutation
+    belongs in the first build.
 
 - [#24 - Reconcile closed GitHub/Project Done items to local MCK done state](https://github.com/iMelki/mission-control-kanban/issues/24)
   - Completed via PR #26 and closed on 2026-06-14.

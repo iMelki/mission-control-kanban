@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Main local control panel plan in
+  `docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md`, covering MCK/Command Center/Mission
+  Control/MemSys/Hermes/n8n handoff boundaries and a safe static-card build
+  slice for `mission-control-kanban#22`
 - Beginner-facing GitHub import flow in the Mission Queue UI with an
   **Import GitHub** modal for loading a GitHub issue URL before creating a
   linked local task
