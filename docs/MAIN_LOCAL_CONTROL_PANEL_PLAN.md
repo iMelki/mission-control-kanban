@@ -110,8 +110,8 @@ Each card should expose:
 ## Follow-Up Issues
 
 - [#29 - Build static Local Control panel cards](https://github.com/iMelki/mission-control-kanban/issues/29):
-  narrow implementation issue for the static local-control panel and MCK-owned
-  health cards.
+  completed on 2026-06-23 with a compact home-page Local Control area and
+  MCK-owned GitHub/OpenClaw/n8n health signals.
 - Optional later slice: integrate a display-safe Command Center surface registry
   API after that API exists.
 - Optional later slice: expose projects-ops health reports through a reviewed

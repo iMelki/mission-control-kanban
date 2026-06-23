@@ -8,17 +8,20 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#29 - Build static Local Control panel cards](https://github.com/iMelki/mission-control-kanban/issues/29)
-  - Goal: implement the first safe home-page Local Control area from
-    [docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md](docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md).
-  - Runtime note: `3002` is the repo development default; the current managed
-    local workspace and Docker-backed n8n sync route use `3021` /
-    `http://mck.host:3021`.
-  - Guardrail: cards may open known URLs and consume MCK-owned health endpoints,
-    but must not start, stop, restart, shell out, call Railway, mutate GitHub,
-    or expose secrets.
+- None currently tracked from this local index.
 
 ## Recently Completed
+
+- [#29 - Build static Local Control panel cards](https://github.com/iMelki/mission-control-kanban/issues/29)
+  - Completed on 2026-06-23.
+  - Result: added a compact home-page Local Control area with source-controlled
+    cards for MCK, Mission Control, Command Center, MemSys, OpenClaw, Hermes,
+    n8n, recurring health handoff, and GitHub diagnostics.
+  - Guardrail: cards only open known URLs or MCK-owned diagnostic/detail routes;
+    they do not start, stop, restart, shell out, call Railway, mutate GitHub,
+    or expose secrets.
+  - Validation: `npm run test:github-sync`, `npm run lint`, and in-app browser
+    desktop/mobile QA with a click-through to `/n8n-sync-history`.
 
 - [#22 - Plan main local control panel for app launch and UI handoff](https://github.com/iMelki/mission-control-kanban/issues/22)
   - Completed on 2026-06-23.

@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Compact home-page Local Control area for `mission-control-kanban#29`, with
+  source-controlled operator links and MCK-owned health signals for GitHub
+  diagnostics, OpenClaw status, and n8n sync history.
 - Main local control panel plan in
   `docs/MAIN_LOCAL_CONTROL_PANEL_PLAN.md`, covering MCK/Command Center/Mission
   Control/MemSys/Hermes/n8n handoff boundaries and a safe static-card build

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle, Github } from 'lucide-react';
 import Link from 'next/link';
+import { LocalControlPanel } from '@/components/LocalControlPanel';
 import type { WorkspaceStats } from '@/lib/types';
 
 export function WorkspaceDashboard() {
@@ -68,6 +69,8 @@ export function WorkspaceDashboard() {
             Select a cockpit workspace. Project-backed workspaces mirror GitHub Projects into local MCK tasks.
           </p>
         </div>
+
+        <LocalControlPanel />
 
         {workspaces.length === 0 ? (
           <div className="text-center py-16">
