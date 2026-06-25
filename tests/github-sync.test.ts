@@ -136,7 +136,7 @@ test('MCK n8n sync payload normalization records alert state and run scope', () 
       dryRun: false,
       receivedAt: '2026-06-10T07:00:00.000Z',
       mode: 'local-mck-sync',
-      baseUrl: 'http://mck.host:3002',
+      baseUrl: 'http://mck.host:3021',
       workspaces: ['assistants', 'memsys'],
       summary: {
         scanned_items: 90,

@@ -1,13 +1,13 @@
 # First-Run Operator Guide
 
-Last updated: 2026-05-21
+Last updated: 2026-06-25
 
 This guide explains how Mission Control Kanban (`MCK`), GitHub, and OpenClaw
 fit together in this workspace.
 
 ## Local Endpoints In This Workspace
 
-- MCK web app: `http://127.0.0.1:3002`
+- MCK web app: `http://127.0.0.1:3021`
 - OpenClaw gateway: `ws://127.0.0.1:28789`
 - OpenClaw config: `C:\Users\Milky\.openclaw\openclaw.json`
 - OpenClaw session store:
@@ -50,7 +50,7 @@ routes that use `gh api` plus your local GitHub token.
 
 ## First Use: Import A GitHub Issue
 
-1. Open `http://127.0.0.1:3002`.
+1. Open `http://127.0.0.1:3021`.
 2. In the Mission Queue header, click **Import GitHub**.
 3. Paste a full GitHub issue URL such as
    `https://github.com/iMelki/projects-ops/issues/6`.
@@ -207,8 +207,8 @@ diagnostics pill.
 
 Check:
 
-- `http://127.0.0.1:3002/api/openclaw/status`
-- `http://127.0.0.1:3002/api/openclaw/sessions`
+- `http://127.0.0.1:3021/api/openclaw/status`
+- `http://127.0.0.1:3021/api/openclaw/sessions`
 
 If `connected: true` is returned, MCK can currently talk to OpenClaw.
 
@@ -229,7 +229,7 @@ $env:GITHUB_TOKEN=$env:GH_GENERAL_TOKEN
 npm run dev:n8n
 ```
 
-Then confirm `http://127.0.0.1:3002/api/github/diagnostics` reports
+Then confirm `http://127.0.0.1:3021/api/github/diagnostics` reports
 `status: ok` before running an import, refresh, or n8n sync.
 
 ### n8n Sync Alerts
@@ -262,9 +262,9 @@ agent, `railway-manager-claw-dev`, exists but is currently idle.
 
 ## Current Local Reality
 
-As of 2026-05-21:
+As of 2026-06-25:
 
-- MCK is running on port `3002`
+- MCK is running on port `3021`
 - the local OpenClaw gateway is reachable on port `28789`
 - GitHub reads are using `GH_GENERAL_TOKEN`
 - GitHub issue import is working

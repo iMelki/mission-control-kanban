@@ -56,16 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tests without touching canonical operator workspaces
 - Baseline `.git-secrets-ignore` for local secret-scan exclusions
 - Root `OPEN_TASKS.md` index for current GitHub issue tracking
-- `npm run dev:n8n` for running local MCK on `0.0.0.0:3002` so Docker-backed
+- `npm run dev:n8n` for running local MCK on `0.0.0.0:3021` so Docker-backed
   n8n workflows can reach the app consistently
 - Operator guidance for restarting local `next dev` after `npm run build` so
   stale `.next` chunks do not trigger `_document` runtime failures
 
 ### Changed
 
-- Clarified the MCK local URL split: `3002` remains the repo development
-  default, while `3021` / `mck.host:3021` is the current managed MCK/n8n sync
-  route for local operations.
+- Aligned the MCK local n8n route on `3021` / `mck.host:3021`; `3002` is no
+  longer documented as the repo development default for scheduled sync work.
 - GitHub Actions workflows now opt JavaScript actions into the Node 24 runtime
   to clear the Node 20 deprecation warning before GitHub's removal date.
 - GitHub import preview now normalizes required dispatch-contract fields from

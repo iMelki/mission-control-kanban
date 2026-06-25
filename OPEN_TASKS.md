@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-06-23
+Last updated: 2026-06-25
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -38,7 +38,7 @@ the local operator entrypoint; historical task notes remain in
     Ready/Review/Blocked/Done mapping.
   - Validation: `pre-commit run --all-files`, `npm run test:github-sync`,
     `npm run build`, and a live Assistants workspace sync against
-    `http://127.0.0.1:3002/api/workspaces/assistants/github-sync`.
+    `http://127.0.0.1:3021/api/workspaces/assistants/github-sync`.
 - [#20 - Clarify workspace-level manual sync control](https://github.com/iMelki/mission-control-kanban/issues/20)
   - Completed via PR #21. The project-backed workspace banner now labels the
     manual refresh control as **Sync now** and reports workspace-level sync
