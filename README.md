@@ -36,7 +36,7 @@ Mission Control is a task management system that lets you create tasks, plan the
 │  ┌─────────────────┐         ┌─────────────────────────────┐   │
 │  │ Mission Control │ ◄─────► │     OpenClaw Gateway        │   │
 │  │   (Next.js)     │   WS    │  (AI Agent Runtime)         │   │
-│  │   Port 3002     │         │  Port 28789                 │   │
+│  │   Port 3021     │         │  Port 28789                 │   │
 │  └─────────────────┘         └─────────────────────────────┘   │
 │         │                              │                        │
 │         ▼                              ▼                        │
@@ -114,7 +114,7 @@ OPENCLAW_GATEWAY_URL=ws://127.0.0.1:28789
 OPENCLAW_GATEWAY_TOKEN=your-openclaw-token-here
 
 # Workspace default port for Mission Control Kanban
-PORT=3002
+PORT=3021
 ```
 
 **How to get these values:**
@@ -149,12 +149,12 @@ npm run dev
 You should see:
 ```
 ▲ Next.js 15.x.x
-- Local: http://localhost:3002
+- Local: http://localhost:3021
 ```
 
 ### Step 6: Open in Browser
 
-Go to: **http://localhost:3002**
+Go to: **http://localhost:3021**
 
 🎉 You should see the Mission Control dashboard!
 
@@ -205,7 +205,7 @@ You can drag tasks between columns manually, or let the system auto-advance them
 |----------|----------|---------|-------------|
 | `OPENCLAW_GATEWAY_URL` | Yes | `ws://127.0.0.1:28789` | WebSocket URL to OpenClaw Gateway |
 | `OPENCLAW_GATEWAY_TOKEN` | Yes | - | Authentication token for OpenClaw |
-| `PORT` | No | `3002` | Port for Mission Control Kanban web server in this workspace |
+| `PORT` | No | `3021` | Port for Mission Control Kanban web server in this workspace |
 
 ### OpenClaw Configuration
 
@@ -344,14 +344,14 @@ SELECT * FROM tasks;
 ### Port Already in Use
 
 ```bash
-# Find what's using port 3002
-lsof -i :3002
+# Find what's using port 3021
+lsof -i :3021
 
 # Kill it (replace PID with the actual number)
 kill -9 PID
 
 # Or use a different port
-PORT=3002 npm run dev
+PORT=3021 npm run dev
 ```
 
 ---

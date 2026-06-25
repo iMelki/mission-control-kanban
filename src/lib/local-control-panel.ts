@@ -140,7 +140,7 @@ export const LOCAL_CONTROL_SURFACES: LocalControlSurface[] = [
   {
     id: 'managed-sync-route',
     name: 'Managed Sync Route',
-    description: 'Repo dev uses 3002; Docker-backed scheduled sync uses mck.host:3021.',
+    description: 'Repo dev and Docker-backed scheduled sync use mck.host:3021.',
     group: 'readiness',
     href: '/workspace/assistants',
     detailHref: '/n8n-sync-history',
