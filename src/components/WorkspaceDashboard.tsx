@@ -201,7 +201,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
               </span>
             </div>
             <p className="mt-1">
-              Auto-refreshes from {workspace.github_project_title || workspace.name}; GitHub remains the task source of truth.
+              {workspace.github_project_auto_refresh ? 'Auto-refreshes' : 'Manual refresh'} from {workspace.github_project_title || workspace.name}; GitHub remains the task source of truth.
             </p>
           </div>
         )}

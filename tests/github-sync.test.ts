@@ -84,10 +84,13 @@ test('GitHub Project workspace mappings cover the operator boards without duplic
   assert.equal(mappings.get('assistants')?.github_project_number, 13);
   assert.equal(mappings.get('memsys')?.github_project_number, 12);
   assert.equal(mappings.get('content-factory')?.github_project_number, 14);
+  assert.equal(mappings.get('asimtop')?.github_project_number, 8);
+  assert.equal(mappings.get('asimtop')?.github_project_title, 'Asimtop Trading Automation');
+  assert.equal(mappings.get('asimtop')?.github_project_auto_refresh, false);
 
   for (const mapping of GITHUB_PROJECT_WORKSPACE_MAPPINGS) {
     assert.equal(mapping.github_project_owner, 'iMelki');
-    assert.equal(mapping.github_project_auto_refresh, true);
+    assert.equal(mapping.github_project_auto_refresh, mapping.slug === 'asimtop' ? false : true);
     assert.match(mapping.description, /mapped to GitHub Project/i);
   }
 });

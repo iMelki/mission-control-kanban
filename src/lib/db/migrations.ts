@@ -392,6 +392,47 @@ const migrations: Migration[] = [
         'mck-sync-test-assistants'
       );
     }
+  },
+  {
+    id: '012',
+    name: 'add_asimtop_project_workspace',
+    up: (db) => {
+      console.log('[Migration 012] Adding Asimtop GitHub Project-backed workspace...');
+
+      db.prepare(`
+        INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        'asimtop',
+        'Asimtop',
+        'asimtop',
+        'Asimtop cockpit mapped to GitHub Project #8.',
+        'A'
+      );
+
+      db.prepare(`
+        UPDATE workspaces
+        SET name = ?,
+            description = ?,
+            icon = ?,
+            github_project_owner = ?,
+            github_project_number = ?,
+            github_project_title = ?,
+            github_project_url = ?,
+            github_project_auto_refresh = 0,
+            updated_at = datetime('now')
+        WHERE slug = ?
+      `).run(
+        'Asimtop',
+        'Asimtop cockpit mapped to GitHub Project #8.',
+        'A',
+        'iMelki',
+        8,
+        'Asimtop Trading Automation',
+        'https://github.com/users/iMelki/projects/8',
+        'asimtop'
+      );
+    }
   }
 ];
 

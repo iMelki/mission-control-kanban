@@ -62,6 +62,18 @@ export const GITHUB_PROJECT_WORKSPACE_MAPPINGS: GitHubProjectWorkspaceMapping[] 
     github_project_url: 'https://github.com/users/iMelki/projects/14',
     github_project_auto_refresh: true,
   },
+  {
+    id: 'asimtop',
+    name: 'Asimtop',
+    slug: 'asimtop',
+    description: 'Asimtop cockpit mapped to GitHub Project #8.',
+    icon: 'A',
+    github_project_owner: 'iMelki',
+    github_project_number: 8,
+    github_project_title: 'Asimtop Trading Automation',
+    github_project_url: 'https://github.com/users/iMelki/projects/8',
+    github_project_auto_refresh: false,
+  },
 ];
 
 interface WorkspaceProjectRow {
