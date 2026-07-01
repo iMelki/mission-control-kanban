@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { mkdir, appendFile } from 'fs/promises';
-import { dirname, resolve } from 'path';
+import { dirname } from 'path';
 import { queryAll, queryOne, run } from './db';
 import type {
   MckN8nSyncAlertLevel,
@@ -220,7 +220,7 @@ function getAlertLogPath(): string | null {
     return null;
   }
 
-  return resolve(process.cwd(), configured?.trim() || DEFAULT_ALERT_LOG_PATH);
+  return configured?.trim() || DEFAULT_ALERT_LOG_PATH;
 }
 
 export async function notifyMckN8nSyncAlert(run: MckN8nSyncRun): Promise<void> {

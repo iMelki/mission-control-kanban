@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Post-runtime-ops tracking for [#38](https://github.com/iMelki/mission-control-kanban/issues/38), including a home-page Runtime Regression card, `/api/runtime/regression`, CI artifact closeout automation via `npm run comment:runtime-artifacts`, and `docs/RUNTIME_REGRESSION_ARTIFACTS.md`.
 - Runtime ops admin console for [#36](https://github.com/iMelki/mission-control-kanban/issues/36): global dispatch failure queue, runtime audit/migration action, workspace section tabs, callback replay protection, callback completion schema export, bridge callback examples, webhook health-test API/UI, runtime health badges, retention settings UI, callback replay ledger, schema/template downloads, retention audit metrics, CI runtime-regression workflow artifacts, and React Doctor full-project 100 policy plus changed-scope 100 wrapper output.
 - Runtime dispatch hardening for [#33](https://github.com/iMelki/mission-control-kanban/issues/33): `task_dispatch_attempts` timeline storage, dispatch history API, Task modal dispatch timeline, safe webhook retry controls, webhook JSON Schema validation/docs, mock webhook/OpenClaw adapter tests, runtime filter chips, agent runtime audit summary, per-agent runtime health labels, reusable panel primitives, and responsive desktop/tablet/mobile smoke checks.
 - `npm run check:runtime-regressions` to run the changed-scope React Doctor gate plus runtime UI smoke from one local regression command.
@@ -73,6 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Switched the default production build to `next build --webpack` to remove the noisy Turbopack NFT trace warning from the supported build path while preserving `npm run build:turbo` for Turbopack inventory.
+- Updated Browserslist/caniuse-lite data; no target browser changes were reported.
 - Scoped README, the OpenClaw agent protocol, first-run operator guide, and dispatch-contract docs so `ASSIGNED` auto-dispatch is explicitly OpenClaw-only until [#32](https://github.com/iMelki/mission-control-kanban/issues/32) adds runtime adapters.
 - Aligned the repo agent instructions with the current GitHub Issues + root `OPEN_TASKS.md` tracking model.
 - Updated the repo-owned React Doctor hook and project config for Next.js 16 / React 19 / ESLint 9 so changed-scope scans and raw full-project scoring report 100/100 while intentional local-operator dashboard exceptions remain documented in `doctor.config.mjs`.

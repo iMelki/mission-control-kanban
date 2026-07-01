@@ -86,6 +86,9 @@ async function main() {
       || /Failed to load n8n sync status: TypeError: Failed to fetch/.test(text)
       || /Failed to load workspace: TypeError: Failed to fetch/.test(text)
       || /Failed to load data: TypeError: Failed to fetch/.test(text)
+      // Local smoke often runs without OpenClaw Gateway; Chromium reports the expected
+      // /api/openclaw/sessions 503 as a generic resource load error without the URL.
+      || /Failed to load resource: the server responded with a status of 503 \(Service Unavailable\)/.test(text)
     );
     page.on('console', (message) => {
       if (message.type() === 'error' && !isIgnorableConsoleNoise(message.text())) {
@@ -106,7 +109,12 @@ async function main() {
     await page.getByText(/Webhook templates & callback cleanup/i).waitFor({ timeout: 10_000 });
     await assertJsonEndpoint('/api/schemas/webhook-dispatch-payload');
     await assertJsonEndpoint('/api/schemas/webhook-callback-completion');
+    await assertJsonEndpoint('/api/runtime/regression');
     await page.screenshot({ path: path.join(artifactDir, 'settings-runtime-ops.png'), fullPage: true });
+
+    await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.getByText(/Runtime Regression/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Workspace surfaces and health/i).waitFor({ timeout: 10_000 });
 
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });

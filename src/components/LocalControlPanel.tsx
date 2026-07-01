@@ -70,6 +70,7 @@ function SurfaceIcon({ surface }: { surface: LocalControlSurface }) {
   if (surface.id.includes('memsys')) return <Database className="size-4" />;
   if (surface.id.includes('hermes')) return <RadioTower className="size-4" />;
   if (surface.id.includes('mission-control') || surface.id.includes('command-center')) return <Monitor className="size-4" />;
+  if (surface.id.includes('runtime-regression')) return <Activity className="size-4" />;
   if (surface.id.includes('sync')) return <RefreshCw className="size-4" />;
   return <Server className="size-4" />;
 }
@@ -104,7 +105,8 @@ export function LocalControlPanel() {
       const checks = LOCAL_CONTROL_SURFACES.filter((surface) => (
         surface.healthSource === 'github' ||
         surface.healthSource === 'openclaw' ||
-        surface.healthSource === 'n8n-sync'
+        surface.healthSource === 'n8n-sync' ||
+        surface.healthSource === 'runtime-regression'
       ));
 
       const updates = await Promise.all(checks.map(async (surface) => {

@@ -6,7 +6,7 @@ export type LocalControlGroup =
 
 export type LocalControlHealthState = 'ok' | 'limited' | 'attention' | 'unknown';
 
-export type LocalControlHealthSource = 'self' | 'github' | 'openclaw' | 'n8n-sync' | 'link-only';
+export type LocalControlHealthSource = 'self' | 'github' | 'openclaw' | 'n8n-sync' | 'runtime-regression' | 'link-only';
 
 export interface LocalControlSurface {
   id: string;
@@ -106,6 +106,17 @@ export const LOCAL_CONTROL_SURFACES: LocalControlSurface[] = [
     mode: 'internal',
     healthSource: 'n8n-sync',
     displayUrl: '/n8n-sync-history',
+  },
+  {
+    id: 'runtime-regression',
+    name: 'Runtime Regression',
+    description: 'Latest MCK runtime smoke proof and screenshot artifact location.',
+    group: 'automation-health',
+    href: '/api/runtime/regression',
+    detailHref: '/api/runtime/regression',
+    mode: 'diagnostic',
+    healthSource: 'runtime-regression',
+    displayUrl: 'npm run check:runtime-regressions',
   },
   {
     id: 'n8n-local',
@@ -267,6 +278,36 @@ export function mapN8nSyncStatusToHealth(payload: unknown): LocalControlHealth {
   };
 }
 
+
+export function mapRuntimeRegressionToHealth(payload: unknown): LocalControlHealth {
+  const status = asRecord(payload);
+  const latest = asRecord(status.latest);
+  const recent = Boolean(status.recent);
+  const screenshotCount = asNumber(latest.screenshot_count);
+
+  if (!status.latest) {
+    return {
+      state: 'unknown',
+      label: 'No proof',
+      detail: 'No local runtime-regression artifact has been recorded yet.',
+    };
+  }
+
+  if (recent) {
+    return {
+      state: 'ok',
+      label: 'Proof ready',
+      detail: `${screenshotCount} screenshot artifact${screenshotCount === 1 ? '' : 's'} from the latest smoke run.`,
+    };
+  }
+
+  return {
+    state: 'limited',
+    label: 'Stale proof',
+    detail: 'Latest runtime-regression proof is older than 24 hours.',
+  };
+}
+
 export function getDefaultHealthForSurface(surface: LocalControlSurface): LocalControlHealth {
   if (surface.healthSource === 'self') {
     return {
@@ -293,6 +334,8 @@ export function mapHealthPayload(source: LocalControlHealthSource, payload: unkn
       return mapOpenClawStatusToHealth(payload);
     case 'n8n-sync':
       return mapN8nSyncStatusToHealth(payload);
+    case 'runtime-regression':
+      return mapRuntimeRegressionToHealth(payload);
     case 'self':
       return getDefaultHealthForSurface({ healthSource: 'self' } as LocalControlSurface);
     default:

@@ -14,8 +14,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { chromium } from 'playwright';
 import { queryOne, queryAll, run } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { existsSync, mkdirSync, readFileSync } from 'fs';
-import path from 'path';
 import * as csstree from 'css-tree';
 import type { Task, TaskDeliverable } from '@/lib/types';
 
@@ -59,9 +57,6 @@ interface TestResponse {
   newStatus?: string;
 }
 
-// Screenshots stored in projects directory - set via PROJECTS_PATH env var
-const SCREENSHOTS_DIR = ((process.env.PROJECTS_PATH || '~/projects').replace(/^~/, process.env.HOME || '')) + '/.screenshots';
-
 /**
  * POST /api/tasks/[id]/test
  * Run automated browser tests on all deliverables for a task
@@ -97,11 +92,6 @@ export async function POST(
         { error: 'No testable deliverables found (file or url types)' },
         { status: 400 }
       );
-    }
-
-    // Ensure screenshots directory exists
-    if (!existsSync(SCREENSHOTS_DIR)) {
-      mkdirSync(SCREENSHOTS_DIR, { recursive: true });
     }
 
     // Launch browser
@@ -293,34 +283,16 @@ async function testDeliverable(
   const resourceErrors: ResourceError[] = [];
   let cssErrors: CssValidationError[] = [];
   let httpStatus: number | null = null;
-  let screenshotPath: string | null = null;
+  const screenshotPath: string | null = null;
 
   const isUrlDeliverable = deliverable.deliverable_type === 'url';
   const testPath = deliverable.path || '';
 
   try {
-    // For file deliverables, check file exists
+    // For file deliverables, skip non-HTML files before browser testing.
+    // We intentionally avoid server-side fs probes here: Turbopack's output-file
+    // tracing treats arbitrary fs reads in app routes as a whole-project trace.
     if (!isUrlDeliverable) {
-      if (!testPath || !existsSync(testPath)) {
-        return {
-          passed: false,
-          deliverable: {
-            id: deliverable.id,
-            title: deliverable.title,
-            path: testPath || 'unknown',
-            type: 'file'
-          },
-          httpStatus: null,
-          consoleErrors: [`File does not exist: ${testPath}`],
-          consoleWarnings: [],
-          cssErrors: [],
-          resourceErrors: [],
-          screenshotPath: null,
-          duration: Date.now() - startTime,
-          error: 'File not found'
-        };
-      }
-
       // Skip non-HTML files for browser testing
       if (!testPath.endsWith('.html') && !testPath.endsWith('.htm')) {
         return {
@@ -341,10 +313,6 @@ async function testDeliverable(
           error: 'Skipped - not an HTML file'
         };
       }
-
-      // Validate CSS in file before browser test
-      const htmlContent = readFileSync(testPath, 'utf-8');
-      cssErrors = extractAndValidateCss(htmlContent);
     }
 
     // For URL deliverables, determine test approach
@@ -354,26 +322,8 @@ async function testDeliverable(
         // HTTP URL - test directly
         testUrl = testPath;
       } else {
-        // Treat as file path
-        if (!existsSync(testPath)) {
-          return {
-            passed: false,
-            deliverable: {
-              id: deliverable.id,
-              title: deliverable.title,
-              path: testPath,
-              type: 'url'
-            },
-            httpStatus: null,
-            consoleErrors: [`URL path does not exist: ${testPath}`],
-            consoleWarnings: [],
-            cssErrors: [],
-            resourceErrors: [],
-            screenshotPath: null,
-            duration: Date.now() - startTime,
-            error: 'Path not found'
-          };
-        }
+        // Treat as file path. Missing paths fail through Playwright navigation,
+        // which keeps this route free of arbitrary fs reads during Turbopack tracing.
         testUrl = `file://${testPath}`;
       }
     } else {
@@ -432,10 +382,11 @@ async function testDeliverable(
     // Wait a bit for any async JS to run
     await page.waitForTimeout(1000);
 
-    // Take screenshot
-    const screenshotFilename = `${taskId}-${deliverable.id}-${Date.now()}.png`;
-    screenshotPath = path.join(SCREENSHOTS_DIR, screenshotFilename);
-    await page.screenshot({ path: screenshotPath, fullPage: true });
+    // Validate rendered inline CSS without server-side file reads.
+    cssErrors = extractAndValidateCss(await page.content());
+
+    // Exercise screenshot rendering without persisting files from this API route.
+    await page.screenshot({ fullPage: true });
 
     await context.close();
 
@@ -526,7 +477,7 @@ export async function GET(
     usage: {
       method: 'POST',
       description: 'Run automated browser tests on all HTML/URL deliverables',
-      returns: 'Test results with pass/fail, console errors, CSS errors, resource errors, and screenshots'
+      returns: 'Test results with pass/fail, console errors, CSS errors, and resource errors'
     }
   });
 }

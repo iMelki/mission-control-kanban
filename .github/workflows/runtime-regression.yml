@@ -1,10 +1,20 @@
 name: Runtime Regression
 
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
 on:
   pull_request:
   push:
     branches: [main, dev]
   workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Optional issue number to receive runtime artifact links'
+        required: false
+        type: string
   schedule:
     - cron: '0 6 * * *'
 
@@ -37,3 +47,8 @@ jobs:
             test-results/**
           if-no-files-found: ignore
           retention-days: 14
+      - name: Comment artifact links on requested issue
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.issue_number != '' && !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run comment:runtime-artifacts -- --issue "${{ inputs.issue_number }}" --branch "${{ github.ref_name }}"
