@@ -239,7 +239,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
               </div>
 
               {/* Runtime & dispatch */}
-              <RuntimeDispatchSection form={form} setForm={setForm} />
+              <RuntimeDispatchSection form={form} setForm={setForm} agentId={agent?.id} />
             </div>
           )}
 

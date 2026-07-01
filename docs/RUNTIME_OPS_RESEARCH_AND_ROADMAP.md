@@ -25,21 +25,24 @@ Community/vendor guidance checked before implementation:
 - Added `/runtime-regression` as an operator-friendly drilldown page for local runtime smoke artifacts instead of making the Local Control card JSON-only.
 - Extended runtime UI smoke to verify the drilldown page.
 - Added a non-blocking `turbopack-inventory` GitHub Actions job that runs `npm run build:turbo`, captures logs/warnings, uploads an artifact, and does not block the supported webpack build.
+- Added webhook runtime config templates for Hermes, Codex, Copilot, Claude Code, n8n, and generic webhook workers.
+- Added a webhook validation wizard that sends a signed non-task ping before enabling webhook `dispatch_enabled`.
+- Added dry-run dispatch previews for manual/OpenClaw/webhook agents so operators can inspect prompts, callbacks, and webhook payloads without side effects.
+- Added bulk runtime migration diff/apply support with selected-agent before/after runtime-field previews.
+- Added task dependency blocked-by APIs and Task modal list visualization.
+- Added ready-for-agent checklist seeding and GitHub issue draft generation from MCK work slices.
+- Added runtime failure-rate threshold alerts to `/api/runtime/health` and Settings → Runtime operations.
+- Added screenshot thumbnail previews and a safe screenshot-serving route for `/runtime-regression`.
+- Updated Runtime Regression CI to comment artifact links on successful PR/requested issue runs.
+- Captured the reusable operator workflow in `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`.
 
 ## Remaining tracked work
 
-1. Webhook endpoint validation wizard before enabling `dispatch_enabled`.
-2. Runtime config template gallery for Hermes, Codex, Copilot, Claude Code, n8n, and generic webhook workers.
-3. Dry-run dispatch preview for every runtime type.
-4. Bulk agent runtime migration UI with before/after diff confirmation.
-5. Task dependency / blocked-by visualization.
-6. Operator-ready checklist editor for ready-for-agent tasks.
-7. GitHub issue creation/update flow from MCK work slices.
-8. Route-level decomposition for oversized workspace/task-modal components.
-9. Mobile-first review of task modal and Settings runtime ops panels.
-10. Daily summary refinements with screenshot/artifact deep links.
-11. Automatic artifact-link comments after successful push/CI closeout.
-12. Deeper Turbopack trace inventory and upstream issue tracking.
+1. Upgrade the blocked-by list into a true dependency graph only if operators need DAG navigation.
+2. Wire GitHub issue drafts to an explicit live create/update action after adding a plain-English confirmation step.
+3. Continue extracting Task modal sections into smaller route/component chunks as follow-up work.
+4. Add scheduled daily summary deep links to the exact latest `/runtime-regression` screenshots once CI artifact URLs are available at run time.
+5. Continue Turbopack trace triage for the `next.config.mjs` → `src/lib/db/index.ts` path while keeping webpack as the supported build.
 
 ## Closeout semantics for the requested explanations
 
@@ -50,6 +53,8 @@ Prefer issue/PR closeout comments. They are event-oriented, avoid churn in sourc
 ### Revisit Turbopack support separately via `npm run build:turbo` inventory without blocking the supported webpack build
 
 `npm run build` remains the required production build (`next build --webpack`). `npm run build:turbo` is now a CI inventory path that uploads logs/warnings. This lets us watch Next/Turbopack NFT trace behavior without breaking operators when the supported build is healthy.
+
+2026-07-01 triage result: tightening the new runtime-regression screenshot route removed it from the warning trace. The remaining non-blocking Turbopack NFT warning still traces `./next.config.mjs` → `./src/lib/db/index.ts` → `./src/app/api/tasks/[id]/planning/route.ts`, which is consistent with the local SQLite route-handler/database bootstrap path. Keep the inventory artifact and webpack build policy until the DB bootstrap can be isolated or annotated without breaking local file-backed operation.
 
 ### Close/reconcile #34 once dispatch metadata refresh persistence is fully regression-covered
 

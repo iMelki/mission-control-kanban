@@ -80,8 +80,9 @@ jobs:
             test-results/**
           if-no-files-found: ignore
           retention-days: 14
-      - name: Comment artifact links on requested issue
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.issue_number != '' && !cancelled() }}
+      - name: Comment artifact links on PR/requested issue after successful CI
+        if: ${{ success() && ((github.event_name == 'workflow_dispatch' && inputs.issue_number != '') || github.event_name == 'pull_request') }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npm run comment:runtime-artifacts -- --issue "${{ inputs.issue_number }}" --branch "${{ github.ref_name }}"
+          COMMENT_TARGET: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.issue_number }}
+        run: npm run comment:runtime-artifacts -- --issue "$COMMENT_TARGET" --branch "${{ github.ref_name }}" --run-id "${{ github.run_id }}"

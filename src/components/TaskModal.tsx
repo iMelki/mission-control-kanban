@@ -10,6 +10,7 @@ import { PlanningTab } from './PlanningTab';
 import { AgentModal } from './AgentModal';
 import { GitHubWritebackPanel } from './GitHubWritebackPanel';
 import { DispatchTimeline } from './DispatchTimeline';
+import { TaskDependenciesPanel } from './TaskDependenciesPanel';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
 import {
@@ -83,6 +84,10 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
+  const [githubIssueDraft, setGithubIssueDraft] = useState<Record<string, unknown> | null>(null);
+  const [isPreviewingDispatch, setIsPreviewingDispatch] = useState(false);
+  const [isLoadingIssueDraft, setIsLoadingIssueDraft] = useState(false);
 
   useEffect(() => {
     setCurrentTask(initialTask);
@@ -158,6 +163,48 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
       console.error('Failed to copy handoff prompt:', error);
       setHandoffCopyState('error');
     }
+  };
+
+  const handleDispatchDryRun = async () => {
+    if (!currentTask?.id) return;
+    setIsPreviewingDispatch(true);
+    try {
+      const response = await fetch(`/api/tasks/${currentTask.id}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: true }),
+      });
+      setDispatchDryRun(await response.json());
+    } finally {
+      setIsPreviewingDispatch(false);
+    }
+  };
+
+  const handleLoadGitHubIssueDraft = async () => {
+    if (!currentTask?.id) return;
+    setIsLoadingIssueDraft(true);
+    try {
+      const response = await fetch(`/api/tasks/${currentTask.id}/github-issue-draft`, { cache: 'no-store' });
+      setGithubIssueDraft(await response.json());
+    } finally {
+      setIsLoadingIssueDraft(false);
+    }
+  };
+
+  const copyGitHubIssueBody = async () => {
+    const draft = githubIssueDraft?.draft as { title?: string; body?: string } | undefined;
+    if (!draft) return;
+    await navigator.clipboard.writeText(`# ${draft.title || form.title}\n\n${draft.body || ''}`);
+  };
+
+  const applyReadyForAgentChecklist = () => {
+    updateFormField('dispatch_readiness', 'ready_for_agent');
+    updateFormField('dispatch_review_mode', form.dispatch_review_mode === 'human_required' ? 'pair_review' : form.dispatch_review_mode);
+    if (!form.dispatch_acceptance_criteria.trim()) updateFormField('dispatch_acceptance_criteria', '- Operator can verify the requested behavior end-to-end');
+    if (!form.dispatch_test_requirements.trim()) updateFormField('dispatch_test_requirements', '- Run relevant automated tests\n- Capture browser smoke evidence when UI changes');
+    if (!form.dispatch_safety_rules.trim()) updateFormField('dispatch_safety_rules', '- Preserve unrelated dirty work\n- Stage and commit only scoped files');
+    if (!form.dispatch_rollback_plan.trim()) updateFormField('dispatch_rollback_plan', 'Revert the scoped commit or disable the feature flag/config path introduced by this task.');
+    if (!form.dispatch_impact.trim()) updateFormField('dispatch_impact', 'Scoped app/runtime behavior change; verify local UX and regression suite before merge.');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -302,8 +349,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-2 sm:items-center sm:p-4">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-lg sm:rounded-lg w-full max-w-5xl max-h-[96vh] sm:max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
           <h2 className="text-lg font-semibold">
@@ -320,7 +367,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
         {/* Tabs - only show for existing tasks */}
         {currentTask && (
-          <div className="flex border-b border-mc-border flex-shrink-0">
+          <div className="flex overflow-x-auto border-b border-mc-border flex-shrink-0">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -343,7 +390,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
         <div className="flex-1 overflow-y-auto p-4">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form id={`${fieldIdPrefix}-form`} onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div>
             <label htmlFor={inputId('title')} className="block text-sm font-medium mb-1">Title</label>
@@ -434,7 +481,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             {/* Status */}
             <div>
               <label htmlFor={inputId('status')} className="block text-sm font-medium mb-1">Status</label>
@@ -578,6 +625,52 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               )}
             </div>
 
+            <div className="grid gap-3 md:grid-cols-3">
+              <button
+                type="button"
+                onClick={applyReadyForAgentChecklist}
+                className="rounded border border-mc-border px-3 py-2 text-left text-sm hover:bg-mc-bg-tertiary"
+              >
+                <span className="block font-medium">Apply ready-for-agent checklist</span>
+                <span className="text-xs text-mc-text-secondary">Seed tests, safety, rollback, and readiness fields.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDispatchDryRun()}
+                disabled={!currentTask || isPreviewingDispatch}
+                className="rounded border border-mc-border px-3 py-2 text-left text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
+              >
+                <span className="block font-medium">Dry-run dispatch preview</span>
+                <span className="text-xs text-mc-text-secondary">Preview manual/OpenClaw/webhook payloads without side effects.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleLoadGitHubIssueDraft()}
+                disabled={!currentTask || isLoadingIssueDraft}
+                className="rounded border border-mc-border px-3 py-2 text-left text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
+              >
+                <span className="block font-medium">GitHub issue draft</span>
+                <span className="text-xs text-mc-text-secondary">Create/update-ready issue text from this work slice.</span>
+              </button>
+            </div>
+
+            {dispatchDryRun && (
+              <details open className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-xs">
+                <summary className="cursor-pointer font-semibold text-mc-text">Dispatch dry-run preview</summary>
+                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-mc-bg p-3">{JSON.stringify(dispatchDryRun, null, 2)}</pre>
+              </details>
+            )}
+
+            {githubIssueDraft && (
+              <details open className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-xs">
+                <summary className="cursor-pointer font-semibold text-mc-text">GitHub issue create/update draft</summary>
+                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-mc-bg p-3">{JSON.stringify(githubIssueDraft, null, 2)}</pre>
+                <button type="button" onClick={() => void copyGitHubIssueBody()} className="mt-2 rounded border border-mc-border px-2 py-1 hover:bg-mc-bg-tertiary">Copy issue title/body</button>
+              </details>
+            )}
+
+            {currentTask && <TaskDependenciesPanel taskId={currentTask.id} />}
+
             <div>
               <label htmlFor={inputId('source-issue-url')} className="block text-sm font-medium mb-1">Source Issue URL</label>
               <input
@@ -590,7 +683,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor={inputId('target-repo')} className="block text-sm font-medium mb-1">Target Repo</label>
                 <input
@@ -615,7 +708,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <label htmlFor={inputId('readiness')} className="block text-sm font-medium mb-1">Readiness</label>
                 <select
@@ -774,7 +867,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
         {/* Footer - only show on overview tab */}
         {activeTab === 'overview' && (
-          <div className="flex items-center justify-between p-4 border-t border-mc-border flex-shrink-0">
+          <div className="flex flex-col gap-3 p-4 border-t border-mc-border flex-shrink-0 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2">
               {currentTask && (
                 <>
@@ -798,8 +891,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={handleSubmit}
+                type="submit"
+                form={`${fieldIdPrefix}-form`}
                 disabled={isSubmitting}
                 className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
               >

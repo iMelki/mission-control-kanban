@@ -2,11 +2,21 @@ import { NextResponse } from 'next/server';
 import { readdir, stat } from 'fs/promises';
 import * as path from 'path';
 
+interface RuntimeRegressionScreenshot {
+  name: string;
+  path: string;
+  preview_url: string;
+  size_bytes: number;
+  updated_at: string;
+}
+
 interface RuntimeRegressionArtifact {
   name: string;
   path: string;
   updated_at: string;
   screenshot_count: number;
+  screenshots: RuntimeRegressionScreenshot[];
+  ci_run_url?: string;
 }
 
 const ARTIFACT_ROOT = path.join(process.cwd(), 'artifacts', 'runtime-ui-smoke');
@@ -23,12 +33,27 @@ async function listRuntimeArtifacts(): Promise<RuntimeRegressionArtifact[]> {
         stat(artifactPath),
         readdir(artifactPath).catch(() => [] as string[]),
       ]);
-      const screenshotCount = files.filter((file) => /\.(png|jpg|jpeg|webp)$/i.test(file)).length;
+      const screenshotFiles = files.filter((file) => /\.(png|jpg|jpeg|webp)$/i.test(file));
+      const screenshots = await Promise.all(screenshotFiles.map(async (file) => {
+        const relativePath = `artifacts/runtime-ui-smoke/${entry.name}/${file}`;
+        const fileStat = await stat(path.join(artifactPath, file));
+        return {
+          name: file,
+          path: relativePath,
+          preview_url: `/api/runtime/regression/screenshot?path=${encodeURIComponent(relativePath)}`,
+          size_bytes: fileStat.size,
+          updated_at: fileStat.mtime.toISOString(),
+        };
+      }));
       artifacts.push({
         name: entry.name,
         path: `artifacts/runtime-ui-smoke/${entry.name}`,
         updated_at: artifactStat.mtime.toISOString(),
-        screenshot_count: screenshotCount,
+        screenshot_count: screenshotFiles.length,
+        screenshots,
+        ci_run_url: process.env.GITHUB_RUN_ID && process.env.GITHUB_REPOSITORY
+          ? `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+          : undefined,
       });
     }
 

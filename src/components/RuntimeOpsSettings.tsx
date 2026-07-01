@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, Clock, Copy, DatabaseZap, Download, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
+import { Activity, Clock, DatabaseZap, Download, RefreshCw, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { RuntimeConfigTemplateGallery } from '@/components/runtime/RuntimeConfigTemplateGallery';
 
 interface CallbackDeliveryRow {
   id: string;
@@ -30,7 +31,20 @@ interface RuntimeHealthPayload {
   agent_counts?: Array<{ runtime_type: string; dispatch_enabled: number; count: number }>;
   attempt_counts?: Array<{ runtime_type: string; status: string; count: number }>;
   failure_rate_trends?: RuntimeFailureRateTrendPoint[];
+  failure_threshold_policy?: { warn_rate: number; critical_rate: number; min_attempts: number; lookback_days: number };
+  failure_threshold_alerts?: RuntimeFailureThresholdAlert[];
   latest_failure?: { created_at: string; runtime_type: string; reason: string } | null;
+}
+
+interface RuntimeFailureThresholdAlert {
+  runtime_type: string;
+  level: 'warning' | 'critical';
+  failure_rate: number;
+  failed: number;
+  timeout: number;
+  total: number;
+  window_days: number;
+  message: string;
 }
 
 interface RuntimeFailureRateTrendPoint {
@@ -88,15 +102,6 @@ const callbackColumns: DataTableColumn<CallbackDeliveryRow>[] = [
 function safeNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
-
-const WEBHOOK_AGENT_TEMPLATE = `{
-  "webhook_url_env": "MCK_AGENT_WEBHOOK_URL",
-  "signature_secret_env": "MCK_WEBHOOK_SIGNATURE_SECRET",
-  "timeout_ms": 30000,
-  "headers": {
-    "X-MCK-Agent": "example-agent"
-  }
-}`;
 
 function runtimeTrendGroups(points: RuntimeFailureRateTrendPoint[]) {
   const grouped = new Map<string, RuntimeFailureRateTrendPoint[]>();
@@ -221,9 +226,9 @@ export function RuntimeOpsSettings() {
     }
   };
 
-  const copyWebhookTemplate = async () => {
+  const copyTemplate = async (configJson: string) => {
     try {
-      await navigator.clipboard.writeText(WEBHOOK_AGENT_TEMPLATE);
+      await navigator.clipboard.writeText(configJson);
       setCopyState('copied');
       setTimeout(() => setCopyState('idle'), 2000);
     } catch {
@@ -239,10 +244,12 @@ export function RuntimeOpsSettings() {
     const webhookConfigured = safeNumber(health?.webhook?.configured);
     const webhookNeedsConfig = safeNumber(health?.webhook?.needs_config);
     const acceptedCallbacks = callbacks.filter((row) => row.status === 'accepted').length;
+    const alerts = health?.failure_threshold_alerts || [];
     return [
       { label: 'Webhook agents ready', value: webhookConfigured, tone: webhookNeedsConfig > 0 ? 'warn' : 'ok' },
       { label: 'Webhook agents needing config', value: webhookNeedsConfig, tone: webhookNeedsConfig > 0 ? 'warn' : 'ok' },
       { label: 'Failed/timeout attempts', value: failedAttempts, tone: failedAttempts > 0 ? 'warn' : 'ok' },
+      { label: 'Failure threshold alerts', value: alerts.length, tone: alerts.length > 0 ? 'warn' : 'ok' },
       { label: 'Accepted callbacks', value: acceptedCallbacks, tone: 'ok' },
     ];
   }, [callbacks, health]);
@@ -264,7 +271,7 @@ export function RuntimeOpsSettings() {
         </button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-5">
         {cards.map((card) => (
           <div key={card.label} className={`rounded border p-3 ${card.tone === 'warn' ? 'border-amber-400/30 bg-amber-500/10' : 'border-mc-border bg-mc-bg'}`}>
             <div className="text-xs uppercase tracking-wide text-mc-text-secondary">{card.label}</div>
@@ -272,6 +279,25 @@ export function RuntimeOpsSettings() {
           </div>
         ))}
       </div>
+
+      {health?.failure_threshold_alerts && health.failure_threshold_alerts.length > 0 && (
+        <div className="space-y-2 rounded border border-amber-400/30 bg-amber-500/10 p-4">
+          <div className="flex items-center gap-2 font-semibold text-amber-100">
+            <ShieldAlert className="size-4" /> Runtime failure threshold alerts
+          </div>
+          {health.failure_threshold_alerts.map((alert) => (
+            <div key={`${alert.runtime_type}-${alert.level}`} className="rounded border border-mc-border bg-mc-bg px-3 py-2 text-sm">
+              <span className={alert.level === 'critical' ? 'font-semibold text-rose-200' : 'font-semibold text-amber-100'}>{alert.level.toUpperCase()}</span>
+              <span className="ml-2 text-mc-text-secondary">{alert.message} Failed/timeout: {alert.failed + alert.timeout}/{alert.total}.</span>
+            </div>
+          ))}
+          {health.failure_threshold_policy && (
+            <div className="text-xs text-mc-text-secondary">
+              Policy: warn {Math.round(health.failure_threshold_policy.warn_rate * 100)}%, critical {Math.round(health.failure_threshold_policy.critical_rate * 100)}%, min {health.failure_threshold_policy.min_attempts} attempts, {health.failure_threshold_policy.lookback_days} day window.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="rounded border border-mc-border bg-mc-bg-secondary p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -314,7 +340,14 @@ export function RuntimeOpsSettings() {
           <div className="flex flex-wrap gap-2">
             <a href="/api/schemas/webhook-dispatch-payload" className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-tertiary"><Download className="size-4" /> Dispatch schema</a>
             <a href="/api/schemas/webhook-callback-completion" className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-tertiary"><Download className="size-4" /> Callback schema</a>
-            <button type="button" onClick={() => void copyWebhookTemplate()} className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-tertiary"><Copy className="size-4" /> {copyState === 'copied' ? 'Template copied' : copyState === 'error' ? 'Copy failed' : 'Copy config template'}</button>
+          </div>
+          <div className="mt-4">
+            <RuntimeConfigTemplateGallery
+              compact
+              onApply={(configJson) => void copyTemplate(configJson)}
+              onCopy={(configJson) => copyTemplate(configJson)}
+            />
+            {copyState !== 'idle' && <div className="mt-2 text-xs text-mc-text-secondary">{copyState === 'copied' ? 'Template copied to clipboard.' : 'Copy failed.'}</div>}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" disabled={loading} onClick={() => void runCallbackPrune(true)} className="rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-tertiary disabled:opacity-50">Dry-run callback prune</button>

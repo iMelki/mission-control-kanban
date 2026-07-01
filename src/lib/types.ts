@@ -88,6 +88,18 @@ export interface GitHubSourceIdentity {
   project_item_id?: string;
 }
 
+export interface TaskDependencySummary {
+  id: string;
+  task_id: string;
+  blocked_by_task_id: string;
+  note?: string | null;
+  created_at: string;
+  blocked_by_title?: string;
+  blocked_by_status?: TaskStatus;
+  blocking_title?: string;
+  blocking_status?: TaskStatus;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -105,6 +117,8 @@ export interface Task {
   dispatch_metadata?: DispatchMetadata;
   dispatch_ready?: boolean;
   dispatch_blockers?: string[];
+  blocked_by?: TaskDependencySummary[];
+  blocking?: TaskDependencySummary[];
   // Joined fields
   assigned_agent?: Agent;
   created_by_agent?: Agent;

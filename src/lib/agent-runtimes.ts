@@ -317,8 +317,21 @@ export function buildWebhookDispatchPayload(
   };
 }
 
-export function getWebhookUrl(config: AgentRuntimeConfig): string | null {
-  const url = typeof config.webhook_url === 'string' ? config.webhook_url : typeof config.url === 'string' ? config.url : null;
+export function getWebhookUrl(
+  config: AgentRuntimeConfig,
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  const directUrl = typeof config.webhook_url === 'string'
+    ? config.webhook_url
+    : typeof config.url === 'string'
+      ? config.url
+      : null;
+  const envKey = typeof config.webhook_url_env === 'string'
+    ? config.webhook_url_env
+    : typeof config.url_env === 'string'
+      ? config.url_env
+      : null;
+  const url = directUrl || (envKey ? env[envKey] : null);
   if (!url) return null;
   try {
     const parsed = new URL(url);

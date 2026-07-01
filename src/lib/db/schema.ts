@@ -187,6 +187,17 @@ CREATE TABLE IF NOT EXISTS task_dispatch_attempts (
 );
 
 
+-- Task dependencies / blocked-by edges
+CREATE TABLE IF NOT EXISTS task_dependencies (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  blocked_by_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  note TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(task_id, blocked_by_task_id),
+  CHECK(task_id <> blocked_by_task_id)
+);
+
 -- Inbound webhook callback delivery replay/idempotency trail
 CREATE TABLE IF NOT EXISTS webhook_callback_deliveries (
   id TEXT PRIMARY KEY,

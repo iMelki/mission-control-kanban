@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryOne } from '@/lib/db';
-import { getWebhookUrl, parseAgentRuntimeConfig } from '@/lib/agent-runtimes';
+import { buildWebhookHeaders, getWebhookUrl, parseAgentRuntimeConfig } from '@/lib/agent-runtimes';
 import { buildSignedWebhookHeaders } from '@/lib/webhook-signatures';
-import type { Agent } from '@/lib/types';
+import type { Agent, AgentRuntimeConfig } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,11 +11,6 @@ const HEALTH_TEST_HEADERS: Record<string, string> = {
   'Content-Type': 'application/json',
   'X-MCK-Health-Check': 'true',
 };
-
-// This route is an operator-triggered health-test client: it sends a signed
-// non-task ping to the configured webhook URL. It does not receive or act on
-// provider webhook events, so inbound webhook signature verification is not
-// applicable here; outbound signing is handled below when a secret is present.
 
 function getHealthTimeoutMs(config: Record<string, unknown>) {
   const value = typeof config.health_timeout_ms === 'number'
@@ -27,21 +22,49 @@ function getHealthTimeoutMs(config: Record<string, unknown>) {
   return Math.min(Math.max(value, 100), 30_000);
 }
 
-export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
+function resolveConfigFromBody(body: Record<string, unknown>): { config?: AgentRuntimeConfig; agent?: Agent; error?: string; status?: number } {
   const agentId = typeof body.agent_id === 'string' ? body.agent_id : '';
-  if (!agentId) return NextResponse.json({ error: 'agent_id is required' }, { status: 400 });
+  const inlineRuntimeType = body.runtime_type;
+  const hasInlineConfig = body.runtime_config !== undefined;
 
-  const agent = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [agentId]);
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
-  if (agent.runtime_type !== 'webhook') {
-    return NextResponse.json({ ok: false, phase: 'config', reason: 'Agent is not a webhook runtime' }, { status: 400 });
+  let agent: Agent | undefined;
+  if (agentId) {
+    const row = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [agentId]);
+    if (!row) return { error: 'Agent not found', status: 404 };
+    agent = row;
   }
 
-  const config = parseAgentRuntimeConfig(agent.runtime_config);
-  const webhookUrl = getWebhookUrl(config);
+  const effectiveRuntimeType = typeof inlineRuntimeType === 'string'
+    ? inlineRuntimeType
+    : agent?.runtime_type;
+  if (effectiveRuntimeType !== 'webhook') {
+    return { error: 'Webhook health validation requires runtime_type=webhook', status: 400 };
+  }
+
+  const config = hasInlineConfig
+    ? parseAgentRuntimeConfig(body.runtime_config)
+    : parseAgentRuntimeConfig(agent?.runtime_config);
+  return { config, agent };
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  const resolved = resolveConfigFromBody(body);
+  if (resolved.error || !resolved.config) {
+    return NextResponse.json({ ok: false, phase: 'config', reason: resolved.error || 'No runtime config resolved' }, { status: resolved.status || 400 });
+  }
+
+  const config = resolved.config;
+  const webhookUrl = getWebhookUrl(config, process.env);
   if (!webhookUrl) {
-    return NextResponse.json({ ok: false, phase: 'config', reason: 'No webhook_url configured' }, { status: 400 });
+    const hasEnvPointer = typeof config.webhook_url_env === 'string' || typeof config.url_env === 'string';
+    return NextResponse.json({
+      ok: false,
+      phase: 'config',
+      reason: hasEnvPointer ? 'Webhook URL env var is not configured or did not contain a valid http(s) URL' : 'No webhook_url, url, webhook_url_env, or url_env configured',
+      signed: false,
+      secret_env_configured: false,
+    }, { status: 400 });
   }
 
   const deliveryId = `health-${uuidv4()}`;
@@ -56,7 +79,11 @@ export async function POST(request: NextRequest) {
   const secretEnv = typeof config.signature_secret_env === 'string' ? config.signature_secret_env : 'MCK_WEBHOOK_SIGNATURE_SECRET';
   const secret = process.env[secretEnv];
   const signedHeaders = secret ? buildSignedWebhookHeaders({ rawBody: payload, secret, deliveryId }) : undefined;
-  const headers = signedHeaders ? { ...HEALTH_TEST_HEADERS, ...signedHeaders } : HEALTH_TEST_HEADERS;
+  const headers = {
+    ...buildWebhookHeaders(config, process.env),
+    ...HEALTH_TEST_HEADERS,
+    ...(signedHeaders || {}),
+  };
 
   const controller = new AbortController();
   const started = Date.now();

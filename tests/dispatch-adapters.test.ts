@@ -167,6 +167,31 @@ test('manual dispatch records a timeline attempt and does not move the task forw
   assert.equal(attempts[0].status, 'manual');
 });
 
+test('webhook dry-run returns canonical preview without recording attempts or sending requests', async () => {
+  resetDb();
+  let calls = 0;
+  const webhook = await withMockWebhook((_request, response) => {
+    calls += 1;
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ ok: true }));
+  });
+
+  try {
+    seedAgent({ runtime_type: 'webhook', dispatch_enabled: true, runtime_config: { webhook_url: webhook.url, timeout_ms: 500 } });
+    seedTask();
+
+    const result = await dispatchTaskToAssignedAgent('task-1', { dryRun: true });
+    assert.equal(result.dry_run, true);
+    assert.equal(result.would_dispatch, true);
+    assert.equal(result.dispatched, false);
+    assert.equal(calls, 0);
+    assert.equal(getDispatchAttempts('task-1').length, 0);
+    assert.equal((result.request_payload as { event?: string }).event, 'mck.task.dispatch');
+  } finally {
+    await webhook.close();
+  }
+});
+
 test('webhook dispatch posts canonical payload, records success, redacts URL, and moves task active', async () => {
   resetDb();
   let received: Record<string, unknown> | undefined;

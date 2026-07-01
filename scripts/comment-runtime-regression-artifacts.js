@@ -15,6 +15,7 @@ function parseArgs(argv) {
     workflow: 'Runtime Regression',
     branch: 'dev',
     issue: process.env.MCK_RUNTIME_ARTIFACT_ISSUE || '',
+    runId: process.env.GITHUB_RUN_ID || '',
     dryRun: false,
   };
 
@@ -24,6 +25,7 @@ function parseArgs(argv) {
     else if (arg === '--workflow') options.workflow = argv[++index];
     else if (arg === '--branch') options.branch = argv[++index];
     else if (arg === '--issue') options.issue = argv[++index];
+    else if (arg === '--run-id') options.runId = argv[++index];
     else if (arg === '--dry-run') options.dryRun = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -41,15 +43,21 @@ function buildArtifactUrl(repo, runId, artifactName) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const runJson = runGh([
-    'run', 'list',
-    '--repo', options.repo,
-    '--workflow', options.workflow,
-    '--branch', options.branch,
-    '--limit', '1',
-    '--json', 'databaseId,displayTitle,conclusion,status,createdAt,headSha,url',
-  ]);
-  const [run] = JSON.parse(runJson || '[]');
+  const runJson = options.runId
+    ? runGh([
+      'run', 'view', options.runId,
+      '--repo', options.repo,
+      '--json', 'databaseId,displayTitle,conclusion,status,createdAt,headSha,url',
+    ])
+    : runGh([
+      'run', 'list',
+      '--repo', options.repo,
+      '--workflow', options.workflow,
+      '--branch', options.branch,
+      '--limit', '1',
+      '--json', 'databaseId,displayTitle,conclusion,status,createdAt,headSha,url',
+    ]);
+  const run = options.runId ? JSON.parse(runJson || '{}') : JSON.parse(runJson || '[]')[0];
   if (!run) {
     throw new Error(`No workflow run found for ${options.workflow} on ${options.repo}@${options.branch}`);
   }

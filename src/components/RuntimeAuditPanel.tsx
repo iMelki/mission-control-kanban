@@ -45,11 +45,11 @@ export function RuntimeAuditPanel() {
 
   useEffect(() => { void load(); }, []);
 
-  const previewMigration = async (apply: boolean) => {
+  const previewMigration = async (apply: boolean, agentIds?: string[]) => {
     const response = await fetch('/api/agents/runtime-audit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dry_run: !apply }),
+      body: JSON.stringify({ dry_run: !apply, agent_ids: agentIds }),
     });
     setMigration(await response.json());
     await load();
@@ -94,7 +94,19 @@ export function RuntimeAuditPanel() {
       </div>
       {migration && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm"><ShieldAlert className="mr-2 inline size-4 text-amber-300" />Migration result: {JSON.stringify(migration)}</div>}
       {healthTest && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm"><CheckCircle2 className="mr-2 inline size-4 text-mc-accent" />Webhook test: {JSON.stringify(healthTest)}</div>}
-      {loading ? <div className="text-sm text-mc-text-secondary">Loading runtime audit…</div> : <DataTable columns={columns} rows={payload?.agents || []} empty="No agents found." />}
+      {loading ? <div className="text-sm text-mc-text-secondary">Loading runtime audit…</div> : (
+        <DataTable
+          columns={columns}
+          rows={payload?.agents || []}
+          empty="No agents found."
+          enableRowSelection={(row) => row.dispatch_blocked || row.needs_config}
+          bulkActions={[
+            { label: 'Preview selected migration', onClick: (rows) => previewMigration(false, rows.map((row) => row.id)) },
+            { label: 'Apply selected migration', variant: 'danger', onClick: (rows) => previewMigration(true, rows.map((row) => row.id)) },
+          ]}
+          selectedRowsLabel={(selected, total) => `${selected}/${total} agents selected for migration diff`}
+        />
+      )}
     </section>
   );
 }

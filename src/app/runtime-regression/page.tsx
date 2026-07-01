@@ -1,13 +1,24 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { Activity, Camera, Clock, ExternalLink, RefreshCw, Terminal } from 'lucide-react';
+
+interface RuntimeRegressionScreenshot {
+  name: string;
+  path: string;
+  preview_url: string;
+  size_bytes: number;
+  updated_at: string;
+}
 
 interface RuntimeRegressionArtifact {
   name: string;
   path: string;
   updated_at: string;
   screenshot_count: number;
+  screenshots: RuntimeRegressionScreenshot[];
+  ci_run_url?: string;
 }
 
 interface RuntimeRegressionPayload {
@@ -95,7 +106,18 @@ export default function RuntimeRegressionPage() {
               <div className="rounded border border-mc-border bg-mc-bg p-3">
                 <div className="mb-1 text-xs uppercase text-mc-text-secondary">Artifact path</div>
                 <code className="break-all text-xs text-mc-accent">{latest.path}</code>
+                {latest.ci_run_url && <a href={latest.ci_run_url} className="mt-2 inline-flex items-center gap-1 text-xs text-mc-accent hover:underline"><ExternalLink className="size-3" /> CI run</a>}
               </div>
+            </div>
+          )}
+          {latest?.screenshots && latest.screenshots.length > 0 && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {latest.screenshots.map((screenshot) => (
+                <figure key={screenshot.path} className="rounded border border-mc-border bg-mc-bg p-2">
+                  <Image src={screenshot.preview_url} alt={screenshot.name} width={320} height={180} unoptimized className="aspect-video w-full rounded object-cover" />
+                  <figcaption className="mt-2 truncate text-xs text-mc-text-secondary" title={screenshot.path}>{screenshot.name}</figcaption>
+                </figure>
+              ))}
             </div>
           )}
         </section>

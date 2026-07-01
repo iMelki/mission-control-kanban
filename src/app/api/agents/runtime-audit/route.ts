@@ -10,5 +10,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const dryRun = body.dry_run !== false;
-  return NextResponse.json(applyRuntimeAuditMigration({ dryRun }));
+  const agentIds = Array.isArray(body.agent_ids)
+    ? body.agent_ids.filter((value: unknown): value is string => typeof value === 'string')
+    : undefined;
+  return NextResponse.json(applyRuntimeAuditMigration({ dryRun, agentIds }));
 }

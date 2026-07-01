@@ -18,6 +18,8 @@ let registerWebhookCallbackDelivery: typeof import('../src/lib/webhook-callback-
 let getWebhookCallbackDeliveries: typeof import('../src/lib/webhook-callback-operations').getWebhookCallbackDeliveries;
 let getRuntimeAudit: typeof import('../src/lib/runtime-operations').getRuntimeAudit;
 let getDispatchFailureRateTrends: typeof import('../src/lib/runtime-operations').getDispatchFailureRateTrends;
+let getDispatchFailureThresholdAlerts: typeof import('../src/lib/runtime-operations').getDispatchFailureThresholdAlerts;
+let applyRuntimeAuditMigration: typeof import('../src/lib/runtime-operations').applyRuntimeAuditMigration;
 let pruneDispatchAttemptsWithAudit: typeof import('../src/lib/runtime-operations').pruneDispatchAttemptsWithAudit;
 
 function resetDb() {
@@ -44,6 +46,8 @@ test.before(async () => {
   getWebhookCallbackDeliveries = callbackOps.getWebhookCallbackDeliveries;
   getRuntimeAudit = runtimeOps.getRuntimeAudit;
   getDispatchFailureRateTrends = runtimeOps.getDispatchFailureRateTrends;
+  getDispatchFailureThresholdAlerts = runtimeOps.getDispatchFailureThresholdAlerts;
+  applyRuntimeAuditMigration = runtimeOps.applyRuntimeAuditMigration;
   pruneDispatchAttemptsWithAudit = runtimeOps.pruneDispatchAttemptsWithAudit;
 });
 
@@ -137,6 +141,39 @@ test('dispatch failure-rate trends group daily runtime failures without hiding m
   assert.equal(webhook?.failure_rate, 0.6667);
   assert.equal(manual?.total, 2);
   assert.equal(manual?.failure_rate, 0.5);
+});
+
+test('dispatch failure threshold alerts and bulk migration diff expose operator gates', () => {
+  resetDb();
+  const now = Date.parse('2026-07-01T12:00:00.000Z');
+  const createdAt = '2026-07-01T10:00:00.000Z';
+  run(
+    `INSERT INTO tasks (id, title, description, status, priority, workspace_id, business_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['task-alert', 'Alert task', '', 'assigned', 'normal', 'default', 'default', createdAt, createdAt]
+  );
+  run(
+    `INSERT INTO agents (id, name, role, description, avatar_emoji, status, runtime_type, runtime_config, dispatch_enabled, workspace_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['agent-alert', 'Unsafe manual', 'Worker', '', '🧪', 'standby', 'manual', null, 1, 'default', createdAt, createdAt]
+  );
+  for (let index = 0; index < 6; index += 1) {
+    run(
+      `INSERT INTO task_dispatch_attempts (id, task_id, runtime_type, status, attempt_number, message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [`attempt-alert-${index}`, 'task-alert', 'webhook', index < 4 ? 'failed' : 'success', 1, 'alert seed', createdAt]
+    );
+  }
+
+  const alerts = getDispatchFailureThresholdAlerts({ now, policy: { warn_rate: 0.25, critical_rate: 0.5, min_attempts: 5, lookback_days: 7 } });
+  assert.equal(alerts[0].runtime_type, 'webhook');
+  assert.equal(alerts[0].level, 'critical');
+  assert.equal(alerts[0].failure_rate, 0.6667);
+
+  const preview = applyRuntimeAuditMigration({ dryRun: true, agentIds: ['agent-alert'] });
+  assert.equal(preview.candidates, 1);
+  assert.equal(preview.diff[0].before.dispatch_enabled, true);
+  assert.equal(preview.diff[0].after.dispatch_enabled, false);
 });
 
 test('retention cleanup records maintenance audit rows', () => {

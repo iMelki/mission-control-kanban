@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
+import { getWebhookUrl, parseAgentRuntimeConfig } from '@/lib/agent-runtimes';
 import type { AgentRuntimeType, DispatchAttemptStatus } from '@/lib/types';
 
 export interface DispatchRetentionPolicy {
@@ -23,6 +24,35 @@ export interface DispatchFailureRateTrendPoint {
   failed: number;
   timeout: number;
   failure_rate: number;
+}
+
+export interface DispatchFailureThresholdPolicy {
+  warn_rate: number;
+  critical_rate: number;
+  min_attempts: number;
+  lookback_days: number;
+}
+
+export interface DispatchFailureThresholdAlert {
+  runtime_type: AgentRuntimeType;
+  level: 'warning' | 'critical';
+  failure_rate: number;
+  failed: number;
+  timeout: number;
+  total: number;
+  window_days: number;
+  message: string;
+}
+
+export interface RuntimeMigrationDiffRow {
+  id: string;
+  agent_id: string;
+  name: string;
+  workspace_id: string;
+  before: { runtime_type: string | null; dispatch_enabled: boolean; runtime_config: string | null };
+  after: { runtime_type: AgentRuntimeType; dispatch_enabled: boolean; runtime_config: string | null };
+  changed_fields: string[];
+  reason: string;
 }
 
 export function getDispatchRetentionPolicy(env: Record<string, string | undefined> = process.env): DispatchRetentionPolicy {
@@ -198,6 +228,65 @@ export function getDispatchFailureRateTrends({
   });
 }
 
+export function getDispatchFailureThresholdPolicy(env: Record<string, string | undefined> = process.env): DispatchFailureThresholdPolicy {
+  const rate = (key: string, fallback: number) => {
+    const parsed = Number(env[key]);
+    return Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), 1) : fallback;
+  };
+  const integer = (key: string, fallback: number, min: number, max: number) => {
+    const parsed = Number(env[key]);
+    return Number.isFinite(parsed) ? Math.min(Math.max(Math.floor(parsed), min), max) : fallback;
+  };
+  return {
+    warn_rate: rate('MCK_DISPATCH_FAILURE_WARN_RATE', 0.25),
+    critical_rate: rate('MCK_DISPATCH_FAILURE_CRITICAL_RATE', 0.5),
+    min_attempts: integer('MCK_DISPATCH_FAILURE_MIN_ATTEMPTS', 5, 1, 10000),
+    lookback_days: integer('MCK_DISPATCH_FAILURE_LOOKBACK_DAYS', 7, 1, 90),
+  };
+}
+
+export function getDispatchFailureThresholdAlerts({
+  now = Date.now(),
+  policy = getDispatchFailureThresholdPolicy(),
+}: {
+  now?: number;
+  policy?: DispatchFailureThresholdPolicy;
+} = {}): DispatchFailureThresholdAlert[] {
+  const rows = queryAll<{ runtime_type: string | null; status: DispatchAttemptStatus; count: number }>(
+    `SELECT runtime_type, status, COUNT(*) as count
+     FROM task_dispatch_attempts
+     WHERE created_at >= ?
+     GROUP BY runtime_type, status`,
+    [cutoffIso(policy.lookback_days, now)]
+  );
+  const grouped = new Map<AgentRuntimeType, { total: number; failed: number; timeout: number }>();
+  for (const row of rows) {
+    const runtimeType = normalizeRuntimeType(row.runtime_type);
+    const existing = grouped.get(runtimeType) ?? { total: 0, failed: 0, timeout: 0 };
+    const count = Number(row.count) || 0;
+    existing.total += count;
+    if (row.status === 'failed') existing.failed += count;
+    if (row.status === 'timeout') existing.timeout += count;
+    grouped.set(runtimeType, existing);
+  }
+  return Array.from(grouped.entries()).flatMap(([runtime_type, counts]) => {
+    if (counts.total < policy.min_attempts) return [];
+    const failureRate = (counts.failed + counts.timeout) / counts.total;
+    if (failureRate < policy.warn_rate) return [];
+    const level: 'warning' | 'critical' = failureRate >= policy.critical_rate ? 'critical' : 'warning';
+    return [{
+      runtime_type,
+      level,
+      failure_rate: Number(failureRate.toFixed(4)),
+      failed: counts.failed,
+      timeout: counts.timeout,
+      total: counts.total,
+      window_days: policy.lookback_days,
+      message: `${runtime_type} dispatch failure rate is ${Math.round(failureRate * 100)}% over ${counts.total} attempts in ${policy.lookback_days} day(s).`,
+    }];
+  }).sort((a, b) => b.failure_rate - a.failure_rate);
+}
+
 export function getRuntimeHealthSummary() {
   const agentCounts = queryAll<{ runtime_type: string; dispatch_enabled: number; count: number }>(
     `SELECT runtime_type, dispatch_enabled, COUNT(*) as count
@@ -217,22 +306,18 @@ export function getRuntimeHealthSummary() {
      LIMIT 1`
   );
 
-  const webhookConfigured = queryOne<{ count: number }>(
-    `SELECT COUNT(*) as count FROM agents
+  const webhookAgents = queryAll<{ runtime_config: string | null }>(
+    `SELECT runtime_config FROM agents
      WHERE runtime_type = 'webhook'
-       AND dispatch_enabled = 1
-       AND runtime_config IS NOT NULL
-       AND (runtime_config LIKE '%webhook_url%' OR runtime_config LIKE '%url%')`
-  )?.count ?? 0;
-  const webhookNeedsConfig = queryOne<{ count: number }>(
-    `SELECT COUNT(*) as count FROM agents
-     WHERE runtime_type = 'webhook'
-       AND dispatch_enabled = 1
-       AND (runtime_config IS NULL OR (runtime_config NOT LIKE '%webhook_url%' AND runtime_config NOT LIKE '%url%'))`
-  )?.count ?? 0;
+       AND dispatch_enabled = 1`
+  );
+  const webhookConfigured = webhookAgents.filter((agent) => getWebhookUrl(parseAgentRuntimeConfig(agent.runtime_config), process.env)).length;
+  const webhookNeedsConfig = webhookAgents.length - webhookConfigured;
+  const failureThresholdPolicy = getDispatchFailureThresholdPolicy();
+  const failureThresholdAlerts = getDispatchFailureThresholdAlerts({ policy: failureThresholdPolicy });
 
   return {
-    ok: webhookNeedsConfig === 0,
+    ok: webhookNeedsConfig === 0 && !failureThresholdAlerts.some((alert) => alert.level === 'critical'),
     generated_at: new Date().toISOString(),
     callback_signature: {
       outbound_secret_configured: Boolean(process.env.MCK_WEBHOOK_SIGNATURE_SECRET),
@@ -252,6 +337,8 @@ export function getRuntimeHealthSummary() {
       }
       : null,
     failure_rate_trends: getDispatchFailureRateTrends(),
+    failure_threshold_policy: failureThresholdPolicy,
+    failure_threshold_alerts: failureThresholdAlerts,
   };
 }
 
@@ -353,7 +440,8 @@ export function getRuntimeAudit() {
   const rows = agents.map((agent) => {
     const runtimeType = agent.runtime_type === 'openclaw' || agent.runtime_type === 'webhook' ? agent.runtime_type : 'manual';
     const dispatchEnabled = Boolean(agent.dispatch_enabled);
-    const needsConfig = runtimeType === 'webhook' && dispatchEnabled && !(agent.runtime_config || '').includes('webhook_url') && !(agent.runtime_config || '').includes('url');
+    const config = parseAgentRuntimeConfig(agent.runtime_config);
+    const needsConfig = runtimeType === 'webhook' && dispatchEnabled && !getWebhookUrl(config, process.env);
     const dispatchBlocked = runtimeType === 'manual' || !dispatchEnabled || needsConfig;
     const recommended_action = needsConfig
       ? 'add_webhook_url_env_config'
@@ -390,21 +478,77 @@ export function getRuntimeAudit() {
   return { generated_at: new Date().toISOString(), summary, agents: rows };
 }
 
-export function applyRuntimeAuditMigration({ dryRun = true }: { dryRun?: boolean } = {}) {
-  const audit = getRuntimeAudit();
-  const updates = audit.agents.filter((agent) => !['manual', 'openclaw', 'webhook'].includes(agent.runtime_type) || agent.runtime_type === 'manual' && agent.dispatch_enabled);
+export function getRuntimeMigrationDiff({ agentIds }: { agentIds?: string[] } = {}): RuntimeMigrationDiffRow[] {
+  const params: unknown[] = [];
+  const filter = agentIds?.length ? `WHERE id IN (${agentIds.map(() => '?').join(', ')})` : '';
+  if (agentIds?.length) params.push(...agentIds);
+  const agents = queryAll<{
+    id: string;
+    name: string;
+    workspace_id: string;
+    runtime_type: string | null;
+    runtime_config: string | null;
+    dispatch_enabled: number | null;
+  }>(`SELECT id, name, workspace_id, runtime_type, runtime_config, dispatch_enabled FROM agents ${filter} ORDER BY workspace_id, name ASC`, params);
+
+  return agents.flatMap((agent) => {
+    const beforeType = agent.runtime_type;
+    const runtimeType = beforeType === 'openclaw' || beforeType === 'webhook' ? beforeType : 'manual';
+    let nextDispatchEnabled = Boolean(agent.dispatch_enabled);
+    let reason = '';
+    if (runtimeType === 'manual' && nextDispatchEnabled) {
+      nextDispatchEnabled = false;
+      reason = 'Manual runtime cannot auto-dispatch.';
+    }
+    if (runtimeType === 'webhook' && nextDispatchEnabled && !getWebhookUrl(parseAgentRuntimeConfig(agent.runtime_config), process.env)) {
+      nextDispatchEnabled = false;
+      reason = 'Webhook dispatch enabled but no resolvable URL exists.';
+    }
+    if (beforeType !== runtimeType) reason = 'Unknown runtime normalized to manual handoff.';
+
+    const changedFields = [
+      beforeType !== runtimeType ? 'runtime_type' : '',
+      Boolean(agent.dispatch_enabled) !== nextDispatchEnabled ? 'dispatch_enabled' : '',
+    ].filter(Boolean);
+    if (changedFields.length === 0) return [];
+
+    return [{
+      id: agent.id,
+      agent_id: agent.id,
+      name: agent.name,
+      workspace_id: agent.workspace_id,
+      before: {
+        runtime_type: beforeType,
+        dispatch_enabled: Boolean(agent.dispatch_enabled),
+        runtime_config: agent.runtime_config,
+      },
+      after: {
+        runtime_type: runtimeType,
+        dispatch_enabled: nextDispatchEnabled,
+        runtime_config: agent.runtime_config,
+      },
+      changed_fields: changedFields,
+      reason,
+    }];
+  });
+}
+
+export function applyRuntimeAuditMigration({ dryRun = true, agentIds }: { dryRun?: boolean; agentIds?: string[] } = {}) {
+  const diff = getRuntimeMigrationDiff({ agentIds });
   if (!dryRun) {
-    for (const agent of updates) {
+    const now = new Date().toISOString();
+    for (const row of diff) {
       run(
         'UPDATE agents SET runtime_type = ?, dispatch_enabled = ?, updated_at = ? WHERE id = ?',
-        ['manual', 0, new Date().toISOString(), agent.id]
+        [row.after.runtime_type, row.after.dispatch_enabled ? 1 : 0, now, row.agent_id]
       );
     }
   }
   return {
     dry_run: dryRun,
-    candidates: updates.length,
-    applied: dryRun ? 0 : updates.length,
-    description: 'Normalize unsafe/unknown runtime states to manual handoff with dispatch disabled.',
+    candidates: diff.length,
+    applied: dryRun ? 0 : diff.length,
+    diff,
+    description: 'Normalize unsafe/unknown runtime states to a safe runtime with explicit dispatch gating.',
   };
 }

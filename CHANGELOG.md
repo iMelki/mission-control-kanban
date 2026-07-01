@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Runtime-ops research roadmap for [#38](https://github.com/iMelki/mission-control-kanban/issues/38) in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`, plus per-runtime failure-rate trend data/cards and the `/runtime-regression` local artifact drilldown UI.
+- Runtime UX workflow for [#38](https://github.com/iMelki/mission-control-kanban/issues/38) in `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`, covering validation wizards, dry-run previews, bulk migration plans, dependencies, artifact closeout, and Turbopack inventory policy.
+- Webhook endpoint validation wizard and runtime config template gallery for Hermes, Codex, Copilot, Claude Code, n8n, and generic webhook workers, with webhook `dispatch_enabled` gated on a successful signed non-task ping.
+- Dry-run dispatch previews for manual/OpenClaw/webhook agents, bulk selected-agent runtime migration diffs, task dependency blocked-by UI/API, ready-for-agent checklist seeding, and GitHub issue draft generation from task dispatch metadata.
+- Runtime failure-rate threshold alerts plus screenshot-thumbnail drilldown details under `/runtime-regression`, backed by a safe screenshot-serving API route and PR/requested-issue artifact comments after successful Runtime Regression CI.
 - Non-blocking Turbopack inventory in the Runtime Regression workflow: `npm run build:turbo` logs are uploaded as `mck-turbopack-inventory` without blocking the supported webpack production build.
 - Persistence-level regression coverage for [#34](https://github.com/iMelki/mission-control-kanban/issues/34), proving GitHub Project sync refreshes stale imported task dispatch metadata after issue grooming without status churn.
 

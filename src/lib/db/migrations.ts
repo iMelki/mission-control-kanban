@@ -557,6 +557,26 @@ const migrations: Migration[] = [
       `);
     }
   },
+  {
+    id: '017',
+    name: 'add_task_dependencies',
+    up: (db) => {
+      console.log('[Migration 017] Adding task dependency blocked-by edges...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_dependencies (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          blocked_by_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          note TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(task_id, blocked_by_task_id),
+          CHECK(task_id <> blocked_by_task_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_task_dependencies_task ON task_dependencies(task_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_task_dependencies_blocker ON task_dependencies(blocked_by_task_id, created_at DESC);
+      `);
+    }
+  },
 ];
 
 /**

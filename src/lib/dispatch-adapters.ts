@@ -36,6 +36,7 @@ const MIN_WEBHOOK_TIMEOUT_MS = 100;
 export interface DispatchOptions {
   retry?: boolean;
   confirm?: boolean;
+  dryRun?: boolean;
 }
 
 interface RecordDispatchAttemptInput {
@@ -160,6 +161,10 @@ export interface DispatchResult {
   webhook_status?: number;
   webhook_url?: string;
   reason?: string;
+  dry_run?: boolean;
+  would_dispatch?: boolean;
+  request_payload?: unknown;
+  validation_errors?: string[];
 }
 
 export class DispatchAdapterError extends Error {
@@ -433,6 +438,62 @@ async function dispatchOpenClaw(task: Task, agent: Agent): Promise<DispatchResul
   };
 }
 
+function buildDispatchDryRunPreview(task: Task, agent: Agent, effectiveRuntimeType: AgentRuntimeType, reason?: string): DispatchResult {
+  const missionControlUrl = getMissionControlUrl();
+  const projectsPath = getProjectsPath();
+  const handoffPrompt = buildManualHandoffPrompt({
+    task,
+    agent,
+    missionControlUrl,
+    projectsPath,
+    mode: effectiveRuntimeType === 'manual' ? 'manual' : 'auto',
+  });
+  const callbacks = buildCallbackUrls(task.id, missionControlUrl);
+
+  if (effectiveRuntimeType === 'webhook') {
+    const config = parseAgentRuntimeConfig(agent.runtime_config);
+    const webhookUrl = getWebhookUrl(config, process.env);
+    const payload = buildWebhookDispatchPayload(task, agent, missionControlUrl, new Date().toISOString(), projectsPath);
+    const validation = validateWebhookDispatchPayload(payload);
+    return {
+      success: validation.valid && Boolean(webhookUrl),
+      task_id: task.id,
+      agent_id: agent.id,
+      runtime_type: 'webhook',
+      requested_runtime_type: agent.runtime_type,
+      dispatched: false,
+      dry_run: true,
+      would_dispatch: validation.valid && Boolean(webhookUrl),
+      webhook_url: webhookUrl ? redactUrlForResponse(webhookUrl) : undefined,
+      request_payload: payload,
+      validation_errors: validation.valid ? undefined : validation.errors,
+      message: validation.valid && webhookUrl
+        ? 'Dry-run preview: webhook payload is valid; no request was sent.'
+        : 'Dry-run preview: webhook dispatch is not ready.',
+      handoff_prompt: handoffPrompt,
+      callbacks,
+      reason: webhookUrl ? reason : 'Webhook URL is not configured or could not be resolved from env.',
+    };
+  }
+
+  return {
+    success: true,
+    task_id: task.id,
+    agent_id: agent.id,
+    runtime_type: effectiveRuntimeType,
+    requested_runtime_type: agent.runtime_type,
+    dispatched: false,
+    dry_run: true,
+    would_dispatch: effectiveRuntimeType === 'openclaw',
+    message: effectiveRuntimeType === 'openclaw'
+      ? 'Dry-run preview: OpenClaw handoff would be sent; no gateway call was made.'
+      : 'Dry-run preview: manual handoff prompt generated; no side effects were recorded.',
+    handoff_prompt: handoffPrompt,
+    callbacks,
+    reason,
+  };
+}
+
 async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult> {
   const config = parseAgentRuntimeConfig(agent.runtime_config);
   const webhookUrl = getWebhookUrl(config);
@@ -571,6 +632,22 @@ export async function dispatchTaskToAssignedAgent(taskId: string, options: Dispa
 
   const agent = loadAgent(task.assigned_agent_id);
   const resolved = resolveAgentRuntime(agent);
+
+  if (options.dryRun) {
+    if (resolved.effective_type !== 'manual') {
+      const validation = validateDispatchMetadata(task.dispatch_metadata);
+      if (!validation.canDispatch) {
+        return {
+          ...buildDispatchDryRunPreview(task, agent, resolved.effective_type, resolved.reason),
+          success: false,
+          would_dispatch: false,
+          message: `Dry-run preview: dispatch contract is incomplete: ${validation.blockers.join('; ')}`,
+          validation_errors: validation.blockers,
+        };
+      }
+    }
+    return buildDispatchDryRunPreview(task, agent, resolved.effective_type, resolved.reason);
+  }
 
   if (options.retry) {
     const latestAttempt = getLatestDispatchAttempt(task.id);
