@@ -7,12 +7,16 @@ const repoRoot = path.resolve(__dirname, "..");
 
 console.log("Running React Doctor for mission-control-kanban...");
 
-const result = spawnSync("npx", ["-y", "react-doctor@latest", "--staged"], {
-  cwd: repoRoot,
-  maxBuffer: MAX_BUFFER_BYTES,
-  stdio: ["inherit", "pipe", "pipe"],
-  shell: true,
-});
+const result = spawnSync(
+  "npx",
+  ["-y", "react-doctor@latest", ".", "--verbose", "--scope", "changed", "--blocking", "warning"],
+  {
+    cwd: repoRoot,
+    maxBuffer: MAX_BUFFER_BYTES,
+    stdio: ["inherit", "pipe", "pipe"],
+    shell: true,
+  }
+);
 
 if (result.error) {
   console.error("Failed to start React Doctor:", result.error);
@@ -27,9 +31,14 @@ const normalizedOutput = output.replace(/\u001b\[[0-9;]*[A-Za-z]/g, "");
 process.stdout.write(stdout);
 process.stderr.write(stderr);
 
-if (/No staged source files found\./i.test(normalizedOutput)) {
-  console.log("\nReact Doctor skipped: no staged frontend source files.");
+if (/No source files found\.|No staged source files found\./i.test(normalizedOutput)) {
+  console.log("\nReact Doctor skipped: no changed frontend source files.");
   process.exit(0);
+}
+
+if (/No issues found!/i.test(normalizedOutput)) {
+  console.log("\nReact Doctor found no changed-scope issues.");
+  process.exit(result.status ?? 0);
 }
 
 const scoreMatch = normalizedOutput.match(/(\d+)\s*\/\s*100/);

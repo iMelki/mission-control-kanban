@@ -2,7 +2,7 @@
 
 **AI Agent Orchestration Dashboard**
 
-Mission Control is a task management system that lets you create tasks, plan them through an AI-guided Q&A process, and automatically dispatch them to AI agents for execution. Think of it as a project manager for AI workers.
+Mission Control is a task management system that lets you create tasks, plan them through an AI-guided Q&A process, and dispatch them to AI agents for execution. Today, automatic runtime dispatch is OpenClaw-specific; other agents can still be tracked in MCK and handed off manually with callback URLs. Think of it as a project manager for AI workers.
 
 ![Version](https://img.shields.io/badge/Version-1.0.0-green) ![Next.js](https://img.shields.io/badge/Next.js-15-black) ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -21,7 +21,7 @@ Mission Control is a task management system that lets you create tasks, plan the
 1. **Create Tasks** - Add tasks with a title and description
 2. **AI Planning** - An AI asks you clarifying questions to understand exactly what you need
 3. **Agent Creation** - Based on your answers, the AI creates a specialized agent for the job
-4. **Auto-Dispatch** - The task is automatically sent to the agent
+4. **OpenClaw Auto-Dispatch / Manual Handoff** - OpenClaw-backed tasks can be automatically sent to the linked OpenClaw agent; Hermes/Codex/Copilot/Claude-style agents use manual handoff with MCK callback URLs until runtime adapters exist
 5. **Execution** - The agent works on your task (browses web, writes code, creates files, etc.)
 6. **Delivery** - Completed work is delivered back to Mission Control
 
@@ -178,7 +178,10 @@ Go to: **http://localhost:3021**
    - Who's the audience?
    - Any constraints?
 4. Answer each question by selecting an option or typing your own
-5. When planning is complete, an agent is automatically created and assigned
+5. When planning is complete, an agent is automatically created and assigned.
+   If the agent is OpenClaw-backed, MCK can dispatch through OpenClaw. For
+   other runtimes, use the manual handoff flow in
+   [docs/MULTI_AGENT_RUNTIMES.md](docs/MULTI_AGENT_RUNTIMES.md).
 
 ### Watching Your Agent Work
 

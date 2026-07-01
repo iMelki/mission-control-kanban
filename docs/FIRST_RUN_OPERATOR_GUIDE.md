@@ -45,6 +45,14 @@ OpenClaw is the runtime and session transport for agent activity:
 - chat/session replay
 - runtime-side execution and presence
 
+### Non-OpenClaw agents
+
+Hermes, Codex, Copilot, Claude Code, and other external agents can be tracked in
+MCK, but they are not launched by the current automatic dispatch route. For
+those agents, MCK owns the task record, dispatch contract, deliverables, and
+callback URLs; the operator launches the worker in that agent's native surface.
+See [MULTI_AGENT_RUNTIMES.md](MULTI_AGENT_RUNTIMES.md) for the handoff pattern.
+
 MCK talks to OpenClaw over WebSocket. MCK talks to GitHub through local API
 routes that use `gh api` plus your local GitHub token.
 

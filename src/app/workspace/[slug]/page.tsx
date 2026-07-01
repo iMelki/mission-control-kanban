@@ -39,17 +39,23 @@ function formatSyncCount(value: unknown): number {
 
 function extractGitHubSyncStatusNotes(payload: Record<string, unknown>): string[] {
   const details = Array.isArray(payload.details) ? payload.details : [];
+  const notes: string[] = [];
 
-  return details
-    .filter((detail): detail is Record<string, unknown> => Boolean(detail) && typeof detail === 'object')
-    .filter((detail) => detail.action === 'status_reconcile' || detail.action === 'drift')
-    .map((detail) => {
-      const issue = typeof detail.issue === 'string' ? `${detail.issue}: ` : '';
-      const reason = typeof detail.reason === 'string' ? detail.reason : String(detail.action);
-      return `${issue}${reason}`;
-    })
-    .filter(Boolean)
-    .slice(0, 3);
+  for (const detail of details) {
+    if (!detail || typeof detail !== 'object') continue;
+    const detailRecord = detail as Record<string, unknown>;
+    if (detailRecord.action !== 'status_reconcile' && detailRecord.action !== 'drift') continue;
+
+    const issue = typeof detailRecord.issue === 'string' ? `${detailRecord.issue}: ` : '';
+    const reason = typeof detailRecord.reason === 'string'
+      ? detailRecord.reason
+      : String(detailRecord.action);
+    notes.push(`${issue}${reason}`);
+
+    if (notes.length === 3) break;
+  }
+
+  return notes;
 }
 
 function formatSyncCadence(status: MckN8nSyncStatusResponse['latest']): string {

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Collapsible workspace side panels for [#31](https://github.com/iMelki/mission-control-kanban/issues/31), with persistent Agents and Live Feed rails so the Mission Queue can use more screen width on demand.
+- `docs/MULTI_AGENT_RUNTIMES.md` for [#32](https://github.com/iMelki/mission-control-kanban/issues/32), documenting the current OpenClaw-only auto-dispatch boundary and manual handoff/callback pattern for Hermes, Codex, Copilot, Claude Code, and other non-OpenClaw agents.
 - Compact home-page Local Control area for `mission-control-kanban#29`, with
   source-controlled operator links and MCK-owned health signals for GitHub
   diagnostics, OpenClaw status, and n8n sync history.
@@ -63,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Scoped README, the OpenClaw agent protocol, first-run operator guide, and dispatch-contract docs so `ASSIGNED` auto-dispatch is explicitly OpenClaw-only until [#32](https://github.com/iMelki/mission-control-kanban/issues/32) adds runtime adapters.
+- Aligned the repo agent instructions with the current GitHub Issues + root `OPEN_TASKS.md` tracking model.
+- Updated the repo-owned React Doctor hook to use changed-scope blocking diagnostics so pre-commit gates fail on newly introduced issues rather than unrelated whole-file inventory warnings.
 - Aligned the MCK local n8n route on `3021` / `mck.host:3021`; `3002` is no
   longer documented as the repo development default for scheduled sync work.
 - GitHub Actions workflows now opt JavaScript actions into the Node 24 runtime

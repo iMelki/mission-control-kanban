@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-06-25
+Last updated: 2026-07-01
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -8,9 +8,23 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- None currently tracked from this local index.
+- [#32 - Add runtime-aware dispatch adapters for manual, OpenClaw, and webhook agents](https://github.com/iMelki/mission-control-kanban/issues/32)
+  - Current state: documented the current OpenClaw-only auto-dispatch boundary
+    in `docs/MULTI_AGENT_RUNTIMES.md` and scoped existing docs so non-OpenClaw
+    agents use manual/native-runtime handoff with MCK callback URLs.
+  - Next implementation: add the runtime/provider adapter layer so `manual`,
+    `openclaw`, and `webhook` dispatches are explicit and test-covered.
 
 ## Recently Completed
+
+- [#31 - Make workspace side panels collapsible](https://github.com/iMelki/mission-control-kanban/issues/31)
+  - Completed on 2026-07-01.
+  - Result: the Agents and Live Feed side panels now collapse into narrow rails,
+    persist their local browser state, and let the Mission Queue expand into
+    the freed width while preserving existing filters, add-agent controls,
+    OpenClaw connection controls, and feed rendering.
+  - Validation: `npm run test:github-sync`, `npm run lint`, `npm run build`,
+    React Doctor, and browser smoke verification.
 
 - [#29 - Build static Local Control panel cards](https://github.com/iMelki/mission-control-kanban/issues/29)
   - Completed on 2026-06-23.
