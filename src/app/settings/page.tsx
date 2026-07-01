@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Settings, Save, RotateCcw, FolderOpen, Link as LinkIcon } from 'lucide-react';
 import { getConfig, updateConfig, resetConfig, type MissionControlConfig } from '@/lib/config';
@@ -13,18 +13,12 @@ import { RuntimeOpsSettings } from '@/components/RuntimeOpsSettings';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [config, setConfig] = useState<MissionControlConfig | null>(null);
+  const [config, setConfig] = useState<MissionControlConfig>(() => getConfig());
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setConfig(getConfig());
-  }, []);
-
   const handleSave = async () => {
-    if (!config) return;
-
     setIsSaving(true);
     setError(null);
     setSaveSuccess(false);
@@ -50,17 +44,8 @@ export default function SettingsPage() {
   };
 
   const handleChange = (field: keyof MissionControlConfig, value: string) => {
-    if (!config) return;
     setConfig({ ...config, [field]: value });
   };
-
-  if (!config) {
-    return (
-      <div className="min-h-screen bg-mc-bg flex items-center justify-center">
-        <div className="text-mc-text-secondary">Loading settings...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-mc-bg">
@@ -69,6 +54,7 @@ export default function SettingsPage() {
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => router.push('/')}
               className="p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary"
               title="Back to Mission Control"
@@ -81,6 +67,7 @@ export default function SettingsPage() {
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={handleReset}
               className="px-4 py-2 border border-mc-border rounded hover:bg-mc-bg-tertiary text-mc-text-secondary flex items-center gap-2"
             >
@@ -88,6 +75,7 @@ export default function SettingsPage() {
               Reset to Defaults
             </button>
             <button
+              type="button"
               onClick={handleSave}
               disabled={isSaving}
               className="px-4 py-2 bg-mc-accent text-mc-bg rounded hover:bg-mc-accent/90 flex items-center gap-2 disabled:opacity-50"
@@ -127,10 +115,11 @@ export default function SettingsPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-mc-text mb-2">
+              <label htmlFor="settings-workspace-base-path" className="block text-sm font-medium text-mc-text mb-2">
                 Workspace Base Path
               </label>
               <input
+                id="settings-workspace-base-path"
                 type="text"
                 value={config.workspaceBasePath}
                 onChange={(e) => handleChange('workspaceBasePath', e.target.value)}
@@ -143,10 +132,11 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-mc-text mb-2">
+              <label htmlFor="settings-projects-path" className="block text-sm font-medium text-mc-text mb-2">
                 Projects Path
               </label>
               <input
+                id="settings-projects-path"
                 type="text"
                 value={config.projectsPath}
                 onChange={(e) => handleChange('projectsPath', e.target.value)}
@@ -159,10 +149,11 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-mc-text mb-2">
+              <label htmlFor="settings-default-project-name" className="block text-sm font-medium text-mc-text mb-2">
                 Default Project Name
               </label>
               <input
+                id="settings-default-project-name"
                 type="text"
                 value={config.defaultProjectName}
                 onChange={(e) => handleChange('defaultProjectName', e.target.value)}
@@ -188,10 +179,11 @@ export default function SettingsPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-mc-text mb-2">
+              <label htmlFor="settings-mission-control-url" className="block text-sm font-medium text-mc-text mb-2">
                 Mission Control URL
               </label>
               <input
+                id="settings-mission-control-url"
                 type="text"
                 value={config.missionControlUrl}
                 onChange={(e) => handleChange('missionControlUrl', e.target.value)}

@@ -247,6 +247,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
         )}
 
         <button
+              type="button"
           onClick={startPlanning}
           disabled={starting}
           className="px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center gap-2"
@@ -291,6 +292,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
                 return (
                   <div key={option.id}>
                     <button
+              type="button"
                       onClick={() => setSelectedOption(option.label)}
                       disabled={submitting}
                       className={`w-full flex items-center gap-3 p-4 rounded-lg border transition-all text-left ${
@@ -336,6 +338,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
             {/* Submit button */}
             <div className="mt-6">
               <button
+              type="button"
                 onClick={submitAnswer}
                 disabled={!selectedOption || submitting || (selectedOption === 'Other' && !otherText.trim())}
                 className="w-full px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center justify-center gap-2"

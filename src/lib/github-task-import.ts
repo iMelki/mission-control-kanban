@@ -79,10 +79,10 @@ function normalizeListSection(value: string | undefined): string[] | undefined {
     return undefined;
   }
 
-  const items = value
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^(?:\s*[-*]\s*\[[ xX]\]\s*|\s*[-*]\s*|\s*\d+\.\s*)/, '').trim())
-    .filter(Boolean);
+  const items = value.split(String.fromCharCode(10)).flatMap((line) => {
+    const normalized = line.replace(/^(?:\s*[-*]\s*\[[ xX]\]\s*|\s*[-*]\s*|\s*\d+\.\s*)/, '').trim();
+    return normalized ? [normalized] : [];
+  });
 
   return items.length > 0 ? items : undefined;
 }
@@ -93,10 +93,10 @@ function normalizeListValue(value: unknown): string[] | undefined {
     return undefined;
   }
 
-  return normalized
-    .split(/\r?\n|,|;/)
-    .map((item) => item.replace(/^(?:\s*[-*]\s*\[[ xX]\]\s*|\s*[-*]\s*|\s*\d+\.\s*)/, '').trim())
-    .filter(Boolean);
+  return normalized.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
+    const normalizedItem = item.replace(/^(?:\s*[-*]\s*\[[ xX]\]\s*|\s*[-*]\s*|\s*\d+\.\s*)/, '').trim();
+    return normalizedItem ? [normalizedItem] : [];
+  });
 }
 
 function normalizeScalarSection(value: string | undefined): string | undefined {
@@ -311,10 +311,11 @@ export function deriveGitHubSourceIdentity(input: {
   return issueUrl ? parseGitHubIssueUrl(issueUrl) : undefined;
 }
 
-export function buildGitHubImportPreview(input: GitHubImportPreviewRequest): GitHubImportPreviewTask {
-  const labels = (input.issue.labels ?? [])
-    .map(normalizeLabel)
-    .filter((label): label is string => Boolean(label));
+function buildGitHubImportPreview(input: GitHubImportPreviewRequest): GitHubImportPreviewTask {
+  const labels = (input.issue.labels ?? []).flatMap((label) => {
+    const normalized = normalizeLabel(label);
+    return normalized ? [normalized] : [];
+  });
   const projectFields = input.project_fields;
   const repoFromFullName = parseRepoFullName(normalizeString(input.repository?.full_name));
   const repoOwner = normalizeString(input.repository?.owner?.login) ?? repoFromFullName.owner;

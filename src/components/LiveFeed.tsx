@@ -140,6 +140,7 @@ function LiveFeedExpandedPanel({
         <div className="flex gap-1">
           {(['all', 'tasks', 'agents'] as FeedFilter[]).map((tab) => (
             <button
+              type="button"
               key={tab}
               onClick={() => onFilterChange(tab)}
               className={`px-3 py-1 text-xs rounded uppercase ${

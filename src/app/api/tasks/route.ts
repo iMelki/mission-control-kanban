@@ -93,7 +93,10 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       // Support comma-separated status values (e.g., status=inbox,testing,in_progress)
-      const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+      const statuses = status.split(',').flatMap((s) => {
+        const trimmed = s.trim();
+        return trimmed ? [trimmed] : [];
+      });
       if (statuses.length === 1) {
         sql += ' AND t.status = ?';
         params.push(statuses[0]);

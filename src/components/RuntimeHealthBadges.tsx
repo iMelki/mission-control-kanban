@@ -5,9 +5,10 @@ import { Activity, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react
 
 interface RuntimeHealthSummary {
   ok: boolean;
-  webhook: { ready: number; total: number; missing_secret: number };
-  openclaw: { enabled: number; sessions: number };
-  secrets: { callback_signature_secret: boolean };
+  webhook?: { ready?: number; total?: number; missing_secret?: number; configured?: number; needs_config?: number };
+  openclaw?: { enabled: number; sessions: number };
+  secrets?: { callback_signature_secret?: boolean };
+  callback_signature?: { outbound_secret_configured?: boolean; inbound_secret_configured?: boolean };
 }
 
 type Listener = () => void;
@@ -64,8 +65,11 @@ export function RuntimeHealthBadges() {
     return <span className="rounded border border-mc-border px-2 py-1 text-xs text-mc-text-secondary">Runtime health…</span>;
   }
 
-  const webhookOk = health.webhook.total === 0 || health.webhook.missing_secret === 0;
-  const callbackOk = health.secrets.callback_signature_secret;
+  const webhookTotal = health.webhook?.total ?? ((health.webhook?.configured ?? 0) + (health.webhook?.needs_config ?? 0));
+  const webhookReady = health.webhook?.ready ?? health.webhook?.configured ?? 0;
+  const webhookMissing = health.webhook?.missing_secret ?? health.webhook?.needs_config ?? 0;
+  const webhookOk = webhookTotal === 0 || webhookMissing === 0;
+  const callbackOk = Boolean(health.secrets?.callback_signature_secret ?? health.callback_signature?.inbound_secret_configured);
 
   return (
     <div className="hidden items-center gap-2 text-xs text-mc-text-secondary 2xl:flex" aria-label="Runtime health summary">
@@ -74,7 +78,7 @@ export function RuntimeHealthBadges() {
         Runtime {health.ok ? 'ok' : 'attention'}
       </span>
       <span className="inline-flex items-center gap-1 rounded border border-mc-border px-2 py-1">
-        <Activity className="size-3" /> Webhooks {health.webhook.ready}/{health.webhook.total}
+        <Activity className="size-3" /> Webhooks {webhookReady}/{webhookTotal}
       </span>
       <span className="inline-flex items-center gap-1 rounded border border-mc-border px-2 py-1">
         <ShieldCheck className="size-3" /> Callback sig {callbackOk ? 'on' : 'off'}

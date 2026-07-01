@@ -294,6 +294,7 @@ function AgentsExpandedPanel({
       </div>
       <div className="p-3 border-t border-mc-border">
         <button
+          type="button"
           onClick={onAddAgent}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-mc-bg-tertiary hover:bg-mc-border rounded text-sm text-mc-text-secondary hover:text-mc-text transition-colors"
         >
@@ -385,6 +386,7 @@ function AgentsPanelHeader({
         {(['all', 'working', 'standby'] as FilterTab[]).map((tab) => (
           <button
             key={tab}
+            type="button"
             onClick={() => onFilterChange(tab)}
             className={`px-3 py-1 text-xs rounded uppercase ${
               filter === tab

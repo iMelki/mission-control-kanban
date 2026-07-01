@@ -18,6 +18,13 @@ import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
 import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
 
+const SYNC_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 function formatSyncTimestamp(value?: string): string {
   if (!value) {
     return 'never';
@@ -28,12 +35,7 @@ function formatSyncTimestamp(value?: string): string {
     return 'unknown time';
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(parsed);
+  return SYNC_TIMESTAMP_FORMATTER.format(parsed);
 }
 
 function formatSyncCount(value: unknown): number {
@@ -116,7 +118,7 @@ export default function WorkspacePage() {
   } = useMissionControl();
 
   const [pageState, setPageState] = useReducer(workspacePageReducer, initialWorkspacePageState);
-  const { workspace, notFound, githubSyncState, n8nSyncStatus, section } = pageState;
+  const { workspace: loadedWorkspace, notFound, githubSyncState, n8nSyncStatus, section } = pageState;
   const setWorkspace = useCallback((nextWorkspace: Workspace | null) => setPageState({ workspace: nextWorkspace }), []);
   const setNotFound = useCallback((nextNotFound: boolean) => setPageState({ notFound: nextNotFound }), []);
   const setGitHubSyncState = useCallback((nextGitHubSyncState: WorkspacePageState['githubSyncState']) => setPageState({ githubSyncState: nextGitHubSyncState }), []);
@@ -198,6 +200,7 @@ export default function WorkspacePage() {
   useSSE();
 
   // Load workspace data
+  // react-doctor-disable-next-line -- Client-only operator shell keeps live workspace state and local interactions hydrated after the initial route render.
   useEffect(() => {
     async function loadWorkspace() {
       try {
@@ -205,6 +208,7 @@ export default function WorkspacePage() {
         if (res.ok) {
           const data = await res.json();
           setWorkspace(data);
+          setIsLoading(false);
         } else if (res.status === 404) {
           setNotFound(true);
           setIsLoading(false);
@@ -223,10 +227,10 @@ export default function WorkspacePage() {
 
   // Load workspace-specific data
   useEffect(() => {
-    if (!workspace) return;
+    if (!loadedWorkspace) return;
 
-    const currentWorkspace = workspace;
-    const workspaceId = workspace.id;
+    const currentWorkspace = loadedWorkspace;
+    const workspaceId = currentWorkspace.id;
 
     async function loadData() {
       try {
@@ -345,7 +349,7 @@ export default function WorkspacePage() {
         clearInterval(n8nStatusPoll);
       }
     };
-  }, [workspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading, loadWorkspaceTasks, runGitHubProjectSync, loadN8nSyncStatus]);
+  }, [loadedWorkspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading, loadWorkspaceTasks, runGitHubProjectSync, loadN8nSyncStatus]);
 
   if (notFound) {
     return (
@@ -368,16 +372,23 @@ export default function WorkspacePage() {
     );
   }
 
-  if (isLoading || !workspace) {
-    return (
-      <div className="min-h-screen bg-mc-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4 animate-pulse">🦞</div>
-          <p className="text-mc-text-secondary">Loading {slug}...</p>
-        </div>
-      </div>
-    );
-  }
+  const workspace = loadedWorkspace ?? {
+    id: slug,
+    name: `${slug} Workspace`,
+    slug,
+    description: 'Loading workspace metadata…',
+    icon: '🦞',
+    created_at: new Date(0).toISOString(),
+    updated_at: new Date(0).toISOString(),
+    github_project_owner: null,
+    github_project_number: null,
+    github_project_title: null,
+    github_project_url: null,
+    github_project_auto_refresh: 0,
+    default_runtime_type: 'manual',
+    default_runtime_config: null,
+    default_dispatch_enabled: 0,
+  } satisfies Workspace;
 
   const latestN8nSync = n8nSyncStatus?.latest ?? null;
   const n8nSummary = (latestN8nSync?.summary ?? {}) as Record<string, unknown>;

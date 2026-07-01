@@ -212,6 +212,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
           <div className="flex flex-col gap-1">
             {session.status === 'active' && (
               <button
+              type="button"
                 onClick={() => handleMarkComplete(session.openclaw_session_id)}
                 className="p-1.5 hover:bg-mc-bg-tertiary rounded text-green-500"
                 title="Mark as complete"
@@ -220,6 +221,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
               </button>
             )}
             <button
+              type="button"
               onClick={() => handleDelete(session.openclaw_session_id)}
               className="p-1.5 hover:bg-mc-bg-tertiary rounded text-red-500"
               title="Delete session"

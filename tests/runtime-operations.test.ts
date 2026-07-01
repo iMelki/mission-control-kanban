@@ -15,6 +15,7 @@ let validateWebhookCallbackPayload: typeof import('../src/lib/webhook-callback-s
 let signWebhookPayload: typeof import('../src/lib/webhook-signatures').signWebhookPayload;
 let verifyWebhookSignature: typeof import('../src/lib/webhook-signatures').verifyWebhookSignature;
 let registerWebhookCallbackDelivery: typeof import('../src/lib/webhook-callback-operations').registerWebhookCallbackDelivery;
+let getWebhookCallbackDeliveries: typeof import('../src/lib/webhook-callback-operations').getWebhookCallbackDeliveries;
 let getRuntimeAudit: typeof import('../src/lib/runtime-operations').getRuntimeAudit;
 let pruneDispatchAttemptsWithAudit: typeof import('../src/lib/runtime-operations').pruneDispatchAttemptsWithAudit;
 
@@ -39,6 +40,7 @@ test.before(async () => {
   signWebhookPayload = signatures.signWebhookPayload;
   verifyWebhookSignature = signatures.verifyWebhookSignature;
   registerWebhookCallbackDelivery = callbackOps.registerWebhookCallbackDelivery;
+  getWebhookCallbackDeliveries = callbackOps.getWebhookCallbackDeliveries;
   getRuntimeAudit = runtimeOps.getRuntimeAudit;
   pruneDispatchAttemptsWithAudit = runtimeOps.pruneDispatchAttemptsWithAudit;
 });
@@ -79,6 +81,9 @@ test('delivery registration rejects duplicate replay IDs', () => {
   assert.equal(first.duplicate, false);
   assert.equal(duplicate.ok, true);
   assert.equal(duplicate.duplicate, true);
+  const deliveries = getWebhookCallbackDeliveries();
+  assert.equal(deliveries.length, 2);
+  assert.equal(deliveries[0].event_type, 'mck.callback.completed');
 });
 
 test('runtime audit flags webhook agents missing dispatch config', () => {

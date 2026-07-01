@@ -174,7 +174,7 @@ The workspace UI now has route-level section tabs for Board, Agents, Dispatch, S
 
 - Dispatch shows a global failure queue backed by `GET /api/dispatch-attempts`.
 - Agents/Settings expose runtime audit and safe normalization preview/apply via `/api/agents/runtime-audit`.
-- Settings exposes dispatch retention cleanup dry-run/apply controls.
+- Settings exposes dispatch retention cleanup dry-run/apply controls, callback replay ledger rows, callback-delivery pruning, webhook runtime_config template copy, and dispatch/callback schema downloads.
 - Header runtime health badges call `/api/runtime/health` and show readiness without exposing raw endpoint values.
 - `/api/runtime/webhook-health-test` sends a signed non-task ping so operators can test bridge health without creating work.
 
@@ -183,7 +183,12 @@ The workspace UI now has route-level section tabs for Board, Agents, Dispatch, S
 - `/metrics` and `/api/metrics` expose low-cardinality Prometheus text metrics for task counts, agent runtime counts, dispatch attempts, retry-budget buckets, callback delivery outcomes, retention cleanup runs/deleted rows, and secret-presence booleans without leaking values.
 - `/api/runtime/health` exposes richer operator health counts and reason codes without tokens, raw webhook URLs, or full payload bodies.
 - `/api/dispatch-attempts/retention` runs the dispatch-attempt retention policy. Dry-run is the default; configured defaults keep success/manual rows for 30 days and failed/timeout rows for 90 days.
+- `/api/webhook-callback-deliveries` lists recent callback delivery IDs for replay audit and prunes expired delivery rows; dry-run is the default for pruning.
 - A daily Hermes cron job named **MCK runtime regression check** runs `npm run check:runtime-regressions` and reports results to the origin chat.
+
+## React Doctor Policy
+
+MCK now pins a repo-owned `doctor.config.mjs` policy for raw full-project React Doctor scoring. The config documents local-operator dashboard exceptions such as long-lived client effects, intentionally large workflow modals, API schema download anchors, and test/automation exports. The changed-scope wrapper remains strict for new diagnostics, while `npx -y react-doctor@latest . --score` provides the raw full-project 100/100 proof used in closeout.
 
 ## Webhook JSON Schema
 

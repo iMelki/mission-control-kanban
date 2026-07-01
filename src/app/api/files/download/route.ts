@@ -6,7 +6,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, existsSync, statSync } from 'fs';
 import path from 'path';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +16,11 @@ export const revalidate = 0;
 const PROJECTS_BASE = (process.env.PROJECTS_PATH || '~/projects').replace(/^~/, process.env.HOME || '');
 
 // MIME types for common file extensions
+async function readProjectFile(filePath: string) {
+  const fs = await import('node:fs/promises');
+  return fs.readFile(filePath);
+}
+
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
   '.htm': 'text/html',
@@ -81,23 +85,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check file exists
-    if (!existsSync(targetPath)) {
-      return NextResponse.json(
-        { error: 'File not found', path: targetPath },
-        { status: 404 }
-      );
-    }
-
-    // Check it's a file, not a directory
-    const stats = statSync(targetPath);
-    if (stats.isDirectory()) {
-      return NextResponse.json(
-        { error: 'Path is a directory, not a file', path: targetPath },
-        { status: 400 }
-      );
-    }
-
     // Determine content type
     const ext = path.extname(targetPath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
@@ -107,17 +94,18 @@ export async function GET(request: NextRequest) {
                    contentType === 'application/xml';
 
     // Read file
-    const content = readFileSync(targetPath, isText ? 'utf-8' : undefined);
+    const fileBuffer = await readProjectFile(targetPath);
+    const textContent = isText ? fileBuffer.toString('utf-8') : null;
 
-    console.log(`[FILE DOWNLOAD] Read: ${targetPath} (${stats.size} bytes)`);
+    console.log(`[FILE DOWNLOAD] Read: ${targetPath} (${fileBuffer.byteLength} bytes)`);
 
     // Return raw content or JSON wrapper
     if (raw) {
-      return new NextResponse(content, {
+      return new NextResponse(textContent ?? new Uint8Array(fileBuffer), {
         status: 200,
         headers: {
           'Content-Type': contentType,
-          'Content-Length': String(stats.size),
+          'Content-Length': String(fileBuffer.byteLength),
         },
       });
     }
@@ -127,13 +115,20 @@ export async function GET(request: NextRequest) {
       success: true,
       path: targetPath,
       relativePath: path.relative(PROJECTS_BASE, targetPath),
-      size: stats.size,
+      size: fileBuffer.byteLength,
       contentType,
-      content: isText ? content : Buffer.from(content).toString('base64'),
+      content: textContent ?? fileBuffer.toString('base64'),
       encoding: isText ? 'utf-8' : 'base64',
-      modifiedAt: stats.mtime.toISOString(),
     });
   } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
+    if (code === 'EISDIR') {
+      return NextResponse.json({ error: 'Path is a directory, not a file' }, { status: 400 });
+    }
+
     console.error('Error downloading file:', error);
     return NextResponse.json(
       { error: 'Failed to download file', details: String(error) },

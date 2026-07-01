@@ -81,7 +81,7 @@ export async function GET() {
       projectCountVisible = projectProbe.data?.viewer?.projectsV2?.totalCount ?? null;
       projectReadAvailable = !projectProbe.errors?.length;
       if (projectProbe.errors?.length) {
-        projectProbeError = projectProbe.errors.map((error) => error.message).filter(Boolean).join('; ');
+        projectProbeError = projectProbe.errors.flatMap((error) => error.message ? [error.message] : []).join('; ');
       }
     } catch (error) {
       projectProbeError = formatGitHubProbeError(error);

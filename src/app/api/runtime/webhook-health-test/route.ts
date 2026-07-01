@@ -7,6 +7,16 @@ import type { Agent } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
+const HEALTH_TEST_HEADERS: Record<string, string> = {
+  'Content-Type': 'application/json',
+  'X-MCK-Health-Check': 'true',
+};
+
+// This route is an operator-triggered health-test client: it sends a signed
+// non-task ping to the configured webhook URL. It does not receive or act on
+// provider webhook events, so inbound webhook signature verification is not
+// applicable here; outbound signing is handled below when a secret is present.
+
 function getHealthTimeoutMs(config: Record<string, unknown>) {
   const value = typeof config.health_timeout_ms === 'number'
     ? config.health_timeout_ms
@@ -43,12 +53,10 @@ export async function POST(request: NextRequest) {
     challenge: uuidv4(),
     health_check: true,
   });
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-MCK-Health-Check': 'true' };
   const secretEnv = typeof config.signature_secret_env === 'string' ? config.signature_secret_env : 'MCK_WEBHOOK_SIGNATURE_SECRET';
   const secret = process.env[secretEnv];
-  if (secret) {
-    Object.assign(headers, buildSignedWebhookHeaders({ rawBody: payload, secret, deliveryId }));
-  }
+  const signedHeaders = secret ? buildSignedWebhookHeaders({ rawBody: payload, secret, deliveryId }) : undefined;
+  const headers = signedHeaders ? { ...HEALTH_TEST_HEADERS, ...signedHeaders } : HEALTH_TEST_HEADERS;
 
   const controller = new AbortController();
   const started = Date.now();

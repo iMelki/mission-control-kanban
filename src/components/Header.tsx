@@ -104,7 +104,7 @@ export function Header({ workspace }: HeaderProps) {
 
       {/* Right: Time & Status */}
       <div className="flex items-center gap-4">
-        <span className="text-mc-text-secondary text-sm font-mono">
+        <span className="text-mc-text-secondary text-sm font-mono" suppressHydrationWarning>
           {format(currentTime, 'HH:mm:ss')}
         </span>
         <div
@@ -122,6 +122,7 @@ export function Header({ workspace }: HeaderProps) {
           {isOnline ? 'ONLINE' : 'OFFLINE'}
         </div>
         <button
+              type="button"
           onClick={() => router.push('/settings')}
           className="p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary"
           title="Settings"

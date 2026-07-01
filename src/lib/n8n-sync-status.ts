@@ -97,7 +97,7 @@ function asNumber(value: unknown): number {
 }
 
 function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function parseJson<T>(value: string | null, fallback: T): T {
@@ -139,9 +139,10 @@ function normalizeWorkspaces(raw: Record<string, unknown>, results: unknown[]): 
   }
 
   return Array.from(new Set(
-    candidates
-      .map((workspace) => asString(workspace).trim())
-      .filter(Boolean)
+    candidates.flatMap((workspace) => {
+      const normalized = asString(workspace).trim();
+      return normalized ? [normalized] : [];
+    })
   ));
 }
 

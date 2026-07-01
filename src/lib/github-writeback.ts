@@ -136,7 +136,7 @@ async function githubGraphQLViaCli<T>(query: string, variables: Record<string, u
 
   const payload = JSON.parse(stdout) as { data?: T; errors?: Array<{ message?: string }> };
   if (payload.errors?.length) {
-    const errorMessage = payload.errors.map((error) => error.message).filter(Boolean).join('; ');
+    const errorMessage = payload.errors.flatMap((error) => error.message ? [error.message] : []).join('; ');
     throw new Error(errorMessage || 'GitHub GraphQL CLI request failed');
   }
 
@@ -275,7 +275,7 @@ async function githubGraphQL<T>(query: string, variables: Record<string, unknown
     const payload = await response.json() as { data?: T; errors?: Array<{ message?: string }> };
 
     if (!response.ok || payload.errors?.length) {
-      const errorMessage = payload.errors?.map((error) => error.message).filter(Boolean).join('; ') || response.statusText;
+      const errorMessage = payload.errors?.flatMap((error) => error.message ? [error.message] : []).join('; ') || response.statusText;
       throw new Error(errorMessage || 'GitHub GraphQL request failed');
     }
 
@@ -506,9 +506,9 @@ export async function applyGitHubWriteback(
         reason: update.reason ?? 'Linked GitHub Project item could not be resolved at apply time',
       }));
     } else {
-      for (const update of applicableUpdates) {
+      await Promise.all(applicableUpdates.map((update) => {
         if (update.field_type === 'single_select' && update.option_id) {
-          await githubGraphQL(
+          return githubGraphQL(
             `
               mutation UpdateProjectField($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
                 updateProjectV2ItemFieldValue(
@@ -533,7 +533,7 @@ export async function applyGitHubWriteback(
             }
           );
         } else if (update.field_type === 'text') {
-          await githubGraphQL(
+          return githubGraphQL(
             `
               mutation UpdateProjectField($projectId: ID!, $itemId: ID!, $fieldId: ID!, $text: String!) {
                 updateProjectV2ItemFieldValue(
@@ -558,7 +558,9 @@ export async function applyGitHubWriteback(
             }
           );
         }
-      }
+
+        return Promise.resolve();
+      }));
     }
   }
 

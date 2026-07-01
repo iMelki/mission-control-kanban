@@ -605,6 +605,7 @@ export function runMigrations(db: Database.Database): void {
  */
 export function getMigrationStatus(db: Database.Database): { applied: string[]; pending: string[] } {
   const applied = (db.prepare('SELECT id FROM _migrations ORDER BY id').all() as { id: string }[]).map(m => m.id);
-  const pending = migrations.filter(m => !applied.includes(m.id)).map(m => m.id);
+  const appliedIds = new Set(applied);
+  const pending = migrations.flatMap((m) => appliedIds.has(m.id) ? [] : [m.id]);
   return { applied, pending };
 }

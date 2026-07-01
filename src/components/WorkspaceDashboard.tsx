@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { LocalControlPanel } from '@/components/LocalControlPanel';
 import type { WorkspaceStats } from '@/lib/types';
 
+const WORKSPACE_ICON_OPTIONS = ['📁', '💼', '🏢', '🚀', '💡', '🎯', '📊', '🔧', '🌟', '🏠'];
+
 export function WorkspaceDashboard() {
   const [workspaces, setWorkspaces] = useState<WorkspaceStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,7 @@ export function WorkspaceDashboard() {
               <h1 className="text-xl font-bold">Mission Control</h1>
             </div>
             <button
+              type="button"
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
             >
@@ -80,6 +83,7 @@ export function WorkspaceDashboard() {
               Create your first workspace to get started
             </p>
             <button
+              type="button"
               onClick={() => setShowCreateModal(true)}
               className="px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
             >
@@ -98,6 +102,7 @@ export function WorkspaceDashboard() {
 
             {/* Add workspace card */}
             <button
+              type="button"
               onClick={() => setShowCreateModal(true)}
               className="border-2 border-dashed border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-colors flex flex-col items-center justify-center gap-3 min-h-[200px]"
             >
@@ -165,12 +170,14 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
           <div className="flex items-center gap-2">
             {workspace.id !== 'default' && !workspace.github_project_number && (
               <button
+                type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   setShowDeleteConfirm(true);
                 }}
                 className="p-1.5 rounded hover:bg-mc-accent-red/20 text-mc-text-secondary hover:text-mc-accent-red transition-colors opacity-0 group-hover:opacity-100"
+                aria-label={`Delete ${workspace.name} workspace`}
                 title="Delete workspace"
               >
                 <Trash2 className="w-4 h-4" />
@@ -210,8 +217,14 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
 
     {/* Delete Confirmation Modal */}
     {showDeleteConfirm && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteConfirm(false)}>
-        <div className="bg-mc-bg-secondary border border-mc-border rounded-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <button
+          type="button"
+          aria-label="Close delete workspace confirmation"
+          className="absolute inset-0 cursor-default"
+          onClick={() => setShowDeleteConfirm(false)}
+        />
+        <div className="relative bg-mc-bg-secondary border border-mc-border rounded-xl w-full max-w-md p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-mc-accent-red/20 rounded-full">
               <AlertTriangle className="w-6 h-6 text-mc-accent-red" />
@@ -233,12 +246,14 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
 
           <div className="flex justify-end gap-3">
             <button
+              type="button"
               onClick={() => setShowDeleteConfirm(false)}
               className="px-4 py-2 text-mc-text-secondary hover:text-mc-text"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleDelete}
               disabled={deleting || workspace.taskCounts.total > 0 || workspace.agentCount > 0}
               className="px-4 py-2 bg-mc-accent-red text-white rounded-lg font-medium hover:bg-mc-accent-red/90 disabled:opacity-50"
@@ -258,8 +273,6 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
   const [icon, setIcon] = useState('📁');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const icons = ['📁', '💼', '🏢', '🚀', '💡', '🎯', '📊', '🔧', '🌟', '🏠'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,36 +310,37 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Icon selector */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Icon</label>
+          <fieldset>
+            <legend className="block text-sm font-medium mb-2">Icon</legend>
             <div className="flex flex-wrap gap-2">
-              {icons.map((i) => (
+              {WORKSPACE_ICON_OPTIONS.map((workspaceIcon) => (
                 <button
-                  key={i}
+                  key={workspaceIcon}
                   type="button"
-                  onClick={() => setIcon(i)}
+                  onClick={() => setIcon(workspaceIcon)}
+                  aria-label={`Select ${workspaceIcon} workspace icon`}
                   className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-colors ${
-                    icon === i
+                    icon === workspaceIcon
                       ? 'bg-mc-accent/20 border-2 border-mc-accent'
                       : 'bg-mc-bg border border-mc-border hover:border-mc-accent/50'
                   }`}
                 >
-                  {i}
+                  {workspaceIcon}
                 </button>
               ))}
             </div>
-          </div>
+          </fieldset>
 
           {/* Name input */}
           <div>
-            <label className="block text-sm font-medium mb-2">Name</label>
+            <label htmlFor="workspace-name" className="block text-sm font-medium mb-2">Name</label>
             <input
+              id="workspace-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Acme Corp"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
-              autoFocus
             />
           </div>
 

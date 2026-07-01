@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, run } from '@/lib/db';
+import { queryAll, queryOne, run } from '@/lib/db';
 
 const DEFAULT_REPLAY_TTL_SECONDS = 86_400;
 
@@ -86,4 +86,26 @@ export function pruneWebhookCallbackDeliveries({ dryRun = true, now = new Date()
   }
 
   return { dry_run: dryRun, expired, deleted: dryRun ? 0 : expired };
+}
+
+
+export function getWebhookCallbackDeliveries({ limit = 100 }: { limit?: number } = {}) {
+  return queryAll<{
+    id: string;
+    delivery_id: string;
+    task_id: string | null;
+    attempt_id: string | null;
+    event_type: string;
+    status: string;
+    reason: string | null;
+    expires_at: string;
+    received_at: string;
+    created_at: string;
+  }>(
+    `SELECT id, delivery_id, task_id, attempt_id, event_type, status, reason, expires_at, received_at, created_at
+     FROM webhook_callback_deliveries
+     ORDER BY received_at DESC
+     LIMIT ?`,
+    [Math.min(Math.max(limit, 1), 250)]
+  );
 }

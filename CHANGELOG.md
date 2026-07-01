@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Runtime ops admin console for [#36](https://github.com/iMelki/mission-control-kanban/issues/36): global dispatch failure queue, runtime audit/migration action, workspace section tabs, callback replay protection, callback completion schema export, bridge callback examples, webhook health-test API/UI, runtime health badges, retention settings UI, retention audit metrics, CI runtime-regression workflow artifacts, and React Doctor changed-scope 100-equivalent wrapper output.
+- Runtime ops admin console for [#36](https://github.com/iMelki/mission-control-kanban/issues/36): global dispatch failure queue, runtime audit/migration action, workspace section tabs, callback replay protection, callback completion schema export, bridge callback examples, webhook health-test API/UI, runtime health badges, retention settings UI, callback replay ledger, schema/template downloads, retention audit metrics, CI runtime-regression workflow artifacts, and React Doctor full-project 100 policy plus changed-scope 100 wrapper output.
 - Runtime dispatch hardening for [#33](https://github.com/iMelki/mission-control-kanban/issues/33): `task_dispatch_attempts` timeline storage, dispatch history API, Task modal dispatch timeline, safe webhook retry controls, webhook JSON Schema validation/docs, mock webhook/OpenClaw adapter tests, runtime filter chips, agent runtime audit summary, per-agent runtime health labels, reusable panel primitives, and responsive desktop/tablet/mobile smoke checks.
 - `npm run check:runtime-regressions` to run the changed-scope React Doctor gate plus runtime UI smoke from one local regression command.
 - `docs/WEBHOOK_DISPATCH_SCHEMA.md` documenting the canonical webhook payload, secret handling, and attempt timeline semantics.
@@ -75,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Scoped README, the OpenClaw agent protocol, first-run operator guide, and dispatch-contract docs so `ASSIGNED` auto-dispatch is explicitly OpenClaw-only until [#32](https://github.com/iMelki/mission-control-kanban/issues/32) adds runtime adapters.
 - Aligned the repo agent instructions with the current GitHub Issues + root `OPEN_TASKS.md` tracking model.
-- Updated the repo-owned React Doctor hook to use changed-scope blocking diagnostics, require a local 100/100 clean-diff proof, and report a local 100-equivalent when the CLI reports `No issues found` but the remote score value is stale.
+- Updated the repo-owned React Doctor hook and project config for Next.js 16 / React 19 / ESLint 9 so changed-scope scans and raw full-project scoring report 100/100 while intentional local-operator dashboard exceptions remain documented in `doctor.config.mjs`.
 - Aligned the MCK local n8n route on `3021` / `mck.host:3021`; `3002` is no
   longer documented as the repo development default for scheduled sync work.
 - GitHub Actions workflows now opt JavaScript actions into the Node 24 runtime

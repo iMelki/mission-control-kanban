@@ -6,6 +6,13 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lu
 import { Header } from '@/components/Header';
 import type { MckN8nSyncRun, MckN8nSyncStatusResponse } from '@/lib/types';
 
+const SYNC_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 function formatDate(value?: string): string {
   if (!value) {
     return 'never';
@@ -16,12 +23,7 @@ function formatDate(value?: string): string {
     return 'unknown time';
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(parsed);
+  return SYNC_DATE_FORMATTER.format(parsed);
 }
 
 function formatCount(value: unknown): number {

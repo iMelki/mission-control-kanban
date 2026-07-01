@@ -23,6 +23,14 @@ async function requestJson(path, init) {
   return body;
 }
 
+async function assertJsonEndpoint(path) {
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`);
+  if (!response.ok) {
+    throw new Error(`GET ${path} failed: ${response.status}`);
+  }
+  await response.json();
+}
+
 async function main() {
   const stamp = Date.now();
   const agent = await requestJson('/api/agents', {
@@ -76,6 +84,7 @@ async function main() {
       /Failed to load sub-agent count: TypeError: Failed to fetch/.test(text)
       || /Failed to load OpenClaw session .* TypeError: Failed to fetch/.test(text)
       || /Failed to load n8n sync status: TypeError: Failed to fetch/.test(text)
+      || /Failed to load workspace: TypeError: Failed to fetch/.test(text)
       || /Failed to load data: TypeError: Failed to fetch/.test(text)
     );
     page.on('console', (message) => {
@@ -91,6 +100,16 @@ async function main() {
     await page.locator('nav[aria-label="Workspace sections"] button').filter({ hasText: 'Settings' }).click();
     await page.getByText(/Workspace runtime defaults/i).waitFor({ timeout: 10_000 });
     await page.screenshot({ path: path.join(artifactDir, 'desktop-runtime-workspace.png'), fullPage: true });
+
+    await page.goto(`${baseUrl.replace(/\/$/, '')}/settings`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.getByText(/Runtime operations/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Webhook templates & callback cleanup/i).waitFor({ timeout: 10_000 });
+    await assertJsonEndpoint('/api/schemas/webhook-dispatch-payload');
+    await assertJsonEndpoint('/api/schemas/webhook-callback-completion');
+    await page.screenshot({ path: path.join(artifactDir, 'settings-runtime-ops.png'), fullPage: true });
+
+    await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
     await page.locator('nav[aria-label="Workspace sections"] button').filter({ hasText: 'Board' }).click();
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
 
@@ -142,6 +161,7 @@ async function main() {
       artifact_dir: artifactDir,
       screenshots: [
         path.join(artifactDir, 'desktop-runtime-workspace.png'),
+        path.join(artifactDir, 'settings-runtime-ops.png'),
         path.join(artifactDir, 'tablet-runtime-workspace.png'),
         path.join(artifactDir, 'mobile-runtime-workspace.png'),
       ],
@@ -153,6 +173,8 @@ async function main() {
         'runtime filter chips',
         'task-modal copy handoff action',
         'dispatch timeline retry control',
+        'settings runtime operations retention and callback panel',
+        'webhook dispatch/callback schema endpoints',
         'tablet responsive shell',
         'mobile responsive shell',
         'no browser console errors',

@@ -85,17 +85,18 @@ function normalizeString(value: unknown): string | undefined {
 
 function normalizeStringArray(value: unknown): string[] | undefined {
   if (Array.isArray(value)) {
-    const items = value
-      .map((item) => normalizeString(item))
-      .filter((item): item is string => Boolean(item));
+    const items = value.flatMap((item) => {
+      const normalized = normalizeString(item);
+      return normalized ? [normalized] : [];
+    });
     return items.length > 0 ? items : undefined;
   }
 
   if (typeof value === 'string') {
-    const items = value
-      .split(/\r?\n|,|;/)
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const items = value.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
+      const trimmed = item.trim();
+      return trimmed ? [trimmed] : [];
+    });
     return items.length > 0 ? items : undefined;
   }
 
@@ -156,13 +157,13 @@ export function parseDispatchMetadata(raw: unknown): DispatchMetadata | undefine
 
 export function validateDispatchMetadata(metadata: DispatchMetadata | undefined): DispatchValidationResult {
   const normalized = normalizeDispatchMetadata(metadata);
-  const missingFields = REQUIRED_FIELD_LABELS.filter(([field]) => {
+  const missingFields = REQUIRED_FIELD_LABELS.flatMap(([field, label]) => {
     const value = normalized?.[field];
     if (Array.isArray(value)) {
-      return value.length === 0;
+      return value.length === 0 ? [label] : [];
     }
-    return !value;
-  }).map(([, label]) => label);
+    return value ? [] : [label];
+  });
 
   const blockers = [...missingFields.map((field) => `Missing ${field}`)];
   const warnings: string[] = [];
