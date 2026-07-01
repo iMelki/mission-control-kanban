@@ -8,14 +8,15 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#32 - Add runtime-aware dispatch adapters for manual, OpenClaw, and webhook agents](https://github.com/iMelki/mission-control-kanban/issues/32)
-  - Current state: documented the current OpenClaw-only auto-dispatch boundary
-    in `docs/MULTI_AGENT_RUNTIMES.md` and scoped existing docs so non-OpenClaw
-    agents use manual/native-runtime handoff with MCK callback URLs.
-  - Next implementation: add the runtime/provider adapter layer so `manual`,
-    `openclaw`, and `webhook` dispatches are explicit and test-covered.
+- None currently tracked in this root index. Use GitHub issues for the live backlog.
 
 ## Recently Completed
+
+- [#32 - Add runtime-aware dispatch adapters for manual, OpenClaw, and webhook agents](https://github.com/iMelki/mission-control-kanban/issues/32)
+  - Completed on 2026-07-01.
+  - Result: added agent runtime fields, SQLite migration/schema support, manual/OpenClaw/webhook dispatch adapters, auto-dispatch safety gating, Agent modal runtime controls, Task modal handoff copy, task-card runtime badges, and browser smoke coverage.
+  - Safety: unknown/disabled runtimes fall back to manual handoff; direct OpenClaw/webhook dispatch validates the dispatch contract; webhook secrets use env-var indirection, bounded timeout, and redacted response URLs.
+  - Validation: `npm run test:agent-runtimes`, `npm run test:github-sync`, `npx tsc --noEmit --incremental false --pretty false`, `npm run lint`, `npm run build`, React Doctor changed-scope scan, and `npm run smoke:runtime-ui`.
 
 - [#31 - Make workspace side panels collapsible](https://github.com/iMelki/mission-control-kanban/issues/31)
   - Completed on 2026-07-01.

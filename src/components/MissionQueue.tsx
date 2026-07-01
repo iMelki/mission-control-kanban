@@ -11,6 +11,7 @@ import {
   summarizeDispatchContract,
   validateDispatchMetadata,
 } from '@/lib/dispatch-contract';
+import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
@@ -319,6 +320,12 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
   const readiness = task.dispatch_metadata?.readiness;
   const reviewMode = task.dispatch_metadata?.review_mode;
   const riskLevel = task.dispatch_metadata?.risk_level;
+  const runtime = resolveAgentRuntime(task.assigned_agent);
+  const runtimeTone = runtime.effective_type === 'manual'
+    ? 'neutral'
+    : runtime.effective_type === 'openclaw'
+      ? 'ready'
+      : 'warn';
 
   const pillClass = (tone: 'ready' | 'warn' | 'risk' | 'neutral') => {
     switch (tone) {
@@ -365,11 +372,23 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
 
         {/* Assigned agent */}
         {task.assigned_agent && (
-          <div className="flex items-center gap-2 mb-3 py-1.5 px-2 bg-mc-bg-tertiary/50 rounded">
-            <span className="text-base">{(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji}</span>
-            <span className="text-xs text-mc-text-secondary truncate">
-              {(task.assigned_agent as unknown as { name: string }).name}
-            </span>
+          <div className="mb-3 rounded bg-mc-bg-tertiary/50 px-2 py-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-base">{(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji}</span>
+              <span className="text-xs text-mc-text-secondary truncate">
+                {(task.assigned_agent as unknown as { name: string }).name}
+              </span>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${pillClass(runtimeTone)}`}>
+                {runtime.label || AGENT_RUNTIME_LABELS.manual}
+              </span>
+              {runtime.reason && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-mc-bg border border-mc-border/50 text-mc-text-secondary">
+                  Dispatch off
+                </span>
+              )}
+            </div>
           </div>
         )}
 

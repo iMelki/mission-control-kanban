@@ -9,6 +9,17 @@ import type {
 
 export type AgentStatus = 'standby' | 'working' | 'offline';
 
+export type AgentRuntimeType = 'manual' | 'openclaw' | 'webhook';
+
+export interface AgentRuntimeConfig {
+  notes?: string;
+  url?: string;
+  webhook_url?: string;
+  bearer_token_env?: string;
+  headers?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 export type TaskStatus = 'planning' | 'inbox' | 'assigned' | 'in_progress' | 'testing' | 'review' | 'done';
 
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
@@ -25,6 +36,7 @@ export type EventType =
   | 'message_sent'
   | 'agent_status_changed'
   | 'agent_joined'
+  | 'task_dispatched'
   | 'system';
 
 export interface Agent {
@@ -35,6 +47,9 @@ export interface Agent {
   avatar_emoji: string;
   status: AgentStatus;
   is_master: boolean;
+  runtime_type: AgentRuntimeType;
+  runtime_config?: AgentRuntimeConfig | string | null;
+  dispatch_enabled: boolean | number;
   workspace_id: string;
   soul_md?: string;
   user_md?: string;
@@ -315,6 +330,9 @@ export interface CreateAgentRequest {
   description?: string;
   avatar_emoji?: string;
   is_master?: boolean;
+  runtime_type?: AgentRuntimeType;
+  runtime_config?: AgentRuntimeConfig | string | null;
+  dispatch_enabled?: boolean;
   soul_md?: string;
   user_md?: string;
   agents_md?: string;

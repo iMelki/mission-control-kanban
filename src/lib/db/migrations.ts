@@ -433,6 +433,41 @@ const migrations: Migration[] = [
         'asimtop'
       );
     }
+  },
+  {
+    id: '013',
+    name: 'add_agent_runtime_fields',
+    up: (db) => {
+      console.log('[Migration 013] Adding agent runtime dispatch fields...');
+
+      const agentsInfo = db.prepare("PRAGMA table_info(agents)").all() as { name: string }[];
+      const hasColumn = (name: string) => agentsInfo.some((col) => col.name === name);
+
+      if (!hasColumn('runtime_type')) {
+        db.exec(`ALTER TABLE agents ADD COLUMN runtime_type TEXT DEFAULT 'manual' CHECK (runtime_type IN ('manual', 'openclaw', 'webhook'))`);
+        console.log('[Migration 013] Added runtime_type');
+      }
+      if (!hasColumn('runtime_config')) {
+        db.exec('ALTER TABLE agents ADD COLUMN runtime_config TEXT');
+        console.log('[Migration 013] Added runtime_config');
+      }
+      if (!hasColumn('dispatch_enabled')) {
+        db.exec('ALTER TABLE agents ADD COLUMN dispatch_enabled INTEGER DEFAULT 0');
+        console.log('[Migration 013] Added dispatch_enabled');
+      }
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_agents_runtime_type ON agents(runtime_type)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_agents_dispatch_enabled ON agents(dispatch_enabled)');
+
+      // Preserve the pre-adapter behavior for existing rows: before this migration,
+      // all assigned auto-dispatch attempts were routed to OpenClaw.
+      db.exec(`
+        UPDATE agents
+        SET runtime_type = 'openclaw',
+            dispatch_enabled = 1
+        WHERE runtime_type IS NULL OR runtime_type = 'manual'
+      `);
+    }
   }
 ];
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, AlertTriangle } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
 import { DeliverablesList } from './DeliverablesList';
@@ -9,6 +9,8 @@ import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { AgentModal } from './AgentModal';
 import { GitHubWritebackPanel } from './GitHubWritebackPanel';
+import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
+import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
 import {
   READINESS_LABELS,
   REVIEW_MODE_LABELS,
@@ -79,6 +81,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   const [activeTab, setActiveTab] = useState<TabType>(initialTask?.status === 'planning' ? 'planning' : 'overview');
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
 
   useEffect(() => {
     setCurrentTask(initialTask);
@@ -112,6 +115,49 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
       : 'border-rose-500/25 bg-rose-500/10 text-rose-100';
   const fieldIdPrefix = currentTask?.id ? `task-modal-${currentTask.id}` : 'task-modal-new';
   const inputId = (name: string) => `${fieldIdPrefix}-${name}`;
+  const assignedAgent = agents.find((candidate) => candidate.id === form.assigned_agent_id) || currentTask?.assigned_agent || null;
+  const assignedRuntime = resolveAgentRuntime(assignedAgent);
+  const canCopyHandoff = Boolean(currentTask?.id && assignedAgent);
+
+  const handleCopyHandoffPrompt = async () => {
+    if (!currentTask || !assignedAgent) return;
+
+    const prompt = buildManualHandoffPrompt({
+      task: {
+        ...currentTask,
+        title: form.title,
+        description: form.description,
+        priority: form.priority,
+        due_date: form.due_date || undefined,
+        dispatch_metadata: {
+          source_issue_url: form.dispatch_source_issue_url,
+          target_repo: form.dispatch_target_repo,
+          project_workstream: form.dispatch_project_workstream,
+          allowed_file_scope: splitLines(form.dispatch_allowed_file_scope),
+          acceptance_criteria: splitLines(form.dispatch_acceptance_criteria),
+          test_requirements: splitLines(form.dispatch_test_requirements),
+          risk_level: form.dispatch_risk_level,
+          readiness: form.dispatch_readiness,
+          review_mode: form.dispatch_review_mode,
+          impact: form.dispatch_impact,
+          rollback_plan: form.dispatch_rollback_plan,
+          safety_rules: splitLines(form.dispatch_safety_rules),
+        },
+      },
+      agent: assignedAgent,
+      missionControlUrl: getMissionControlUrl(),
+      projectsPath: getProjectsPath(),
+    });
+
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setHandoffCopyState('copied');
+      window.setTimeout(() => setHandoffCopyState('idle'), 2000);
+    } catch (error) {
+      console.error('Failed to copy handoff prompt:', error);
+      setHandoffCopyState('error');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -448,6 +494,22 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 ➕ Add new agent…
               </option>
             </select>
+            {assignedAgent && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-mc-border bg-mc-bg-secondary px-3 py-2 text-xs">
+                <span className="font-medium text-mc-text">Runtime: {assignedRuntime.label}</span>
+                {assignedRuntime.reason && <span className="text-mc-text-secondary">{assignedRuntime.reason}</span>}
+                <button
+                  type="button"
+                  onClick={handleCopyHandoffPrompt}
+                  disabled={!canCopyHandoff}
+                  className="ml-auto inline-flex items-center gap-1 rounded border border-mc-border px-2 py-1 text-xs text-mc-text hover:bg-mc-bg-tertiary disabled:opacity-50"
+                  title={currentTask ? 'Copy a handoff prompt for this task' : 'Save the task before copying a handoff prompt'}
+                >
+                  {handoffCopyState === 'copied' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {handoffCopyState === 'copied' ? 'Copied' : handoffCopyState === 'error' ? 'Copy failed' : 'Copy handoff'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Due Date */}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryOne, run } from '@/lib/db';
 import type { Agent, UpdateAgentRequest } from '@/lib/types';
+import { normalizeAgentForResponse, runtimeInputToDb } from '@/lib/agent-api';
 
 // GET /api/agents/[id] - Get a single agent
 export async function GET(
@@ -16,7 +17,7 @@ export async function GET(
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
 
-    return NextResponse.json(agent);
+    return NextResponse.json(normalizeAgentForResponse(agent));
   } catch (error) {
     console.error('Failed to fetch agent:', error);
     return NextResponse.json({ error: 'Failed to fetch agent' }, { status: 500 });
@@ -84,6 +85,19 @@ export async function PATCH(
       updates.push('agents_md = ?');
       values.push(body.agents_md);
     }
+    if (body.runtime_type !== undefined || body.runtime_config !== undefined || body.dispatch_enabled !== undefined) {
+      const runtime = runtimeInputToDb({
+        runtime_type: body.runtime_type ?? existing.runtime_type,
+        runtime_config: body.runtime_config ?? existing.runtime_config,
+        dispatch_enabled: body.dispatch_enabled ?? existing.dispatch_enabled,
+      });
+      updates.push('runtime_type = ?');
+      values.push(runtime.runtime_type);
+      updates.push('runtime_config = ?');
+      values.push(runtime.runtime_config);
+      updates.push('dispatch_enabled = ?');
+      values.push(runtime.dispatch_enabled);
+    }
 
     if (updates.length === 0) {
       return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
@@ -96,7 +110,7 @@ export async function PATCH(
     run(`UPDATE agents SET ${updates.join(', ')} WHERE id = ?`, values);
 
     const agent = queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [id]);
-    return NextResponse.json(agent);
+    return NextResponse.json(agent ? normalizeAgentForResponse(agent) : null);
   } catch (error) {
     console.error('Failed to update agent:', error);
     return NextResponse.json({ error: 'Failed to update agent' }, { status: 500 });

@@ -2,91 +2,140 @@
 
 Last updated: 2026-07-01
 
-Mission Control Kanban (MCK) can represent many kinds of agents on the board,
-but the current automatic dispatch implementation is **OpenClaw-specific**.
+Mission Control Kanban (MCK) can represent many kinds of agents on the board. Runtime-aware dispatch now separates **ownership tracking** from **runtime launch** so operators can safely use OpenClaw, webhook bridges, and manual/native surfaces such as Hermes, Codex, Copilot, or Claude Code.
 
 ## Current Rule
 
-> Do not rely on the `ASSIGNED` auto-dispatch path unless the assigned agent is
-> actually OpenClaw-backed.
+> Do not rely on the `ASSIGNED` auto-dispatch path unless the assigned agent has a runtime adapter and `dispatch_enabled` is on.
 
-In plain English: putting a task in `ASSIGNED` means the board knows who owns the
-work. It does **not** mean MCK can launch Hermes, Codex, Copilot, Claude Code, or
-another runtime by itself today.
+In plain English: putting a task in `ASSIGNED` means the board knows who owns the work. MCK only launches work automatically for agents whose runtime supports auto-dispatch and whose agent record explicitly enables it. Manual agents remain tracker/handoff agents.
 
-The current `POST /api/tasks/:id/dispatch` route sends work through the OpenClaw
-gateway. The dispatch-contract fields still matter for every task, but a complete
-contract only proves that a task is safe to hand off; it does not prove that the
-assigned runtime can be started automatically.
+## Runtime Fields
 
-## What Works Today
+Agents now carry three runtime fields:
 
-### OpenClaw agents
+| Field | Meaning |
+| --- | --- |
+| `runtime_type` | Which dispatch path to use: `manual`, `openclaw`, or `webhook`. Unknown values fall back to `manual`. |
+| `runtime_config` | JSON configuration for that runtime, such as a webhook URL or OpenClaw session hint. Do not store raw secrets here. |
+| `dispatch_enabled` | Explicit safety toggle. If false, even `openclaw` and `webhook` agents fall back to manual handoff. |
 
-OpenClaw-backed agents can use the existing MCK dispatch path:
+### SQLite migration for runtime fields
 
-1. The task has an assigned OpenClaw agent.
-2. Required dispatch metadata is complete.
-3. The OpenClaw gateway/session link is available.
-4. MCK dispatches the task to OpenClaw and can move the task into active work.
+Migration `013_add_agent_runtime_fields` adds those columns and indexes to existing SQLite databases. Fresh databases get the same fields from `src/lib/db/schema.ts`.
 
-### Non-OpenClaw agents
+Why this exists: old MCK agent rows did not know whether they were OpenClaw, manual, or webhook-backed. The migration gives existing and future rows a stable schema so dispatch code can make a safe runtime decision instead of guessing.
 
-For Hermes, Codex, Copilot, Claude Code, or other external agents, use MCK as
-the board of record and launch the worker in its native surface.
+## Runtime Adapter Registry
 
-Recommended handoff prompt contents:
+Dispatch now routes through an adapter layer instead of calling OpenClaw directly from `/api/tasks/:id/dispatch`.
 
-- MCK task ID and title
-- task description and priority
-- target repo / allowed file scope
+Adapters implemented:
+
+- `manual` — generates a copyable handoff prompt and callback URLs. It does **not** move the task to `in_progress` automatically.
+- `openclaw` — preserves the existing OpenClaw gateway/session behavior through an adapter.
+- `webhook` — POSTs a canonical dispatch payload to the configured endpoint. It only moves the task forward after a successful 2xx response.
+
+Deferred:
+
+- `local_command` — intentionally not implemented. It would require explicit environment enablement, a command allowlist, and a dry-run preview because it can run local processes.
+
+## `/api/tasks/:id/dispatch` Behavior
+
+The dispatch route now:
+
+1. Loads the task and assigned agent.
+2. Resolves the effective runtime:
+   - no agent, unknown runtime, manual runtime, or disabled dispatch → `manual`
+   - enabled OpenClaw → `openclaw`
+   - enabled webhook → `webhook`
+3. Calls the matching adapter.
+4. Returns adapter-specific evidence.
+
+This means OpenClaw is no longer the implicit default. It is one adapter behind the same contract as the other runtimes.
+
+## Manual Handoff Prompt
+
+Manual dispatch returns:
+
+- task ID, title, description, priority, due date
+- GitHub source issue when available
+- target repo / workstream
+- allowed file scope
 - acceptance criteria
-- required tests or verification commands
-- safety rules and rollback/fallback notes
-- output directory or deliverable expectations
-- MCK callback URLs
+- test requirements
+- impact and rollback/fallback notes
+- safety rules
+- output directory expectation
+- callback URLs for activity, deliverables, and status updates
 
-Callback pattern for a local MCK task:
+The Task modal also exposes a compact **Copy handoff** action so an operator can paste the prompt into Hermes, Codex, Copilot, Claude Code, or another native agent surface.
 
-```text
-When you start, POST:
-http://127.0.0.1:3021/api/tasks/<TASK_ID>/activities
-Body: {"activity_type":"started","message":"Started work in <agent/runtime>"}
+## Webhook Payload and Secret Handling
 
-When you create an artifact, POST:
-http://127.0.0.1:3021/api/tasks/<TASK_ID>/deliverables
-Body: {"deliverable_type":"file","title":"summary.md","path":"S:/source/..."}
+Webhook agents use `runtime_config.webhook_url` or `runtime_config.url`.
 
-When done, PATCH:
-http://127.0.0.1:3021/api/tasks/<TASK_ID>
-Body: {"status":"review"}
+The payload includes:
+
+- `event: "mck.task.dispatch"`
+- `version: 1`
+- task summary and dispatch metadata
+- assigned agent summary
+- callback URLs
+- output directory
+- prompt markdown
+- issued timestamp
+
+Webhook auth uses environment indirection:
+
+```json
+{
+  "webhook_url": "https://example.test/mck-dispatch",
+  "bearer_token_env": "MCK_WEBHOOK_TOKEN",
+  "headers": {
+    "X-MCK-Bridge": "hermes"
+  }
+}
 ```
 
-## Planned Runtime Model
+MCK reads the token from the named environment variable at dispatch time. Raw bearer tokens, API keys, and secrets should not be stored in `runtime_config`. Webhook calls are bounded by a default 30 second timeout (`timeout_ms` / `webhook_timeout_ms`, capped at 120 seconds), and API responses redact query strings/fragments from webhook URLs.
 
-The intended first-class model is a runtime/provider layer instead of another
-hardcoded dispatch path.
+If the webhook call fails or returns non-2xx, MCK returns an error and does not move the task to `in_progress`. Direct dispatch calls also validate the dispatch contract before launching OpenClaw/webhook runtimes; manual handoff remains available even when a task still needs grooming.
 
-Suggested runtime types:
+## OpenClaw Compatibility
 
-- `manual` — MCK generates/carries a copyable handoff prompt and callback URLs;
-  the operator launches the worker manually.
-- `openclaw` — existing gateway behavior, routed through an OpenClaw adapter.
-- `webhook` — MCK posts a canonical dispatch payload to an approved endpoint.
-- `local_command` — deferred; must require explicit enablement, a command
-  allowlist, and a dry-run preview before any local shell execution.
+OpenClaw dispatch behavior is preserved through the `openclaw` adapter:
 
-Until that adapter layer exists, non-OpenClaw agents should default to manual
-handoff/tracker behavior.
+1. Connect to the OpenClaw gateway if needed.
+2. Reuse or create an active `openclaw_sessions` row.
+3. Send the runtime prompt via `chat.send`.
+4. Move the task to `in_progress` only after the message is accepted.
+5. Mark the agent `working` and write a `task_dispatched` event.
+
+## Operator UI
+
+Agent modal runtime controls now expose:
+
+- runtime type selector
+- auto-dispatch enable/disable toggle
+- runtime config JSON field with secret-handling guidance
+
+Task cards now show the assigned agent runtime badge so operators can see whether assignment means manual handoff, OpenClaw auto, webhook auto, or dispatch-off behavior.
+
+Task modal now includes a compact manual handoff prompt copy action for assigned tasks.
+
+## `.hermes/plans` Decision
+
+The local `.hermes/plans/2026-06-30_085351-multi-agent-runtimes.md` file is a scratch implementation plan. Its durable lessons have been promoted into this source-controlled doc and the shared workflow `mck-runtime-adapter-implementation`. Keep `.hermes/` local unless a future plan contains unique canonical content not already represented in docs.
 
 ## Operator Checklist
 
 Before trusting automatic dispatch, confirm:
 
-1. The assigned agent is OpenClaw-backed.
-2. The task's dispatch metadata is complete.
-3. The OpenClaw session/gateway is healthy.
-4. The operator actually wants MCK to start that runtime now.
+1. The assigned agent has runtime type `openclaw` or `webhook`.
+2. `dispatch_enabled` is true.
+3. The task's dispatch metadata is complete.
+4. The runtime target is healthy and configured.
+5. The operator actually wants MCK to start that runtime now.
 
-If any answer is no, keep the task tracked in MCK and launch the worker manually
-with the callback instructions above.
+If any answer is no, keep the task tracked in MCK and use the handoff prompt/callback instructions instead.

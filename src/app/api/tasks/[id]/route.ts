@@ -10,11 +10,15 @@ import {
   requiresDispatchContractBeforeWorkStarts,
 } from '@/lib/dispatch-contract';
 import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
+import { normalizeAgentRuntimeType, normalizeDispatchEnabled, shouldAutoDispatchAgent } from '@/lib/agent-runtimes';
 import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
 
 type TaskRow = Task & {
   assigned_agent_name?: string;
   assigned_agent_emoji?: string;
+  assigned_agent_runtime_type?: string | null;
+  assigned_agent_runtime_config?: string | null;
+  assigned_agent_dispatch_enabled?: boolean | number | null;
   created_by_agent_name?: string;
   created_by_agent_emoji?: string;
   dispatch_metadata?: string | null;
@@ -51,6 +55,16 @@ function decorateTask(task: TaskRow) {
     dispatch_metadata: dispatchMetadata,
     dispatch_ready: validation.canDispatch,
     dispatch_blockers: validation.blockers,
+    assigned_agent: task.assigned_agent_id
+      ? {
+          id: task.assigned_agent_id,
+          name: task.assigned_agent_name,
+          avatar_emoji: task.assigned_agent_emoji,
+          runtime_type: normalizeAgentRuntimeType(task.assigned_agent_runtime_type),
+          runtime_config: task.assigned_agent_runtime_config,
+          dispatch_enabled: normalizeDispatchEnabled(task.assigned_agent_dispatch_enabled),
+        }
+      : undefined,
   };
 }
 
@@ -64,7 +78,10 @@ export async function GET(
     const task = queryOne<TaskRow>(
       `SELECT t.*,
         aa.name as assigned_agent_name,
-        aa.avatar_emoji as assigned_agent_emoji
+        aa.avatar_emoji as assigned_agent_emoji,
+        aa.runtime_type as assigned_agent_runtime_type,
+        aa.runtime_config as assigned_agent_runtime_config,
+        aa.dispatch_enabled as assigned_agent_dispatch_enabled
        FROM tasks t
        LEFT JOIN agents aa ON t.assigned_agent_id = aa.id
        WHERE t.id = ?`,
@@ -276,6 +293,9 @@ export async function PATCH(
       `SELECT t.*,
         aa.name as assigned_agent_name,
         aa.avatar_emoji as assigned_agent_emoji,
+        aa.runtime_type as assigned_agent_runtime_type,
+        aa.runtime_config as assigned_agent_runtime_config,
+        aa.dispatch_enabled as assigned_agent_dispatch_enabled,
         ca.name as created_by_agent_name,
         ca.avatar_emoji as created_by_agent_emoji
        FROM tasks t
@@ -313,15 +333,38 @@ export async function PATCH(
           ]
         );
       } else {
-        // Call dispatch endpoint asynchronously (don't wait for response)
-        const missionControlUrl = getMissionControlUrl();
-        fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ task: decoratedTask }),
-        }).catch(err => {
-          console.error('Auto-dispatch failed:', err);
-        });
+        const assignedAgent = decoratedTask.assigned_agent_id
+          ? queryOne<Agent>('SELECT * FROM agents WHERE id = ?', [decoratedTask.assigned_agent_id])
+          : null;
+
+        if (!shouldAutoDispatchAgent(assignedAgent)) {
+          run(
+            `INSERT INTO events (id, type, agent_id, task_id, message, metadata, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              uuidv4(),
+              'system',
+              assignedAgent?.id || null,
+              id,
+              `Auto-dispatch skipped for \"${decoratedTask.title}\": ${assignedAgent?.name || 'assigned agent'} requires manual handoff or dispatch is disabled`,
+              JSON.stringify({
+                runtime_type: assignedAgent?.runtime_type || 'manual',
+                dispatch_enabled: assignedAgent?.dispatch_enabled ?? false,
+              }),
+              now,
+            ]
+          );
+        } else {
+          // Call dispatch endpoint asynchronously (don't wait for response)
+          const missionControlUrl = getMissionControlUrl();
+          fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task: decoratedTask }),
+          }).catch(err => {
+            console.error('Auto-dispatch failed:', err);
+          });
+        }
       }
     }
 

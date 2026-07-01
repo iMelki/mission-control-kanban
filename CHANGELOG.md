@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Runtime-aware dispatch adapters for [#32](https://github.com/iMelki/mission-control-kanban/issues/32): agents now carry `runtime_type`, `runtime_config`, and `dispatch_enabled`; `/api/tasks/:id/dispatch` routes through `manual`, `openclaw`, and `webhook` adapters; manual dispatch returns copyable handoff prompts; webhook dispatch posts a canonical payload with env-var token indirection.
+- Agent modal runtime controls, Task modal handoff copy action, and task-card runtime badges so operators can see whether assignment means manual handoff, OpenClaw auto, webhook auto, or dispatch-off behavior.
+- `npm run smoke:runtime-ui` browser coverage for runtime controls, task-card runtime badges, handoff copy visibility, and browser-console cleanliness.
+- `npm run test:agent-runtimes` for runtime fallback, manual handoff, webhook payload/header, and auto-dispatch gating coverage.
 - Collapsible workspace side panels for [#31](https://github.com/iMelki/mission-control-kanban/issues/31), with persistent Agents and Live Feed rails so the Mission Queue can use more screen width on demand.
 - `docs/MULTI_AGENT_RUNTIMES.md` for [#32](https://github.com/iMelki/mission-control-kanban/issues/32), documenting the current OpenClaw-only auto-dispatch boundary and manual handoff/callback pattern for Hermes, Codex, Copilot, Claude Code, and other non-OpenClaw agents.
 - Compact home-page Local Control area for `mission-control-kanban#29`, with

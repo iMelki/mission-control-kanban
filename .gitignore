@@ -46,6 +46,7 @@ next-env.d.ts
 
 # local development notes/handoffs (may contain sensitive context)
 /thoughts/
+/.hermes/
 .git-secrets.json
 /.logs/
 /logs/

@@ -1,9 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Save, Trash2 } from 'lucide-react';
+import { X, Save, Trash2, RadioTower } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
-import type { Agent, AgentStatus } from '@/lib/types';
+import {
+  AGENT_RUNTIME_DESCRIPTIONS,
+  AGENT_RUNTIME_LABELS,
+  AGENT_RUNTIME_TYPES,
+  parseAgentRuntimeConfig,
+  serializeAgentRuntimeConfig,
+} from '@/lib/agent-runtimes';
+import type { Agent, AgentRuntimeType, AgentStatus } from '@/lib/types';
 
 interface AgentModalProps {
   agent?: Agent;
@@ -14,18 +21,119 @@ interface AgentModalProps {
 
 const EMOJI_OPTIONS = ['🤖', '🦞', '💻', '🔍', '✍️', '🎨', '📊', '🧠', '⚡', '🚀', '🎯', '🔧'];
 
+function formatRuntimeConfig(value: Agent['runtime_config']) {
+  const parsed = parseAgentRuntimeConfig(value);
+  return Object.keys(parsed).length ? JSON.stringify(parsed, null, 2) : '';
+}
+
+type AgentFormState = {
+  name: string;
+  role: string;
+  description: string;
+  avatar_emoji: string;
+  status: AgentStatus;
+  is_master: boolean;
+  runtime_type: AgentRuntimeType;
+  runtime_config: string;
+  dispatch_enabled: boolean;
+  soul_md: string;
+  user_md: string;
+  agents_md: string;
+};
+
+function RuntimeDispatchSection({
+  form,
+  setForm,
+}: {
+  form: AgentFormState;
+  setForm: React.Dispatch<React.SetStateAction<AgentFormState>>;
+}) {
+  return (
+    <section className="rounded-lg border border-mc-border bg-mc-bg/60 p-3 space-y-3">
+      <div className="flex items-start gap-2">
+        <RadioTower className="w-4 h-4 text-mc-accent mt-0.5" />
+        <div>
+          <h3 className="text-sm font-semibold">Runtime & dispatch</h3>
+          <p className="text-xs text-mc-text-secondary">
+            Controls whether assignment only tracks ownership or can launch work through a runtime adapter.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="agent-runtime-type" className="block text-sm font-medium mb-1">Runtime type</label>
+          <select
+            id="agent-runtime-type"
+            value={form.runtime_type}
+            onChange={(e) => setForm({
+              ...form,
+              runtime_type: e.target.value as AgentRuntimeType,
+              dispatch_enabled: e.target.value === 'manual' ? false : form.dispatch_enabled,
+            })}
+            className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+          >
+            {AGENT_RUNTIME_TYPES.map((runtimeType) => (
+              <option key={runtimeType} value={runtimeType}>{AGENT_RUNTIME_LABELS[runtimeType]}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-mc-text-secondary">
+            {AGENT_RUNTIME_DESCRIPTIONS[form.runtime_type]}
+          </p>
+        </div>
+
+        <div className="rounded border border-mc-border bg-mc-bg-secondary p-3">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.dispatch_enabled}
+              disabled={form.runtime_type === 'manual'}
+              onChange={(e) => setForm({ ...form, dispatch_enabled: e.target.checked })}
+              className="w-4 h-4 mt-0.5"
+            />
+            <span>
+              <span className="block font-medium">Enable auto-dispatch</span>
+              <span className="block text-xs text-mc-text-secondary">
+                Manual agents always require handoff. OpenClaw/webhook agents only auto-launch when this is enabled.
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="agent-runtime-config" className="block text-sm font-medium mb-1">Runtime config JSON</label>
+        <textarea
+          id="agent-runtime-config"
+          value={form.runtime_config}
+          onChange={(e) => setForm({ ...form, runtime_config: e.target.value })}
+          rows={4}
+          className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-mc-accent resize-y"
+          placeholder={form.runtime_type === 'webhook' ? '{\n  "webhook_url": "https://example.test/mck",\n  "bearer_token_env": "MCK_WEBHOOK_TOKEN"\n}' : '{\n  "notes": "Optional runtime notes"\n}'}
+        />
+        <p className="mt-1 text-xs text-mc-text-secondary">
+          Store env-var names such as <code>bearer_token_env</code>, not raw secrets.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: AgentModalProps) {
   const { addAgent, updateAgent, agents } = useMissionControl();
   const [activeTab, setActiveTab] = useState<'info' | 'soul' | 'user' | 'agents'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<AgentFormState>({
     name: agent?.name || '',
     role: agent?.role || '',
     description: agent?.description || '',
     avatar_emoji: agent?.avatar_emoji || '🤖',
     status: agent?.status || 'standby' as AgentStatus,
     is_master: agent?.is_master || false,
+    runtime_type: agent?.runtime_type || 'manual' as AgentRuntimeType,
+    runtime_config: formatRuntimeConfig(agent?.runtime_config),
+    dispatch_enabled: Boolean(agent?.dispatch_enabled),
     soul_md: agent?.soul_md || '',
     user_md: agent?.user_md || '',
     agents_md: agent?.agents_md || '',
@@ -44,6 +152,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          runtime_config: serializeAgentRuntimeConfig(form.runtime_config),
           workspace_id: workspaceId || agent?.workspace_id || 'default',
         }),
       });
@@ -216,6 +325,9 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                   Master Orchestrator (can coordinate other agents)
                 </label>
               </div>
+
+              {/* Runtime & dispatch */}
+              <RuntimeDispatchSection form={form} setForm={setForm} />
             </div>
           )}
 
