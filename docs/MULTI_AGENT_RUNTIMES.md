@@ -122,7 +122,32 @@ Agent modal runtime controls now expose:
 
 Task cards now show the assigned agent runtime badge so operators can see whether assignment means manual handoff, OpenClaw auto, webhook auto, or dispatch-off behavior.
 
-Task modal now includes a compact manual handoff prompt copy action for assigned tasks.
+The Agents panel now includes a compact post-migration runtime audit summary and per-agent runtime health labels:
+
+- manual/off agents are clearly handoff-only;
+- OpenClaw agents show whether a local OpenClaw session is currently linked;
+- webhook agents show that their runtime is dispatch-capable when enabled.
+
+Mission Queue includes runtime filter chips for `manual`, `OpenClaw`, `webhook`, and `dispatch off`, following shadcn/ReUI-style visible-filter patterns rather than hiding filter state inside a menu.
+
+Task modal now includes a compact manual handoff prompt copy action for assigned tasks plus a Dispatch timeline panel that lists adapter outcome history and exposes safe webhook retry for failed/timeout webhook attempts only.
+
+## Dispatch Attempt Timeline
+
+Migration `014_add_task_dispatch_attempts` creates `task_dispatch_attempts` for runtime audit history. Every manual, OpenClaw, and webhook dispatch attempt records:
+
+- adapter/runtime type;
+- outcome status (`manual`, `success`, `failed`, `timeout`, `skipped`, `retrying`);
+- attempt number;
+- HTTP status and redacted webhook URL when available;
+- bounded error/response text;
+- request payload JSON for webhook audit context.
+
+`GET /api/tasks/:id/dispatch` returns this timeline. `POST /api/tasks/:id/dispatch` accepts `{ "retry": true }` only when the effective runtime is webhook and the latest attempt failed or timed out.
+
+## Webhook JSON Schema
+
+Webhook payload validation is documented in [WEBHOOK_DISPATCH_SCHEMA.md](WEBHOOK_DISPATCH_SCHEMA.md). The implementation keeps a source-controlled JSON Schema shape in `src/lib/webhook-dispatch-schema.ts` and validates the canonical outbound payload before posting.
 
 ## `.hermes/plans` Decision
 

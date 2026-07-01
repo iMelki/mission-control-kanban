@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Runtime dispatch hardening for [#33](https://github.com/iMelki/mission-control-kanban/issues/33): `task_dispatch_attempts` timeline storage, dispatch history API, Task modal dispatch timeline, safe webhook retry controls, webhook JSON Schema validation/docs, mock webhook/OpenClaw adapter tests, runtime filter chips, agent runtime audit summary, per-agent runtime health labels, reusable panel primitives, and responsive desktop/tablet/mobile smoke checks.
+- `npm run check:runtime-regressions` to run the changed-scope React Doctor gate plus runtime UI smoke from one local regression command.
+- `docs/WEBHOOK_DISPATCH_SCHEMA.md` documenting the canonical webhook payload, secret handling, and attempt timeline semantics.
 - Runtime-aware dispatch adapters for [#32](https://github.com/iMelki/mission-control-kanban/issues/32): agents now carry `runtime_type`, `runtime_config`, and `dispatch_enabled`; `/api/tasks/:id/dispatch` routes through `manual`, `openclaw`, and `webhook` adapters; manual dispatch returns copyable handoff prompts; webhook dispatch posts a canonical payload with env-var token indirection.
 - Agent modal runtime controls, Task modal handoff copy action, and task-card runtime badges so operators can see whether assignment means manual handoff, OpenClaw auto, webhook auto, or dispatch-off behavior.
 - `npm run smoke:runtime-ui` browser coverage for runtime controls, task-card runtime badges, handoff copy visibility, and browser-console cleanliness.

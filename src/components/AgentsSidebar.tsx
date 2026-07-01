@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Plus, ChevronLeft, ChevronRight, Zap, ZapOff, Loader2 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
-import type { Agent, AgentStatus, OpenClawSession } from '@/lib/types';
+import type { Agent, AgentRuntimeType, AgentStatus, OpenClawSession } from '@/lib/types';
+import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import { AgentModal } from './AgentModal';
 
 type FilterTab = 'all' | 'working' | 'standby';
@@ -159,6 +160,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
         ) : (
           <AgentsExpandedPanel
             agents={filteredAgents}
+            allAgents={agents}
             allAgentCount={agents.length}
             activeSubAgents={activeSubAgents}
             filter={filter}
@@ -240,6 +242,7 @@ function AgentsCollapsedRail({
 
 function AgentsExpandedPanel({
   agents,
+  allAgents,
   allAgentCount,
   activeSubAgents,
   filter,
@@ -253,6 +256,7 @@ function AgentsExpandedPanel({
   onConnectToOpenClaw,
 }: {
   agents: Agent[];
+  allAgents: Agent[];
   allAgentCount: number;
   activeSubAgents: number;
   filter: FilterTab;
@@ -270,6 +274,7 @@ function AgentsExpandedPanel({
       <AgentsPanelHeader
         activeSubAgents={activeSubAgents}
         agentCount={allAgentCount}
+        agents={allAgents}
         filter={filter}
         onCollapse={onCollapse}
         onFilterChange={onFilterChange}
@@ -300,15 +305,48 @@ function AgentsExpandedPanel({
   );
 }
 
+
+function getRuntimeAuditCounts(agents: Agent[]) {
+  const counts: Record<AgentRuntimeType | 'dispatch_off', number> = {
+    manual: 0,
+    openclaw: 0,
+    webhook: 0,
+    dispatch_off: 0,
+  };
+
+  for (const agent of agents) {
+    const runtime = resolveAgentRuntime(agent);
+    counts[runtime.requested_type] += 1;
+    if (runtime.reason) counts.dispatch_off += 1;
+  }
+
+  return counts;
+}
+
+function getRuntimeHealth(agent: Agent, openclawSession?: OpenClawSession | null) {
+  const runtime = resolveAgentRuntime(agent);
+  if (runtime.effective_type === 'manual') {
+    return { label: runtime.reason ? 'Manual / off' : 'Manual', className: 'bg-mc-bg text-mc-text-secondary border-mc-border' };
+  }
+  if (runtime.effective_type === 'openclaw') {
+    return openclawSession
+      ? { label: 'OpenClaw ready', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' }
+      : { label: 'OpenClaw link?', className: 'bg-amber-500/10 text-amber-300 border-amber-500/30' };
+  }
+  return { label: 'Webhook ready', className: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' };
+}
+
 function AgentsPanelHeader({
   activeSubAgents,
   agentCount,
+  agents,
   filter,
   onCollapse,
   onFilterChange,
 }: {
   activeSubAgents: number;
   agentCount: number;
+  agents: Agent[];
   filter: FilterTab;
   onCollapse: () => void;
   onFilterChange: (filter: FilterTab) => void;
@@ -342,6 +380,7 @@ function AgentsPanelHeader({
           </div>
         </div>
       )}
+      <RuntimeAuditSummary agents={agents} />
       <div className="flex gap-1">
         {(['all', 'working', 'standby'] as FilterTab[]).map((tab) => (
           <button
@@ -356,6 +395,25 @@ function AgentsPanelHeader({
             {tab}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+
+function RuntimeAuditSummary({ agents }: { agents: Agent[] }) {
+  const counts = getRuntimeAuditCounts(agents);
+  return (
+    <div className="mb-3 rounded-lg border border-mc-border/60 bg-mc-bg/70 p-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-mc-text-secondary">Runtime audit</span>
+        <span className="text-[10px] text-mc-text-secondary">post-migration</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1 text-[10px]">
+        <span className="rounded border border-mc-border/50 px-2 py-1 text-mc-text-secondary">Manual {counts.manual}</span>
+        <span className="rounded border border-emerald-500/30 px-2 py-1 text-emerald-300">OpenClaw {counts.openclaw}</span>
+        <span className="rounded border border-cyan-500/30 px-2 py-1 text-cyan-300">Webhook {counts.webhook}</span>
+        <span className="rounded border border-amber-500/30 px-2 py-1 text-amber-300">Off {counts.dispatch_off}</span>
       </div>
     </div>
   );
@@ -376,6 +434,9 @@ function AgentRow({
   onSelect: () => void;
   onConnectToOpenClaw: (e: React.MouseEvent) => void;
 }) {
+  const runtime = resolveAgentRuntime(agent);
+  const runtimeHealth = getRuntimeHealth(agent, openclawSession);
+
   return (
     <div
       className={`w-full rounded hover:bg-mc-bg-tertiary transition-colors ${
@@ -395,6 +456,14 @@ function AgentRow({
             {!!agent.is_master && <span className="text-xs text-mc-accent-yellow">★</span>}
           </div>
           <div className="text-xs text-mc-text-secondary truncate">{agent.role}</div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <span className={`rounded border px-2 py-0.5 text-[10px] ${runtimeHealth.className}`}>
+              {runtimeHealth.label}
+            </span>
+            <span className="rounded border border-mc-border/50 px-2 py-0.5 text-[10px] text-mc-text-secondary">
+              {AGENT_RUNTIME_LABELS[runtime.requested_type]}
+            </span>
+          </div>
         </div>
         <span className={`text-xs px-2 py-0.5 rounded uppercase ${getStatusBadge(agent.status)}`}>
           {agent.status}

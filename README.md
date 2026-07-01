@@ -2,7 +2,7 @@
 
 **AI Agent Orchestration Dashboard**
 
-Mission Control is a task management system that lets you create tasks, plan them through an AI-guided Q&A process, and dispatch them to AI agents for execution. Runtime dispatch is now adapter-based: manual agents get copyable handoff prompts, OpenClaw agents use the existing gateway/session path, and webhook agents receive canonical dispatch payloads. Think of it as a project manager for AI workers.
+Mission Control is a task management system that lets you create tasks, plan them through an AI-guided Q&A process, and dispatch them to AI agents for execution. Runtime dispatch is adapter-based: manual agents get copyable handoff prompts, OpenClaw agents use the existing gateway/session path, and webhook agents receive canonical dispatch payloads with schema validation, attempt history, and safe retry controls. Think of it as a project manager for AI workers.
 
 ![Version](https://img.shields.io/badge/Version-1.0.0-green) ![Next.js](https://img.shields.io/badge/Next.js-15-black) ![License](https://img.shields.io/badge/License-MIT-blue)
 

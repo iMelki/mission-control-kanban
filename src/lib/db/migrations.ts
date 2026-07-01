@@ -468,6 +468,35 @@ const migrations: Migration[] = [
         WHERE runtime_type IS NULL OR runtime_type = 'manual'
       `);
     }
+  },
+  {
+    id: '014',
+    name: 'add_task_dispatch_attempts',
+    up: (db) => {
+      console.log('[Migration 014] Adding task dispatch attempt timeline...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_dispatch_attempts (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          agent_id TEXT REFERENCES agents(id),
+          runtime_type TEXT NOT NULL CHECK (runtime_type IN ('manual', 'openclaw', 'webhook')),
+          adapter_name TEXT,
+          status TEXT NOT NULL CHECK (status IN ('manual', 'success', 'failed', 'timeout', 'skipped', 'retrying')),
+          attempt_number INTEGER NOT NULL DEFAULT 1,
+          message TEXT NOT NULL,
+          http_status INTEGER,
+          webhook_url TEXT,
+          error_message TEXT,
+          request_payload TEXT,
+          response_body TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_task ON task_dispatch_attempts(task_id, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_status ON task_dispatch_attempts(status, created_at DESC)');
+    }
   }
 ];
 

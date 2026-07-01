@@ -9,6 +9,7 @@ import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { AgentModal } from './AgentModal';
 import { GitHubWritebackPanel } from './GitHubWritebackPanel';
+import { DispatchTimeline } from './DispatchTimeline';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
 import {
@@ -733,6 +734,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 }}
               />
             )}
+
+            {currentTask && <DispatchTimeline taskId={currentTask.id} />}
           </div>
             </form>
           )}

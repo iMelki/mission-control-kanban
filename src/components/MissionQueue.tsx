@@ -12,7 +12,7 @@ import {
   validateDispatchMetadata,
 } from '@/lib/dispatch-contract';
 import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes';
-import type { Task, TaskStatus } from '@/lib/types';
+import type { AgentRuntimeType, Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
 import { GitHubConnectionStatus } from './GitHubConnectionStatus';
@@ -22,6 +22,16 @@ import { formatDistanceToNow } from 'date-fns';
 interface MissionQueueProps {
   workspaceId?: string;
 }
+
+type RuntimeFilter = 'all' | AgentRuntimeType | 'dispatch_off';
+
+const RUNTIME_FILTERS: { id: RuntimeFilter; label: string }[] = [
+  { id: 'all', label: 'All runtimes' },
+  { id: 'manual', label: 'Manual' },
+  { id: 'openclaw', label: 'OpenClaw' },
+  { id: 'webhook', label: 'Webhook' },
+  { id: 'dispatch_off', label: 'Dispatch off' },
+];
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: 'planning', label: '📋 PLANNING', color: 'border-t-mc-accent-purple' },
@@ -39,6 +49,7 @@ interface MissionQueueUiState {
   editingTask: Task | null;
   draggedTask: Task | null;
   dropError: string | null;
+  runtimeFilter: RuntimeFilter;
 }
 
 type MissionQueueUiAction =
@@ -50,7 +61,8 @@ type MissionQueueUiAction =
   | { type: 'clear_editing_task' }
   | { type: 'drag_task'; task: Task }
   | { type: 'clear_dragged_task' }
-  | { type: 'set_drop_error'; error: string | null };
+  | { type: 'set_drop_error'; error: string | null }
+  | { type: 'set_runtime_filter'; filter: RuntimeFilter };
 
 const initialMissionQueueUiState: MissionQueueUiState = {
   showCreateModal: false,
@@ -58,6 +70,7 @@ const initialMissionQueueUiState: MissionQueueUiState = {
   editingTask: null,
   draggedTask: null,
   dropError: null,
+  runtimeFilter: 'all',
 };
 
 function missionQueueUiReducer(
@@ -83,6 +96,8 @@ function missionQueueUiReducer(
       return { ...state, draggedTask: null };
     case 'set_drop_error':
       return { ...state, dropError: action.error };
+    case 'set_runtime_filter':
+      return { ...state, runtimeFilter: action.filter };
     default:
       return state;
   }
@@ -100,11 +115,21 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     editingTask,
     draggedTask,
     dropError,
+    runtimeFilter,
   } = uiState;
-  const blockedInboxTasks = tasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0);
 
+
+  const matchesRuntimeFilter = (task: Task) => {
+    if (runtimeFilter === 'all') return true;
+    const runtime = resolveAgentRuntime(task.assigned_agent);
+    if (runtimeFilter === 'dispatch_off') return Boolean(runtime.reason);
+    return runtime.requested_type === runtimeFilter || runtime.effective_type === runtimeFilter;
+  };
+
+  const visibleTasks = tasks.filter(matchesRuntimeFilter);
+  const blockedInboxTasks = visibleTasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0);
   const getTasksByStatus = (status: TaskStatus) =>
-    tasks.filter((task) => task.status === status);
+    visibleTasks.filter((task) => task.status === status);
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     dispatchUi({ type: 'drag_task', task });
@@ -212,6 +237,27 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       </div>
 
       <GitHubReadinessCard />
+
+      <div className="mx-3 mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-mc-border/60 bg-mc-bg-secondary/60 px-3 py-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-mc-text-secondary">Runtime filter</span>
+        {RUNTIME_FILTERS.map((filterOption) => (
+          <button
+            key={filterOption.id}
+            type="button"
+            onClick={() => dispatchUi({ type: 'set_runtime_filter', filter: filterOption.id })}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+              runtimeFilter === filterOption.id
+                ? 'border-mc-accent bg-mc-accent/20 text-mc-accent'
+                : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
+            }`}
+          >
+            {filterOption.label}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-mc-text-secondary">
+          Showing {visibleTasks.length}/{tasks.length}
+        </span>
+      </div>
 
       {blockedInboxTasks.length > 0 && (
         <div className="mx-3 mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">

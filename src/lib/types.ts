@@ -37,7 +37,28 @@ export type EventType =
   | 'agent_status_changed'
   | 'agent_joined'
   | 'task_dispatched'
+  | 'task_dispatch_failed'
+  | 'task_dispatch_retry'
   | 'system';
+
+export type DispatchAttemptStatus = 'manual' | 'success' | 'failed' | 'timeout' | 'skipped' | 'retrying';
+
+export interface TaskDispatchAttempt {
+  id: string;
+  task_id: string;
+  agent_id?: string | null;
+  runtime_type: AgentRuntimeType;
+  adapter_name?: string | null;
+  status: DispatchAttemptStatus;
+  attempt_number: number;
+  message: string;
+  http_status?: number | null;
+  webhook_url?: string | null;
+  error_message?: string | null;
+  request_payload?: string | null;
+  response_body?: string | null;
+  created_at: string;
+}
 
 export interface Agent {
   id: string;

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, run } from '@/lib/db';
+import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
 import { getOpenClawClient } from '@/lib/openclaw/client';
@@ -15,7 +15,8 @@ import {
   parseAgentRuntimeConfig,
   resolveAgentRuntime,
 } from '@/lib/agent-runtimes';
-import type { Agent, AgentRuntimeType, OpenClawSession, Task } from '@/lib/types';
+import { validateWebhookDispatchPayload } from '@/lib/webhook-dispatch-schema';
+import type { Agent, AgentRuntimeType, DispatchAttemptStatus, OpenClawSession, Task, TaskDispatchAttempt } from '@/lib/types';
 
 type TaskDispatchRow = Omit<Task, 'dispatch_metadata' | 'github_source' | 'assigned_agent'> & {
   dispatch_metadata?: string | null;
@@ -28,6 +29,26 @@ type TaskDispatchRow = Omit<Task, 'dispatch_metadata' | 'github_source' | 'assig
 
 const DEFAULT_WEBHOOK_TIMEOUT_MS = 30_000;
 const MAX_WEBHOOK_TIMEOUT_MS = 120_000;
+const MIN_WEBHOOK_TIMEOUT_MS = 100;
+
+export interface DispatchOptions {
+  retry?: boolean;
+}
+
+interface RecordDispatchAttemptInput {
+  task: Task;
+  agent: Agent;
+  runtimeType: AgentRuntimeType;
+  status: DispatchAttemptStatus;
+  message: string;
+  now: string;
+  adapterName?: string;
+  httpStatus?: number | null;
+  webhookUrl?: string | null;
+  errorMessage?: string | null;
+  requestPayload?: unknown;
+  responseBody?: string | null;
+}
 
 function redactUrlForResponse(rawUrl: string) {
   try {
@@ -44,7 +65,82 @@ function getWebhookTimeoutMs(config: ReturnType<typeof parseAgentRuntimeConfig>)
   if (!Number.isFinite(numeric) || numeric <= 0) {
     return DEFAULT_WEBHOOK_TIMEOUT_MS;
   }
-  return Math.min(Math.max(1_000, Math.floor(numeric)), MAX_WEBHOOK_TIMEOUT_MS);
+  return Math.min(Math.max(MIN_WEBHOOK_TIMEOUT_MS, Math.floor(numeric)), MAX_WEBHOOK_TIMEOUT_MS);
+}
+
+function nextAttemptNumber(taskId: string) {
+  const latest = queryOne<{ attempt_number: number }>(
+    'SELECT attempt_number FROM task_dispatch_attempts WHERE task_id = ? ORDER BY attempt_number DESC LIMIT 1',
+    [taskId]
+  );
+  return (latest?.attempt_number ?? 0) + 1;
+}
+
+function safeJsonStringify(value: unknown) {
+  if (value === undefined) return null;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return JSON.stringify({ error: 'Payload could not be serialized for audit' });
+  }
+}
+
+function recordDispatchAttempt({
+  task,
+  agent,
+  runtimeType,
+  status,
+  message,
+  now,
+  adapterName,
+  httpStatus,
+  webhookUrl,
+  errorMessage,
+  requestPayload,
+  responseBody,
+}: RecordDispatchAttemptInput) {
+  run(
+    `INSERT INTO task_dispatch_attempts (
+      id, task_id, agent_id, runtime_type, adapter_name, status, attempt_number,
+      message, http_status, webhook_url, error_message, request_payload, response_body, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      uuidv4(),
+      task.id,
+      agent.id,
+      runtimeType,
+      adapterName ?? runtimeType,
+      status,
+      nextAttemptNumber(task.id),
+      message,
+      httpStatus ?? null,
+      webhookUrl ?? null,
+      errorMessage ?? null,
+      requestPayload ? safeJsonStringify(requestPayload) : null,
+      responseBody ?? null,
+      now,
+    ]
+  );
+}
+
+export function getDispatchAttempts(taskId: string, limit = 20): TaskDispatchAttempt[] {
+  return queryAll<TaskDispatchAttempt>(
+    `SELECT * FROM task_dispatch_attempts
+     WHERE task_id = ?
+     ORDER BY attempt_number DESC, created_at DESC
+     LIMIT ?`,
+    [taskId, limit]
+  );
+}
+
+function getLatestDispatchAttempt(taskId: string): TaskDispatchAttempt | undefined {
+  return queryOne<TaskDispatchAttempt>(
+    `SELECT * FROM task_dispatch_attempts
+     WHERE task_id = ?
+     ORDER BY attempt_number DESC, created_at DESC
+     LIMIT 1`,
+    [taskId]
+  );
 }
 
 export interface DispatchResult {
@@ -195,6 +291,15 @@ async function dispatchManual(task: Task, agent: Agent, reason?: string): Promis
   });
 
   logManualHandoff(task, agent, reason, handoffPrompt, now);
+  recordDispatchAttempt({
+    task,
+    agent,
+    runtimeType: 'manual',
+    status: 'manual',
+    message: 'Manual handoff prompt generated; no runtime auto-launch was attempted.',
+    now,
+    adapterName: 'manual',
+  });
 
   return {
     success: true,
@@ -212,11 +317,22 @@ async function dispatchManual(task: Task, agent: Agent, reason?: string): Promis
 
 async function dispatchOpenClaw(task: Task, agent: Agent): Promise<DispatchResult> {
   const client = getOpenClawClient();
+  const now = new Date().toISOString();
   if (!client.isConnected()) {
     try {
       await client.connect();
     } catch (err) {
       console.error('Failed to connect to OpenClaw Gateway:', err);
+      recordDispatchAttempt({
+        task,
+        agent,
+        runtimeType: 'openclaw',
+        status: 'failed',
+        message: 'OpenClaw adapter could not connect to the gateway.',
+        now,
+        adapterName: 'openclaw',
+        errorMessage: err instanceof Error ? err.message : 'Unknown error',
+      });
       throw new DispatchAdapterError('Failed to connect to OpenClaw Gateway', 503);
     }
   }
@@ -225,8 +341,6 @@ async function dispatchOpenClaw(task: Task, agent: Agent): Promise<DispatchResul
     'SELECT * FROM openclaw_sessions WHERE agent_id = ? AND status = ?',
     [agent.id, 'active']
   );
-
-  const now = new Date().toISOString();
 
   if (!session) {
     const sessionId = uuidv4();
@@ -276,13 +390,33 @@ async function dispatchOpenClaw(task: Task, agent: Agent): Promise<DispatchResul
     });
   } catch (err) {
     console.error('Failed to send message to OpenClaw agent:', err);
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    recordDispatchAttempt({
+      task,
+      agent,
+      runtimeType: 'openclaw',
+      status: 'failed',
+      message: 'OpenClaw adapter failed while sending the task handoff.',
+      now,
+      adapterName: 'openclaw',
+      errorMessage,
+    });
     throw new DispatchAdapterError(
-      `Failed to send task to OpenClaw agent: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      `Failed to send task to OpenClaw agent: ${errorMessage}`,
       500
     );
   }
 
   markTaskDispatched(task, agent, 'openclaw', `Task "${task.title}" dispatched to ${agent.name} via OpenClaw`, now);
+  recordDispatchAttempt({
+    task,
+    agent,
+    runtimeType: 'openclaw',
+    status: 'success',
+    message: `Task "${task.title}" dispatched to ${agent.name} via OpenClaw`,
+    now,
+    adapterName: 'openclaw',
+  });
 
   return {
     success: true,
@@ -307,6 +441,24 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
   const missionControlUrl = getMissionControlUrl();
   const projectsPath = getProjectsPath();
   const payload = buildWebhookDispatchPayload(task, agent, missionControlUrl, now, projectsPath);
+  const payloadValidation = validateWebhookDispatchPayload(payload);
+  if (!payloadValidation.valid) {
+    recordDispatchAttempt({
+      task,
+      agent,
+      runtimeType: 'webhook',
+      status: 'failed',
+      message: 'Webhook dispatch payload failed local JSON Schema validation.',
+      now,
+      adapterName: 'webhook',
+      errorMessage: payloadValidation.errors.join('; '),
+      requestPayload: payload,
+      webhookUrl: redactUrlForResponse(webhookUrl),
+    });
+    throw new DispatchAdapterError('Webhook dispatch payload failed schema validation', 500, {
+      validation_errors: payloadValidation.errors,
+    });
+  }
   const headers = buildWebhookHeaders(config, process.env);
   const timeoutMs = getWebhookTimeoutMs(config);
   const controller = new AbortController();
@@ -323,10 +475,23 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
   } catch (err) {
     console.error('Webhook dispatch failed:', err);
     const wasAbort = err instanceof Error && err.name === 'AbortError';
+    const errorMessage = wasAbort
+      ? `Webhook dispatch timed out after ${timeoutMs}ms`
+      : `Webhook dispatch failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+    recordDispatchAttempt({
+      task,
+      agent,
+      runtimeType: 'webhook',
+      status: wasAbort ? 'timeout' : 'failed',
+      message: wasAbort ? 'Webhook dispatch timed out.' : 'Webhook dispatch failed before receiving a response.',
+      now,
+      adapterName: 'webhook',
+      webhookUrl: redactUrlForResponse(webhookUrl),
+      errorMessage,
+      requestPayload: payload,
+    });
     throw new DispatchAdapterError(
-      wasAbort
-        ? `Webhook dispatch timed out after ${timeoutMs}ms`
-        : `Webhook dispatch failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      errorMessage,
       wasAbort ? 504 : 502
     );
   } finally {
@@ -335,6 +500,20 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
 
   if (!response.ok) {
     const responseText = await response.text().catch(() => '');
+    recordDispatchAttempt({
+      task,
+      agent,
+      runtimeType: 'webhook',
+      status: 'failed',
+      message: `Webhook dispatch returned HTTP ${response.status}.`,
+      now,
+      adapterName: 'webhook',
+      httpStatus: response.status,
+      webhookUrl: redactUrlForResponse(webhookUrl),
+      errorMessage: response.statusText || `HTTP ${response.status}`,
+      requestPayload: payload,
+      responseBody: responseText.slice(0, 1000),
+    });
     throw new DispatchAdapterError(
       `Webhook dispatch returned HTTP ${response.status}`,
       502,
@@ -343,6 +522,18 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
   }
 
   markTaskDispatched(task, agent, 'webhook', `Task "${task.title}" dispatched to ${agent.name} via webhook`, now);
+  recordDispatchAttempt({
+    task,
+    agent,
+    runtimeType: 'webhook',
+    status: 'success',
+    message: `Task "${task.title}" dispatched to ${agent.name} via webhook`,
+    now,
+    adapterName: 'webhook',
+    httpStatus: response.status,
+    webhookUrl: redactUrlForResponse(webhookUrl),
+    requestPayload: payload,
+  });
 
   return {
     success: true,
@@ -357,7 +548,7 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
   };
 }
 
-export async function dispatchTaskToAssignedAgent(taskId: string): Promise<DispatchResult> {
+export async function dispatchTaskToAssignedAgent(taskId: string, options: DispatchOptions = {}): Promise<DispatchResult> {
   const task = loadTask(taskId);
   if (!task.assigned_agent_id) {
     throw new DispatchAdapterError('Task has no assigned agent', 400);
@@ -365,6 +556,16 @@ export async function dispatchTaskToAssignedAgent(taskId: string): Promise<Dispa
 
   const agent = loadAgent(task.assigned_agent_id);
   const resolved = resolveAgentRuntime(agent);
+
+  if (options.retry) {
+    const latestAttempt = getLatestDispatchAttempt(task.id);
+    if (resolved.effective_type !== 'webhook') {
+      throw new DispatchAdapterError('Only webhook dispatch attempts can be retried safely from MCK', 400);
+    }
+    if (!latestAttempt || !['failed', 'timeout'].includes(latestAttempt.status)) {
+      throw new DispatchAdapterError('No failed webhook dispatch attempt is available to retry', 409);
+    }
+  }
 
   if (resolved.effective_type === 'manual') {
     return dispatchManual(task, agent, resolved.reason);

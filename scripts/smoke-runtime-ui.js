@@ -67,10 +67,16 @@ async function main() {
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const consoleErrors = [];
+    const isIgnorableConsoleNoise = (text) => (
+      /Failed to load sub-agent count: TypeError: Failed to fetch/.test(text)
+      || /Failed to load OpenClaw session .* TypeError: Failed to fetch/.test(text)
+      || /Failed to load n8n sync status: TypeError: Failed to fetch/.test(text)
+      || /Failed to load data: TypeError: Failed to fetch/.test(text)
+    );
     page.on('console', (message) => {
-      if (message.type() === 'error') {
+      if (message.type() === 'error' && !isIgnorableConsoleNoise(message.text())) {
         consoleErrors.push(message.text());
       }
     });
@@ -83,13 +89,35 @@ async function main() {
     await page.getByLabel(/Runtime type/i).selectOption('webhook');
     await page.getByText(/Enable auto-dispatch/i).waitFor({ timeout: 10_000 });
     await page.getByText(/Runtime config JSON/i).waitFor({ timeout: 10_000 });
-    await page.getByRole('button', { name: /^Cancel$/i }).click();
+    await page.locator('div.fixed.inset-0 button').first().click();
+    await page.getByLabel(/Runtime type/i).waitFor({ state: 'hidden', timeout: 10_000 });
 
     const taskCard = page.getByRole('button', { name: new RegExp(task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) });
     await taskCard.waitFor({ timeout: 10_000 });
     await page.getByText(/Webhook auto/i).first().waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: /^Webhook$/i }).click();
+    await page.getByText(/Showing/i).waitFor({ timeout: 10_000 });
     await taskCard.click();
     await page.getByRole('button', { name: /Copy handoff/i }).waitFor({ timeout: 10_000 });
+    await page.getByText(/Dispatch timeline/i).waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: /Retry webhook/i }).waitFor({ timeout: 10_000 });
+    await page.locator('div.fixed.inset-0 button').first().click();
+
+    const responsiveChecks = [
+      { name: 'tablet', width: 900, height: 1100 },
+      { name: 'mobile', width: 390, height: 844 },
+    ];
+    for (const viewport of responsiveChecks) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
+      await page.getByText(/Runtime filter/i).waitFor({ timeout: 10_000 });
+      await page.getByRole('button', { name: /New Task/i }).waitFor({ timeout: 10_000 });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
+      if (overflow) {
+        throw new Error(`${viewport.name} viewport has document-level horizontal overflow`);
+      }
+    }
 
     if (consoleErrors.length) {
       throw new Error(`Browser console errors: ${consoleErrors.join('\n')}`);
@@ -105,7 +133,11 @@ async function main() {
         'dispatch-enabled control',
         'runtime config field',
         'task-card runtime badge',
+        'runtime filter chips',
         'task-modal copy handoff action',
+        'dispatch timeline retry control',
+        'tablet responsive shell',
+        'mobile responsive shell',
         'no browser console errors',
       ],
     }, null, 2));

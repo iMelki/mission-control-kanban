@@ -165,6 +165,24 @@ CREATE TABLE IF NOT EXISTS task_activities (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Dispatch attempt timeline (runtime adapter outcomes and retry trail)
+CREATE TABLE IF NOT EXISTS task_dispatch_attempts (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  agent_id TEXT REFERENCES agents(id),
+  runtime_type TEXT NOT NULL CHECK (runtime_type IN ('manual', 'openclaw', 'webhook')),
+  adapter_name TEXT,
+  status TEXT NOT NULL CHECK (status IN ('manual', 'success', 'failed', 'timeout', 'skipped', 'retrying')),
+  attempt_number INTEGER NOT NULL DEFAULT 1,
+  message TEXT NOT NULL,
+  http_status INTEGER,
+  webhook_url TEXT,
+  error_message TEXT,
+  request_payload TEXT,
+  response_body TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Task deliverables table (files, URLs, artifacts)
 CREATE TABLE IF NOT EXISTS task_deliverables (
   id TEXT PRIMARY KEY,
@@ -225,6 +243,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
 CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_task ON task_dispatch_attempts(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_status ON task_dispatch_attempts(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_deliverables_task ON task_deliverables(task_id);
 CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
