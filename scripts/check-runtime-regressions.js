@@ -99,7 +99,7 @@ async function main() {
   const startedAt = new Date().toISOString();
   const checks = [];
 
-  const reactDoctor = await run('npx', ['-y', 'react-doctor@latest', '.', '--verbose', '--scope', 'changed', '--blocking', 'warning']);
+  const reactDoctor = await run('node', ['scripts/run-react-doctor.js']);
   checks.push({ name: 'React Doctor changed-file gate', ok: reactDoctor.code === 0 });
 
   let server;

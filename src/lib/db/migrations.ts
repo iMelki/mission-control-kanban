@@ -520,7 +520,43 @@ const migrations: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_default_runtime ON workspaces(default_runtime_type, default_dispatch_enabled)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_runtime_status ON task_dispatch_attempts(runtime_type, status, created_at DESC)');
     }
-  }
+  },
+
+  {
+    id: '016',
+    name: 'add_webhook_callback_delivery_and_runtime_maintenance',
+    up: (db) => {
+      console.log('[Migration 016] Adding webhook callback replay and runtime maintenance tables...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS webhook_callback_deliveries (
+          id TEXT PRIMARY KEY,
+          delivery_id TEXT NOT NULL UNIQUE,
+          task_id TEXT,
+          attempt_id TEXT,
+          event_type TEXT NOT NULL DEFAULT 'unknown',
+          status TEXT NOT NULL CHECK (status IN ('accepted', 'duplicate', 'rejected', 'schema_invalid', 'signature_invalid')),
+          reason TEXT,
+          expires_at TEXT NOT NULL,
+          received_at TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_webhook_callback_deliveries_received ON webhook_callback_deliveries(received_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_webhook_callback_deliveries_expires ON webhook_callback_deliveries(expires_at);
+
+        CREATE TABLE IF NOT EXISTS runtime_maintenance_runs (
+          id TEXT PRIMARY KEY,
+          run_type TEXT NOT NULL,
+          dry_run INTEGER NOT NULL DEFAULT 1,
+          status TEXT NOT NULL CHECK (status IN ('success', 'failed')),
+          deleted_count INTEGER DEFAULT 0,
+          summary TEXT,
+          error_message TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_runtime_maintenance_runs_type ON runtime_maintenance_runs(run_type, created_at DESC);
+      `);
+    }
+  },
 ];
 
 /**

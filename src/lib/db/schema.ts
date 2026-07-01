@@ -186,6 +186,33 @@ CREATE TABLE IF NOT EXISTS task_dispatch_attempts (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+
+-- Inbound webhook callback delivery replay/idempotency trail
+CREATE TABLE IF NOT EXISTS webhook_callback_deliveries (
+  id TEXT PRIMARY KEY,
+  delivery_id TEXT NOT NULL UNIQUE,
+  task_id TEXT,
+  attempt_id TEXT,
+  event_type TEXT NOT NULL DEFAULT 'unknown',
+  status TEXT NOT NULL CHECK (status IN ('accepted', 'duplicate', 'rejected', 'schema_invalid', 'signature_invalid')),
+  reason TEXT,
+  expires_at TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Runtime maintenance runs, including dispatch-retention cleanup evidence
+CREATE TABLE IF NOT EXISTS runtime_maintenance_runs (
+  id TEXT PRIMARY KEY,
+  run_type TEXT NOT NULL,
+  dry_run INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL CHECK (status IN ('success', 'failed')),
+  deleted_count INTEGER DEFAULT 0,
+  summary TEXT,
+  error_message TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Task deliverables table (files, URLs, artifacts)
 CREATE TABLE IF NOT EXISTS task_deliverables (
   id TEXT PRIMARY KEY,
@@ -248,6 +275,9 @@ CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
 CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_task ON task_dispatch_attempts(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_status ON task_dispatch_attempts(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_webhook_callback_deliveries_received ON webhook_callback_deliveries(received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_webhook_callback_deliveries_expires ON webhook_callback_deliveries(expires_at);
+CREATE INDEX IF NOT EXISTS idx_runtime_maintenance_runs_type ON runtime_maintenance_runs(run_type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_deliverables_task ON task_deliverables(task_id);
 CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);

@@ -464,6 +464,11 @@ function AgentRow({
               {AGENT_RUNTIME_LABELS[runtime.requested_type]}
             </span>
           </div>
+          {runtime.reason && (
+            <div className="mt-1 rounded border border-amber-400/20 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-100">
+              Why off: {runtime.reason}
+            </div>
+          )}
         </div>
         <span className={`text-xs px-2 py-0.5 rounded uppercase ${getStatusBadge(agent.status)}`}>
           {agent.status}

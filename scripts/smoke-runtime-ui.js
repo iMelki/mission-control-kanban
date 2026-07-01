@@ -87,8 +87,12 @@ async function main() {
 
     fs.mkdirSync(artifactDir, { recursive: true });
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
+    await page.locator('nav[aria-label="Workspace sections"] button').filter({ hasText: 'Settings' }).click();
     await page.getByText(/Workspace runtime defaults/i).waitFor({ timeout: 10_000 });
     await page.screenshot({ path: path.join(artifactDir, 'desktop-runtime-workspace.png'), fullPage: true });
+    await page.locator('nav[aria-label="Workspace sections"] button').filter({ hasText: 'Board' }).click();
+    await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
 
     await page.getByRole('button', { name: /Add agent/i }).click();
     await page.getByLabel(/Runtime type/i).waitFor({ timeout: 10_000 });

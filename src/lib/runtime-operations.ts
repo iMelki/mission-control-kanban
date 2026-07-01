@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import type { AgentRuntimeType, DispatchAttemptStatus } from '@/lib/types';
 
@@ -88,6 +89,10 @@ export interface DispatchRetryBudgetResult {
 }
 
 const retryBuckets = new Map<string, number[]>();
+
+export function getDispatchRetryBudgetBucketCount() {
+  return retryBuckets.size;
+}
 
 export function checkDispatchRetryBudget({
   taskId,
@@ -180,5 +185,159 @@ export function getRuntimeHealthSummary() {
         reason: latestFailure.error_message ? latestFailure.error_message.slice(0, 160) : 'unknown',
       }
       : null,
+  };
+}
+
+
+export function recordRuntimeMaintenanceRun({
+  runType,
+  dryRun,
+  status,
+  deletedCount = 0,
+  summary,
+  errorMessage,
+}: {
+  runType: string;
+  dryRun: boolean;
+  status: 'success' | 'failed';
+  deletedCount?: number;
+  summary?: unknown;
+  errorMessage?: string;
+}) {
+  run(
+    `INSERT INTO runtime_maintenance_runs (id, run_type, dry_run, status, deleted_count, summary, error_message, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [uuidv4(), runType, dryRun ? 1 : 0, status, deletedCount, summary ? JSON.stringify(summary) : null, errorMessage || null, new Date().toISOString()]
+  );
+}
+
+export function pruneDispatchAttemptsWithAudit(options: Parameters<typeof pruneDispatchAttempts>[0] = {}) {
+  try {
+    const result = pruneDispatchAttempts(options);
+    recordRuntimeMaintenanceRun({
+      runType: 'dispatch_attempt_retention',
+      dryRun: result.dry_run,
+      status: 'success',
+      deletedCount: result.deleted,
+      summary: result,
+    });
+    return result;
+  } catch (error) {
+    recordRuntimeMaintenanceRun({
+      runType: 'dispatch_attempt_retention',
+      dryRun: options?.dryRun ?? true,
+      status: 'failed',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+export function getDispatchFailureQueue({ limit = 100, workspaceId }: { limit?: number; workspaceId?: string } = {}) {
+  const params: unknown[] = [];
+  let workspaceFilter = '';
+  if (workspaceId) {
+    workspaceFilter = 'AND t.workspace_id = ?';
+    params.push(workspaceId);
+  }
+  params.push(Math.min(Math.max(limit, 1), 250));
+  return queryAll<{
+    id: string;
+    task_id: string;
+    task_title: string;
+    workspace_id: string;
+    agent_id: string | null;
+    agent_name: string | null;
+    runtime_type: string;
+    status: string;
+    attempt_number: number;
+    message: string;
+    error_message: string | null;
+    http_status: number | null;
+    webhook_url: string | null;
+    created_at: string;
+  }>(
+    `SELECT d.id, d.task_id, t.title as task_title, t.workspace_id,
+            d.agent_id, a.name as agent_name, d.runtime_type, d.status,
+            d.attempt_number, d.message, d.error_message, d.http_status,
+            d.webhook_url, d.created_at
+     FROM task_dispatch_attempts d
+     LEFT JOIN tasks t ON t.id = d.task_id
+     LEFT JOIN agents a ON a.id = d.agent_id
+     WHERE d.status IN ('failed', 'timeout') ${workspaceFilter}
+     ORDER BY d.created_at DESC
+     LIMIT ?`,
+    params
+  );
+}
+
+export function getRuntimeAudit() {
+  const agents = queryAll<{
+    id: string;
+    name: string;
+    role: string;
+    runtime_type: string | null;
+    runtime_config: string | null;
+    dispatch_enabled: number | null;
+    workspace_id: string;
+    status: string;
+  }>('SELECT id, name, role, runtime_type, runtime_config, dispatch_enabled, workspace_id, status FROM agents ORDER BY workspace_id, name ASC');
+
+  const rows = agents.map((agent) => {
+    const runtimeType = agent.runtime_type === 'openclaw' || agent.runtime_type === 'webhook' ? agent.runtime_type : 'manual';
+    const dispatchEnabled = Boolean(agent.dispatch_enabled);
+    const needsConfig = runtimeType === 'webhook' && dispatchEnabled && !(agent.runtime_config || '').includes('webhook_url') && !(agent.runtime_config || '').includes('url');
+    const dispatchBlocked = runtimeType === 'manual' || !dispatchEnabled || needsConfig;
+    const recommended_action = needsConfig
+      ? 'add_webhook_url_env_config'
+      : runtimeType === 'manual'
+        ? 'manual_handoff_ok'
+        : !dispatchEnabled
+          ? 'enable_dispatch_when_operator_approved'
+          : 'none';
+    return {
+      ...agent,
+      runtime_type: runtimeType,
+      dispatch_enabled: dispatchEnabled,
+      needs_config: needsConfig,
+      dispatch_blocked: dispatchBlocked,
+      reason: needsConfig
+        ? 'Webhook dispatch is enabled but no webhook URL is configured.'
+        : runtimeType === 'manual'
+          ? 'Manual agents require copy/paste handoff.'
+          : !dispatchEnabled
+            ? 'Auto-dispatch is disabled for this agent.'
+            : 'Ready for runtime dispatch.',
+      recommended_action,
+    };
+  });
+
+  const summary = rows.reduce<Record<string, number>>((acc, row) => {
+    acc.total = (acc.total || 0) + 1;
+    acc[row.runtime_type] = (acc[row.runtime_type] || 0) + 1;
+    if (row.dispatch_blocked) acc.dispatch_blocked = (acc.dispatch_blocked || 0) + 1;
+    if (row.needs_config) acc.needs_config = (acc.needs_config || 0) + 1;
+    return acc;
+  }, {});
+
+  return { generated_at: new Date().toISOString(), summary, agents: rows };
+}
+
+export function applyRuntimeAuditMigration({ dryRun = true }: { dryRun?: boolean } = {}) {
+  const audit = getRuntimeAudit();
+  const updates = audit.agents.filter((agent) => !['manual', 'openclaw', 'webhook'].includes(agent.runtime_type) || agent.runtime_type === 'manual' && agent.dispatch_enabled);
+  if (!dryRun) {
+    for (const agent of updates) {
+      run(
+        'UPDATE agents SET runtime_type = ?, dispatch_enabled = ?, updated_at = ? WHERE id = ?',
+        ['manual', 0, new Date().toISOString(), agent.id]
+      );
+    }
+  }
+  return {
+    dry_run: dryRun,
+    candidates: updates.length,
+    applied: dryRun ? 0 : updates.length,
+    description: 'Normalize unsafe/unknown runtime states to manual handoff with dispatch disabled.',
   };
 }

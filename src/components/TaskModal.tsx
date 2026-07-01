@@ -498,7 +498,12 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             {assignedAgent && (
               <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-mc-border bg-mc-bg-secondary px-3 py-2 text-xs">
                 <span className="font-medium text-mc-text">Runtime: {assignedRuntime.label}</span>
-                {assignedRuntime.reason && <span className="text-mc-text-secondary">{assignedRuntime.reason}</span>}
+                {assignedRuntime.reason && (
+                  <details className="text-mc-text-secondary">
+                    <summary className="cursor-pointer text-amber-100">Why dispatch is disabled / manual</summary>
+                    <p className="mt-1 max-w-xl">{assignedRuntime.reason}. Assignment still tracks ownership; use Copy handoff unless this agent is configured for OpenClaw/webhook dispatch and auto-dispatch is enabled.</p>
+                  </details>
+                )}
                 <button
                   type="button"
                   onClick={handleCopyHandoffPrompt}

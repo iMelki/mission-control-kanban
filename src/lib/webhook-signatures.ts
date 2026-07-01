@@ -7,6 +7,7 @@ export interface WebhookSignatureInput {
   secret: string;
   timestamp: string | number;
   version?: 'v1';
+  deliveryId?: string;
 }
 
 export interface WebhookSignatureVerificationInput extends WebhookSignatureInput {
@@ -20,15 +21,26 @@ export interface WebhookSignatureVerificationResult {
   reason?: 'missing_signature' | 'missing_secret' | 'bad_timestamp' | 'stale_timestamp' | 'bad_signature';
 }
 
-export function buildWebhookSignatureBaseString({ rawBody, timestamp, version = 'v1' }: WebhookSignatureInput) {
+export function buildWebhookSignatureBaseString({ rawBody, timestamp, version = 'v1', deliveryId }: WebhookSignatureInput) {
+  if (deliveryId) {
+    return `${deliveryId}.${timestamp}.${rawBody}`;
+  }
   return `${version}.${timestamp}.${rawBody}`;
 }
 
 export function signWebhookPayload(input: WebhookSignatureInput) {
-  return `v1=${crypto
+  const prefix = input.deliveryId ? 'sha256' : 'v1';
+  return `${prefix}=${crypto
     .createHmac('sha256', input.secret)
     .update(buildWebhookSignatureBaseString(input), 'utf8')
     .digest('hex')}`;
+}
+
+function timingSafeTextEqual(actual: string, expected: string) {
+  const actualBuffer = Buffer.from(actual, 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  if (actualBuffer.length !== expectedBuffer.length) return false;
+  return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
 export function verifyWebhookSignature({
@@ -36,6 +48,7 @@ export function verifyWebhookSignature({
   secret,
   timestamp,
   signature,
+  deliveryId,
   nowMs = Date.now(),
   toleranceSeconds = DEFAULT_TOLERANCE_SECONDS,
 }: WebhookSignatureVerificationInput): WebhookSignatureVerificationResult {
@@ -49,14 +62,20 @@ export function verifyWebhookSignature({
   const ageSeconds = Math.abs(nowMs / 1000 - timestampSeconds);
   if (ageSeconds > toleranceSeconds) return { ok: false, reason: 'stale_timestamp' };
 
-  const expected = signWebhookPayload({ rawBody, secret, timestamp: timestampText });
-  const actualBuffer = Buffer.from(signature, 'utf8');
-  const expectedBuffer = Buffer.from(expected, 'utf8');
-  if (actualBuffer.length !== expectedBuffer.length) return { ok: false, reason: 'bad_signature' };
+  const expected = signWebhookPayload({ rawBody, secret, timestamp: timestampText, deliveryId });
+  if (timingSafeTextEqual(signature, expected)) {
+    return { ok: true };
+  }
 
-  return crypto.timingSafeEqual(actualBuffer, expectedBuffer)
-    ? { ok: true }
-    : { ok: false, reason: 'bad_signature' };
+  // Backward compatibility for bridge authors already using the pre-delivery-id v1 signature.
+  if (deliveryId) {
+    const legacyExpected = signWebhookPayload({ rawBody, secret, timestamp: timestampText });
+    if (timingSafeTextEqual(signature, legacyExpected)) {
+      return { ok: true };
+    }
+  }
+
+  return { ok: false, reason: 'bad_signature' };
 }
 
 export function buildSignedWebhookHeaders({
@@ -73,7 +92,8 @@ export function buildSignedWebhookHeaders({
   const timestampText = String(timestamp);
   return {
     'X-MCK-Timestamp': timestampText,
-    'X-MCK-Signature': signWebhookPayload({ rawBody, secret, timestamp: timestampText }),
+    'X-MCK-Signature': signWebhookPayload({ rawBody, secret, timestamp: timestampText, deliveryId }),
     'X-MCK-Delivery': deliveryId,
+    'X-MCK-Delivery-ID': deliveryId,
   };
 }

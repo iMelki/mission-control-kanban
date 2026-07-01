@@ -158,9 +158,29 @@ Migration `014_add_task_dispatch_attempts` creates `task_dispatch_attempts` for 
 
 `GET /api/tasks/:id/dispatch` returns this timeline. `POST /api/tasks/:id/dispatch` accepts `{ "retry": true }` only when the effective runtime is webhook and the latest attempt failed or timed out. Repeated webhook retries require `{ "confirm": true }` and are rate-limited per task/runtime so operators get an explicit duplicate-work warning instead of accidental replay loops.
 
+
+## Replay-Safe Callback Completion
+
+Migration `016_add_webhook_callback_delivery_and_runtime_maintenance` adds callback delivery replay tracking and retention-audit rows:
+
+- `webhook_callback_deliveries` stores signed callback `X-MCK-Delivery-ID` values with short retention so bridge redeliveries are idempotent and replay substitution is blocked.
+- `runtime_maintenance_runs` records retention cleanup dry-runs/applies for metrics and operator audit.
+
+Signed callbacks use `X-MCK-Delivery-ID`, `X-MCK-Timestamp`, and `X-MCK-Signature`. The HMAC base string is `<delivery-id>.<timestamp>.<raw-json-body>`. See [WEBHOOK_BRIDGE_CALLBACK_EXAMPLES.md](WEBHOOK_BRIDGE_CALLBACK_EXAMPLES.md) and `/api/schemas/webhook-callback-completion` for bridge-author examples.
+
+## Runtime Ops Admin Surfaces
+
+The workspace UI now has route-level section tabs for Board, Agents, Dispatch, Settings, and Activity. This follows the community pattern from shadcn/ReUI-style dashboard shells: keep generic tabs/tables/panels conventional, and reserve MCK-specific logic for runtime semantics.
+
+- Dispatch shows a global failure queue backed by `GET /api/dispatch-attempts`.
+- Agents/Settings expose runtime audit and safe normalization preview/apply via `/api/agents/runtime-audit`.
+- Settings exposes dispatch retention cleanup dry-run/apply controls.
+- Header runtime health badges call `/api/runtime/health` and show readiness without exposing raw endpoint values.
+- `/api/runtime/webhook-health-test` sends a signed non-task ping so operators can test bridge health without creating work.
+
 ## Runtime Health, Metrics, and Retention
 
-- `/metrics` and `/api/metrics` expose low-cardinality Prometheus text metrics for task counts, agent runtime counts, dispatch attempts, and secret-presence booleans without leaking values.
+- `/metrics` and `/api/metrics` expose low-cardinality Prometheus text metrics for task counts, agent runtime counts, dispatch attempts, retry-budget buckets, callback delivery outcomes, retention cleanup runs/deleted rows, and secret-presence booleans without leaking values.
 - `/api/runtime/health` exposes richer operator health counts and reason codes without tokens, raw webhook URLs, or full payload bodies.
 - `/api/dispatch-attempts/retention` runs the dispatch-attempt retention policy. Dry-run is the default; configured defaults keep success/manual rows for 30 days and failed/timeout rows for 90 days.
 - A daily Hermes cron job named **MCK runtime regression check** runs `npm run check:runtime-regressions` and reports results to the origin chat.

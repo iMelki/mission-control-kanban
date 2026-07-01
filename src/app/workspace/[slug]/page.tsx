@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lucide-react';
@@ -10,6 +10,9 @@ import { MissionQueue } from '@/components/MissionQueue';
 import { LiveFeed } from '@/components/LiveFeed';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { WorkspaceRuntimePolicyPanel } from '@/components/WorkspaceRuntimePolicyPanel';
+import { DispatchFailureQueue } from '@/components/DispatchFailureQueue';
+import { RuntimeAuditPanel } from '@/components/RuntimeAuditPanel';
+import { WorkspaceSectionTabs, type WorkspaceSection } from '@/components/workspace/WorkspaceSectionTabs';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
@@ -74,6 +77,31 @@ function formatSyncCadence(status: MckN8nSyncStatusResponse['latest']): string {
   return [schedule, timezone].filter(Boolean).join(' ') || 'configured schedule';
 }
 
+
+type WorkspacePageState = {
+  workspace: Workspace | null;
+  notFound: boolean;
+  githubSyncState: {
+    state: 'idle' | 'syncing' | 'success' | 'error';
+    message?: string;
+    statusNotes?: string[];
+  };
+  n8nSyncStatus: MckN8nSyncStatusResponse | null;
+  section: WorkspaceSection;
+};
+
+const initialWorkspacePageState: WorkspacePageState = {
+  workspace: null,
+  notFound: false,
+  githubSyncState: { state: 'idle' },
+  n8nSyncStatus: null,
+  section: 'board',
+};
+
+function workspacePageReducer(state: WorkspacePageState, patch: Partial<WorkspacePageState>): WorkspacePageState {
+  return { ...state, ...patch };
+}
+
 export default function WorkspacePage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -87,14 +115,13 @@ export default function WorkspacePage() {
     isLoading,
   } = useMissionControl();
 
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [githubSyncState, setGitHubSyncState] = useState<{
-    state: 'idle' | 'syncing' | 'success' | 'error';
-    message?: string;
-    statusNotes?: string[];
-  }>({ state: 'idle' });
-  const [n8nSyncStatus, setN8nSyncStatus] = useState<MckN8nSyncStatusResponse | null>(null);
+  const [pageState, setPageState] = useReducer(workspacePageReducer, initialWorkspacePageState);
+  const { workspace, notFound, githubSyncState, n8nSyncStatus, section } = pageState;
+  const setWorkspace = useCallback((nextWorkspace: Workspace | null) => setPageState({ workspace: nextWorkspace }), []);
+  const setNotFound = useCallback((nextNotFound: boolean) => setPageState({ notFound: nextNotFound }), []);
+  const setGitHubSyncState = useCallback((nextGitHubSyncState: WorkspacePageState['githubSyncState']) => setPageState({ githubSyncState: nextGitHubSyncState }), []);
+  const setN8nSyncStatus = useCallback((nextN8nSyncStatus: MckN8nSyncStatusResponse | null) => setPageState({ n8nSyncStatus: nextN8nSyncStatus }), []);
+  const setSection = useCallback((nextSection: WorkspaceSection) => setPageState({ section: nextSection }), []);
   const autoSyncedWorkspaceRef = useRef<string | null>(null);
 
   const loadWorkspaceTasks = useCallback(async (workspaceIdToLoad: string) => {
@@ -152,7 +179,7 @@ export default function WorkspacePage() {
         message: error instanceof Error ? error.message : 'GitHub Project refresh failed',
       });
     }
-  }, [loadWorkspaceTasks]);
+  }, [loadWorkspaceTasks, setGitHubSyncState]);
 
   const loadN8nSyncStatus = useCallback(async () => {
     try {
@@ -165,7 +192,7 @@ export default function WorkspacePage() {
     } catch (error) {
       console.error('Failed to load n8n sync status:', error);
     }
-  }, []);
+  }, [setN8nSyncStatus]);
 
   // Connect to SSE for real-time updates
   useSSE();
@@ -192,7 +219,7 @@ export default function WorkspacePage() {
     }
 
     loadWorkspace();
-  }, [slug, setIsLoading]);
+  }, [slug, setIsLoading, setNotFound, setWorkspace]);
 
   // Load workspace-specific data
   useEffect(() => {
@@ -364,7 +391,8 @@ export default function WorkspacePage() {
   return (
     <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
       <Header workspace={workspace} />
-      <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />
+      <WorkspaceSectionTabs section={section} onSectionChange={setSection} />
+      {section === 'settings' && <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />}
 
       {workspace.github_project_owner && workspace.github_project_number && (
         <div className="border-b border-mc-border bg-mc-bg-secondary px-4 py-2">
@@ -395,7 +423,7 @@ export default function WorkspacePage() {
                   <AlertTriangle className="size-4 mt-0.5 shrink-0" />
                   <div className="space-y-0.5">
                     <span className="block">GitHub/MCK status reconciliation is visible for this sync.</span>
-                    {githubSyncState.statusNotes.map((note) => (
+                    {githubSyncState.statusNotes.map((note: string) => (
                       <span key={note} className="block text-xs text-amber-100/90">{note}</span>
                     ))}
                   </div>
@@ -436,15 +464,36 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Agents Sidebar */}
-        <AgentsSidebar workspaceId={workspace.id} />
-
-        {/* Main Content Area */}
-        <MissionQueue workspaceId={workspace.id} />
-
-        {/* Live Feed */}
-        <LiveFeed />
+      <div className="flex-1 overflow-hidden">
+        {section === 'board' && (
+          <div className="flex h-full overflow-hidden">
+            <AgentsSidebar workspaceId={workspace.id} />
+            <MissionQueue workspaceId={workspace.id} />
+            <LiveFeed />
+          </div>
+        )}
+        {section === 'agents' && (
+          <div className="flex h-full overflow-hidden">
+            <AgentsSidebar workspaceId={workspace.id} />
+            <div className="flex-1 overflow-auto p-4">
+              <RuntimeAuditPanel />
+            </div>
+          </div>
+        )}
+        {section === 'dispatch' && <DispatchFailureQueue workspaceId={workspace.id} />}
+        {section === 'settings' && (
+          <div className="h-full overflow-auto p-4">
+            <RuntimeAuditPanel />
+          </div>
+        )}
+        {section === 'activity' && (
+          <div className="flex h-full overflow-hidden">
+            <div className="flex-1 overflow-auto p-4">
+              <DispatchFailureQueue workspaceId={workspace.id} />
+            </div>
+            <LiveFeed />
+          </div>
+        )}
       </div>
 
       {/* Debug Panel - only shows when debug mode enabled */}

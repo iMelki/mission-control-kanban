@@ -1,0 +1,39 @@
+name: Runtime Regression
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  runtime-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run runtime regression checks
+        env:
+          MCK_SMOKE_ARTIFACT_DIR: artifacts/runtime-ui-smoke/ci
+        run: npm run check:runtime-regressions
+      - name: Upload runtime smoke artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mck-runtime-ui-smoke
+          path: |
+            artifacts/runtime-ui-smoke/**
+            playwright-report/**
+            test-results/**
+          if-no-files-found: ignore
+          retention-days: 14

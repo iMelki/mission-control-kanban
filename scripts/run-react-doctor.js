@@ -2,7 +2,7 @@ const { spawnSync } = require("child_process");
 const path = require("path");
 
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
-const MIN_SCORE = 95;
+const MIN_SCORE = 100;
 const repoRoot = path.resolve(__dirname, "..");
 
 console.log("Running React Doctor for mission-control-kanban...");
@@ -38,6 +38,7 @@ if (/No source files found\.|No staged source files found\./i.test(normalizedOut
 
 if (/No issues found!/i.test(normalizedOutput)) {
   console.log("\nReact Doctor found no changed-scope issues.");
+  console.log("React Doctor Local Score: 100/100 (changed-scope, no diagnostics)");
   process.exit(result.status ?? 0);
 }
 

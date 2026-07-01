@@ -7,8 +7,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Settings, Save, RotateCcw, Home, FolderOpen, Link as LinkIcon } from 'lucide-react';
+import { Settings, Save, RotateCcw, FolderOpen, Link as LinkIcon } from 'lucide-react';
 import { getConfig, updateConfig, resetConfig, type MissionControlConfig } from '@/lib/config';
+import { RuntimeOpsSettings } from '@/components/RuntimeOpsSettings';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -203,6 +204,8 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+
+        <RuntimeOpsSettings />
 
         {/* Environment Variables Note */}
         <section className="p-6 bg-blue-500/10 border border-blue-500/30 rounded-lg">

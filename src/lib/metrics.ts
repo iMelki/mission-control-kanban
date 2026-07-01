@@ -1,4 +1,5 @@
 import { queryAll, queryOne } from '@/lib/db';
+import { getDispatchRetryBudgetBucketCount } from '@/lib/runtime-operations';
 
 function promEscape(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -54,6 +55,45 @@ export function buildMckMetricsText() {
   lines.push('# HELP mck_webhook_agents_missing_config Webhook agents enabled for dispatch without a configured URL.');
   lines.push('# TYPE mck_webhook_agents_missing_config gauge');
   lines.push(`mck_webhook_agents_missing_config ${pendingWebhookConfig}`);
+
+
+  lines.push('# HELP mck_dispatch_retry_budget_active Runtime retry budget buckets visible in-process for duplicate-work protection.');
+  lines.push('# TYPE mck_dispatch_retry_budget_active gauge');
+  lines.push(`mck_dispatch_retry_budget_active ${getDispatchRetryBudgetBucketCount()}`);
+
+  lines.push('# HELP mck_webhook_callback_deliveries_total Inbound callback delivery rows by verification/replay status and event type.');
+  lines.push('# TYPE mck_webhook_callback_deliveries_total gauge');
+  const deliveryCounts = queryAll<{ status: string; event_type: string; count: number }>(
+    'SELECT status, event_type, COUNT(*) as count FROM webhook_callback_deliveries GROUP BY status, event_type'
+  );
+  for (const row of deliveryCounts) {
+    lines.push(line('mck_webhook_callback_deliveries_total', {
+      status: row.status || 'unknown',
+      event_type: row.event_type || 'unknown',
+    }, row.count));
+  }
+
+  lines.push('# HELP mck_retention_cleanup_runs_total Runtime retention cleanup runs by type/status/dry-run mode.');
+  lines.push('# TYPE mck_retention_cleanup_runs_total gauge');
+  const cleanupRuns = queryAll<{ run_type: string; dry_run: number; status: string; count: number }>(
+    'SELECT run_type, dry_run, status, COUNT(*) as count FROM runtime_maintenance_runs GROUP BY run_type, dry_run, status'
+  );
+  for (const row of cleanupRuns) {
+    lines.push(line('mck_retention_cleanup_runs_total', {
+      run_type: row.run_type || 'unknown',
+      dry_run: row.dry_run ? 'true' : 'false',
+      status: row.status || 'unknown',
+    }, row.count));
+  }
+
+  lines.push('# HELP mck_retention_cleanup_deleted_records_total Runtime retention cleanup deleted row count by run type.');
+  lines.push('# TYPE mck_retention_cleanup_deleted_records_total gauge');
+  const cleanupDeleted = queryAll<{ run_type: string; deleted: number }>(
+    'SELECT run_type, SUM(deleted_count) as deleted FROM runtime_maintenance_runs GROUP BY run_type'
+  );
+  for (const row of cleanupDeleted) {
+    lines.push(line('mck_retention_cleanup_deleted_records_total', { run_type: row.run_type || 'unknown' }, row.deleted || 0));
+  }
 
   lines.push('# HELP mck_runtime_secret_configured Runtime secret presence flags; values are booleans as 0/1, never secret values.');
   lines.push('# TYPE mck_runtime_secret_configured gauge');
