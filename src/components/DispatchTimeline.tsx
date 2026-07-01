@@ -71,12 +71,17 @@ export function DispatchTimeline({ taskId }: DispatchTimelineProps) {
 
   const handleRetry = async () => {
     if (!canRetryWebhook) return;
+    const repeatedRetry = latest.attempt_number > 1;
+    const confirmRetry = repeatedRetry
+      ? window.confirm('Retry this webhook dispatch again? This can duplicate downstream work if the bridge already accepted it.')
+      : true;
+    if (!confirmRetry) return;
     setRetryState('retrying');
     try {
       const response = await fetch(`/api/tasks/${taskId}/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retry: true }),
+        body: JSON.stringify({ retry: true, confirm: repeatedRetry }),
       });
       if (!response.ok) throw new Error(`Retry failed with HTTP ${response.status}`);
       setRetryState('idle');

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
-import type { Agent, CreateAgentRequest } from '@/lib/types';
+import type { Agent, CreateAgentRequest, Workspace } from '@/lib/types';
 import { normalizeAgentForResponse, runtimeInputToDb } from '@/lib/agent-api';
+import { resolveAgentRuntimeDefaults } from '@/lib/agent-runtimes';
 
 // GET /api/agents - List all agents
 export async function GET(request: NextRequest) {
@@ -38,7 +39,10 @@ export async function POST(request: NextRequest) {
     const id = uuidv4();
     const now = new Date().toISOString();
 
-    const runtime = runtimeInputToDb(body);
+    const workspaceId = (body as { workspace_id?: string }).workspace_id || 'default';
+    const workspace = queryOne<Workspace>('SELECT * FROM workspaces WHERE id = ? OR slug = ?', [workspaceId, workspaceId]);
+    const runtimeDefaults = resolveAgentRuntimeDefaults(body, workspace);
+    const runtime = runtimeInputToDb(runtimeDefaults);
 
     run(
       `INSERT INTO agents (id, name, role, description, avatar_emoji, is_master, runtime_type, runtime_config, dispatch_enabled, workspace_id, soul_md, user_md, agents_md, created_at, updated_at)
@@ -53,7 +57,7 @@ export async function POST(request: NextRequest) {
         runtime.runtime_type,
         runtime.runtime_config,
         runtime.dispatch_enabled,
-        (body as { workspace_id?: string }).workspace_id || 'default',
+        workspace?.id || workspaceId,
         body.soul_md || null,
         body.user_md || null,
         body.agents_md || null,

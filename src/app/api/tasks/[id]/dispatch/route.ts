@@ -36,7 +36,10 @@ export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
-    const result = await dispatchTaskToAssignedAgent(id, { retry: Boolean(body.retry) });
+    const result = await dispatchTaskToAssignedAgent(id, {
+      retry: Boolean(body.retry),
+      confirm: Boolean(body.confirm),
+    });
     return NextResponse.json(result);
   } catch (error) {
     console.error('Failed to dispatch task:', error);

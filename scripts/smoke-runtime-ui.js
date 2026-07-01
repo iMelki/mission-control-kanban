@@ -1,8 +1,11 @@
 const { chromium } = require('playwright');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const baseUrl = process.env.MCK_SMOKE_URL || 'http://127.0.0.1:3021';
-const workspaceSlug = process.env.MCK_SMOKE_WORKSPACE || 'assistants';
+const workspaceSlug = process.env.MCK_SMOKE_WORKSPACE || 'default';
 const workspaceUrl = `${baseUrl.replace(/\/$/, '')}/workspace/${workspaceSlug}`;
+const artifactDir = process.env.MCK_SMOKE_ARTIFACT_DIR || path.join(process.cwd(), 'artifacts', 'runtime-ui-smoke', String(Date.now()));
 
 async function requestJson(path, init) {
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
@@ -82,19 +85,22 @@ async function main() {
     });
     page.on('pageerror', (error) => consoleErrors.push(error.message));
 
+    fs.mkdirSync(artifactDir, { recursive: true });
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.getByText(/Workspace runtime defaults/i).waitFor({ timeout: 10_000 });
+    await page.screenshot({ path: path.join(artifactDir, 'desktop-runtime-workspace.png'), fullPage: true });
 
     await page.getByRole('button', { name: /Add agent/i }).click();
     await page.getByLabel(/Runtime type/i).waitFor({ timeout: 10_000 });
     await page.getByLabel(/Runtime type/i).selectOption('webhook');
     await page.getByText(/Enable auto-dispatch/i).waitFor({ timeout: 10_000 });
-    await page.getByText(/Runtime config JSON/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/^Runtime config JSON$/i).waitFor({ timeout: 10_000 });
     await page.locator('div.fixed.inset-0 button').first().click();
     await page.getByLabel(/Runtime type/i).waitFor({ state: 'hidden', timeout: 10_000 });
 
     const taskCard = page.getByRole('button', { name: new RegExp(task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) });
     await taskCard.waitFor({ timeout: 10_000 });
-    await page.getByText(/Webhook auto/i).first().waitFor({ timeout: 10_000 });
+    await taskCard.getByText(/Webhook auto/i).waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: /^Webhook$/i }).click();
     await page.getByText(/Showing/i).waitFor({ timeout: 10_000 });
     await taskCard.click();
@@ -113,6 +119,7 @@ async function main() {
       await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
       await page.getByText(/Runtime filter/i).waitFor({ timeout: 10_000 });
       await page.getByRole('button', { name: /New Task/i }).waitFor({ timeout: 10_000 });
+      await page.screenshot({ path: path.join(artifactDir, `${viewport.name}-runtime-workspace.png`), fullPage: true });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
       if (overflow) {
         throw new Error(`${viewport.name} viewport has document-level horizontal overflow`);
@@ -128,6 +135,12 @@ async function main() {
       workspaceUrl,
       agent_id: agent.id,
       task_id: task.id,
+      artifact_dir: artifactDir,
+      screenshots: [
+        path.join(artifactDir, 'desktop-runtime-workspace.png'),
+        path.join(artifactDir, 'tablet-runtime-workspace.png'),
+        path.join(artifactDir, 'mobile-runtime-workspace.png'),
+      ],
       checks: [
         'agent modal runtime selector',
         'dispatch-enabled control',

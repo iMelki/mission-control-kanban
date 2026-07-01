@@ -2,7 +2,7 @@
 
 **AI Agent Orchestration Dashboard**
 
-Mission Control is a task management system that lets you create tasks, plan them through an AI-guided Q&A process, and dispatch them to AI agents for execution. Runtime dispatch is adapter-based: manual agents get copyable handoff prompts, OpenClaw agents use the existing gateway/session path, and webhook agents receive canonical dispatch payloads with schema validation, attempt history, and safe retry controls. Think of it as a project manager for AI workers.
+Mission Control is a task management system that lets you create tasks, plan them through an AI-guided Q&A process, and dispatch them to AI agents for execution. Runtime dispatch is adapter-based: manual agents get copyable handoff prompts, OpenClaw agents use the existing gateway/session path, and webhook agents receive canonical dispatch payloads with schema validation, attempt history, safe retry controls, HMAC signing support, runtime-health reporting, and workspace-level default runtime policy. Think of it as a project manager for AI workers.
 
 ![Version](https://img.shields.io/badge/Version-1.0.0-green) ![Next.js](https://img.shields.io/badge/Next.js-15-black) ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -115,6 +115,16 @@ OPENCLAW_GATEWAY_TOKEN=your-openclaw-token-here
 
 # Workspace default port for Mission Control Kanban
 PORT=3021
+
+# Optional webhook runtime signing (store env-var names in agent config, never raw secrets)
+MCK_WEBHOOK_SIGNATURE_SECRET=replace-with-outbound-hmac-secret
+MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET=replace-with-inbound-callback-hmac-secret
+
+# Dispatch attempt retention defaults
+MCK_DISPATCH_RETENTION_SUCCEEDED_DAYS=30
+MCK_DISPATCH_RETENTION_FAILED_DAYS=90
+MCK_DISPATCH_RETENTION_MANUAL_DAYS=30
+MCK_DISPATCH_RETENTION_BATCH_SIZE=500
 ```
 
 **How to get these values:**

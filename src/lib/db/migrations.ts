@@ -496,6 +496,29 @@ const migrations: Migration[] = [
 
       db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_task ON task_dispatch_attempts(task_id, created_at DESC)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_status ON task_dispatch_attempts(status, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_runtime_status ON task_dispatch_attempts(runtime_type, status, created_at DESC)');
+    }
+  },
+  {
+    id: '015',
+    name: 'add_workspace_runtime_policy',
+    up: (db) => {
+      console.log('[Migration 015] Adding workspace default runtime policy...');
+      const workspacesInfo = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+      const hasColumn = (name: string) => workspacesInfo.some((col) => col.name === name);
+
+      if (!hasColumn('default_runtime_type')) {
+        db.exec(`ALTER TABLE workspaces ADD COLUMN default_runtime_type TEXT DEFAULT 'manual' CHECK (default_runtime_type IN ('manual', 'openclaw', 'webhook'))`);
+      }
+      if (!hasColumn('default_runtime_config')) {
+        db.exec('ALTER TABLE workspaces ADD COLUMN default_runtime_config TEXT');
+      }
+      if (!hasColumn('default_dispatch_enabled')) {
+        db.exec('ALTER TABLE workspaces ADD COLUMN default_dispatch_enabled INTEGER DEFAULT 0');
+      }
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_default_runtime ON workspaces(default_runtime_type, default_dispatch_enabled)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_runtime_status ON task_dispatch_attempts(runtime_type, status, created_at DESC)');
     }
   }
 ];

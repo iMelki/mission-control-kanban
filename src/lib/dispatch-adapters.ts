@@ -16,6 +16,8 @@ import {
   resolveAgentRuntime,
 } from '@/lib/agent-runtimes';
 import { validateWebhookDispatchPayload } from '@/lib/webhook-dispatch-schema';
+import { checkDispatchRetryBudget } from '@/lib/runtime-operations';
+import { buildSignedWebhookHeaders } from '@/lib/webhook-signatures';
 import type { Agent, AgentRuntimeType, DispatchAttemptStatus, OpenClawSession, Task, TaskDispatchAttempt } from '@/lib/types';
 
 type TaskDispatchRow = Omit<Task, 'dispatch_metadata' | 'github_source' | 'assigned_agent'> & {
@@ -33,6 +35,7 @@ const MIN_WEBHOOK_TIMEOUT_MS = 100;
 
 export interface DispatchOptions {
   retry?: boolean;
+  confirm?: boolean;
 }
 
 interface RecordDispatchAttemptInput {
@@ -459,7 +462,19 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
       validation_errors: payloadValidation.errors,
     });
   }
+  const payloadBody = JSON.stringify(payload);
   const headers = buildWebhookHeaders(config, process.env);
+  const signatureSecretEnv = typeof config.signature_secret_env === 'string'
+    ? config.signature_secret_env
+    : 'MCK_WEBHOOK_SIGNATURE_SECRET';
+  const signatureSecret = process.env[signatureSecretEnv];
+  if (signatureSecret) {
+    Object.assign(headers, buildSignedWebhookHeaders({
+      rawBody: payloadBody,
+      secret: signatureSecret,
+      deliveryId: `dispatch-${task.id}-${now}`,
+    }));
+  }
   const timeoutMs = getWebhookTimeoutMs(config);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -469,7 +484,7 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
     response = await fetch(webhookUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload),
+      body: payloadBody,
       signal: controller.signal,
     });
   } catch (err) {
@@ -564,6 +579,20 @@ export async function dispatchTaskToAssignedAgent(taskId: string, options: Dispa
     }
     if (!latestAttempt || !['failed', 'timeout'].includes(latestAttempt.status)) {
       throw new DispatchAdapterError('No failed webhook dispatch attempt is available to retry', 409);
+    }
+    const budget = checkDispatchRetryBudget({
+      taskId: task.id,
+      runtimeType: resolved.effective_type,
+      attemptNumber: latestAttempt.attempt_number,
+      confirm: options.confirm,
+    });
+    if (!budget.allowed) {
+      const message = budget.reason === 'missing_confirmation'
+        ? 'Repeated webhook retries require explicit operator confirmation'
+        : budget.reason === 'rate_limited'
+          ? 'Webhook retry rate limit reached'
+          : 'Too many webhook retry attempts require explicit operator confirmation';
+      throw new DispatchAdapterError(message, budget.reason === 'rate_limited' ? 429 : 400, budget);
     }
   }
 

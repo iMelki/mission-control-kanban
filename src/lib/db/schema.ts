@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS workspaces (
   github_project_title TEXT,
   github_project_url TEXT,
   github_project_auto_refresh INTEGER DEFAULT 0,
+  default_runtime_type TEXT DEFAULT 'manual' CHECK (default_runtime_type IN ('manual', 'openclaw', 'webhook')),
+  default_runtime_config TEXT,
+  default_dispatch_enabled INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

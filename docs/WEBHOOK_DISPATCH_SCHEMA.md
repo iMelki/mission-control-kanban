@@ -91,3 +91,49 @@ Every dispatch creates a row in `task_dispatch_attempts` with:
 - request payload JSON for audit/replay context
 
 The Task modal renders these rows in the Dispatch timeline and only enables **Retry webhook** when the latest attempt is a failed/timeout webhook dispatch.
+
+
+## Published schema endpoint
+
+Bridge authors can fetch the exact schema that MCK uses for outbound dispatch validation:
+
+- Inline: `GET /api/schemas/webhook-dispatch-payload`
+- Download: `GET /api/schemas/webhook-dispatch-payload?download=1`
+
+The route returns `application/schema+json` and includes `X-Schema-Id` so bridge code can cache or pin the contract version.
+
+## Optional HMAC signatures
+
+Webhook runtimes can ask MCK to sign outbound dispatch requests without storing raw secrets in `runtime_config`:
+
+```json
+{
+  "webhook_url": "https://example.test/mck-dispatch",
+  "bearer_token_env": "MCK_WEBHOOK_TOKEN",
+  "signature_secret_env": "MCK_WEBHOOK_SIGNATURE_SECRET"
+}
+```
+
+When the referenced env var is configured, MCK adds:
+
+- `X-MCK-Timestamp`
+- `X-MCK-Signature`
+- `X-MCK-Delivery`
+
+The signature base string is:
+
+```text
+v1.<timestamp>.<raw-json-body>
+```
+
+The signature value is `v1=<hex-hmac-sha256>`. Consumers should reject stale timestamps, verify with a timing-safe comparison, and store delivery IDs briefly if replay protection is needed.
+
+Inbound agent-completion callbacks can be verified with `MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET`. When that env var is configured, `/api/webhooks/agent-completion` rejects missing, stale, or invalid `X-MCK-Signature` headers before parsing JSON.
+
+## Retention, retry, and health
+
+- Dispatch attempts are retained by policy via `POST /api/dispatch-attempts/retention`; dry-run is the default.
+- Defaults: success/manual 30 days, failed/timeout 90 days, batch size 500.
+- Repeated webhook retries require explicit operator confirmation and are rate-limited per task/runtime.
+- Runtime health is available at `GET /api/runtime/health` and reports counts/reason codes without exposing tokens, secrets, raw callback URLs, or full payload bodies.
+- Low-cardinality Prometheus text metrics are available at `/metrics` and `/api/metrics`.

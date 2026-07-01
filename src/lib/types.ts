@@ -16,6 +16,7 @@ export interface AgentRuntimeConfig {
   url?: string;
   webhook_url?: string;
   bearer_token_env?: string;
+  signature_secret_env?: string;
   headers?: Record<string, string>;
   [key: string]: unknown;
 }
@@ -153,6 +154,12 @@ export interface Business {
   created_at: string;
 }
 
+export interface WorkspaceRuntimePolicy {
+  default_runtime_type: AgentRuntimeType;
+  default_runtime_config?: AgentRuntimeConfig | string | null;
+  default_dispatch_enabled: boolean | number;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -164,6 +171,9 @@ export interface Workspace {
   github_project_title?: string | null;
   github_project_url?: string | null;
   github_project_auto_refresh?: boolean | number | null;
+  default_runtime_type?: AgentRuntimeType | string | null;
+  default_runtime_config?: AgentRuntimeConfig | string | null;
+  default_dispatch_enabled?: boolean | number | null;
   created_at: string;
   updated_at: string;
 }
@@ -179,6 +189,9 @@ export interface WorkspaceStats {
   github_project_title?: string | null;
   github_project_url?: string | null;
   github_project_auto_refresh?: boolean | number | null;
+  default_runtime_type?: AgentRuntimeType | string | null;
+  default_runtime_config?: AgentRuntimeConfig | string | null;
+  default_dispatch_enabled?: boolean | number | null;
   taskCounts: {
     planning: number;
     inbox: number;
@@ -345,6 +358,12 @@ export interface PlanningState {
 }
 
 // API request/response types
+export interface UpdateWorkspaceRuntimePolicyRequest {
+  default_runtime_type?: AgentRuntimeType;
+  default_runtime_config?: AgentRuntimeConfig | string | null;
+  default_dispatch_enabled?: boolean;
+}
+
 export interface CreateAgentRequest {
   name: string;
   role: string;

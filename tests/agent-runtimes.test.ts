@@ -12,7 +12,10 @@ import {
   resolveAgentRuntime,
   serializeAgentRuntimeConfig,
   shouldAutoDispatchAgent,
+  normalizeWorkspaceRuntimePolicy,
+  resolveAgentRuntimeDefaults,
 } from '../src/lib/agent-runtimes';
+import { signWebhookPayload, verifyWebhookSignature } from '../src/lib/webhook-signatures';
 import type { Agent, Task } from '../src/lib/types';
 
 const baseAgent: Agent = {
@@ -140,4 +143,64 @@ test('webhook adapter payload is canonical and headers use env indirection for s
   assert.equal(payload.task.id, baseTask.id);
   assert.equal(payload.callbacks.status, 'http://mck.host:3021/api/tasks/task-1');
   assert.match(payload.prompt_markdown, /Mission Control is launching this task through the configured runtime adapter/);
+});
+
+
+test('workspace runtime defaults normalize and can seed new agent runtime input', () => {
+  const workspacePolicy = normalizeWorkspaceRuntimePolicy({
+    default_runtime_type: 'webhook',
+    default_runtime_config: '{"webhook_url":"https://bridge.example/mck"}',
+    default_dispatch_enabled: 1,
+  });
+
+  assert.equal(workspacePolicy.default_runtime_type, 'webhook');
+  assert.equal(workspacePolicy.default_dispatch_enabled, true);
+  assert.equal(workspacePolicy.default_runtime_config.webhook_url, 'https://bridge.example/mck');
+
+  const inherited = resolveAgentRuntimeDefaults({}, {
+    default_runtime_type: 'webhook',
+    default_runtime_config: { webhook_url: 'https://bridge.example/mck' },
+    default_dispatch_enabled: true,
+  });
+
+  assert.equal(inherited.runtime_type, 'webhook');
+  assert.equal(inherited.dispatch_enabled, true);
+  assert.equal(inherited.inherited_from_workspace, true);
+
+  const override = resolveAgentRuntimeDefaults({ runtime_type: 'manual' }, {
+    default_runtime_type: 'webhook',
+    default_dispatch_enabled: true,
+  });
+  assert.equal(override.runtime_type, 'manual');
+  assert.equal(override.inherited_from_workspace, false);
+});
+
+test('webhook signatures use timestamped HMAC and timing-safe verification', () => {
+  const rawBody = JSON.stringify({ task_id: 'task-1', summary: 'done' });
+  const timestamp = '1782888000';
+  const secret = 'unit-test-secret';
+  const signature = signWebhookPayload({ rawBody, secret, timestamp });
+
+  assert.match(signature, /^v1=[a-f0-9]{64}$/);
+  assert.deepEqual(verifyWebhookSignature({
+    rawBody,
+    secret,
+    timestamp,
+    signature,
+    nowMs: Number(timestamp) * 1000,
+  }), { ok: true });
+  assert.equal(verifyWebhookSignature({
+    rawBody,
+    secret,
+    timestamp,
+    signature: signature.replace(/.$/, '0'),
+    nowMs: Number(timestamp) * 1000,
+  }).ok, false);
+  assert.equal(verifyWebhookSignature({
+    rawBody,
+    secret,
+    timestamp,
+    signature,
+    nowMs: (Number(timestamp) + 600) * 1000,
+  }).reason, 'stale_timestamp');
 });

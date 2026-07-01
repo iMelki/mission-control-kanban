@@ -26,6 +26,19 @@ Migration `013_add_agent_runtime_fields` adds those columns and indexes to exist
 
 Why this exists: old MCK agent rows did not know whether they were OpenClaw, manual, or webhook-backed. The migration gives existing and future rows a stable schema so dispatch code can make a safe runtime decision instead of guessing.
 
+
+## Workspace Default Runtime Policy
+
+Migration `015_add_workspace_runtime_policy` adds workspace defaults for new agents:
+
+| Field | Meaning |
+| --- | --- |
+| `default_runtime_type` | The runtime type new agents inherit when their create request does not specify one. |
+| `default_runtime_config` | Optional JSON config template. Store env-var names only, not raw secrets. |
+| `default_dispatch_enabled` | Whether new OpenClaw/webhook agents inherit auto-dispatch enabled. Manual defaults always remain handoff-only. |
+
+The workspace page exposes these controls in **Workspace runtime defaults**. Existing agents keep their explicit runtime fields; the workspace policy is an inheritance default for future agents and a visible operator reference point.
+
 ## Runtime Adapter Registry
 
 Dispatch now routes through an adapter layer instead of calling OpenClaw directly from `/api/tasks/:id/dispatch`.
@@ -143,7 +156,14 @@ Migration `014_add_task_dispatch_attempts` creates `task_dispatch_attempts` for 
 - bounded error/response text;
 - request payload JSON for webhook audit context.
 
-`GET /api/tasks/:id/dispatch` returns this timeline. `POST /api/tasks/:id/dispatch` accepts `{ "retry": true }` only when the effective runtime is webhook and the latest attempt failed or timed out.
+`GET /api/tasks/:id/dispatch` returns this timeline. `POST /api/tasks/:id/dispatch` accepts `{ "retry": true }` only when the effective runtime is webhook and the latest attempt failed or timed out. Repeated webhook retries require `{ "confirm": true }` and are rate-limited per task/runtime so operators get an explicit duplicate-work warning instead of accidental replay loops.
+
+## Runtime Health, Metrics, and Retention
+
+- `/metrics` and `/api/metrics` expose low-cardinality Prometheus text metrics for task counts, agent runtime counts, dispatch attempts, and secret-presence booleans without leaking values.
+- `/api/runtime/health` exposes richer operator health counts and reason codes without tokens, raw webhook URLs, or full payload bodies.
+- `/api/dispatch-attempts/retention` runs the dispatch-attempt retention policy. Dry-run is the default; configured defaults keep success/manual rows for 30 days and failed/timeout rows for 90 days.
+- A daily Hermes cron job named **MCK runtime regression check** runs `npm run check:runtime-regressions` and reports results to the origin chat.
 
 ## Webhook JSON Schema
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryOne, queryAll, run } from '@/lib/db';
+import { verifyWebhookSignature } from '@/lib/webhook-signatures';
 import type { Task, Agent, OpenClawSession } from '@/lib/types';
 
 /**
@@ -21,7 +22,22 @@ import type { Task, Agent, OpenClawSession } from '@/lib/types';
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const rawBody = await request.text();
+    const inboundSecret = process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET;
+    const suppliedSignature = request.headers.get('x-mck-signature');
+    if (inboundSecret || suppliedSignature) {
+      const verification = verifyWebhookSignature({
+        rawBody,
+        secret: inboundSecret || '',
+        timestamp: request.headers.get('x-mck-timestamp') || '',
+        signature: suppliedSignature,
+      });
+      if (!verification.ok) {
+        return NextResponse.json({ error: 'Invalid webhook signature', reason: verification.reason }, { status: 401 });
+      }
+    }
+
+    const body = JSON.parse(rawBody || '{}');
     const now = new Date().toISOString();
 
     // Handle direct task_id completion

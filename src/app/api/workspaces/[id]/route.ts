@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { normalizeAgentRuntimeType, normalizeDispatchEnabled, parseAgentRuntimeConfig, serializeAgentRuntimeConfig } from '@/lib/agent-runtimes';
 
 // GET /api/workspaces/[id] - Get a single workspace
 export async function GET(
@@ -36,7 +37,14 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { name, description, icon } = body;
+    const {
+      name,
+      description,
+      icon,
+      default_runtime_type,
+      default_runtime_config,
+      default_dispatch_enabled,
+    } = body;
 
     const db = getDb();
 
@@ -61,6 +69,18 @@ export async function PATCH(
     if (icon !== undefined) {
       updates.push('icon = ?');
       values.push(icon);
+    }
+    if (default_runtime_type !== undefined) {
+      updates.push('default_runtime_type = ?');
+      values.push(normalizeAgentRuntimeType(default_runtime_type));
+    }
+    if (default_runtime_config !== undefined) {
+      updates.push('default_runtime_config = ?');
+      values.push(serializeAgentRuntimeConfig(parseAgentRuntimeConfig(default_runtime_config)));
+    }
+    if (default_dispatch_enabled !== undefined) {
+      updates.push('default_dispatch_enabled = ?');
+      values.push(normalizeDispatchEnabled(default_dispatch_enabled) ? 1 : 0);
     }
 
     if (updates.length === 0) {

@@ -1,4 +1,4 @@
-import type { Agent, AgentRuntimeConfig, AgentRuntimeType, Task } from './types';
+import type { Agent, AgentRuntimeConfig, AgentRuntimeType, Task, Workspace } from './types';
 
 export const AGENT_RUNTIME_TYPES: AgentRuntimeType[] = ['manual', 'openclaw', 'webhook'];
 
@@ -117,6 +117,27 @@ export function serializeAgentRuntimeConfig(value: unknown): string | null {
     }
   }
   return JSON.stringify(value);
+}
+
+export function normalizeWorkspaceRuntimePolicy(workspace?: Partial<Workspace> | null) {
+  return {
+    default_runtime_type: normalizeAgentRuntimeType(workspace?.default_runtime_type),
+    default_runtime_config: parseAgentRuntimeConfig(workspace?.default_runtime_config),
+    default_dispatch_enabled: normalizeDispatchEnabled(workspace?.default_dispatch_enabled),
+  };
+}
+
+export function resolveAgentRuntimeDefaults(
+  input: { runtime_type?: unknown; runtime_config?: unknown; dispatch_enabled?: unknown },
+  workspace?: Partial<Workspace> | null,
+) {
+  const policy = normalizeWorkspaceRuntimePolicy(workspace);
+  return {
+    runtime_type: input.runtime_type === undefined ? policy.default_runtime_type : normalizeAgentRuntimeType(input.runtime_type),
+    runtime_config: input.runtime_config === undefined ? policy.default_runtime_config : parseAgentRuntimeConfig(input.runtime_config),
+    dispatch_enabled: input.dispatch_enabled === undefined ? policy.default_dispatch_enabled : normalizeDispatchEnabled(input.dispatch_enabled),
+    inherited_from_workspace: input.runtime_type === undefined && input.runtime_config === undefined && input.dispatch_enabled === undefined,
+  };
 }
 
 export function getDispatchAdapter(runtimeType: unknown): RuntimeAdapterDescriptor {
