@@ -30,6 +30,8 @@ The script uses:
 
 Manual dispatch of the Runtime Regression workflow now accepts an optional `issue_number` input. When provided, the workflow uploads artifacts and then comments the latest run/artifact links on that issue using the repository `GITHUB_TOKEN` with `issues: write` and `actions: read` permissions.
 
+The workflow also has a non-blocking `turbopack-inventory` job. It runs `npm run build:turbo`, writes `turbopack-build.log`, extracts NFT/tracing warnings into `turbopack-warnings.txt`, uploads both files as `mck-turbopack-inventory`, and never blocks the supported webpack production build.
+
 ## Pitfalls
 
 - Artifact download URLs can expire or require GitHub access, so the closeout should always include the workflow-run URL too.

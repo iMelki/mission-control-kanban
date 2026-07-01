@@ -16,6 +16,15 @@ export interface DispatchRetentionResult {
   candidates: number;
 }
 
+export interface DispatchFailureRateTrendPoint {
+  date: string;
+  runtime_type: AgentRuntimeType;
+  total: number;
+  failed: number;
+  timeout: number;
+  failure_rate: number;
+}
+
 export function getDispatchRetentionPolicy(env: Record<string, string | undefined> = process.env): DispatchRetentionPolicy {
   const numberFromEnv = (key: string, fallback: number, min: number, max: number) => {
     const parsed = Number(env[key]);
@@ -132,6 +141,63 @@ export function checkDispatchRetryBudget({
   return { allowed: true };
 }
 
+function normalizeRuntimeType(value: string | null | undefined): AgentRuntimeType {
+  return value === 'openclaw' || value === 'webhook' ? value : 'manual';
+}
+
+export function getDispatchFailureRateTrends({
+  days = 14,
+  now = Date.now(),
+}: {
+  days?: number;
+  now?: number;
+} = {}): DispatchFailureRateTrendPoint[] {
+  const boundedDays = Math.min(Math.max(Math.floor(days), 1), 90);
+  const rows = queryAll<{
+    date: string;
+    runtime_type: string | null;
+    status: DispatchAttemptStatus;
+    count: number;
+  }>(
+    `SELECT substr(created_at, 1, 10) as date,
+            runtime_type,
+            status,
+            COUNT(*) as count
+     FROM task_dispatch_attempts
+     WHERE created_at >= ?
+     GROUP BY substr(created_at, 1, 10), runtime_type, status
+     ORDER BY date ASC, runtime_type ASC`,
+    [cutoffIso(boundedDays, now)]
+  );
+
+  const grouped = new Map<string, DispatchFailureRateTrendPoint>();
+  for (const row of rows) {
+    const runtimeType = normalizeRuntimeType(row.runtime_type);
+    const key = `${row.date}:${runtimeType}`;
+    const existing = grouped.get(key) ?? {
+      date: row.date,
+      runtime_type: runtimeType,
+      total: 0,
+      failed: 0,
+      timeout: 0,
+      failure_rate: 0,
+    };
+    const count = Number(row.count) || 0;
+    existing.total += count;
+    if (row.status === 'failed') existing.failed += count;
+    if (row.status === 'timeout') existing.timeout += count;
+    existing.failure_rate = existing.total > 0
+      ? Number(((existing.failed + existing.timeout) / existing.total).toFixed(4))
+      : 0;
+    grouped.set(key, existing);
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.runtime_type.localeCompare(b.runtime_type);
+  });
+}
+
 export function getRuntimeHealthSummary() {
   const agentCounts = queryAll<{ runtime_type: string; dispatch_enabled: number; count: number }>(
     `SELECT runtime_type, dispatch_enabled, COUNT(*) as count
@@ -185,6 +251,7 @@ export function getRuntimeHealthSummary() {
         reason: latestFailure.error_message ? latestFailure.error_message.slice(0, 160) : 'unknown',
       }
       : null,
+    failure_rate_trends: getDispatchFailureRateTrends(),
   };
 }
 

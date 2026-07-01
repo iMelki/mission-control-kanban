@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Runtime-ops research roadmap for [#38](https://github.com/iMelki/mission-control-kanban/issues/38) in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`, plus per-runtime failure-rate trend data/cards and the `/runtime-regression` local artifact drilldown UI.
+- Non-blocking Turbopack inventory in the Runtime Regression workflow: `npm run build:turbo` logs are uploaded as `mck-turbopack-inventory` without blocking the supported webpack production build.
+- Persistence-level regression coverage for [#34](https://github.com/iMelki/mission-control-kanban/issues/34), proving GitHub Project sync refreshes stale imported task dispatch metadata after issue grooming without status churn.
+
 - Post-runtime-ops tracking for [#38](https://github.com/iMelki/mission-control-kanban/issues/38), including a home-page Runtime Regression card, `/api/runtime/regression`, CI artifact closeout automation via `npm run comment:runtime-artifacts`, and `docs/RUNTIME_REGRESSION_ARTIFACTS.md`.
 - Runtime ops admin console for [#36](https://github.com/iMelki/mission-control-kanban/issues/36): global dispatch failure queue, runtime audit/migration action, workspace section tabs, callback replay protection, callback completion schema export, bridge callback examples, webhook health-test API/UI, runtime health badges, retention settings UI, callback replay ledger, schema/template downloads, retention audit metrics, CI runtime-regression workflow artifacts, and React Doctor full-project 100 policy plus changed-scope 100 wrapper output.
 - Runtime dispatch hardening for [#33](https://github.com/iMelki/mission-control-kanban/issues/33): `task_dispatch_attempts` timeline storage, dispatch history API, Task modal dispatch timeline, safe webhook retry controls, webhook JSON Schema validation/docs, mock webhook/OpenClaw adapter tests, runtime filter chips, agent runtime audit summary, per-agent runtime health labels, reusable panel primitives, and responsive desktop/tablet/mobile smoke checks.

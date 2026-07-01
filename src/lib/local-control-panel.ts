@@ -112,7 +112,7 @@ export const LOCAL_CONTROL_SURFACES: LocalControlSurface[] = [
     name: 'Runtime Regression',
     description: 'Latest MCK runtime smoke proof and screenshot artifact location.',
     group: 'automation-health',
-    href: '/api/runtime/regression',
+    href: '/runtime-regression',
     detailHref: '/api/runtime/regression',
     mode: 'diagnostic',
     healthSource: 'runtime-regression',

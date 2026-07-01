@@ -29,7 +29,17 @@ interface RuntimeHealthPayload {
   };
   agent_counts?: Array<{ runtime_type: string; dispatch_enabled: number; count: number }>;
   attempt_counts?: Array<{ runtime_type: string; status: string; count: number }>;
+  failure_rate_trends?: RuntimeFailureRateTrendPoint[];
   latest_failure?: { created_at: string; runtime_type: string; reason: string } | null;
+}
+
+interface RuntimeFailureRateTrendPoint {
+  date: string;
+  runtime_type: string;
+  total: number;
+  failed: number;
+  timeout: number;
+  failure_rate: number;
 }
 
 const callbackColumns: DataTableColumn<CallbackDeliveryRow>[] = [
@@ -87,6 +97,72 @@ const WEBHOOK_AGENT_TEMPLATE = `{
     "X-MCK-Agent": "example-agent"
   }
 }`;
+
+function runtimeTrendGroups(points: RuntimeFailureRateTrendPoint[]) {
+  const grouped = new Map<string, RuntimeFailureRateTrendPoint[]>();
+  for (const point of points) {
+    const existing = grouped.get(point.runtime_type) ?? [];
+    existing.push(point);
+    grouped.set(point.runtime_type, existing);
+  }
+  return Array.from(grouped.entries()).map(([runtime, runtimePoints]) => ({
+    runtime,
+    points: runtimePoints.slice(-14),
+    latest: runtimePoints[runtimePoints.length - 1],
+  }));
+}
+
+function RuntimeFailureRateCards({ points }: { points: RuntimeFailureRateTrendPoint[] }) {
+  const groups = runtimeTrendGroups(points);
+  if (groups.length === 0) {
+    return (
+      <div className="rounded border border-mc-border bg-mc-bg p-4 text-sm text-mc-text-secondary">
+        No runtime dispatch attempts in the current trend window yet. The chart will populate after manual, webhook, or OpenClaw dispatch attempts are recorded.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-3">
+      {groups.map((group) => {
+        const latest = group.latest;
+        const failed = safeNumber(latest?.failed) + safeNumber(latest?.timeout);
+        const total = safeNumber(latest?.total);
+        const failurePercent = Math.round(safeNumber(latest?.failure_rate) * 100);
+        return (
+          <div key={group.runtime} className="rounded border border-mc-border bg-mc-bg p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-mc-text-secondary">{group.runtime}</div>
+                <div className="mt-1 text-2xl font-semibold text-mc-text">{failurePercent}%</div>
+              </div>
+              <span className="rounded border border-mc-border px-2 py-1 text-xs text-mc-text-secondary">
+                {failed}/{total} failed
+              </span>
+            </div>
+            <div className="mt-4 flex h-16 items-end gap-1" aria-label={`${group.runtime} dispatch failure-rate trend`}>
+              {group.points.map((point) => {
+                const height = Math.max(4, Math.round(point.failure_rate * 64));
+                const isFailure = point.failed + point.timeout > 0;
+                return (
+                  <div
+                    key={`${point.date}-${group.runtime}`}
+                    title={`${point.date}: ${Math.round(point.failure_rate * 100)}% (${point.failed + point.timeout}/${point.total})`}
+                    className={`min-w-3 flex-1 rounded-t ${isFailure ? 'bg-amber-400/80' : 'bg-emerald-400/60'}`}
+                    style={{ height }}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-2 text-xs text-mc-text-secondary">
+              Latest bucket: {latest?.date ?? '—'} · low sample sizes can look volatile.
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function RuntimeOpsSettings() {
   const [retentionResult, setRetentionResult] = useState<Record<string, unknown> | null>(null);
@@ -195,6 +271,20 @@ export function RuntimeOpsSettings() {
             <div className="mt-1 text-2xl font-semibold text-mc-text">{card.value}</div>
           </div>
         ))}
+      </div>
+
+      <div className="rounded border border-mc-border bg-mc-bg-secondary p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Activity className="size-4 text-mc-accent" />
+            <h3 className="font-semibold">Per-runtime failure-rate trends</h3>
+          </div>
+          <span className="text-xs text-mc-text-secondary">14-day dispatch attempt window</span>
+        </div>
+        <p className="mb-4 text-sm text-mc-text-secondary">
+          Small multiples show failed plus timeout attempts divided by total dispatch attempts for each runtime. Manual attempts are included so handoff-only queues do not look artificially perfect.
+        </p>
+        <RuntimeFailureRateCards points={health?.failure_rate_trends || []} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

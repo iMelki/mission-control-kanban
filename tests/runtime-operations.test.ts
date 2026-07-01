@@ -17,6 +17,7 @@ let verifyWebhookSignature: typeof import('../src/lib/webhook-signatures').verif
 let registerWebhookCallbackDelivery: typeof import('../src/lib/webhook-callback-operations').registerWebhookCallbackDelivery;
 let getWebhookCallbackDeliveries: typeof import('../src/lib/webhook-callback-operations').getWebhookCallbackDeliveries;
 let getRuntimeAudit: typeof import('../src/lib/runtime-operations').getRuntimeAudit;
+let getDispatchFailureRateTrends: typeof import('../src/lib/runtime-operations').getDispatchFailureRateTrends;
 let pruneDispatchAttemptsWithAudit: typeof import('../src/lib/runtime-operations').pruneDispatchAttemptsWithAudit;
 
 function resetDb() {
@@ -42,6 +43,7 @@ test.before(async () => {
   registerWebhookCallbackDelivery = callbackOps.registerWebhookCallbackDelivery;
   getWebhookCallbackDeliveries = callbackOps.getWebhookCallbackDeliveries;
   getRuntimeAudit = runtimeOps.getRuntimeAudit;
+  getDispatchFailureRateTrends = runtimeOps.getDispatchFailureRateTrends;
   pruneDispatchAttemptsWithAudit = runtimeOps.pruneDispatchAttemptsWithAudit;
 });
 
@@ -98,6 +100,43 @@ test('runtime audit flags webhook agents missing dispatch config', () => {
   assert.equal(audit.summary.total, 1);
   assert.equal(audit.summary.needs_config, 1);
   assert.equal(audit.agents[0].recommended_action, 'add_webhook_url_env_config');
+});
+
+test('dispatch failure-rate trends group daily runtime failures without hiding manual volume', () => {
+  resetDb();
+  const now = Date.parse('2026-07-01T12:00:00.000Z');
+  const dayOne = '2026-06-30T10:00:00.000Z';
+  const dayTwo = '2026-07-01T10:00:00.000Z';
+  run(
+    `INSERT INTO tasks (id, title, description, status, priority, workspace_id, business_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['task-trend', 'Trend task', '', 'assigned', 'normal', 'default', 'default', dayOne, dayOne]
+  );
+  const attempts = [
+    ['attempt-1', 'webhook', 'success', dayOne],
+    ['attempt-2', 'webhook', 'failed', dayOne],
+    ['attempt-3', 'webhook', 'timeout', dayOne],
+    ['attempt-4', 'manual', 'manual', dayTwo],
+    ['attempt-5', 'manual', 'failed', dayTwo],
+  ];
+  for (const [id, runtimeType, status, createdAt] of attempts) {
+    run(
+      `INSERT INTO task_dispatch_attempts (id, task_id, runtime_type, status, attempt_number, message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, 'task-trend', runtimeType, status, 1, 'trend seed', createdAt]
+    );
+  }
+
+  const trends = getDispatchFailureRateTrends({ days: 7, now });
+  const webhook = trends.find((point) => point.runtime_type === 'webhook');
+  const manual = trends.find((point) => point.runtime_type === 'manual');
+  assert.equal(webhook?.date, '2026-06-30');
+  assert.equal(webhook?.total, 3);
+  assert.equal(webhook?.failed, 1);
+  assert.equal(webhook?.timeout, 1);
+  assert.equal(webhook?.failure_rate, 0.6667);
+  assert.equal(manual?.total, 2);
+  assert.equal(manual?.failure_rate, 0.5);
 });
 
 test('retention cleanup records maintenance audit rows', () => {

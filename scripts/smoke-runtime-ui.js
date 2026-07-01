@@ -116,6 +116,10 @@ async function main() {
     await page.getByText(/Runtime Regression/i).waitFor({ timeout: 10_000 });
     await page.getByText(/Workspace surfaces and health/i).waitFor({ timeout: 10_000 });
 
+    await page.goto(`${baseUrl.replace(/\/$/, '')}/runtime-regression`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.getByRole('heading', { name: /Runtime Regression Evidence/i }).waitFor({ timeout: 10_000 });
+    await page.getByText(/Local command/i).waitFor({ timeout: 10_000 });
+
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
     await page.locator('nav[aria-label="Workspace sections"] button').filter({ hasText: 'Board' }).click();

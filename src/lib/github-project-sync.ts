@@ -512,6 +512,23 @@ export async function syncGitHubProjectWorkspace(
   }
 
   const project = await loadProjectItems(workspace.github_project_owner, workspace.github_project_number);
+  return syncLoadedGitHubProjectWorkspace(workspaceIdOrSlug, project, options);
+}
+
+export async function syncLoadedGitHubProjectWorkspace(
+  workspaceIdOrSlug: string,
+  project: Pick<ProjectItemsPage, 'title'> & { allItems: GitHubProjectItemNode[] },
+  options: { dryRun?: boolean } = {}
+): Promise<GitHubProjectWorkspaceSyncResult> {
+  const workspace = findWorkspaceProject(workspaceIdOrSlug);
+  if (!workspace) {
+    throw new Error(`Workspace '${workspaceIdOrSlug}' was not found.`);
+  }
+
+  if (!workspace.github_project_owner || !workspace.github_project_number) {
+    throw new Error(`Workspace '${workspace.slug}' is not linked to a GitHub Project.`);
+  }
+
   const result: GitHubProjectWorkspaceSyncResult = {
     workspace_id: workspace.id,
     workspace_slug: workspace.slug,
