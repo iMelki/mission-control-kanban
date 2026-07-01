@@ -129,7 +129,6 @@ This is the first stable, tested, and working release of Mission Control.
 
 ### Added
 
-- Runtime ops admin console for [#36](https://github.com/iMelki/mission-control-kanban/issues/36): global dispatch failure queue, runtime audit/migration action, workspace section tabs, callback replay protection, callback completion schema export, bridge callback examples, webhook health-test API/UI, runtime health badges, retention settings UI, retention audit metrics, CI runtime-regression workflow artifacts, and React Doctor changed-scope 100-equivalent wrapper output.
 - **Task Management**
   - Create, edit, and delete tasks
   - Drag-and-drop Kanban board with 7 status columns
@@ -187,7 +186,6 @@ This is the first stable, tested, and working release of Mission Control.
 
 ### Added
 
-- Runtime ops admin console for [#36](https://github.com/iMelki/mission-control-kanban/issues/36): global dispatch failure queue, runtime audit/migration action, workspace section tabs, callback replay protection, callback completion schema export, bridge callback examples, webhook health-test API/UI, runtime health badges, retention settings UI, retention audit metrics, CI runtime-regression workflow artifacts, and React Doctor changed-scope 100-equivalent wrapper output.
 - Initial project setup
 - Basic task CRUD
 - Kanban board prototype
