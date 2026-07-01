@@ -11,6 +11,7 @@ import {
 import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import type { Task, CreateTaskRequest, Agent } from '@/lib/types';
 import { normalizeAgentRuntimeType, normalizeDispatchEnabled } from '@/lib/agent-runtimes';
+import { listTaskDependenciesForTasks } from '@/lib/task-dependencies';
 
 type TaskRow = Task & {
   assigned_agent_name?: string;
@@ -121,7 +122,12 @@ export async function GET(request: NextRequest) {
     sql += ' ORDER BY t.created_at DESC';
 
     const tasks = queryAll<TaskRow>(sql, params);
-    return NextResponse.json(tasks.map(decorateTask));
+    const dependencies = listTaskDependenciesForTasks(tasks.map((task) => task.id));
+    return NextResponse.json(tasks.map((task) => {
+      const decorated = decorateTask(task);
+      const taskDependencies = dependencies.get(task.id);
+      return taskDependencies ? { ...decorated, ...taskDependencies } : decorated;
+    }));
   } catch (error) {
     console.error('Failed to fetch tasks:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });

@@ -11,6 +11,7 @@ import {
 } from '@/lib/dispatch-contract';
 import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import { normalizeAgentRuntimeType, normalizeDispatchEnabled, shouldAutoDispatchAgent } from '@/lib/agent-runtimes';
+import { listTaskDependencies } from '@/lib/task-dependencies';
 import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
 
 type TaskRow = Task & {
@@ -92,7 +93,10 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    return NextResponse.json(decorateTask(task));
+    return NextResponse.json({
+      ...decorateTask(task),
+      ...listTaskDependencies(id),
+    });
   } catch (error) {
     console.error('Failed to fetch task:', error);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });

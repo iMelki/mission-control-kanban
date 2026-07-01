@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { queryOne } from '@/lib/db';
-import { parseDispatchMetadata } from '@/lib/dispatch-contract';
-import { normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
-import { buildGitHubIssueDraftFromTask } from '@/lib/github-issue-drafts';
-import type { Task } from '@/lib/types';
+import {
+  applyGitHubIssueDraft,
+  buildGitHubIssueDraftPayload,
+  loadTaskForIssueDraft,
+} from '@/lib/github-issue-drafts';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,18 +13,28 @@ interface RouteParams {
 
 export async function GET(_request: Request, { params }: RouteParams) {
   const { id } = await params;
-  const row = queryOne<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [id]);
-  if (!row) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-  const task = {
-    ...row,
-    dispatch_metadata: parseDispatchMetadata(row.dispatch_metadata),
-    github_source: normalizeGitHubSourceIdentity({
-      repo_owner: row.source_repo_owner,
-      repo_name: row.source_repo_name,
-      issue_number: row.source_issue_number,
-      issue_url: row.source_issue_url,
-      project_item_id: row.source_project_item_id,
-    }),
-  } as unknown as Task;
-  return NextResponse.json({ dry_run: true, draft: buildGitHubIssueDraftFromTask(task) });
+  const task = loadTaskForIssueDraft(id);
+  if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  return NextResponse.json(buildGitHubIssueDraftPayload(task));
+}
+
+export async function POST(request: Request, { params }: RouteParams) {
+  const { id } = await params;
+  const task = loadTaskForIssueDraft(id);
+  if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  const body = await request.json().catch(() => ({}));
+  const dryRun = body.dry_run !== false;
+  const plan = buildGitHubIssueDraftPayload(task);
+  if (dryRun) return NextResponse.json(plan);
+  try {
+    const applied = await applyGitHubIssueDraft({
+      task,
+      confirmationText: typeof body.confirmation_text === 'string' ? body.confirmation_text : '',
+    });
+    return NextResponse.json(applied);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'GitHub issue create/update failed';
+    const status = error instanceof Error && error.name === 'ConfirmationError' ? 400 : 502;
+    return NextResponse.json({ error: message, ...plan }, { status });
+  }
 }

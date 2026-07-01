@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { applyRuntimeAuditMigration, getRuntimeAudit } from '@/lib/runtime-operations';
+import { applyRuntimeAuditMigration, getRuntimeAudit, getRuntimeMaintenanceRuns } from '@/lib/runtime-operations';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json(getRuntimeAudit());
+  return NextResponse.json({
+    ...getRuntimeAudit(),
+    migration_history: getRuntimeMaintenanceRuns({ runType: 'runtime_audit_migration', limit: 8 }),
+  });
 }
 
 export async function POST(request: NextRequest) {

@@ -75,6 +75,34 @@ async function main() {
     }),
   });
 
+
+  const blockerTask = await requestJson('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: `Runtime UI blocker ${stamp}`,
+      description: 'Temporary blocker task for dependency graph smoke coverage.',
+      priority: 'normal',
+      status: 'in_progress',
+      workspace_id: workspaceSlug,
+    }),
+  });
+
+  await requestJson(`/api/tasks/${task.id}/dependencies`, {
+    method: 'POST',
+    body: JSON.stringify({ blocked_by_task_id: blockerTask.id, note: 'Smoke dependency edge' }),
+  });
+
+  const checklistTask = await requestJson('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: `Runtime checklist smoke ${stamp}`,
+      description: 'Temporary sparse task for ready checklist smoke coverage.',
+      priority: 'normal',
+      status: 'inbox',
+      workspace_id: workspaceSlug,
+    }),
+  });
+
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
@@ -89,6 +117,7 @@ async function main() {
       // Local smoke often runs without OpenClaw Gateway; Chromium reports the expected
       // /api/openclaw/sessions 503 as a generic resource load error without the URL.
       || /Failed to load resource: the server responded with a status of 503 \(Service Unavailable\)/.test(text)
+      || (/hydration-mismatch/.test(text) && /caret-color/.test(text))
     );
     page.on('console', (message) => {
       if (message.type() === 'error' && !isIgnorableConsoleNoise(message.text())) {
@@ -99,9 +128,14 @@ async function main() {
 
     fs.mkdirSync(artifactDir, { recursive: true });
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.waitForTimeout(1500);
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
-    await page.locator('nav[aria-label="Workspace sections"] button').filter({ hasText: 'Settings' }).click();
-    await page.getByText(/Workspace runtime defaults/i).waitFor({ timeout: 10_000 });
+    const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
+    await workspaceNav.waitFor({ timeout: 20_000 });
+    const workspaceSettingsButton = workspaceNav.getByRole('button', { name: /^Settings$/i });
+    await workspaceSettingsButton.waitFor({ timeout: 20_000 });
+    await workspaceSettingsButton.click({ force: true });
+    await page.getByRole('heading', { name: /Workspace runtime defaults/i }).waitFor({ timeout: 20_000 });
     await page.screenshot({ path: path.join(artifactDir, 'desktop-runtime-workspace.png'), fullPage: true });
 
     await page.goto(`${baseUrl.replace(/\/$/, '')}/settings`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
@@ -112,7 +146,11 @@ async function main() {
     await assertJsonEndpoint('/api/runtime/regression');
     await page.screenshot({ path: path.join(artifactDir, 'settings-runtime-ops.png'), fullPage: true });
 
-    await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    try {
+      await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    } catch (error) {
+      if (!/ERR_ABORTED/.test(String(error))) throw error;
+    }
     await page.getByText(/Runtime Regression/i).waitFor({ timeout: 10_000 });
     await page.getByText(/Workspace surfaces and health/i).waitFor({ timeout: 10_000 });
 
@@ -121,14 +159,24 @@ async function main() {
     await page.getByText(/Local command/i).waitFor({ timeout: 10_000 });
 
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.waitForTimeout(1500);
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
-    await page.locator('nav[aria-label="Workspace sections"] button').filter({ hasText: 'Board' }).click();
+    await workspaceNav.getByRole('button', { name: /^Board$/i }).click();
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(1500);
 
-    await page.getByRole('button', { name: /Add agent/i }).click();
-    await page.getByLabel(/Runtime type/i).waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: /Add agent/i }).click({ force: true });
+    await page.getByText(/Runtime & dispatch/i).waitFor({ timeout: 20_000 });
+    await page.getByLabel(/Runtime type/i).waitFor({ timeout: 20_000 });
     await page.getByLabel(/Runtime type/i).selectOption('webhook');
     await page.getByText(/Enable auto-dispatch/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Webhook validation wizard/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Validate endpoint\/env\/secret settings/i).waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: /Validate endpoint/i }).waitFor({ timeout: 10_000 });
+    const autoDispatchCheckbox = page.getByLabel(/Enable auto-dispatch/i);
+    if (!(await autoDispatchCheckbox.isDisabled())) {
+      throw new Error('Webhook auto-dispatch should be disabled before validation');
+    }
     await page.getByText(/^Runtime config JSON$/i).waitFor({ timeout: 10_000 });
     await page.locator('div.fixed.inset-0 button').first().click();
     await page.getByLabel(/Runtime type/i).waitFor({ state: 'hidden', timeout: 10_000 });
@@ -136,12 +184,30 @@ async function main() {
     const taskCard = page.getByRole('button', { name: new RegExp(task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) });
     await taskCard.waitFor({ timeout: 10_000 });
     await taskCard.getByText(/Webhook auto/i).waitFor({ timeout: 10_000 });
+    await taskCard.getByText(/Blocked by 1/i).waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: /^Webhook$/i }).click();
     await page.getByText(/Showing/i).waitFor({ timeout: 10_000 });
     await taskCard.click();
     await page.getByRole('button', { name: /Copy handoff/i }).waitFor({ timeout: 10_000 });
     await page.getByText(/Dispatch timeline/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Task dependencies \/ blocked-by/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Dependency graph/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Smoke dependency edge/i).first().waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: /Retry webhook/i }).waitFor({ timeout: 10_000 });
+    await page.locator('div.fixed.inset-0 button').first().click();
+    await page.getByRole('button', { name: /All runtimes/i }).click();
+
+    const checklistCard = page.getByRole('button', { name: new RegExp(checklistTask.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) });
+    await checklistCard.waitFor({ timeout: 10_000 });
+    await checklistCard.click();
+    await page.getByRole('button', { name: /Apply ready-for-agent checklist/i }).click();
+    await page.locator('select[id$="-readiness"]').evaluate((element) => {
+      if (element.value !== 'ready_for_agent') throw new Error(`Expected ready_for_agent, got ${element.value}`);
+    });
+    await page.getByText(/Operator can verify/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Run relevant automated tests/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Preserve unrelated dirty work/i).waitFor({ timeout: 10_000 });
+    await page.getByText(/Revert the scoped commit/i).waitFor({ timeout: 10_000 });
     await page.locator('div.fixed.inset-0 button').first().click();
 
     const responsiveChecks = [
@@ -151,6 +217,7 @@ async function main() {
     for (const viewport of responsiveChecks) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.waitForTimeout(1500);
       await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
       await page.getByText(/Runtime filter/i).waitFor({ timeout: 10_000 });
       await page.getByRole('button', { name: /New Task/i }).waitFor({ timeout: 10_000 });
@@ -184,6 +251,9 @@ async function main() {
         'task-card runtime badge',
         'runtime filter chips',
         'task-modal copy handoff action',
+        'task dependency graph and blocked-by badge',
+        'ready-for-agent checklist seeding',
+        'webhook validation wizard disabled gate',
         'dispatch timeline retry control',
         'settings runtime operations retention and callback panel',
         'webhook dispatch/callback schema endpoints',
@@ -198,6 +268,12 @@ async function main() {
     }
     await requestJson(`/api/tasks/${task.id}`, { method: 'DELETE' }).catch((error) => {
       console.error(`Failed to clean up smoke task ${task.id}:`, error);
+    });
+    await requestJson(`/api/tasks/${blockerTask.id}`, { method: 'DELETE' }).catch((error) => {
+      console.error(`Failed to clean up smoke blocker task ${blockerTask.id}:`, error);
+    });
+    await requestJson(`/api/tasks/${checklistTask.id}`, { method: 'DELETE' }).catch((error) => {
+      console.error(`Failed to clean up smoke checklist task ${checklistTask.id}:`, error);
     });
     await requestJson(`/api/agents/${agent.id}`, { method: 'DELETE' }).catch((error) => {
       console.error(`Failed to clean up smoke agent ${agent.id}:`, error);

@@ -24,6 +24,34 @@ export function listTaskDependencies(taskId: string) {
   return { blocked_by, blocking };
 }
 
+export function listTaskDependenciesForTasks(taskIds: string[]) {
+  if (taskIds.length === 0) return new Map<string, ReturnType<typeof listTaskDependencies>>();
+  const placeholders = taskIds.map(() => '?').join(', ');
+  const blockedRows = queryAll<TaskDependencySummary>(
+    `SELECT d.id, d.task_id, d.blocked_by_task_id, d.note, d.created_at,
+            t.title as blocked_by_title, t.status as blocked_by_status
+     FROM task_dependencies d
+     JOIN tasks t ON t.id = d.blocked_by_task_id
+     WHERE d.task_id IN (${placeholders})
+     ORDER BY d.created_at DESC`,
+    taskIds
+  );
+  const blockingRows = queryAll<TaskDependencySummary>(
+    `SELECT d.id, d.task_id, d.blocked_by_task_id, d.note, d.created_at,
+            t.title as blocking_title, t.status as blocking_status
+     FROM task_dependencies d
+     JOIN tasks t ON t.id = d.task_id
+     WHERE d.blocked_by_task_id IN (${placeholders})
+     ORDER BY d.created_at DESC`,
+    taskIds
+  );
+  const grouped = new Map<string, { blocked_by: TaskDependencySummary[]; blocking: TaskDependencySummary[] }>();
+  for (const taskId of taskIds) grouped.set(taskId, { blocked_by: [], blocking: [] });
+  for (const row of blockedRows) grouped.get(row.task_id)?.blocked_by.push(row);
+  for (const row of blockingRows) grouped.get(row.blocked_by_task_id)?.blocking.push(row);
+  return grouped;
+}
+
 export function listDependencyCandidates(taskId: string, workspaceId: string) {
   return queryAll<{ id: string; title: string; status: string }>(
     `SELECT id, title, status FROM tasks

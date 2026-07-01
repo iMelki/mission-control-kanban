@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, AlertTriangle, Copy, Check } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
 import { DeliverablesList } from './DeliverablesList';
@@ -11,6 +11,9 @@ import { AgentModal } from './AgentModal';
 import { GitHubWritebackPanel } from './GitHubWritebackPanel';
 import { DispatchTimeline } from './DispatchTimeline';
 import { TaskDependenciesPanel } from './TaskDependenciesPanel';
+import { RuntimeActionsPanel } from './task-modal/RuntimeActionsPanel';
+import { GitHubIssueDraftPanel } from './task-modal/GitHubIssueDraftPanel';
+import { DispatchContractSection } from './task-modal/DispatchContractSection';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
 import {
@@ -85,9 +88,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
-  const [githubIssueDraft, setGithubIssueDraft] = useState<Record<string, unknown> | null>(null);
   const [isPreviewingDispatch, setIsPreviewingDispatch] = useState(false);
-  const [isLoadingIssueDraft, setIsLoadingIssueDraft] = useState(false);
 
   useEffect(() => {
     setCurrentTask(initialTask);
@@ -178,23 +179,6 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     } finally {
       setIsPreviewingDispatch(false);
     }
-  };
-
-  const handleLoadGitHubIssueDraft = async () => {
-    if (!currentTask?.id) return;
-    setIsLoadingIssueDraft(true);
-    try {
-      const response = await fetch(`/api/tasks/${currentTask.id}/github-issue-draft`, { cache: 'no-store' });
-      setGithubIssueDraft(await response.json());
-    } finally {
-      setIsLoadingIssueDraft(false);
-    }
-  };
-
-  const copyGitHubIssueBody = async () => {
-    const draft = githubIssueDraft?.draft as { title?: string; body?: string } | undefined;
-    if (!draft) return;
-    await navigator.clipboard.writeText(`# ${draft.title || form.title}\n\n${draft.body || ''}`);
   };
 
   const applyReadyForAgentChecklist = () => {
@@ -578,249 +562,29 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           </div>
 
           <div className="pt-2 border-t border-mc-border space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold">Dispatch Contract</h3>
-              <p className="text-xs text-mc-text-secondary mt-1">
-                These fields mirror the GitHub-native readiness contract used to decide whether auto-dispatch is safe.
-              </p>
-              {currentTask?.status === 'inbox' && currentTask.dispatch_blockers && currentTask.dispatch_blockers.length > 0 && (
-                <p className="text-xs text-amber-200 mt-2">
-                  Why this task is still in Inbox: it is missing one or more required dispatch fields. Fill the scope,
-                  acceptance criteria, tests, review mode, impact, and rollback plan here, then save before moving it forward.
-                </p>
-              )}
-            </div>
+            <DispatchContractSection
+              form={form}
+              updateFormField={updateFormField}
+              inputId={inputId}
+              currentTask={currentTask}
+              dispatchPreview={dispatchPreview}
+              dispatchSummaryClass={dispatchSummaryClass}
+              readinessOptions={readinessOptions}
+              reviewModeOptions={reviewModeOptions}
+              riskOptions={riskOptions}
+            />
 
-            <div className={`rounded-lg border px-3 py-3 ${dispatchSummaryClass}`}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">{dispatchPreview.headline}</p>
-                  <p className="mt-1 text-xs opacity-90">
-                    Readiness: {dispatchPreview.readinessLabel}
-                    {dispatchPreview.reviewModeLabel ? ` · Review: ${dispatchPreview.reviewModeLabel}` : ''}
-                    {dispatchPreview.riskLevelLabel ? ` · Risk: ${dispatchPreview.riskLevelLabel}` : ''}
-                  </p>
-                </div>
-                {dispatchPreview.state !== 'ready' && (
-                  <span className="text-[11px] font-medium uppercase tracking-wide opacity-90">
-                    Save after filling the missing contract fields
-                  </span>
-                )}
-              </div>
+            <RuntimeActionsPanel
+              onApplyReadyChecklist={applyReadyForAgentChecklist}
+              onDispatchDryRun={handleDispatchDryRun}
+              isPreviewingDispatch={isPreviewingDispatch}
+              dispatchDryRun={dispatchDryRun}
+              disabled={!currentTask}
+            />
 
-              {dispatchPreview.blockers.length > 0 && (
-                <ul className="mt-3 space-y-1 text-xs list-disc list-inside">
-                  {dispatchPreview.blockers.slice(0, 4).map((blocker) => (
-                    <li key={blocker}>{blocker}</li>
-                  ))}
-                </ul>
-              )}
+            {currentTask && <GitHubIssueDraftPanel taskId={currentTask.id} fallbackTitle={form.title} />}
 
-              {dispatchPreview.warnings.length > 0 && (
-                <ul className="mt-2 space-y-1 text-xs list-disc list-inside opacity-90">
-                  {dispatchPreview.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <button
-                type="button"
-                onClick={applyReadyForAgentChecklist}
-                className="rounded border border-mc-border px-3 py-2 text-left text-sm hover:bg-mc-bg-tertiary"
-              >
-                <span className="block font-medium">Apply ready-for-agent checklist</span>
-                <span className="text-xs text-mc-text-secondary">Seed tests, safety, rollback, and readiness fields.</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDispatchDryRun()}
-                disabled={!currentTask || isPreviewingDispatch}
-                className="rounded border border-mc-border px-3 py-2 text-left text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
-              >
-                <span className="block font-medium">Dry-run dispatch preview</span>
-                <span className="text-xs text-mc-text-secondary">Preview manual/OpenClaw/webhook payloads without side effects.</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleLoadGitHubIssueDraft()}
-                disabled={!currentTask || isLoadingIssueDraft}
-                className="rounded border border-mc-border px-3 py-2 text-left text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
-              >
-                <span className="block font-medium">GitHub issue draft</span>
-                <span className="text-xs text-mc-text-secondary">Create/update-ready issue text from this work slice.</span>
-              </button>
-            </div>
-
-            {dispatchDryRun && (
-              <details open className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-xs">
-                <summary className="cursor-pointer font-semibold text-mc-text">Dispatch dry-run preview</summary>
-                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-mc-bg p-3">{JSON.stringify(dispatchDryRun, null, 2)}</pre>
-              </details>
-            )}
-
-            {githubIssueDraft && (
-              <details open className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-xs">
-                <summary className="cursor-pointer font-semibold text-mc-text">GitHub issue create/update draft</summary>
-                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-mc-bg p-3">{JSON.stringify(githubIssueDraft, null, 2)}</pre>
-                <button type="button" onClick={() => void copyGitHubIssueBody()} className="mt-2 rounded border border-mc-border px-2 py-1 hover:bg-mc-bg-tertiary">Copy issue title/body</button>
-              </details>
-            )}
-
-            {currentTask && <TaskDependenciesPanel taskId={currentTask.id} />}
-
-            <div>
-              <label htmlFor={inputId('source-issue-url')} className="block text-sm font-medium mb-1">Source Issue URL</label>
-              <input
-                id={inputId('source-issue-url')}
-                type="url"
-                value={form.dispatch_source_issue_url}
-                onChange={(e) => updateFormField('dispatch_source_issue_url', e.target.value)}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                placeholder="https://github.com/owner/repo/issues/123"
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor={inputId('target-repo')} className="block text-sm font-medium mb-1">Target Repo</label>
-                <input
-                  id={inputId('target-repo')}
-                  type="text"
-                  value={form.dispatch_target_repo}
-                  onChange={(e) => updateFormField('dispatch_target_repo', e.target.value)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                  placeholder="iMelki/mission-control"
-                />
-              </div>
-              <div>
-                <label htmlFor={inputId('project-workstream')} className="block text-sm font-medium mb-1">Project / Workstream</label>
-                <input
-                  id={inputId('project-workstream')}
-                  type="text"
-                  value={form.dispatch_project_workstream}
-                  onChange={(e) => updateFormField('dispatch_project_workstream', e.target.value)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                  placeholder="projects-ops rollout"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <label htmlFor={inputId('readiness')} className="block text-sm font-medium mb-1">Readiness</label>
-                <select
-                  id={inputId('readiness')}
-                  value={form.dispatch_readiness}
-                  onChange={(e) => updateFormField('dispatch_readiness', e.target.value as DispatchReadiness)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  {readinessOptions.map((value) => (
-                    <option key={value} value={value}>{READINESS_LABELS[value]}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor={inputId('review-mode')} className="block text-sm font-medium mb-1">Review Mode</label>
-                <select
-                  id={inputId('review-mode')}
-                  value={form.dispatch_review_mode}
-                  onChange={(e) => updateFormField('dispatch_review_mode', e.target.value as DispatchReviewMode)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  {reviewModeOptions.map((value) => (
-                    <option key={value} value={value}>{REVIEW_MODE_LABELS[value]}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor={inputId('risk-level')} className="block text-sm font-medium mb-1">Risk Level</label>
-                <select
-                  id={inputId('risk-level')}
-                  value={form.dispatch_risk_level}
-                  onChange={(e) => updateFormField('dispatch_risk_level', e.target.value as DispatchRiskLevel)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  {riskOptions.map((value) => (
-                    <option key={value} value={value}>{RISK_LEVEL_LABELS[value]}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor={inputId('impact')} className="block text-sm font-medium mb-1">Impact</label>
-              <input
-                id={inputId('impact')}
-                type="text"
-                value={form.dispatch_impact}
-                onChange={(e) => updateFormField('dispatch_impact', e.target.value)}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                placeholder="Docs only / code / infra / security"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('allowed-file-scope')} className="block text-sm font-medium mb-1">Allowed File Scope</label>
-              <textarea
-                id={inputId('allowed-file-scope')}
-                value={form.dispatch_allowed_file_scope}
-                onChange={(e) => updateFormField('dispatch_allowed_file_scope', e.target.value)}
-                rows={3}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="One file or path per line"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('acceptance-criteria')} className="block text-sm font-medium mb-1">Acceptance Criteria</label>
-              <textarea
-                id={inputId('acceptance-criteria')}
-                value={form.dispatch_acceptance_criteria}
-                onChange={(e) => updateFormField('dispatch_acceptance_criteria', e.target.value)}
-                rows={3}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="One acceptance criterion per line"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('test-requirements')} className="block text-sm font-medium mb-1">Test Requirements</label>
-              <textarea
-                id={inputId('test-requirements')}
-                value={form.dispatch_test_requirements}
-                onChange={(e) => updateFormField('dispatch_test_requirements', e.target.value)}
-                rows={3}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="One verification command or expected test per line"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('safety-rules')} className="block text-sm font-medium mb-1">Safety Rules</label>
-              <textarea
-                id={inputId('safety-rules')}
-                value={form.dispatch_safety_rules}
-                onChange={(e) => updateFormField('dispatch_safety_rules', e.target.value)}
-                rows={2}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="One guardrail per line"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('rollback-plan')} className="block text-sm font-medium mb-1">Rollback / Fallback Plan</label>
-              <textarea
-                id={inputId('rollback-plan')}
-                value={form.dispatch_rollback_plan}
-                onChange={(e) => updateFormField('dispatch_rollback_plan', e.target.value)}
-                rows={3}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="How to contain or revert the change if dispatch goes wrong"
-              />
-            </div>
+            {currentTask && <TaskDependenciesPanel task={currentTask} />}
 
             {currentTask?.github_source && (
               <GitHubWritebackPanel

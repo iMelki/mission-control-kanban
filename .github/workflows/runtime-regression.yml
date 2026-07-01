@@ -63,8 +63,24 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+      - name: Install Playwright system dependencies
+        timeout-minutes: 8
+        run: npx playwright install-deps chromium
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 8
+        run: |
+          for attempt in 1 2 3; do
+            npx playwright install chromium && exit 0
+            sleep $((attempt * 10))
+          done
+          exit 1
       - name: Run runtime regression checks
         env:
           MCK_SMOKE_ARTIFACT_DIR: artifacts/runtime-ui-smoke/ci
@@ -80,6 +96,11 @@ jobs:
             test-results/**
           if-no-files-found: ignore
           retention-days: 14
+      - name: Write runtime artifact links to step summary
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run comment:runtime-artifacts -- --dry-run --github-step-summary --branch "${{ github.ref_name }}" --run-id "${{ github.run_id }}"
       - name: Comment artifact links on PR/requested issue after successful CI
         if: ${{ success() && ((github.event_name == 'workflow_dispatch' && inputs.issue_number != '') || github.event_name == 'pull_request') }}
         env:

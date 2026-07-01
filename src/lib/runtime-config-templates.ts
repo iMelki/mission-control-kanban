@@ -16,6 +16,69 @@ export interface RuntimeConfigTemplate {
   config: AgentRuntimeConfig;
 }
 
+export interface RuntimeConfigTemplateDiagnostic {
+  template_id: RuntimeConfigTemplateId;
+  template_label: string;
+  env_name: string;
+  kind: 'webhook_url' | 'bearer_token' | 'signature_secret';
+  configured: boolean;
+  valid?: boolean;
+  severity: 'ok' | 'warning' | 'blocked';
+  message: string;
+}
+
+function envDiagnostic({
+  template,
+  envName,
+  kind,
+  value,
+}: {
+  template: RuntimeConfigTemplate;
+  envName?: unknown;
+  kind: RuntimeConfigTemplateDiagnostic['kind'];
+  value?: string;
+}): RuntimeConfigTemplateDiagnostic[] {
+  if (typeof envName !== 'string' || !envName.trim()) return [];
+  const name = envName.trim();
+  const configured = Boolean(value && value.trim());
+  const isUrl = kind === 'webhook_url';
+  const valid = isUrl && configured ? /^https?:\/\//.test(value || '') : configured;
+  const severity = !configured
+    ? (kind === 'webhook_url' ? 'blocked' : 'warning')
+    : valid ? 'ok' : 'blocked';
+  const label = kind === 'webhook_url' ? 'Webhook URL' : kind === 'bearer_token' ? 'Bearer token' : 'Signature secret';
+  return [{
+    template_id: template.id,
+    template_label: template.label,
+    env_name: name,
+    kind,
+    configured,
+    valid,
+    severity,
+    message: !configured
+      ? `${label} env var ${name} is not configured.`
+      : valid
+        ? `${label} env var ${name} is configured.`
+        : `${label} env var ${name} is configured but does not look valid.`,
+  }];
+}
+
+export function diagnoseRuntimeConfigTemplate(template: RuntimeConfigTemplate, env: Record<string, string | undefined> = process.env): RuntimeConfigTemplateDiagnostic[] {
+  return [
+    ...envDiagnostic({ template, envName: template.config.webhook_url_env, kind: 'webhook_url', value: env[String(template.config.webhook_url_env || '')] }),
+    ...envDiagnostic({ template, envName: template.config.bearer_token_env, kind: 'bearer_token', value: env[String(template.config.bearer_token_env || '')] }),
+    ...envDiagnostic({ template, envName: template.config.signature_secret_env, kind: 'signature_secret', value: env[String(template.config.signature_secret_env || '')] }),
+  ];
+}
+
+export function getRuntimeConfigTemplateDiagnostics(env: Record<string, string | undefined> = process.env) {
+  return RUNTIME_CONFIG_TEMPLATES.map((template) => ({
+    template_id: template.id,
+    template_label: template.label,
+    diagnostics: diagnoseRuntimeConfigTemplate(template, env),
+  }));
+}
+
 export const RUNTIME_CONFIG_TEMPLATES: RuntimeConfigTemplate[] = [
   {
     id: 'hermes',

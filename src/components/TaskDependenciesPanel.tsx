@@ -2,16 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Link2, Trash2 } from 'lucide-react';
-
-interface DependencyRow {
-  id: string;
-  blocked_by_task_id: string;
-  blocked_by_title?: string;
-  blocked_by_status?: string;
-  blocking_title?: string;
-  blocking_status?: string;
-  note?: string | null;
-}
+import type { Task, TaskDependencySummary } from '@/lib/types';
+import { DependencyBadges } from './DependencyBadges';
 
 interface CandidateTask {
   id: string;
@@ -19,9 +11,59 @@ interface CandidateTask {
   status: string;
 }
 
-export function TaskDependenciesPanel({ taskId }: { taskId: string }) {
-  const [blockedBy, setBlockedBy] = useState<DependencyRow[]>([]);
-  const [blocking, setBlocking] = useState<DependencyRow[]>([]);
+function statusTone(status?: string) {
+  if (status === 'done') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
+  if (status === 'review' || status === 'testing') return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  return 'border-mc-border bg-mc-bg-tertiary text-mc-text-secondary';
+}
+
+function NodeCard({ title, status, note, active }: { title?: string; status?: string; note?: string | null; active?: boolean }) {
+  return (
+    <div className={`rounded border p-2 text-sm ${active ? 'border-mc-accent/50 bg-mc-accent/10' : 'border-mc-border bg-mc-bg'}`}>
+      <div className="line-clamp-2 font-medium text-mc-text">{title || 'Untitled task'}</div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-mc-text-secondary">
+        {status && <span className={`rounded border px-1.5 py-0.5 ${statusTone(status)}`}>{status.replace('_', ' ')}</span>}
+        {note && <span className="line-clamp-1">{note}</span>}
+      </div>
+    </div>
+  );
+}
+
+function DependencyGraph({ task, blockedBy, blocking }: { task: Pick<Task, 'id' | 'title' | 'status'>; blockedBy: TaskDependencySummary[]; blocking: TaskDependencySummary[] }) {
+  return (
+    <div className="rounded border border-mc-border bg-mc-bg-secondary/60 p-3" data-testid="dependency-graph">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-mc-text-secondary">Dependency graph</div>
+        <DependencyBadges blockedBy={blockedBy} blocking={blocking} compact />
+      </div>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
+        <div className="space-y-2">
+          <div className="text-[11px] font-semibold uppercase text-mc-text-secondary">Blockers</div>
+          {blockedBy.length > 0 ? blockedBy.map((row) => (
+            <NodeCard key={row.id} title={row.blocked_by_title} status={row.blocked_by_status} note={row.note} />
+          )) : <div className="rounded border border-dashed border-mc-border p-2 text-xs text-mc-text-secondary">No local blockers</div>}
+        </div>
+        <div className="hidden text-mc-text-secondary md:block">→</div>
+        <div className="space-y-2">
+          <div className="text-[11px] font-semibold uppercase text-mc-text-secondary">Current task</div>
+          <NodeCard title={task.title} status={task.status} active />
+          {blocking.length > 0 && <div className="text-center text-mc-text-secondary">↓</div>}
+          {blocking.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold uppercase text-mc-text-secondary">This task blocks</div>
+              {blocking.map((row) => <NodeCard key={row.id} title={row.blocking_title} status={row.blocking_status} note={row.note} />)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function TaskDependenciesPanel({ task }: { task: Pick<Task, 'id' | 'title' | 'status'> }) {
+  const taskId = task.id;
+  const [blockedBy, setBlockedBy] = useState<TaskDependencySummary[]>([]);
+  const [blocking, setBlocking] = useState<TaskDependencySummary[]>([]);
   const [candidates, setCandidates] = useState<CandidateTask[]>([]);
   const [selectedTask, setSelectedTask] = useState('');
   const [note, setNote] = useState('');
@@ -62,14 +104,18 @@ export function TaskDependenciesPanel({ taskId }: { taskId: string }) {
 
   return (
     <section className="rounded border border-mc-border bg-mc-bg-secondary p-3 space-y-3">
-      <div className="flex items-start gap-2">
-        <Link2 className="mt-0.5 size-4 text-mc-accent" />
-        <div>
-          <h3 className="text-sm font-semibold">Task dependencies / blocked-by</h3>
-          <p className="text-xs text-mc-text-secondary">Track dependency edges before multi-agent work starts. This list-based view is the first step before graph rendering.</p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex items-start gap-2">
+          <Link2 className="mt-0.5 size-4 text-mc-accent" />
+          <div>
+            <h3 className="text-sm font-semibold">Task dependencies / blocked-by</h3>
+            <p className="text-xs text-mc-text-secondary">Track local dependency edges before multi-agent work starts. The compact graph keeps DAG navigation visible without adding a heavy graph dependency.</p>
+          </div>
         </div>
+        <DependencyBadges blockedBy={blockedBy} blocking={blocking} compact />
       </div>
       {error && <div className="rounded border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{error}</div>}
+      <DependencyGraph task={task} blockedBy={blockedBy} blocking={blocking} />
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <select value={selectedTask} onChange={(event) => setSelectedTask(event.target.value)} className="w-full rounded border border-mc-border bg-mc-bg px-3 py-2 text-sm">
           <option value="">Select a task that blocks this one…</option>

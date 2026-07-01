@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getOpenClawClient } from '@/lib/openclaw/client';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // File system imports removed - using OpenClaw API instead
 
 type OpenClawMessage = { role: string; content: Array<{ type: string; text?: string }> };

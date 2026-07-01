@@ -365,6 +365,36 @@ export function recordRuntimeMaintenanceRun({
   );
 }
 
+export function getRuntimeMaintenanceRuns({ runType, limit = 10 }: { runType?: string; limit?: number } = {}) {
+  const params: unknown[] = [];
+  let filter = '';
+  if (runType) {
+    filter = 'WHERE run_type = ?';
+    params.push(runType);
+  }
+  params.push(Math.min(Math.max(limit, 1), 100));
+  return queryAll<{
+    id: string;
+    run_type: string;
+    dry_run: number;
+    status: string;
+    deleted_count: number;
+    summary: string | null;
+    error_message: string | null;
+    created_at: string;
+  }>(
+    `SELECT id, run_type, dry_run, status, deleted_count, summary, error_message, created_at
+     FROM runtime_maintenance_runs ${filter}
+     ORDER BY created_at DESC
+     LIMIT ?`,
+    params
+  ).map((row) => ({
+    ...row,
+    dry_run: Boolean(row.dry_run),
+    summary: row.summary ? JSON.parse(row.summary) : null,
+  }));
+}
+
 export function pruneDispatchAttemptsWithAudit(options: Parameters<typeof pruneDispatchAttempts>[0] = {}) {
   try {
     const result = pruneDispatchAttempts(options);
@@ -534,21 +564,44 @@ export function getRuntimeMigrationDiff({ agentIds }: { agentIds?: string[] } = 
 }
 
 export function applyRuntimeAuditMigration({ dryRun = true, agentIds }: { dryRun?: boolean; agentIds?: string[] } = {}) {
-  const diff = getRuntimeMigrationDiff({ agentIds });
-  if (!dryRun) {
-    const now = new Date().toISOString();
-    for (const row of diff) {
-      run(
-        'UPDATE agents SET runtime_type = ?, dispatch_enabled = ?, updated_at = ? WHERE id = ?',
-        [row.after.runtime_type, row.after.dispatch_enabled ? 1 : 0, now, row.agent_id]
-      );
+  try {
+    const diff = getRuntimeMigrationDiff({ agentIds });
+    if (!dryRun) {
+      const now = new Date().toISOString();
+      for (const row of diff) {
+        run(
+          'UPDATE agents SET runtime_type = ?, dispatch_enabled = ?, updated_at = ? WHERE id = ?',
+          [row.after.runtime_type, row.after.dispatch_enabled ? 1 : 0, now, row.agent_id]
+        );
+      }
     }
+    const result = {
+      dry_run: dryRun,
+      candidates: diff.length,
+      applied: dryRun ? 0 : diff.length,
+      diff,
+      description: 'Normalize unsafe/unknown runtime states to a safe runtime with explicit dispatch gating.',
+    };
+    recordRuntimeMaintenanceRun({
+      runType: 'runtime_audit_migration',
+      dryRun,
+      status: 'success',
+      deletedCount: 0,
+      summary: {
+        selected_agent_ids: agentIds || null,
+        candidates: result.candidates,
+        applied: result.applied,
+        changed_agents: diff.map((row) => ({ agent_id: row.agent_id, name: row.name, changed_fields: row.changed_fields, reason: row.reason })),
+      },
+    });
+    return result;
+  } catch (error) {
+    recordRuntimeMaintenanceRun({
+      runType: 'runtime_audit_migration',
+      dryRun,
+      status: 'failed',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
-  return {
-    dry_run: dryRun,
-    candidates: diff.length,
-    applied: dryRun ? 0 : diff.length,
-    diff,
-    description: 'Normalize unsafe/unknown runtime states to a safe runtime with explicit dispatch gating.',
-  };
 }

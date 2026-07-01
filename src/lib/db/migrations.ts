@@ -7,12 +7,12 @@
  * 3. Never runs the same migration twice
  */
 
-import Database from 'better-sqlite3';
+import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 interface Migration {
   id: string;
   name: string;
-  up: (db: Database.Database) => void;
+  up: (db: SqliteDatabase) => void;
 }
 
 // All migrations in order - NEVER remove or reorder existing migrations
@@ -582,7 +582,7 @@ const migrations: Migration[] = [
 /**
  * Run all pending migrations
  */
-export function runMigrations(db: Database.Database): void {
+export function runMigrations(db: SqliteDatabase): void {
   // Create migrations tracking table
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -623,7 +623,7 @@ export function runMigrations(db: Database.Database): void {
 /**
  * Get migration status
  */
-export function getMigrationStatus(db: Database.Database): { applied: string[]; pending: string[] } {
+export function getMigrationStatus(db: SqliteDatabase): { applied: string[]; pending: string[] } {
   const applied = (db.prepare('SELECT id FROM _migrations ORDER BY id').all() as { id: string }[]).map(m => m.id);
   const appliedIds = new Set(applied);
   const pending = migrations.flatMap((m) => appliedIds.has(m.id) ? [] : [m.id]);

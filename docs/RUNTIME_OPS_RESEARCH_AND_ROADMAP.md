@@ -1,6 +1,6 @@
 # Runtime Ops Research and Implementation Roadmap
 
-Updated: 2026-07-01
+Updated: 2026-07-02
 
 This note records the research-first decisions for the post-runtime-ops MCK workstream tracked by [#38](https://github.com/iMelki/mission-control-kanban/issues/38) and the dispatch metadata refresh closeout tracked by [#34](https://github.com/iMelki/mission-control-kanban/issues/34).
 
@@ -35,14 +35,22 @@ Community/vendor guidance checked before implementation:
 - Added screenshot thumbnail previews and a safe screenshot-serving route for `/runtime-regression`.
 - Updated Runtime Regression CI to comment artifact links on successful PR/requested issue runs.
 - Captured the reusable operator workflow in `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`.
+- Added explicit live GitHub issue create/update from the Task modal issue-draft panel, gated by a plain-English confirmation checkbox and the existing write-back safety layer.
+- Extracted Task modal runtime surfaces into reusable dispatch-contract, runtime-actions, and GitHub issue draft components.
+- Added compact task dependency graph/badges plus automated cycle-detection coverage and batch task dependency summaries.
+- Added runtime migration audit history, env-var presence diagnostics for runtime templates, and a safe local mock webhook receiver (`npm run mock:webhook`).
+- Expanded browser smoke coverage for dependency panel visibility, blocked-by badges, ready-for-agent checklist seeding, and webhook validation wizard disabled states.
+- Reduced SQLite/Turbopack trace pressure with type-only database imports/lazy loading while pinning the local `dev:n8n` script to webpack because Next dev/Turbopack can break file-backed SQLite route APIs in this app.
+- Split Playwright system dependency and Chromium download steps in CI, added browser-cache restore, and added step-summary artifact deep links for daily/runtime closeout.
 
 ## Remaining tracked work
 
-1. Upgrade the blocked-by list into a true dependency graph only if operators need DAG navigation.
-2. Wire GitHub issue drafts to an explicit live create/update action after adding a plain-English confirmation step.
-3. Continue extracting Task modal sections into smaller route/component chunks as follow-up work.
-4. Add scheduled daily summary deep links to the exact latest `/runtime-regression` screenshots once CI artifact URLs are available at run time.
-5. Continue Turbopack trace triage for the `next.config.mjs` → `src/lib/db/index.ts` path while keeping webpack as the supported build.
+1. Evaluate whether operators need true multi-hop DAG navigation after using the compact blockers → task → downstream dependency graph in live work.
+2. Add dedicated mock-webhook browser smokes for explicit success and failure validation wizard states using `npm run mock:webhook`.
+3. Add a settings/runtime diagnostics surface for env-var template presence if operators need it outside the Agent modal template gallery.
+4. Continue route-level Task modal decomposition if the remaining non-runtime edit fields become harder to maintain.
+5. Keep Turbopack as inventory-only until both `next build` and `next dev` can run file-backed SQLite route APIs without regressions.
+6. Promote daily runtime-summary links from local/CI artifacts into durable issue comments; avoid committing expiring artifact URLs into source docs.
 
 ## Closeout semantics for the requested explanations
 

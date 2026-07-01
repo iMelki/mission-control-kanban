@@ -1,6 +1,6 @@
 # MCK Runtime UX + Regression Workflow
 
-Updated: 2026-07-01
+Updated: 2026-07-02
 
 Use this workflow when adding runtime dispatch UI, dense workspace refinements, or regression automation to Mission Control Kanban.
 
@@ -30,6 +30,8 @@ Use this workflow when adding runtime dispatch UI, dense workspace refinements, 
 - Use blocked-by edges for local MCK task dependencies.
 - Keep the ready-for-agent checklist operator-editable and visible in the Task modal.
 - GitHub issue create/update flows should start as generated drafts unless a user explicitly approves live GitHub mutation.
+- Use a compact blockers → task → downstream graph before adding full DAG navigation. Escalate to React Flow/Dagre only when operators need multi-hop traversal.
+- Add task-card dependency badges for local blocked-by/blocking edges so operators see blocked work without opening the modal.
 
 ## 5. Regression and artifact closeout
 
@@ -39,7 +41,9 @@ Run the validation bundle:
 npm run lint
 npm test
 npm run build
-npm run check:runtime-regressions
+npm run doctor:react
+npm run smoke:runtime-ui
+npm run comment:runtime-artifacts -- --dry-run
 ```
 
 For CI evidence:
@@ -54,5 +58,6 @@ Runtime Regression CI comments on PRs after successful workflow completion. Loca
 ## 6. Turbopack inventory policy
 
 - `npm run build` remains webpack-backed and blocking.
+- `npm run dev:n8n` is also webpack-backed on port 3021; Next dev/Turbopack can serve the shell while breaking file-backed SQLite route APIs, so do not remove `--webpack` without a route-level smoke proof.
 - `npm run build:turbo` remains non-blocking inventory until the `next.config.mjs` → `src/lib/db/index.ts` output-file-tracing path is resolved.
 - Upload or inspect `mck-turbopack-inventory` artifacts for trace warnings rather than blocking operator work.

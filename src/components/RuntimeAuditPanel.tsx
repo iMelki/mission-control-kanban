@@ -20,6 +20,14 @@ interface AuditAgent {
 interface AuditPayload {
   summary: Record<string, number>;
   agents: AuditAgent[];
+  migration_history?: Array<{
+    id: string;
+    dry_run: boolean;
+    status: string;
+    summary?: Record<string, unknown> | null;
+    error_message?: string | null;
+    created_at: string;
+  }>;
 }
 
 const columns: DataTableColumn<AuditAgent>[] = [
@@ -93,6 +101,22 @@ export function RuntimeAuditPanel() {
         ))}
       </div>
       {migration && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm"><ShieldAlert className="mr-2 inline size-4 text-amber-300" />Migration result: {JSON.stringify(migration)}</div>}
+      {payload?.migration_history && payload.migration_history.length > 0 && (
+        <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm">
+          <div className="mb-2 font-semibold">Recent runtime migration audit history</div>
+          <div className="space-y-2">
+            {payload.migration_history.map((run) => (
+              <div key={run.id} className="rounded border border-mc-border bg-mc-bg p-2 text-xs">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <span>{run.dry_run ? 'Dry-run' : 'Applied'} · {run.status}</span>
+                  <span className="text-mc-text-secondary">{new Date(run.created_at).toLocaleString()}</span>
+                </div>
+                <div className="mt-1 text-mc-text-secondary">{run.error_message || JSON.stringify(run.summary)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {healthTest && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm"><CheckCircle2 className="mr-2 inline size-4 text-mc-accent" />Webhook test: {JSON.stringify(healthTest)}</div>}
       {loading ? <div className="text-sm text-mc-text-secondary">Loading runtime audit…</div> : (
         <DataTable

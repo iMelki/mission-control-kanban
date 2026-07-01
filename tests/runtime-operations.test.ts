@@ -20,6 +20,7 @@ let getRuntimeAudit: typeof import('../src/lib/runtime-operations').getRuntimeAu
 let getDispatchFailureRateTrends: typeof import('../src/lib/runtime-operations').getDispatchFailureRateTrends;
 let getDispatchFailureThresholdAlerts: typeof import('../src/lib/runtime-operations').getDispatchFailureThresholdAlerts;
 let applyRuntimeAuditMigration: typeof import('../src/lib/runtime-operations').applyRuntimeAuditMigration;
+let getRuntimeMaintenanceRuns: typeof import('../src/lib/runtime-operations').getRuntimeMaintenanceRuns;
 let pruneDispatchAttemptsWithAudit: typeof import('../src/lib/runtime-operations').pruneDispatchAttemptsWithAudit;
 
 function resetDb() {
@@ -48,6 +49,7 @@ test.before(async () => {
   getDispatchFailureRateTrends = runtimeOps.getDispatchFailureRateTrends;
   getDispatchFailureThresholdAlerts = runtimeOps.getDispatchFailureThresholdAlerts;
   applyRuntimeAuditMigration = runtimeOps.applyRuntimeAuditMigration;
+  getRuntimeMaintenanceRuns = runtimeOps.getRuntimeMaintenanceRuns;
   pruneDispatchAttemptsWithAudit = runtimeOps.pruneDispatchAttemptsWithAudit;
 });
 
@@ -174,6 +176,10 @@ test('dispatch failure threshold alerts and bulk migration diff expose operator 
   assert.equal(preview.candidates, 1);
   assert.equal(preview.diff[0].before.dispatch_enabled, true);
   assert.equal(preview.diff[0].after.dispatch_enabled, false);
+  const history = getRuntimeMaintenanceRuns({ runType: 'runtime_audit_migration' });
+  assert.equal(history.length, 1);
+  assert.equal(history[0].dry_run, true);
+  assert.equal((history[0].summary as { candidates?: number } | null)?.candidates, 1);
 });
 
 test('retention cleanup records maintenance audit rows', () => {

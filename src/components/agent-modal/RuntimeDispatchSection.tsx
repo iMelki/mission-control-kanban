@@ -137,8 +137,10 @@ export function RuntimeDispatchSection({
         </div>
 
         <div className="rounded border border-mc-border bg-mc-bg-secondary p-3">
-          <label className="flex items-start gap-2 text-sm">
+          <label htmlFor="agent-dispatch-enabled" className="flex items-start gap-2 text-sm">
             <input
+              id="agent-dispatch-enabled"
+              aria-label="Enable auto-dispatch"
               type="checkbox"
               checked={form.dispatch_enabled}
               disabled={form.runtime_type === 'manual' || (form.runtime_type === 'webhook' && !webhookValidationOk)}

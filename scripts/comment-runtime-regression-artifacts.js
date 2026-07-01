@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { spawnSync } = require('node:child_process');
+const { appendFileSync } = require('node:fs');
 
 function runGh(args, { allowFailure = false } = {}) {
   const result = spawnSync('gh', args, { encoding: 'utf8' });
@@ -16,7 +17,9 @@ function parseArgs(argv) {
     branch: 'dev',
     issue: process.env.MCK_RUNTIME_ARTIFACT_ISSUE || '',
     runId: process.env.GITHUB_RUN_ID || '',
+    publicBaseUrl: process.env.MCK_PUBLIC_BASE_URL || process.env.MISSION_CONTROL_URL || 'http://127.0.0.1:3021',
     dryRun: false,
+    githubStepSummary: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -26,6 +29,8 @@ function parseArgs(argv) {
     else if (arg === '--branch') options.branch = argv[++index];
     else if (arg === '--issue') options.issue = argv[++index];
     else if (arg === '--run-id') options.runId = argv[++index];
+    else if (arg === '--public-base-url') options.publicBaseUrl = argv[++index];
+    else if (arg === '--github-step-summary') options.githubStepSummary = true;
     else if (arg === '--dry-run') options.dryRun = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -37,8 +42,27 @@ function buildRunUrl(repo, runId) {
   return `https://github.com/${repo}/actions/runs/${runId}`;
 }
 
-function buildArtifactUrl(repo, runId, artifactName) {
-  return `${buildRunUrl(repo, runId)}#artifacts` + (artifactName ? ` (${artifactName})` : '');
+function buildArtifactUrl(repo, runId, artifact) {
+  return artifact.id ? `${buildRunUrl(repo, runId)}/artifacts/${artifact.id}` : `${buildRunUrl(repo, runId)}#artifacts`;
+}
+
+function buildBody({ options, run, artifacts }) {
+  const artifactLines = artifacts.length
+    ? artifacts.map((artifact) => `- [${artifact.name}](${buildArtifactUrl(options.repo, run.databaseId, artifact)}); expires ${artifact.expires_at}`).join('\n')
+    : '- No unexpired artifacts found for this run.';
+  const baseUrl = options.publicBaseUrl.replace(/\/$/, '');
+  return [
+    'Runtime regression artifact evidence:',
+    '',
+    `- Workflow: ${options.workflow}`,
+    `- Run: ${run.url || buildRunUrl(options.repo, run.databaseId)}`,
+    `- Status: ${run.status}; conclusion: ${run.conclusion || 'pending'}`,
+    `- Commit: ${run.headSha}`,
+    `- Local drilldown: ${baseUrl}/runtime-regression`,
+    `- Runtime health: ${baseUrl}/api/runtime/health`,
+    '- Artifacts:',
+    artifactLines,
+  ].join('\n');
 }
 
 function main() {
@@ -58,14 +82,12 @@ function main() {
       '--json', 'databaseId,displayTitle,conclusion,status,createdAt,headSha,url',
     ]);
   const run = options.runId ? JSON.parse(runJson || '{}') : JSON.parse(runJson || '[]')[0];
-  if (!run) {
-    throw new Error(`No workflow run found for ${options.workflow} on ${options.repo}@${options.branch}`);
-  }
+  if (!run) throw new Error(`No workflow run found for ${options.workflow} on ${options.repo}@${options.branch}`);
 
   const artifactsJson = runGh([
     'api',
     `repos/${options.repo}/actions/runs/${run.databaseId}/artifacts`,
-    '--jq', '.artifacts[] | {name, expired, size_in_bytes, created_at, expires_at}',
+    '--jq', '.artifacts[] | {id, name, expired, size_in_bytes, created_at, expires_at, archive_download_url}',
   ], { allowFailure: true });
 
   const artifacts = artifactsJson
@@ -74,20 +96,11 @@ function main() {
     .map((line) => JSON.parse(line))
     .filter((artifact) => !artifact.expired);
 
-  const artifactLines = artifacts.length
-    ? artifacts.map((artifact) => `- ${artifact.name}: ${buildArtifactUrl(options.repo, run.databaseId, artifact.name)}; expires ${artifact.expires_at}`).join('\n')
-    : '- No unexpired artifacts found for this run.';
+  const body = buildBody({ options, run, artifacts });
 
-  const body = [
-    'Runtime regression artifact evidence:',
-    '',
-    `- Workflow: ${options.workflow}`,
-    `- Run: ${run.url || buildRunUrl(options.repo, run.databaseId)}`,
-    `- Status: ${run.status}; conclusion: ${run.conclusion || 'pending'}`,
-    `- Commit: ${run.headSha}`,
-    '- Artifacts:',
-    artifactLines,
-  ].join('\n');
+  if (options.githubStepSummary && process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${body}\n`);
+  }
 
   if (!options.issue || options.dryRun) {
     console.log(body);

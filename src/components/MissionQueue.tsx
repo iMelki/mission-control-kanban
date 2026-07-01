@@ -17,6 +17,7 @@ import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
 import { GitHubConnectionStatus } from './GitHubConnectionStatus';
 import { GitHubReadinessCard } from './GitHubReadinessCard';
+import { DependencyBadges } from './DependencyBadges';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MissionQueueProps {
@@ -437,6 +438,8 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
             </div>
           </div>
         )}
+
+        <DependencyBadges blockedBy={task.blocked_by} blocking={task.blocking} />
 
         {(readiness || reviewMode || riskLevel) && (
           <div className="flex flex-wrap gap-1.5 mb-3">
