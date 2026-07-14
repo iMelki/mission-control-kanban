@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Exact issue-filtered GitHub Project workspace sync for [#39](https://github.com/iMelki/mission-control-kanban/issues/39). Callers can pass `issue_refs` to require one active Project match per ref and limit both dry-run and apply behavior to that reviewed subset.
 - Runtime-ops research roadmap for [#38](https://github.com/iMelki/mission-control-kanban/issues/38) in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`, plus per-runtime failure-rate trend data/cards and the `/runtime-regression` local artifact drilldown UI.
 - Runtime UX workflow for [#38](https://github.com/iMelki/mission-control-kanban/issues/38) in `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`, covering validation wizards, dry-run previews, bulk migration plans, dependencies, artifact closeout, and Turbopack inventory policy.
 - Webhook endpoint validation wizard and runtime config template gallery for Hermes, Codex, Copilot, Claude Code, n8n, and generic webhook workers, with webhook `dispatch_enabled` gated on a successful signed non-task ping.

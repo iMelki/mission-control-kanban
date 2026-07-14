@@ -172,3 +172,54 @@ test('GitHub Project sync refreshes existing imported task dispatch metadata fro
   assert.equal(metadata?.risk_level, 'medium');
   assert.deepEqual(metadata?.allowed_file_scope, ['src/lib/github-project-sync.ts', 'tests/github-project-sync-persistence.test.ts']);
 });
+
+test('targeted GitHub Project sync mutates only one exact issue ref', async () => {
+  seedWorkspaceAndTask();
+  const issue = (number: number, id: string) => ({
+    id,
+    isArchived: false,
+    content: {
+      __typename: 'Issue',
+      number,
+      title: `Issue ${number}`,
+      body: '## Impact\nTargeted sync proof.',
+      url: `https://github.com/iMelki/mission-control-kanban/issues/${number}`,
+      state: 'OPEN',
+      closed: false,
+      repository: {
+        name: 'mission-control-kanban',
+        nameWithOwner: 'iMelki/mission-control-kanban',
+        owner: { login: 'iMelki' },
+      },
+      labels: { nodes: [{ name: 'type:ops' }] },
+    },
+    fieldValues: { nodes: [{ name: 'Ready', field: { name: 'Status' } }] },
+  });
+
+  const result = await syncLoadedGitHubProjectWorkspace(
+    'assistants',
+    { title: 'Assistants', allItems: [issue(34, 'PVTI_existing'), issue(35, 'PVTI_target')] },
+    { dryRun: true, issueRefs: ['iMelki/mission-control-kanban#35'] }
+  );
+
+  assert.equal(result.selection, 'targeted');
+  assert.deepEqual(result.requested_issue_refs, ['iMelki/mission-control-kanban#35']);
+  assert.equal(result.scanned_items, 2);
+  assert.equal(result.selected_items, 1);
+  assert.equal(result.imported, 1);
+  assert.equal(result.updated, 0);
+  assert.deepEqual(result.details.map((detail) => detail.issue), ['iMelki/mission-control-kanban#35']);
+});
+
+test('targeted GitHub Project sync fails closed when the issue ref is missing', async () => {
+  seedWorkspaceAndTask();
+
+  await assert.rejects(
+    syncLoadedGitHubProjectWorkspace(
+      'assistants',
+      { title: 'Assistants', allItems: [] },
+      { dryRun: true, issueRefs: ['iMelki/mission-control-kanban#35'] }
+    ),
+    /must match exactly one active Project item; found 0/
+  );
+});

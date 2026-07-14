@@ -25,6 +25,21 @@ When a project-backed workspace opens, MCK calls:
 POST /api/workspaces/{workspaceId}/github-sync
 ```
 
+For a bounded import or refresh, pass exact GitHub issue refs. The server reads
+the full linked Project but mutates only refs that each match exactly one active
+Project item; missing or duplicate refs fail before any task write:
+
+```json
+{
+  "dry_run": true,
+  "issue_refs": ["iMelki/memsys#301"]
+}
+```
+
+Repeat the same body with `"dry_run": false` only after reviewing the targeted
+dry-run result. A targeted result reports `selection=targeted`, the requested
+refs, total `scanned_items`, and exact `selected_items`.
+
 The route reads the linked GitHub Project with the local GitHub token and:
 
 - imports open GitHub issue items that are not already local tasks
