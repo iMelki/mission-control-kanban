@@ -1,17 +1,12 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-07-14
+Last updated: 2026-07-17
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
-
-- [#40 - Make React Doctor pre-commit staged-scope and score-outage safe](https://github.com/iMelki/mission-control-kanban/issues/40)
-  - Status: implementation complete locally on 2026-07-17; validation and issue closeout remain.
-  - Result: pre-commit now passes matching staged paths, the wrapper selects the staged Git index with React Doctor `--scope files --staged`, warning diagnostics fail closed, and `--no-score` removes remote score availability from the commit decision.
-  - Evidence: fixture-backed tests cover clean staged files, blocking warnings, unrelated branch files, score-outage text, no-source skips, Git-index failures, and process failures. Emergency bypass policy is documented in `CONTRIBUTING.md`.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.
@@ -24,6 +19,13 @@ the local operator entrypoint; historical task notes remain in
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 
 ## Recently Completed
+
+- [#40 - Make React Doctor pre-commit staged-scope and score-outage safe](https://github.com/iMelki/mission-control-kanban/issues/40)
+  - Closed on 2026-07-17 after commit `1b564b9` made the local warning-level
+    gate staged-file scoped, score-outage independent, and fail-closed for
+    index/process failures.
+  - Validation: all existing tests plus 10/10 hook/config fixtures, lint,
+    Markdown links, staged secret scan, and deterministic no-source skip.
 
 - [#39 - Add exact issue-filtered GitHub Project workspace sync](https://github.com/iMelki/mission-control-kanban/issues/39)
   - Completed on 2026-07-14 for the `projects-ops#73` / `memsys#301` bounded import path.
