@@ -188,7 +188,13 @@ The workspace UI now has route-level section tabs for Board, Agents, Dispatch, S
 
 ## React Doctor Policy
 
-MCK now pins a repo-owned `doctor.config.mjs` policy for raw full-project React Doctor scoring. The config documents local-operator dashboard exceptions such as long-lived client effects, intentionally large workflow modals, API schema download anchors, and test/automation exports. The changed-scope wrapper remains strict for new diagnostics, while `npx -y react-doctor@latest . --score` provides the raw full-project 100/100 proof used in closeout.
+MCK pins a repo-owned `doctor.config.mjs` policy for raw full-project React Doctor scoring. The config documents local-operator dashboard exceptions such as long-lived client effects, intentionally large workflow modals, API schema download anchors, and test/automation exports.
+
+The pre-commit wrapper is intentionally narrower than a branch or full-project scan. Pre-commit passes matching staged frontend paths to `scripts/run-react-doctor.js`, and the wrapper invokes React Doctor with `--scope files --staged --blocking warning --no-score`. This keeps unrelated `dev -> main` diagnostics out of the commit boundary, fails on warnings introduced in the staged frontend set, and avoids score-service availability as a commit dependency. If the staged Git index cannot be read or React Doctor cannot complete, the wrapper fails closed.
+
+Use `npm run doctor:react` to run the same staged gate manually. Use `npx -y react-doctor@latest . --score` only for explicit full-project closeout evidence; it is not the pre-commit decision source.
+
+The research basis, failure model, validation cases, and emergency bypass are recorded in [REACT_DOCTOR_PRECOMMIT_GATE.md](REACT_DOCTOR_PRECOMMIT_GATE.md).
 
 ## Webhook JSON Schema
 

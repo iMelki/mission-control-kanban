@@ -89,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Scoped the React Doctor pre-commit gate for [#40](https://github.com/iMelki/mission-control-kanban/issues/40) to staged frontend files, made warning-level local diagnostics fail closed, and removed remote score-service availability from the commit decision.
 - Switched the default production build to `next build --webpack` to remove the noisy Turbopack NFT trace warning from the supported build path while preserving `npm run build:turbo` for Turbopack inventory.
 - Updated Browserslist/caniuse-lite data; no target browser changes were reported.
 - Scoped README, the OpenClaw agent protocol, first-run operator guide, and dispatch-contract docs so `ASSIGNED` auto-dispatch is explicitly OpenClaw-only until [#32](https://github.com/iMelki/mission-control-kanban/issues/32) adds runtime adapters.
@@ -107,8 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Inbox` instead of forcing the operator to infer that from a failed drag
 - GitHub write-back continues to fall back to `gh api` when direct Node fetches
   are unavailable in the local environment
-- The local React Doctor pre-commit wrapper now passes clean scans even when
-  the remote score API is temporarily unreachable
+- The local React Doctor pre-commit wrapper uses deterministic staged-file
+  diagnostics and does not call the remote score API
 - Project-backed workspaces now auto-refresh from their mapped GitHub Project
   on open while preserving GitHub as the source of truth and avoiding local
   workflow status churn

@@ -30,5 +30,5 @@ repos:
         name: React Doctor
         entry: node scripts/run-react-doctor.js
         language: system
-        pass_filenames: false
+        pass_filenames: true
         files: ^(src|app|components|lib|hooks)/.*\.(ts|tsx|js|jsx|mjs|cjs)$

@@ -9,9 +9,9 @@ the local operator entrypoint; historical task notes remain in
 ## Active
 
 - [#40 - Make React Doctor pre-commit staged-scope and score-outage safe](https://github.com/iMelki/mission-control-kanban/issues/40)
-  - Status: open after the 2026-07-14 #39 commit gate scanned the full `dev -> main` delta and could not reach the score API.
-  - Scope: make the hook evaluate staged frontend files, preserve strict failure for new diagnostics, and use deterministic local results when remote scoring is unavailable.
-  - Current commit boundary: #39 may use `SKIP=react-doctor` only after its own diagnostic is removed and focused tests, TypeScript, lint, secret scanning, Markdown links, and all other hooks pass.
+  - Status: implementation complete locally on 2026-07-17; validation and issue closeout remain.
+  - Result: pre-commit now passes matching staged paths, the wrapper selects the staged Git index with React Doctor `--scope files --staged`, warning diagnostics fail closed, and `--no-score` removes remote score availability from the commit decision.
+  - Evidence: fixture-backed tests cover clean staged files, blocking warnings, unrelated branch files, score-outage text, no-source skips, Git-index failures, and process failures. Emergency bypass policy is documented in `CONTRIBUTING.md`.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.
