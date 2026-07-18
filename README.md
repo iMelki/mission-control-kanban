@@ -116,7 +116,7 @@ OPENCLAW_GATEWAY_TOKEN=your-openclaw-token-here
 # Workspace default port for Mission Control Kanban
 PORT=3021
 
-# Optional webhook runtime signing (store env-var names in agent config, never raw secrets)
+# Required for webhook auto-dispatch (store env-var names in agent config, never raw secrets)
 MCK_WEBHOOK_SIGNATURE_SECRET=replace-with-outbound-hmac-secret
 MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET=replace-with-inbound-callback-hmac-secret
 

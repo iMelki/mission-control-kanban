@@ -12,6 +12,7 @@ const {
   buildReactDoctorArgs,
   classifyReactDoctorResult,
   readStagedFrontendFiles,
+  resolveNpxInvocation,
   selectFrontendFiles,
 } = reactDoctorPrecommit;
 
@@ -55,6 +56,40 @@ test("builds a staged local gate without changed-branch or score API scope", () 
     "--blocking",
     "warning",
   ]);
+});
+
+test("launches npx through node on Windows instead of spawning a cmd shim", () => {
+  const execPath = "C:\\node\\node.exe";
+  const expectedCli = path.win32.join(
+    path.win32.dirname(execPath),
+    "node_modules",
+    "npm",
+    "bin",
+    "npx-cli.js",
+  );
+  const result = resolveNpxInvocation({
+    platform: "win32",
+    execPath,
+    existsSync: (candidate) => candidate === expectedCli,
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    command: execPath,
+    prefixArgs: [expectedCli],
+  });
+  assert.equal(result.command.endsWith(".cmd"), false);
+});
+
+test("fails closed when the Windows npx JavaScript entrypoint is unavailable", () => {
+  const result = resolveNpxInvocation({
+    platform: "win32",
+    execPath: "C:\\node\\node.exe",
+    existsSync: () => false,
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.error, /npx-cli\.js/);
 });
 
 test("reads the staged Git index and excludes unrelated branch files", () => {

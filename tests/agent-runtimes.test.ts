@@ -6,6 +6,7 @@ import {
   buildManualHandoffPrompt,
   buildWebhookDispatchPayload,
   buildWebhookHeaders,
+  getWebhookSignatureSecret,
   getWebhookUrl,
   normalizeAgentRuntimeType,
   parseAgentRuntimeConfig,
@@ -143,6 +144,23 @@ test('webhook adapter payload is canonical and headers use env indirection for s
   assert.equal(payload.task.id, baseTask.id);
   assert.equal(payload.callbacks.status, 'http://mck.host:3021/api/tasks/task-1');
   assert.match(payload.prompt_markdown, /Mission Control is launching this task through the configured runtime adapter/);
+});
+
+test('webhook signing secret resolution defaults safely and never returns an empty secret', () => {
+  assert.deepEqual(getWebhookSignatureSecret({}, {
+    MCK_WEBHOOK_SIGNATURE_SECRET: ' default-secret ',
+  }), {
+    env_name: 'MCK_WEBHOOK_SIGNATURE_SECRET',
+    secret: 'default-secret',
+    configured: true,
+  });
+  assert.deepEqual(getWebhookSignatureSecret({ signature_secret_env: 'CUSTOM_SECRET' }, {
+    CUSTOM_SECRET: '   ',
+  }), {
+    env_name: 'CUSTOM_SECRET',
+    secret: null,
+    configured: false,
+  });
 });
 
 

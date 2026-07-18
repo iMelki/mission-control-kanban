@@ -40,7 +40,8 @@ export function RuntimeDispatchSection({
   const [isValidating, setIsValidating] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const currentValidationKey = `${form.runtime_type}:${form.runtime_config}`;
-  const webhookValidationOk = form.runtime_type !== 'webhook' || (validationKey === currentValidationKey && validation?.ok === true);
+  const webhookValidationOk = form.runtime_type !== 'webhook'
+    || (validationKey === currentValidationKey && validation?.verified === true);
 
   const dispatchDisabledReason = form.runtime_type === 'manual'
     ? 'Manual agents cannot auto-dispatch; they receive copyable handoff prompts.'
@@ -90,7 +91,7 @@ export function RuntimeDispatchSection({
       const payload = await response.json();
       setValidation(payload);
       setValidationKey(currentValidationKey);
-      if (payload.ok) {
+      if (payload.verified === true) {
         setForm((prev) => ({ ...prev, dispatch_enabled: true }));
       }
     } finally {

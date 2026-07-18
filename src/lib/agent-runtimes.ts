@@ -1,6 +1,7 @@
 import type { Agent, AgentRuntimeConfig, AgentRuntimeType, Task, Workspace } from './types';
 
 export const AGENT_RUNTIME_TYPES: AgentRuntimeType[] = ['manual', 'openclaw', 'webhook'];
+export const DEFAULT_WEBHOOK_SIGNATURE_SECRET_ENV = 'MCK_WEBHOOK_SIGNATURE_SECRET';
 
 export const AGENT_RUNTIME_LABELS: Record<AgentRuntimeType, string> = {
   manual: 'Manual handoff',
@@ -339,6 +340,21 @@ export function getWebhookUrl(
   } catch {
     return null;
   }
+}
+
+export function getWebhookSignatureSecret(
+  config: AgentRuntimeConfig,
+  env: Record<string, string | undefined> = process.env,
+) {
+  const envName = typeof config.signature_secret_env === 'string' && config.signature_secret_env.trim()
+    ? config.signature_secret_env.trim()
+    : DEFAULT_WEBHOOK_SIGNATURE_SECRET_ENV;
+  const value = env[envName]?.trim();
+  return {
+    env_name: envName,
+    secret: value || null,
+    configured: Boolean(value),
+  };
 }
 
 export function buildWebhookHeaders(

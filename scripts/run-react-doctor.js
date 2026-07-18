@@ -1,9 +1,11 @@
 const { spawnSync } = require("child_process");
+const fs = require("fs");
 const path = require("path");
 const {
   buildReactDoctorArgs,
   classifyReactDoctorResult,
   readStagedFrontendFiles,
+  resolveNpxInvocation,
   selectFrontendFiles,
 } = require("./react-doctor-precommit-core.cjs");
 
@@ -31,9 +33,19 @@ if (stagedFiles.length === 0) {
 
 console.log(`Running React Doctor for ${stagedFiles.length} staged frontend file(s)...`);
 
+const npxInvocation = resolveNpxInvocation({
+  platform: process.platform,
+  execPath: process.execPath,
+  existsSync: fs.existsSync,
+});
+if (!npxInvocation.ok) {
+  console.error(`React Doctor pre-commit gate failed closed: ${npxInvocation.error}`);
+  process.exit(1);
+}
+
 const result = spawnSync(
-  process.platform === "win32" ? "npx.cmd" : "npx",
-  buildReactDoctorArgs(),
+  npxInvocation.command,
+  [...npxInvocation.prefixArgs, ...buildReactDoctorArgs()],
   {
     cwd: repoRoot,
     maxBuffer: MAX_BUFFER_BYTES,

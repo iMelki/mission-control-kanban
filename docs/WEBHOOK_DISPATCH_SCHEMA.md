@@ -102,9 +102,9 @@ Bridge authors can fetch the exact schema that MCK uses for outbound dispatch va
 
 The route returns `application/schema+json` and includes `X-Schema-Id` so bridge code can cache or pin the contract version.
 
-## Optional HMAC signatures
+## Required HMAC signatures
 
-Webhook runtimes can ask MCK to sign outbound dispatch requests without storing raw secrets in `runtime_config`:
+Webhook auto-dispatch requires MCK to sign outbound requests without storing raw secrets in `runtime_config`:
 
 ```json
 {
@@ -119,14 +119,36 @@ When the referenced env var is configured, MCK adds:
 - `X-MCK-Timestamp`
 - `X-MCK-Signature`
 - `X-MCK-Delivery`
+- `X-MCK-Delivery-ID`
 
-The signature base string is:
+For current delivery-ID-aware requests, the signature base string is:
 
 ```text
-v1.<timestamp>.<raw-json-body>
+<delivery-id>.<timestamp>.<raw-json-body>
 ```
 
-The signature value is `v1=<hex-hmac-sha256>`. Consumers should reject stale timestamps, verify with a timing-safe comparison, and store delivery IDs briefly if replay protection is needed.
+The signature value is `sha256=<hex-hmac-sha256>`. Consumers should reject
+stale timestamps, verify with a timing-safe comparison, and store delivery IDs
+briefly for replay protection. The verifier retains the earlier
+`v1.<timestamp>.<raw-json-body>` form only for bridge compatibility.
+
+If the signing secret is absent, dry-run reports `would_dispatch=false`, live
+dispatch records a failed attempt without making a network request, and the
+runtime audit recommends `add_webhook_signature_secret`.
+
+The validation wizard distinguishes endpoint reachability from trust:
+
+- an unsigned HTTP response can set `reachable=true`, but never `verified=true`;
+- only a signed 2xx response sets `verified=true` and can enable dispatch;
+- config edits invalidate the in-memory validation evidence;
+- timeout/request failures set both fields false.
+
+Webhook URLs are operator-controlled server-side request destinations. Keep MCK
+on its local/trusted control-plane boundary and configure only known bridge
+hosts. If this route is ever exposed to untrusted users, add an explicit host/IP
+allowlist and DNS-rebinding controls before accepting arbitrary destinations.
+This follows OWASP SSRF guidance:
+<https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html>.
 
 Inbound agent-completion callbacks can be verified with `MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET`. When that env var is configured, `/api/webhooks/agent-completion` rejects missing, stale, or invalid `X-MCK-Signature` headers before parsing JSON.
 

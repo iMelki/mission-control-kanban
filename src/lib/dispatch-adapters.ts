@@ -11,6 +11,7 @@ import {
   buildManualHandoffPrompt,
   buildWebhookDispatchPayload,
   buildWebhookHeaders,
+  getWebhookSignatureSecret,
   getWebhookUrl,
   parseAgentRuntimeConfig,
   resolveAgentRuntime,
@@ -453,26 +454,32 @@ function buildDispatchDryRunPreview(task: Task, agent: Agent, effectiveRuntimeTy
   if (effectiveRuntimeType === 'webhook') {
     const config = parseAgentRuntimeConfig(agent.runtime_config);
     const webhookUrl = getWebhookUrl(config, process.env);
+    const signature = getWebhookSignatureSecret(config, process.env);
     const payload = buildWebhookDispatchPayload(task, agent, missionControlUrl, new Date().toISOString(), projectsPath);
     const validation = validateWebhookDispatchPayload(payload);
+    const ready = validation.valid && Boolean(webhookUrl) && signature.configured;
     return {
-      success: validation.valid && Boolean(webhookUrl),
+      success: ready,
       task_id: task.id,
       agent_id: agent.id,
       runtime_type: 'webhook',
       requested_runtime_type: agent.runtime_type,
       dispatched: false,
       dry_run: true,
-      would_dispatch: validation.valid && Boolean(webhookUrl),
+      would_dispatch: ready,
       webhook_url: webhookUrl ? redactUrlForResponse(webhookUrl) : undefined,
       request_payload: payload,
       validation_errors: validation.valid ? undefined : validation.errors,
-      message: validation.valid && webhookUrl
+      message: ready
         ? 'Dry-run preview: webhook payload is valid; no request was sent.'
         : 'Dry-run preview: webhook dispatch is not ready.',
       handoff_prompt: handoffPrompt,
       callbacks,
-      reason: webhookUrl ? reason : 'Webhook URL is not configured or could not be resolved from env.',
+      reason: !webhookUrl
+        ? 'Webhook URL is not configured or could not be resolved from env.'
+        : !signature.configured
+          ? `Webhook signing secret env ${signature.env_name} is not configured.`
+          : reason,
     };
   }
 
@@ -525,17 +532,28 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
   }
   const payloadBody = JSON.stringify(payload);
   const headers = buildWebhookHeaders(config, process.env);
-  const signatureSecretEnv = typeof config.signature_secret_env === 'string'
-    ? config.signature_secret_env
-    : 'MCK_WEBHOOK_SIGNATURE_SECRET';
-  const signatureSecret = process.env[signatureSecretEnv];
-  if (signatureSecret) {
-    Object.assign(headers, buildSignedWebhookHeaders({
-      rawBody: payloadBody,
-      secret: signatureSecret,
-      deliveryId: `dispatch-${task.id}-${now}`,
-    }));
+  const signature = getWebhookSignatureSecret(config, process.env);
+  if (!signature.secret) {
+    const errorMessage = `Webhook signing secret env ${signature.env_name} is not configured.`;
+    recordDispatchAttempt({
+      task,
+      agent,
+      runtimeType: 'webhook',
+      status: 'failed',
+      message: 'Webhook dispatch blocked before network request.',
+      now,
+      adapterName: 'webhook',
+      webhookUrl: redactUrlForResponse(webhookUrl),
+      errorMessage,
+      requestPayload: payload,
+    });
+    throw new DispatchAdapterError(errorMessage, 400, { secret_env: signature.env_name });
   }
+  Object.assign(headers, buildSignedWebhookHeaders({
+    rawBody: payloadBody,
+    secret: signature.secret,
+    deliveryId: `dispatch-${task.id}-${now}`,
+  }));
   const timeoutMs = getWebhookTimeoutMs(config);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);

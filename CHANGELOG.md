@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Signed-webhook lifecycle regression coverage for
+  [#38](https://github.com/iMelki/mission-control-kanban/issues/38): validation
+  separates `reachable` from `verified`, webhook dispatch requires a resolved
+  HMAC secret before network I/O, and runtime audit reports missing secrets
+  without mutating agent records.
+- React Doctor's staged pre-commit gate now launches npm's JavaScript npx
+  entrypoint through Node on Windows, avoiding `spawnSync npx.cmd EINVAL`
+  without enabling shell interpolation; #40 fixtures cover the launcher.
+
 - Exact issue-filtered GitHub Project workspace sync for [#39](https://github.com/iMelki/mission-control-kanban/issues/39). Callers can pass `issue_refs` to require one active Project match per ref and limit both dry-run and apply behavior to that reviewed subset.
 - Runtime-ops research roadmap for [#38](https://github.com/iMelki/mission-control-kanban/issues/38) in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`, plus per-runtime failure-rate trend data/cards and the `/runtime-regression` local artifact drilldown UI.
 - Runtime UX workflow for [#38](https://github.com/iMelki/mission-control-kanban/issues/38) in `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`, covering validation wizards, dry-run previews, bulk migration plans, dependencies, artifact closeout, and Turbopack inventory policy.

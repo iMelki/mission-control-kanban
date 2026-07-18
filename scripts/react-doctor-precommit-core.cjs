@@ -75,6 +75,23 @@ function buildReactDoctorArgs() {
   ];
 }
 
+function resolveNpxInvocation({ platform, execPath, existsSync }) {
+  if (platform !== "win32") {
+    return { ok: true, command: "npx", prefixArgs: [] };
+  }
+
+  const nodeDir = execPath.replace(/[\\/][^\\/]+$/, "");
+  const npxCli = [nodeDir, "node_modules", "npm", "bin", "npx-cli.js"].join("\\");
+  if (!existsSync(npxCli)) {
+    return {
+      ok: false,
+      error: `Could not resolve npm's npx-cli.js beside ${execPath}.`,
+    };
+  }
+
+  return { ok: true, command: execPath, prefixArgs: [npxCli] };
+}
+
 function classifyReactDoctorResult(result, output) {
   if (result.error) {
     return { ok: false, message: `Failed to start React Doctor: ${result.error.message}` };
@@ -108,5 +125,6 @@ module.exports = {
   classifyReactDoctorResult,
   normalizeRepoRelativePath,
   readStagedFrontendFiles,
+  resolveNpxInvocation,
   selectFrontendFiles,
 };

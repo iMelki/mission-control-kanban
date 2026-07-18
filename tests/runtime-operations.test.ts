@@ -108,6 +108,42 @@ test('runtime audit flags webhook agents missing dispatch config', () => {
   assert.equal(audit.agents[0].recommended_action, 'add_webhook_url_env_config');
 });
 
+test('runtime audit blocks enabled webhook agents with URL but no signing secret', () => {
+  resetDb();
+  const previousSecret = process.env.MCK_WEBHOOK_SIGNATURE_SECRET;
+  delete process.env.MCK_WEBHOOK_SIGNATURE_SECRET;
+  const now = new Date().toISOString();
+  run(
+    `INSERT INTO agents (id, name, role, description, avatar_emoji, status, runtime_type, runtime_config, dispatch_enabled, workspace_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'agent-signed',
+      'Signed Webhook Agent',
+      'Bridge',
+      '',
+      'test',
+      'standby',
+      'webhook',
+      JSON.stringify({ webhook_url: 'http://127.0.0.1:9123/hook' }),
+      1,
+      'default',
+      now,
+      now,
+    ],
+  );
+
+  try {
+    const audit = getRuntimeAudit();
+    assert.equal(audit.summary.needs_config, 1);
+    assert.equal(audit.agents[0].dispatch_blocked, true);
+    assert.equal(audit.agents[0].recommended_action, 'add_webhook_signature_secret');
+    assert.match(audit.agents[0].reason, /MCK_WEBHOOK_SIGNATURE_SECRET/);
+  } finally {
+    if (previousSecret === undefined) delete process.env.MCK_WEBHOOK_SIGNATURE_SECRET;
+    else process.env.MCK_WEBHOOK_SIGNATURE_SECRET = previousSecret;
+  }
+});
+
 test('dispatch failure-rate trends group daily runtime failures without hiding manual volume', () => {
   resetDb();
   const now = Date.parse('2026-07-01T12:00:00.000Z');

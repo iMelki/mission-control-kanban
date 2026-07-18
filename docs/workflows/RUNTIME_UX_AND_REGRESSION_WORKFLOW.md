@@ -15,8 +15,14 @@ Use this workflow when adding runtime dispatch UI, dense workspace refinements, 
 1. Runtime config template selected or manually filled.
 2. Endpoint resolves through an env-var pointer or safe URL.
 3. Health wizard sends a signed non-task ping.
-4. Only then allow `dispatch_enabled=true` for webhook agents.
+4. Treat `reachable=true` as transport evidence only; require `verified=true`
+   from a signed 2xx response before allowing `dispatch_enabled=true`.
 5. Dry-run dispatch must show rendered payload/prompt/callbacks before any external side effect.
+
+Existing webhook agents with a URL but no resolved signing-secret env remain
+unchanged in storage, but runtime audit reports `needs_config` and live dispatch
+fails before any network request. Do not use audit migration to silently invent
+or persist secret values.
 
 ## 3. Bulk migration plan/apply
 

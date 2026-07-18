@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryOne } from '@/lib/db';
-import { buildWebhookHeaders, getWebhookUrl, parseAgentRuntimeConfig } from '@/lib/agent-runtimes';
+import {
+  buildWebhookHeaders,
+  getWebhookSignatureSecret,
+  getWebhookUrl,
+  parseAgentRuntimeConfig,
+} from '@/lib/agent-runtimes';
 import { buildSignedWebhookHeaders } from '@/lib/webhook-signatures';
 import type { Agent, AgentRuntimeConfig } from '@/lib/types';
 
@@ -60,6 +65,8 @@ export async function POST(request: NextRequest) {
     const hasEnvPointer = typeof config.webhook_url_env === 'string' || typeof config.url_env === 'string';
     return NextResponse.json({
       ok: false,
+      reachable: false,
+      verified: false,
       phase: 'config',
       reason: hasEnvPointer ? 'Webhook URL env var is not configured or did not contain a valid http(s) URL' : 'No webhook_url, url, webhook_url_env, or url_env configured',
       signed: false,
@@ -76,9 +83,10 @@ export async function POST(request: NextRequest) {
     challenge: uuidv4(),
     health_check: true,
   });
-  const secretEnv = typeof config.signature_secret_env === 'string' ? config.signature_secret_env : 'MCK_WEBHOOK_SIGNATURE_SECRET';
-  const secret = process.env[secretEnv];
-  const signedHeaders = secret ? buildSignedWebhookHeaders({ rawBody: payload, secret, deliveryId }) : undefined;
+  const signature = getWebhookSignatureSecret(config, process.env);
+  const signedHeaders = signature.secret
+    ? buildSignedWebhookHeaders({ rawBody: payload, secret: signature.secret, deliveryId })
+    : undefined;
   const headers = {
     ...buildWebhookHeaders(config, process.env),
     ...HEALTH_TEST_HEADERS,
@@ -97,22 +105,34 @@ export async function POST(request: NextRequest) {
       signal: controller.signal,
     });
     const latencyMs = Date.now() - started;
+    const reachable = true;
+    const verified = response.ok && signature.configured;
     return NextResponse.json({
-      ok: response.ok,
-      phase: 'post_signed_ping',
+      ok: verified,
+      reachable,
+      verified,
+      phase: signature.configured ? 'post_signed_ping' : 'post_unsigned_ping',
       http_status: response.status,
       latency_ms: latencyMs,
-      signed: Boolean(secret),
-      secret_env_configured: Boolean(secret),
-      message: response.ok ? 'Webhook accepted signed non-task ping.' : 'Webhook ping returned a non-2xx status.',
-    }, { status: response.ok ? 200 : 502 });
+      signed: signature.configured,
+      secret_env: signature.env_name,
+      secret_env_configured: signature.configured,
+      message: !signature.configured
+        ? `Webhook responded, but signing secret env ${signature.env_name} is not configured. Auto-dispatch remains disabled.`
+        : response.ok
+          ? 'Webhook accepted signed non-task ping.'
+          : 'Webhook ping returned a non-2xx status.',
+    }, { status: !signature.configured ? 424 : response.ok ? 200 : 502 });
   } catch (error) {
     return NextResponse.json({
       ok: false,
-      phase: 'post_signed_ping',
+      reachable: false,
+      verified: false,
+      phase: signature.configured ? 'post_signed_ping' : 'post_unsigned_ping',
       reason: error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'request_failed',
-      signed: Boolean(secret),
-      secret_env_configured: Boolean(secret),
+      signed: signature.configured,
+      secret_env: signature.env_name,
+      secret_env_configured: signature.configured,
     }, { status: 502 });
   } finally {
     clearTimeout(timer);

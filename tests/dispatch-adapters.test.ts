@@ -8,6 +8,7 @@ import http from 'node:http';
 process.env.MISSION_CONTROL_URL = 'http://127.0.0.1:3021';
 process.env.PROJECTS_PATH = 'S:/source/CCAI/Assistants/projects';
 process.env.MCK_TEST_WEBHOOK_TOKEN = 'test-token';
+process.env.MCK_WEBHOOK_SIGNATURE_SECRET = 'test-signature-secret';
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mck-dispatch-'));
 process.env.DATABASE_PATH = path.join(tmpDir, 'mission-control-test.db');
@@ -200,6 +201,9 @@ test('webhook dispatch posts canonical payload, records success, redacts URL, an
     request.on('data', (chunk) => { body += String(chunk); });
     request.on('end', () => {
       assert.equal(request.headers.authorization, 'Bearer test-token');
+      assert.match(String(request.headers['x-mck-signature']), /^sha256=[a-f0-9]{64}$/);
+      assert.match(String(request.headers['x-mck-timestamp']), /^\d+$/);
+      assert.match(String(request.headers['x-mck-delivery']), /^dispatch-task-1-/);
       received = JSON.parse(body);
       response.writeHead(202, { 'Content-Type': 'application/json' });
       response.end(JSON.stringify({ ok: true }));
@@ -232,6 +236,39 @@ test('webhook dispatch posts canonical payload, records success, redacts URL, an
     assert.equal(attempt.http_status, 202);
     assert.equal(attempt.webhook_url, webhook.url.replace('?secret=redacted', ''));
   } finally {
+    await webhook.close();
+  }
+});
+
+test('webhook dispatch fails closed before network when the signing secret is absent', async () => {
+  resetDb();
+  let calls = 0;
+  const webhook = await withMockWebhook((_request, response) => {
+    calls += 1;
+    response.writeHead(200);
+    response.end('unexpected');
+  });
+  const previousSecret = process.env.MCK_WEBHOOK_SIGNATURE_SECRET;
+  delete process.env.MCK_WEBHOOK_SIGNATURE_SECRET;
+
+  try {
+    seedAgent({
+      runtime_type: 'webhook',
+      dispatch_enabled: true,
+      runtime_config: { webhook_url: webhook.url, timeout_ms: 500 },
+    });
+    seedTask();
+
+    await assert.rejects(
+      () => dispatchTaskToAssignedAgent('task-1'),
+      /signing secret env MCK_WEBHOOK_SIGNATURE_SECRET is not configured/,
+    );
+    assert.equal(calls, 0);
+    const attempt = getDispatchAttempts('task-1')[0];
+    assert.equal(attempt.status, 'failed');
+    assert.match(attempt.error_message || '', /signing secret env/);
+  } finally {
+    process.env.MCK_WEBHOOK_SIGNATURE_SECRET = previousSecret;
     await webhook.close();
   }
 });

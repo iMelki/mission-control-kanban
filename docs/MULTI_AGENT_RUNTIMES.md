@@ -176,7 +176,10 @@ The workspace UI now has route-level section tabs for Board, Agents, Dispatch, S
 - Agents/Settings expose runtime audit and safe normalization preview/apply via `/api/agents/runtime-audit`.
 - Settings exposes dispatch retention cleanup dry-run/apply controls, callback replay ledger rows, callback-delivery pruning, webhook runtime_config template copy, and dispatch/callback schema downloads.
 - Header runtime health badges call `/api/runtime/health` and show readiness without exposing raw endpoint values.
-- `/api/runtime/webhook-health-test` sends a signed non-task ping so operators can test bridge health without creating work.
+- `/api/runtime/webhook-health-test` sends a non-task ping and reports
+  `reachable` separately from `verified`. Only a signed 2xx result is verified
+  and can enable webhook auto-dispatch; unsigned responses are reachability
+  evidence only.
 
 ## Runtime Health, Metrics, and Retention
 

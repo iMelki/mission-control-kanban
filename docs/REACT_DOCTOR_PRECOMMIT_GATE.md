@@ -29,9 +29,17 @@ The design therefore uses pre-commit's filename filter for fast routing, React D
 | Git index cannot be read | Fail closed | The wrapper cannot prove its input boundary. |
 | React Doctor cannot start or terminates unexpectedly | Fail closed | No trustworthy diagnostic result exists. |
 
+On Windows, `.cmd` files are shell scripts and cannot be passed portably to
+Node's `spawnSync` with `shell: false`. The wrapper resolves npm's
+`node_modules/npm/bin/npx-cli.js` beside `process.execPath` and launches it with
+that same Node executable. Missing launcher evidence fails closed; the hook does
+not enable `shell: true` or interpolate staged filenames into a command string.
+
 ## Validation
 
-`npm run test:react-doctor-hook` covers path filtering, a real temporary Git index, clean and blocking results, score-outage text, no-source behavior, index-read failure, and process failure.
+`npm run test:react-doctor-hook` covers path filtering, a real temporary Git
+index, clean and blocking results, score-outage text, no-source behavior,
+index-read failure, process failure, and Windows npx entrypoint resolution.
 
 For an explicit full-project closeout, run `npx -y react-doctor@latest . --score` separately and record whether the remote score was available. Do not treat that remote result as the commit gate.
 

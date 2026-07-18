@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -15,6 +15,11 @@ the local operator entrypoint; historical task notes remain in
   - Second slice completed: added per-runtime failure-rate trend cards in Runtime operations, created `/runtime-regression` as a local artifact drilldown UI, extended smoke coverage for the drilldown, added a non-blocking `turbopack-inventory` CI artifact job, and documented the research-first roadmap in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`.
   - Third slice completed: added runtime config templates, webhook endpoint validation gating, dry-run dispatch previews, selected-agent runtime migration diffs, task dependency blocked-by UI/API, ready-for-agent checklist seeding, GitHub issue draft generation, runtime failure-threshold alerts, runtime-regression screenshot thumbnails, PR/requested-issue artifact comments after successful CI, and the reusable workflow doc `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`.
   - Fourth slice completed: added explicit GitHub issue live create/update behind a plain-English confirmation checkbox, extracted Task modal runtime sections into reusable components, added dependency graph/badges with cycle-detection tests, added runtime migration audit history, runtime-template env diagnostics, local webhook mock receiver, Playwright browser-cache CI tuning, runtime artifact deep links, and expanded browser smoke coverage for dependency/checklist/webhook wizard states.
+  - Fifth slice completed: webhook validation now distinguishes unsigned
+    reachability from signed verification, auto-dispatch and live dispatch fail
+    closed without a resolved signing secret, runtime audit exposes the missing
+    secret without mutating agent records, and loopback route/adapter tests
+    cover signed success, unsigned 2xx, non-2xx, and no-network failure.
   - Validation: `npm run lint`, `npm test`, `npm run build`, `npm run doctor:react`, `npm run smoke:runtime-ui`, and `npm run comment:runtime-artifacts -- --dry-run`.
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 
@@ -26,6 +31,9 @@ the local operator entrypoint; historical task notes remain in
     index/process failures.
   - Validation: all existing tests plus 10/10 hook/config fixtures, lint,
     Markdown links, staged secret scan, and deterministic no-source skip.
+  - Follow-up on 2026-07-19: a real commit exposed `spawnSync npx.cmd EINVAL`
+    on Windows. The gate now invokes npm's `npx-cli.js` with `node.exe`, keeps
+    `shell: false`, and has explicit success/missing-entrypoint fixtures.
 
 - [#39 - Add exact issue-filtered GitHub Project workspace sync](https://github.com/iMelki/mission-control-kanban/issues/39)
   - Completed on 2026-07-14 for the `projects-ops#73` / `memsys#301` bounded import path.

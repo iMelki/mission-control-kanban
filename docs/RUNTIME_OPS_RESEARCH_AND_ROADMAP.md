@@ -1,6 +1,6 @@
 # Runtime Ops Research and Implementation Roadmap
 
-Updated: 2026-07-02
+Updated: 2026-07-19
 
 This note records the research-first decisions for the post-runtime-ops MCK workstream tracked by [#38](https://github.com/iMelki/mission-control-kanban/issues/38) and the dispatch metadata refresh closeout tracked by [#34](https://github.com/iMelki/mission-control-kanban/issues/34).
 
@@ -16,6 +16,14 @@ Community/vendor guidance checked before implementation:
 - React Flow/Dagre/ELK: reserve graph UI for true dependency DAGs; start with list/table blocked-by affordances when enough.
 - GitHub Actions artifact docs and Security Lab guidance: artifact closeout links are best as issue/PR comments; workflow_run follow-ups must not execute untrusted artifacts.
 - Next.js output file tracing docs and community Turbopack/NFT warning reports: keep webpack as the blocking production build, run Turbopack as a non-blocking inventory artifact until the trace warning is fully characterized.
+- GitHub webhook guidance: use a high-entropy secret, HMAC-SHA256, unique
+  delivery IDs, HTTPS verification, and bounded response times rather than
+  treating endpoint reachability as authenticity.
+- Stripe webhook guidance: bind timestamps into signatures and reject stale
+  deliveries to limit replay.
+- OWASP SSRF guidance: operator-supplied webhook URLs are server-side request
+  destinations; keep this local control plane trusted and require host/IP
+  allowlisting before exposing configuration to untrusted callers.
 
 ## Implemented in this slice
 
@@ -42,6 +50,16 @@ Community/vendor guidance checked before implementation:
 - Expanded browser smoke coverage for dependency panel visibility, blocked-by badges, ready-for-agent checklist seeding, and webhook validation wizard disabled states.
 - Reduced SQLite/Turbopack trace pressure with type-only database imports/lazy loading while pinning the local `dev:n8n` script to webpack because Next dev/Turbopack can break file-backed SQLite route APIs in this app.
 - Split Playwright system dependency and Chromium download steps in CI, added browser-cache restore, and added step-summary artifact deep links for daily/runtime closeout.
+- Split webhook health evidence into `reachable` and `verified`, require a
+  resolved signing secret for outbound dispatch, fail before network I/O when
+  it is absent, and report missing-secret audit state without mutating agents.
+
+Primary security references for the signed-webhook slice:
+
+- <https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks>
+- <https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries>
+- <https://docs.stripe.com/webhooks>
+- <https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html>
 
 ## Remaining tracked work
 

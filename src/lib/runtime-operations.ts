@@ -1,6 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
-import { getWebhookUrl, parseAgentRuntimeConfig } from '@/lib/agent-runtimes';
+import {
+  getWebhookSignatureSecret,
+  getWebhookUrl,
+  parseAgentRuntimeConfig,
+} from '@/lib/agent-runtimes';
 import type { AgentRuntimeType, DispatchAttemptStatus } from '@/lib/types';
 
 export interface DispatchRetentionPolicy {
@@ -311,7 +315,11 @@ export function getRuntimeHealthSummary() {
      WHERE runtime_type = 'webhook'
        AND dispatch_enabled = 1`
   );
-  const webhookConfigured = webhookAgents.filter((agent) => getWebhookUrl(parseAgentRuntimeConfig(agent.runtime_config), process.env)).length;
+  const webhookConfigured = webhookAgents.filter((agent) => {
+    const config = parseAgentRuntimeConfig(agent.runtime_config);
+    return Boolean(getWebhookUrl(config, process.env))
+      && getWebhookSignatureSecret(config, process.env).configured;
+  }).length;
   const webhookNeedsConfig = webhookAgents.length - webhookConfigured;
   const failureThresholdPolicy = getDispatchFailureThresholdPolicy();
   const failureThresholdAlerts = getDispatchFailureThresholdAlerts({ policy: failureThresholdPolicy });
@@ -471,28 +479,39 @@ export function getRuntimeAudit() {
     const runtimeType = agent.runtime_type === 'openclaw' || agent.runtime_type === 'webhook' ? agent.runtime_type : 'manual';
     const dispatchEnabled = Boolean(agent.dispatch_enabled);
     const config = parseAgentRuntimeConfig(agent.runtime_config);
-    const needsConfig = runtimeType === 'webhook' && dispatchEnabled && !getWebhookUrl(config, process.env);
+    const hasWebhookUrl = Boolean(getWebhookUrl(config, process.env));
+    const signature = getWebhookSignatureSecret(config, process.env);
+    const missingWebhookUrl = runtimeType === 'webhook' && dispatchEnabled && !hasWebhookUrl;
+    const missingSignatureSecret = runtimeType === 'webhook'
+      && dispatchEnabled
+      && hasWebhookUrl
+      && !signature.configured;
+    const needsConfig = missingWebhookUrl || missingSignatureSecret;
     const dispatchBlocked = runtimeType === 'manual' || !dispatchEnabled || needsConfig;
-    const recommended_action = needsConfig
+    const recommended_action = missingWebhookUrl
       ? 'add_webhook_url_env_config'
-      : runtimeType === 'manual'
-        ? 'manual_handoff_ok'
-        : !dispatchEnabled
-          ? 'enable_dispatch_when_operator_approved'
-          : 'none';
+      : missingSignatureSecret
+        ? 'add_webhook_signature_secret'
+        : runtimeType === 'manual'
+          ? 'manual_handoff_ok'
+          : !dispatchEnabled
+            ? 'enable_dispatch_when_operator_approved'
+            : 'none';
     return {
       ...agent,
       runtime_type: runtimeType,
       dispatch_enabled: dispatchEnabled,
       needs_config: needsConfig,
       dispatch_blocked: dispatchBlocked,
-      reason: needsConfig
+      reason: missingWebhookUrl
         ? 'Webhook dispatch is enabled but no webhook URL is configured.'
-        : runtimeType === 'manual'
-          ? 'Manual agents require copy/paste handoff.'
-          : !dispatchEnabled
-            ? 'Auto-dispatch is disabled for this agent.'
-            : 'Ready for runtime dispatch.',
+        : missingSignatureSecret
+          ? `Webhook dispatch is enabled but signing secret env ${signature.env_name} is not configured.`
+          : runtimeType === 'manual'
+            ? 'Manual agents require copy/paste handoff.'
+            : !dispatchEnabled
+              ? 'Auto-dispatch is disabled for this agent.'
+              : 'Ready for runtime dispatch.',
       recommended_action,
     };
   });
