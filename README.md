@@ -324,6 +324,15 @@ SELECT * FROM tasks;
 
 ---
 
+## Security
+
+Secret handling and the staged/CI enforcement contract are documented in
+[`docs/SECRET_SCANNING_POLICY.md`](docs/SECRET_SCANNING_POLICY.md). The
+repository uses scanning-only enforcement and does not rely on Git clean/smudge
+filters or a plaintext repository-local secret store.
+
+---
+
 ## 🔧 Troubleshooting
 
 ### "Failed to connect to OpenClaw Gateway"

@@ -1,12 +1,20 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-07-19
+Last updated: 2026-07-21
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
+
+- [#41 - Migrate secret-policy configuration to scanning-only](https://github.com/iMelki/mission-control-kanban/issues/41)
+  - Local migration is complete: the legacy store is privately backed up,
+    filter config and attributes are removed, explicit policy is present, and
+    non-policy tracked bytes are unchanged.
+  - Local positive/negative Gitleaks canaries and the pinned v3 pull-request
+    scanner passed. Keep open until PR #42's post-cutover checks are green and
+    the issue/comment readback is recorded.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.
