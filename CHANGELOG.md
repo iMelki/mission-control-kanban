@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Explicit scanning-only policy for [#41](https://github.com/iMelki/mission-control-kanban/issues/41), with a private hash-bound legacy-store backup, staged positive/negative Gitleaks canary proof, and repository-health readback showing no remaining filter/store conflicts.
 - Secret-scanning policy documentation covering local staged enforcement, the independently pinned Gitleaks v3 pull-request job, server-side protection, and rollback boundaries.
+- Follow-up tracking for [#43](https://github.com/iMelki/mission-control-kanban/issues/43) and [#44](https://github.com/iMelki/mission-control-kanban/issues/44), separating the Runtime Regression artifact-comment permission defect and all-files pre-commit churn from the completed #41 security-policy migration.
 
 - Signed-webhook lifecycle regression coverage for
   [#38](https://github.com/iMelki/mission-control-kanban/issues/38): validation

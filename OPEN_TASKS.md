@@ -8,13 +8,16 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#41 - Migrate secret-policy configuration to scanning-only](https://github.com/iMelki/mission-control-kanban/issues/41)
-  - Local migration is complete: the legacy store is privately backed up,
-    filter config and attributes are removed, explicit policy is present, and
-    non-policy tracked bytes are unchanged.
-  - Local positive/negative Gitleaks canaries and the pinned v3 pull-request
-    scanner passed. Keep open until PR #42's post-cutover checks are green and
-    the issue/comment readback is recorded.
+- [#43 - Fix Runtime Regression PR artifact-comment permission](https://github.com/iMelki/mission-control-kanban/issues/43)
+  - Runtime validation and artifact upload passed, but PR run `29784230901`
+    failed only when the final comment call lacked integration permission.
+    Preserve least privilege and separate trusted commenting from untrusted PR
+    execution where needed.
+
+- [#44 - Make all-files pre-commit deterministic and one-shot](https://github.com/iMelki/mission-control-kanban/issues/44)
+  - `pre-commit run --all-files` caused unrelated line-ending rewrites and
+    repeated React Doctor/npm invocations. Staged-only validation passes; make
+    the broad gate byte-stable and one-shot before using it as a health proof.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.
@@ -32,6 +35,13 @@ the local operator entrypoint; historical task notes remain in
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 
 ## Recently Completed
+
+- [#41 - Migrate secret-policy configuration to scanning-only](https://github.com/iMelki/mission-control-kanban/issues/41)
+  - Closed on 2026-07-21 after commit `e351e9c` removed legacy filter/store
+    state, added explicit scanning-only policy, preserved a private opaque
+    rollback receipt, and proved non-policy tracked bytes unchanged.
+  - Validation: positive/negative local Gitleaks canaries, policy audit 25/0/0,
+    pinned v3 secret scan, CI, exact issue readback, and open PR #42.
 
 - [#40 - Make React Doctor pre-commit staged-scope and score-outage safe](https://github.com/iMelki/mission-control-kanban/issues/40)
   - Closed on 2026-07-17 after commit `1b564b9` made the local warning-level
