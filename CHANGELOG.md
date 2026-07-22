@@ -11,13 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Least-privilege Runtime Regression artifact comments for #43: same-repository
-  pull requests receive `pull-requests: write`, fork PRs stay read-only, and a
-  denied comment is reported distinctly as `comment-permission`.
+- Least-privilege Runtime Regression artifact comments for #43: validation jobs
+  stay read-only, a no-checkout job receives only `actions: read` and
+  `issues: write`, fork PRs cannot enter it, and the posted body is read back.
 - Deterministic all-files pre-commit behavior for #44: mixed line endings fail
-  without rewriting files and React Doctor executes once using the staged
-  index. The regression proof hashes all 209 tracked/untracked task files and
-  records zero byte changes after the broad gate.
+  without rewriting files and `require_serial` makes React Doctor execute once
+  with the selected filenames. The broad-gate regression proof also compares
+  tracked-file hashes before and after validation.
 
 - Explicit scanning-only policy for [#41](https://github.com/iMelki/mission-control-kanban/issues/41), with a private hash-bound legacy-store backup, staged positive/negative Gitleaks canary proof, and repository-health readback showing no remaining filter/store conflicts.
 - Secret-scanning policy documentation covering local staged enforcement, the independently pinned Gitleaks v3 pull-request job, server-side protection, and rollback boundaries.

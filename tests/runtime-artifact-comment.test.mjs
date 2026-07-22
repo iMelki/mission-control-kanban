@@ -12,17 +12,25 @@ const {
   runGh,
 } = require("../scripts/comment-runtime-regression-artifacts.js");
 
-test("workflow grants PR comments only to same-repository pull requests", () => {
+test("workflow isolates issue-write permission in a no-checkout comment job", () => {
   const workflow = fs.readFileSync(
     path.join(repoRoot, ".github/workflows/runtime-regression.yml"),
     "utf8",
   );
 
-  assert.match(workflow, /pull-requests:\s*write/);
+  const topPermissions = workflow.match(/permissions:[\s\S]*?(?=\n\non:)/)?.[0] ?? "";
+  const commentJob = workflow.match(/\n  comment-runtime-artifacts:[\s\S]*$/)?.[0] ?? "";
+
+  assert.doesNotMatch(topPermissions, /issues:\s*write|pull-requests:\s*write/);
+  assert.match(commentJob, /needs:\s*runtime-regression/);
+  assert.match(commentJob, /permissions:[\s\S]*?actions:\s*read[\s\S]*?issues:\s*write/);
+  assert.doesNotMatch(commentJob, /actions\/checkout/);
   assert.match(
-    workflow,
+    commentJob,
     /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/,
   );
+  assert.match(commentJob, /gh api --method POST/);
+  assert.match(commentJob, /gh api "repos\/\$\{GH_REPO\}\/issues\/\$\{COMMENT_TARGET\}\/comments\/\$\{comment_id\}"/);
 });
 
 test("classifies a denied PR comment separately from runtime validation", () => {

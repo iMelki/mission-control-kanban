@@ -24,7 +24,8 @@ test("pre-commit invokes React Doctor once and keeps line-ending checks read-onl
   const reactDoctorHook = config.match(/- id: react-doctor[\s\S]*$/)?.[0];
 
   assert.match(markdownHook ?? "", /pass_filenames:\s*false/);
-  assert.match(reactDoctorHook ?? "", /pass_filenames:\s*false/);
+  assert.match(reactDoctorHook ?? "", /pass_filenames:\s*true/);
+  assert.match(reactDoctorHook ?? "", /require_serial:\s*true/);
   assert.match(config, /- id: mixed-line-ending[\s\S]*?args:\s*\[--fix=no\]/);
 });
 
