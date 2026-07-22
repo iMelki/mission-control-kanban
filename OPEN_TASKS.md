@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -8,16 +8,12 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#43 - Fix Runtime Regression PR artifact-comment permission](https://github.com/iMelki/mission-control-kanban/issues/43)
-  - Runtime validation and artifact upload passed, but PR run `29784230901`
-    failed only when the final comment call lacked integration permission.
-    Preserve least privilege and separate trusted commenting from untrusted PR
-    execution where needed.
-
-- [#44 - Make all-files pre-commit deterministic and one-shot](https://github.com/iMelki/mission-control-kanban/issues/44)
-  - `pre-commit run --all-files` caused unrelated line-ending rewrites and
-    repeated React Doctor/npm invocations. Staged-only validation passes; make
-    the broad gate byte-stable and one-shot before using it as a health proof.
+- [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
+  - Runtime Regression run `29887043238` attempt 1 failed while rendering
+    `/workspace/default` with `Unexpected end of JSON input`; all temporary
+    smoke entities were cleaned up. Failed-job-only attempt 2 passed unchanged,
+    so preserve both receipts and identify the empty/partial JSON source rather
+    than weakening the smoke gate.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.
@@ -35,6 +31,24 @@ the local operator entrypoint; historical task notes remain in
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 
 ## Recently Completed
+
+- [#43 - Fix Runtime Regression PR artifact-comment permission](https://github.com/iMelki/mission-control-kanban/issues/43)
+  - Completed on 2026-07-22 with least-privilege no-checkout comment jobs:
+    same-repository PRs receive only `pull-requests: write`, explicit issue
+    dispatches receive only `issues: write`, and fork PRs cannot enter the
+    write-capable job.
+  - Live proof: Runtime Regression run `29887043238` attempt 2 passed, posted
+    comment `5041329447` on PR #45, and read the exact JSON body back. The
+    comment records commit `56d8ea1`, the source branch, and both artifacts.
+
+- [#44 - Make all-files pre-commit deterministic and one-shot](https://github.com/iMelki/mission-control-kanban/issues/44)
+  - Completed on 2026-07-22: mixed-line-ending checks are report-only, React
+    Doctor receives selected files once with `require_serial`, and the
+    all-files proof hashed 209 tracked files before and after validation with
+    zero changes.
+  - Validation: 91.928-second all-files pass, 12/12 React Doctor tests, 2/2
+    runtime-comment tests, full test/lint/build, and pre-push deep scan of 792
+    files.
 
 - [#41 - Migrate secret-policy configuration to scanning-only](https://github.com/iMelki/mission-control-kanban/issues/41)
   - Closed on 2026-07-21 after commit `e351e9c` removed legacy filter/store

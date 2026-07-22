@@ -9,7 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrected Runtime Regression comment readback to use GitHub's repository-level
+  issue-comment endpoint and report the pull request head SHA/ref instead of the
+  synthetic merge ref. Run `29887043238` attempt 2 posted and verified the live
+  PR #45 artifact comment successfully.
+- Tracked the separate intermittent runtime JSON fixture failure as #46 after
+  run `29887043238` attempt 1 failed and attempt 2 passed unchanged.
+
 ### Added
+
+- Least-privilege Runtime Regression artifact comments for #43: validation jobs
+  stay read-only; separate no-checkout jobs receive only `pull-requests: write`
+  for same-repository PRs or `issues: write` for explicit dispatches, and each
+  posted body is read back.
+- Deterministic all-files pre-commit behavior for #44: mixed line endings fail
+  without rewriting files and `require_serial` makes React Doctor execute once
+  with the selected filenames. The broad-gate regression proof also compares
+  tracked-file hashes before and after validation.
 
 - Explicit scanning-only policy for [#41](https://github.com/iMelki/mission-control-kanban/issues/41), with a private hash-bound legacy-store backup, staged positive/negative Gitleaks canary proof, and repository-health readback showing no remaining filter/store conflicts.
 - Secret-scanning policy documentation covering local staged enforcement, the independently pinned Gitleaks v3 pull-request job, server-side protection, and rollback boundaries.

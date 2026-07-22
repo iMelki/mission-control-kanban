@@ -2,12 +2,25 @@
 const { spawnSync } = require('node:child_process');
 const { appendFileSync } = require('node:fs');
 
-function runGh(args, { allowFailure = false } = {}) {
-  const result = spawnSync('gh', args, { encoding: 'utf8' });
-  if (result.status !== 0 && !allowFailure) {
-    throw new Error(`${['gh', ...args].join(' ')} failed:\n${result.stderr || result.stdout}`);
+function classifyGhFailure(args, result) {
+  const output = `${result.stderr || ''}\n${result.stdout || ''}`;
+  if (
+    args[0] === 'issue' &&
+    args[1] === 'comment' &&
+    /Resource not accessible by integration|addComment|HTTP 403/i.test(output)
+  ) {
+    return 'comment-permission';
   }
-  return result.stdout.trim();
+  return 'gh-command';
+}
+
+function runGh(args, { allowFailure = false } = {}, spawn = spawnSync) {
+  const result = spawn('gh', args, { encoding: 'utf8' });
+  if (result.status !== 0 && !allowFailure) {
+    const failureKind = classifyGhFailure(args, result);
+    throw new Error(`[${failureKind}] ${['gh', ...args].join(' ')} failed:\n${result.stderr || result.stdout}`);
+  }
+  return String(result.stdout || '').trim();
 }
 
 function parseArgs(argv) {
@@ -111,9 +124,20 @@ function main() {
   console.log(`Commented runtime regression artifacts on ${options.repo}#${options.issue}`);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+module.exports = {
+  buildArtifactUrl,
+  buildBody,
+  buildRunUrl,
+  classifyGhFailure,
+  parseArgs,
+  runGh,
+};
+
+if (require.main === module) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }

@@ -18,13 +18,15 @@ const {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("pre-commit routes filenames only to the React Doctor hook", () => {
+test("pre-commit invokes React Doctor once and keeps line-ending checks read-only", () => {
   const config = fs.readFileSync(path.join(repoRoot, ".pre-commit-config.yaml"), "utf8");
   const markdownHook = config.match(/- id: markdown-link-check[\s\S]*?(?=\n\s*- id: react-doctor)/)?.[0];
   const reactDoctorHook = config.match(/- id: react-doctor[\s\S]*$/)?.[0];
 
   assert.match(markdownHook ?? "", /pass_filenames:\s*false/);
   assert.match(reactDoctorHook ?? "", /pass_filenames:\s*true/);
+  assert.match(reactDoctorHook ?? "", /require_serial:\s*true/);
+  assert.match(config, /- id: mixed-line-ending[\s\S]*?args:\s*\[--fix=no\]/);
 });
 
 test("selects only safe, staged-scope frontend paths", () => {
