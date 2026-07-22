@@ -42,6 +42,11 @@ test("workflow isolates PR and issue write permissions in no-checkout jobs", () 
   assert.match(issueCommentJob, /github\.event_name == 'workflow_dispatch'/);
   for (const commentJob of [prCommentJob, issueCommentJob]) {
     assert.match(commentJob, /gh api --method POST/);
+    assert.match(commentJob, /mck-runtime-regression-artifact-evidence/);
+    assert.match(commentJob, /gh api --method PATCH/);
+    assert.match(commentJob, /--paginate/);
+    assert.match(commentJob, /--slurp/);
+    assert.doesNotMatch(commentJob, /head -n/);
     assert.match(commentJob, /gh api "repos\/\$\{GH_REPO\}\/issues\/comments\/\$\{comment_id\}"/);
     assert.doesNotMatch(
       commentJob,

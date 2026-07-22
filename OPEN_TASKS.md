@@ -17,11 +17,14 @@ the local operator entrypoint; historical task notes remain in
   - Root cause: the failure log shows Next.js `next dev` compiling the route
     and reading a truncated internal JSON manifest before returning HTTP 500;
     no application fixture file or SQLite JSON value was partial. The runner
-    now uses a fresh webpack `next build` plus isolated `next start` by default,
-    rejects an occupied port, and retains `MCK_REGRESSION_SERVER_MODE=dev` only
-    for local diagnosis.
-  - Local validation: server-plan contract `2/2`; full runtime smoke remains
-    pending remote CI proof after the pushed fix.
+    now uses a fresh webpack `next build`, stages `public` and `.next/static`
+    into `.next/standalone`, and launches the same standalone server entrypoint
+    as Docker with explicit host and port settings. It rejects an occupied port
+    and retains `MCK_REGRESSION_SERVER_MODE=dev` only for local diagnosis.
+  - Runtime artifact receipts use one marker-based PR/issue comment that is
+    updated and read back, preventing a new success notification on every run.
+  - Local validation: server-plan contract `2/2`; full runtime smoke and three
+    consecutive remote paths remain required before closure.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.

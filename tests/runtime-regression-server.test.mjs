@@ -11,7 +11,15 @@ test('Runtime Regression defaults to a fresh production build and server', () =>
   assert.deepEqual(plan, {
     mode: 'production',
     build: { command: 'npm', args: ['run', 'build'] },
-    start: { command: 'npm', args: ['run', 'start', '--', '-H', '0.0.0.0', '-p', '43121'] },
+    assets: [
+      { source: 'public', destination: '.next/standalone/public' },
+      { source: '.next/static', destination: '.next/standalone/.next/static' },
+    ],
+    start: {
+      command: 'node',
+      args: ['.next/standalone/server.js'],
+      env: { HOSTNAME: '0.0.0.0', PORT: '43121' },
+    },
   });
 });
 
@@ -21,6 +29,7 @@ test('the development server is opt-in for local diagnosis only', () => {
   assert.deepEqual(plan, {
     mode: 'dev',
     build: null,
+    assets: [],
     start: { command: 'npm', args: ['run', 'dev:n8n'] },
   });
 });

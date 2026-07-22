@@ -11,11 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Runtime Regression now builds a fresh webpack production output and uses
-  `next start`, avoiding the intermittent `next dev` manifest read race that
-  caused `/workspace/default` to fail with `Unexpected end of JSON input`.
-  The runner also fails closed when port 3021 is already occupied and has a
-  focused server-mode contract test.
+- Runtime Regression now builds a fresh webpack production output, stages the
+  standalone runtime assets, and launches `.next/standalone/server.js` with the
+  same host/port contract as Docker. This avoids both the intermittent
+  development-manifest race and Next.js's unsupported `next start` warning for
+  standalone output.
+- Successful Runtime Regression artifact receipts now update one marker-based
+  PR/issue comment and read it back exactly instead of appending a notification
+  on every run.
 - Corrected Runtime Regression comment readback to use GitHub's repository-level
   issue-comment endpoint and report the pull request head SHA/ref instead of the
   synthetic merge ref. Run `29887043238` attempt 2 posted and verified the live

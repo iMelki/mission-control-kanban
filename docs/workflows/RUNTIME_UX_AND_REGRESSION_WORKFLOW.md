@@ -59,15 +59,19 @@ npm run comment:runtime-artifacts -- --dry-run
 npm run comment:runtime-artifacts -- --issue <issue-or-pr-number>
 ```
 
-`npm run check:runtime-regressions` builds the webpack production output and
-starts it with `next start` before creating smoke entities. This keeps the
-test away from `next dev`'s on-demand manifest writes, which can expose a
-partially written JSON manifest during route compilation. The runner fails if
-port 3021 is already occupied, so it cannot silently test an unrelated server.
+`npm run check:runtime-regressions` builds the webpack production output,
+stages `public` and `.next/static` into `.next/standalone`, and launches
+`.next/standalone/server.js` with explicit `HOSTNAME` and `PORT` values before
+creating smoke entities. This keeps the test away from `next dev`'s on-demand
+manifest writes and exercises the same server entrypoint used by Docker. The
+runner fails if port 3021 is already occupied, so it cannot silently test an unrelated server.
 Use `MCK_REGRESSION_SERVER_MODE=dev` only for an explicitly local diagnostic;
 that mode is not the CI contract.
 
-Runtime Regression CI comments on PRs after successful workflow completion. Local screenshot thumbnails and metadata live at `/runtime-regression`.
+Runtime Regression CI maintains one marker-based PR or requested-issue comment
+after successful workflow completion, updates it on later runs, and reads the
+exact body back. Local screenshot thumbnails and metadata live at
+`/runtime-regression`.
 
 ## 6. Turbopack inventory policy
 

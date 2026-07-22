@@ -1,4 +1,5 @@
 const { spawn, spawnSync } = require('node:child_process');
+const { cpSync, existsSync, rmSync } = require('node:fs');
 const net = require('node:net');
 const { getRuntimeRegressionServerPlan } = require('./runtime-regression-server');
 
@@ -77,6 +78,16 @@ function killProcessTree(child) {
   child.kill('SIGTERM');
 }
 
+function stageRuntimeAssets(assets) {
+  for (const asset of assets) {
+    if (!existsSync(asset.source)) {
+      throw new Error(`Runtime Regression asset is missing after build: ${asset.source}`);
+    }
+    rmSync(asset.destination, { recursive: true, force: true });
+    cpSync(asset.source, asset.destination, { recursive: true });
+  }
+}
+
 function isPortOpen() {
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port });
@@ -116,18 +127,19 @@ async function main() {
       if (build.code !== 0) {
         throw new Error(`Runtime Regression production build failed with exit code ${build.code}.`);
       }
+      stageRuntimeAssets(serverPlan.assets);
     }
 
     server = isWindows
       ? spawn(process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe', windowsCommandArgs(serverPlan.start.command, serverPlan.start.args), {
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
+        env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...(serverPlan.start.env || {}) },
       })
       : spawn(serverPlan.start.command, serverPlan.start.args, {
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
+        env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...(serverPlan.start.env || {}) },
       });
     server.stdout.on('data', (chunk) => process.stdout.write(chunk));
     server.stderr.on('data', (chunk) => process.stderr.write(chunk));

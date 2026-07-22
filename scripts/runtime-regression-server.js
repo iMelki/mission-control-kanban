@@ -11,6 +11,7 @@ function getRuntimeRegressionServerPlan({
     return {
       mode: normalizedMode,
       build: null,
+      assets: [],
       start: { command: 'npm', args: ['run', 'dev:n8n'] },
     };
   }
@@ -18,7 +19,15 @@ function getRuntimeRegressionServerPlan({
   return {
     mode: normalizedMode,
     build: { command: 'npm', args: ['run', 'build'] },
-    start: { command: 'npm', args: ['run', 'start', '--', '-H', host, '-p', String(port)] },
+    assets: [
+      { source: 'public', destination: '.next/standalone/public' },
+      { source: '.next/static', destination: '.next/standalone/.next/static' },
+    ],
+    start: {
+      command: 'node',
+      args: ['.next/standalone/server.js'],
+      env: { HOSTNAME: host, PORT: String(port) },
+    },
   };
 }
 
