@@ -119,8 +119,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       RUN_ID: ${{ github.run_id }}
-      HEAD_SHA: ${{ github.sha }}
-      REF_NAME: ${{ github.ref_name }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      REF_NAME: ${{ github.event.pull_request.head.ref }}
       COMMENT_TARGET: ${{ github.event.pull_request.number }}
     steps:
       - name: Post and verify runtime artifact comment
@@ -157,7 +157,7 @@ jobs:
               --input comment-request.json \
               --jq '.id'
           )"
-          gh api "repos/${GH_REPO}/issues/${COMMENT_TARGET}/comments/${comment_id}" \
+          gh api "repos/${GH_REPO}/issues/comments/${comment_id}" \
             > comment-readback.json
           jq -e --rawfile expected comment.md '.body == $expected' comment-readback.json
 
@@ -217,6 +217,6 @@ jobs:
               --input comment-request.json \
               --jq '.id'
           )"
-          gh api "repos/${GH_REPO}/issues/${COMMENT_TARGET}/comments/${comment_id}" \
+          gh api "repos/${GH_REPO}/issues/comments/${comment_id}" \
             > comment-readback.json
           jq -e --rawfile expected comment.md '.body == $expected' comment-readback.json

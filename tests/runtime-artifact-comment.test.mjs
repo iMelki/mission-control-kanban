@@ -34,13 +34,19 @@ test("workflow isolates PR and issue write permissions in no-checkout jobs", () 
     prCommentJob,
     /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/,
   );
+  assert.match(prCommentJob, /HEAD_SHA:\s*\$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(prCommentJob, /REF_NAME:\s*\$\{\{ github\.event\.pull_request\.head\.ref \}\}/);
   assert.match(issueCommentJob, /needs:\s*runtime-regression/);
   assert.match(issueCommentJob, /permissions:[\s\S]*?actions:\s*read[\s\S]*?issues:\s*write/);
   assert.doesNotMatch(issueCommentJob, /pull-requests:\s*write|actions\/checkout/);
   assert.match(issueCommentJob, /github\.event_name == 'workflow_dispatch'/);
   for (const commentJob of [prCommentJob, issueCommentJob]) {
     assert.match(commentJob, /gh api --method POST/);
-    assert.match(commentJob, /gh api "repos\/\$\{GH_REPO\}\/issues\/\$\{COMMENT_TARGET\}\/comments\/\$\{comment_id\}"/);
+    assert.match(commentJob, /gh api "repos\/\$\{GH_REPO\}\/issues\/comments\/\$\{comment_id\}"/);
+    assert.doesNotMatch(
+      commentJob,
+      /issues\/\$\{COMMENT_TARGET\}\/comments\/\$\{comment_id\}/,
+    );
     assert.match(
       commentJob,
       /jq -e --rawfile expected comment\.md '\.body == \$expected' comment-readback\.json/,
