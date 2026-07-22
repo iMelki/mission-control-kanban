@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrected Runtime Regression comment readback to use GitHub's repository-level
+  issue-comment endpoint and report the pull request head SHA/ref instead of the
+  synthetic merge ref. Run `29887043238` attempt 2 posted and verified the live
+  PR #45 artifact comment successfully.
+- Tracked the separate intermittent runtime JSON fixture failure as #46 after
+  run `29887043238` attempt 1 failed and attempt 2 passed unchanged.
+
 ### Added
 
 - Least-privilege Runtime Regression artifact comments for #43: validation jobs
