@@ -158,8 +158,8 @@ jobs:
               --jq '.id'
           )"
           gh api "repos/${GH_REPO}/issues/${COMMENT_TARGET}/comments/${comment_id}" \
-            --jq '.body' > comment-readback.md
-          diff -u comment.md comment-readback.md
+            > comment-readback.json
+          jq -e --rawfile expected comment.md '.body == $expected' comment-readback.json
 
   comment-runtime-artifacts-issue:
     name: Comment runtime artifact links on requested issue
@@ -218,5 +218,5 @@ jobs:
               --jq '.id'
           )"
           gh api "repos/${GH_REPO}/issues/${COMMENT_TARGET}/comments/${comment_id}" \
-            --jq '.body' > comment-readback.md
-          diff -u comment.md comment-readback.md
+            > comment-readback.json
+          jq -e --rawfile expected comment.md '.body == $expected' comment-readback.json

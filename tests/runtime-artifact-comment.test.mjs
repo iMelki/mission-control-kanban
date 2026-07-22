@@ -41,6 +41,10 @@ test("workflow isolates PR and issue write permissions in no-checkout jobs", () 
   for (const commentJob of [prCommentJob, issueCommentJob]) {
     assert.match(commentJob, /gh api --method POST/);
     assert.match(commentJob, /gh api "repos\/\$\{GH_REPO\}\/issues\/\$\{COMMENT_TARGET\}\/comments\/\$\{comment_id\}"/);
+    assert.match(
+      commentJob,
+      /jq -e --rawfile expected comment\.md '\.body == \$expected' comment-readback\.json/,
+    );
   }
 });
 
