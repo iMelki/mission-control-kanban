@@ -46,6 +46,7 @@ test("workflow isolates PR and issue write permissions in no-checkout jobs", () 
     assert.match(commentJob, /gh api --method PATCH/);
     assert.match(commentJob, /--paginate/);
     assert.match(commentJob, /--slurp/);
+    assert.match(commentJob, /\| jq -r/);
     assert.doesNotMatch(commentJob, /head -n/);
     assert.match(commentJob, /gh api "repos\/\$\{GH_REPO\}\/issues\/comments\/\$\{comment_id\}"/);
     assert.doesNotMatch(

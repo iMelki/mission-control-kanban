@@ -154,7 +154,7 @@ jobs:
           jq -n --rawfile body comment.md '{body: $body}' > comment-request.json
           comment_id="$(gh api --paginate --slurp \
             "repos/${GH_REPO}/issues/${COMMENT_TARGET}/comments" \
-            --jq '[.[][] | select(.body | contains("<!-- mck-runtime-regression-artifact-evidence -->")) | .id][0] // empty')"
+            | jq -r '[.[][] | select(.body | contains("<!-- mck-runtime-regression-artifact-evidence -->")) | .id][0] // empty')"
           if [ -n "$comment_id" ]; then
             gh api --method PATCH \
               "repos/${GH_REPO}/issues/comments/${comment_id}" \
@@ -224,7 +224,7 @@ jobs:
           jq -n --rawfile body comment.md '{body: $body}' > comment-request.json
           comment_id="$(gh api --paginate --slurp \
             "repos/${GH_REPO}/issues/${COMMENT_TARGET}/comments" \
-            --jq '[.[][] | select(.body | contains("<!-- mck-runtime-regression-artifact-evidence -->")) | .id][0] // empty')"
+            | jq -r '[.[][] | select(.body | contains("<!-- mck-runtime-regression-artifact-evidence -->")) | .id][0] // empty')"
           if [ -n "$comment_id" ]; then
             gh api --method PATCH \
               "repos/${GH_REPO}/issues/comments/${comment_id}" \
