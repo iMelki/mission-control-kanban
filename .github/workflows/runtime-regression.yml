@@ -4,6 +4,7 @@ permissions:
   contents: read
   actions: read
   issues: write
+  pull-requests: write
 
 on:
   pull_request:
@@ -102,7 +103,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: npm run comment:runtime-artifacts -- --dry-run --github-step-summary --branch "${{ github.ref_name }}" --run-id "${{ github.run_id }}"
       - name: Comment artifact links on PR/requested issue after successful CI
-        if: ${{ success() && ((github.event_name == 'workflow_dispatch' && inputs.issue_number != '') || github.event_name == 'pull_request') }}
+        if: >-
+          ${{ success() && (
+            (github.event_name == 'workflow_dispatch' && inputs.issue_number != '') ||
+            (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+          ) }}
         env:
           GH_TOKEN: ${{ github.token }}
           COMMENT_TARGET: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.issue_number }}

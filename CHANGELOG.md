@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Least-privilege Runtime Regression artifact comments for #43: same-repository
+  pull requests receive `pull-requests: write`, fork PRs stay read-only, and a
+  denied comment is reported distinctly as `comment-permission`.
+- Deterministic all-files pre-commit behavior for #44: mixed line endings fail
+  without rewriting files and React Doctor executes once using the staged
+  index. The regression proof hashes all 209 tracked/untracked task files and
+  records zero byte changes after the broad gate.
+
 - Explicit scanning-only policy for [#41](https://github.com/iMelki/mission-control-kanban/issues/41), with a private hash-bound legacy-store backup, staged positive/negative Gitleaks canary proof, and repository-health readback showing no remaining filter/store conflicts.
 - Secret-scanning policy documentation covering local staged enforcement, the independently pinned Gitleaks v3 pull-request job, server-side protection, and rollback boundaries.
 - Follow-up tracking for [#43](https://github.com/iMelki/mission-control-kanban/issues/43) and [#44](https://github.com/iMelki/mission-control-kanban/issues/44), separating the Runtime Regression artifact-comment permission defect and all-files pre-commit churn from the completed #41 security-policy migration.

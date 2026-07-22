@@ -5,6 +5,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: mixed-line-ending
+        args: [--fix=no]
       - id: check-yaml
       - id: check-json
       - id: check-added-large-files
@@ -30,5 +31,5 @@ repos:
         name: React Doctor
         entry: node scripts/run-react-doctor.js
         language: system
-        pass_filenames: true
+        pass_filenames: false
         files: ^(src|app|components|lib|hooks)/.*\.(ts|tsx|js|jsx|mjs|cjs)$

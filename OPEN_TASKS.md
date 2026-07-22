@@ -13,11 +13,19 @@ the local operator entrypoint; historical task notes remain in
     failed only when the final comment call lacked integration permission.
     Preserve least privilege and separate trusted commenting from untrusted PR
     execution where needed.
+  - Implementation on `fix/43-44-runtime-validation` adds minimum
+    `pull-requests: write`, skips write-capable commenting for fork PRs, and
+    classifies denied comments as `comment-permission`. A same-repository PR
+    run must post the artifact links before closure.
 
 - [#44 - Make all-files pre-commit deterministic and one-shot](https://github.com/iMelki/mission-control-kanban/issues/44)
   - `pre-commit run --all-files` caused unrelated line-ending rewrites and
     repeated React Doctor/npm invocations. Staged-only validation passes; make
     the broad gate byte-stable and one-shot before using it as a health proof.
+  - Implementation on `fix/43-44-runtime-validation` makes line-ending checks
+    report-only and invokes React Doctor once without passed filenames. Local
+    all-files validation passed across 209 hashed files with zero byte changes;
+    CI proof remains before closure.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.
