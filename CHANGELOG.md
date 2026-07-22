@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Least-privilege Runtime Regression artifact comments for #43: validation jobs
-  stay read-only, a no-checkout job receives only `actions: read` and
-  `issues: write`, fork PRs cannot enter it, and the posted body is read back.
+  stay read-only; separate no-checkout jobs receive only `pull-requests: write`
+  for same-repository PRs or `issues: write` for explicit dispatches, and each
+  posted body is read back.
 - Deterministic all-files pre-commit behavior for #44: mixed line endings fail
   without rewriting files and `require_serial` makes React Doctor execute once
   with the selected filenames. The broad-gate regression proof also compares

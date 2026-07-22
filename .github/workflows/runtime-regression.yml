@@ -101,16 +101,74 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: npm run comment:runtime-artifacts -- --dry-run --github-step-summary --branch "${{ github.ref_name }}" --run-id "${{ github.run_id }}"
 
-  comment-runtime-artifacts:
-    name: Comment runtime artifact links
+  comment-runtime-artifacts-pr:
+    name: Comment runtime artifact links on PR
     needs: runtime-regression
     if: >-
       ${{
         needs.runtime-regression.result == 'success' &&
-        (
-          (github.event_name == 'workflow_dispatch' && inputs.issue_number != '') ||
-          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-        )
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.run_id }}
+      HEAD_SHA: ${{ github.sha }}
+      REF_NAME: ${{ github.ref_name }}
+      COMMENT_TARGET: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Post and verify runtime artifact comment
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="https://github.com/${GH_REPO}/actions/runs/${RUN_ID}"
+          artifacts_json="$(gh api "repos/${GH_REPO}/actions/runs/${RUN_ID}/artifacts")"
+
+          {
+            printf '%s\n\n' 'Runtime regression artifact evidence:'
+            printf '%s\n' "- Workflow: Runtime Regression"
+            printf '%s\n' "- Run: ${run_url}"
+            printf '%s\n' '- Status: completed; conclusion: success'
+            printf '%s\n' "- Commit: ${HEAD_SHA}"
+            printf '%s\n' "- Branch: ${REF_NAME}"
+            printf '%s\n' '- Artifacts:'
+            artifact_lines="$(
+              jq -r --arg run_url "$run_url" \
+                '.artifacts[] | select(.expired == false) | "- [\(.name)](\($run_url)/artifacts/\(.id)); expires \(.expires_at)"' \
+                <<< "$artifacts_json"
+            )"
+            if [ -n "$artifact_lines" ]; then
+              printf '%s\n' "$artifact_lines"
+            else
+              printf '%s\n' '- No unexpired artifacts found for this run.'
+            fi
+          } > comment.md
+
+          jq -n --rawfile body comment.md '{body: $body}' > comment-request.json
+          comment_id="$(
+            gh api --method POST \
+              "repos/${GH_REPO}/issues/${COMMENT_TARGET}/comments" \
+              --input comment-request.json \
+              --jq '.id'
+          )"
+          gh api "repos/${GH_REPO}/issues/${COMMENT_TARGET}/comments/${comment_id}" \
+            --jq '.body' > comment-readback.md
+          diff -u comment.md comment-readback.md
+
+  comment-runtime-artifacts-issue:
+    name: Comment runtime artifact links on requested issue
+    needs: runtime-regression
+    if: >-
+      ${{
+        needs.runtime-regression.result == 'success' &&
+        github.event_name == 'workflow_dispatch' &&
+        inputs.issue_number != ''
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -123,7 +181,7 @@ jobs:
       RUN_ID: ${{ github.run_id }}
       HEAD_SHA: ${{ github.sha }}
       REF_NAME: ${{ github.ref_name }}
-      COMMENT_TARGET: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.issue_number }}
+      COMMENT_TARGET: ${{ inputs.issue_number }}
     steps:
       - name: Post and verify runtime artifact comment
         shell: bash

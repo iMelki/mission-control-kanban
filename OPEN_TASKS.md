@@ -14,10 +14,11 @@ the local operator entrypoint; historical task notes remain in
     Preserve least privilege and separate trusted commenting from untrusted PR
     execution where needed.
   - Implementation on `fix/43-44-runtime-validation` keeps validation jobs
-    read-only and moves `issues: write` into a no-checkout comment job. Fork
-    PRs cannot enter that job, denied comments classify as `comment-permission`,
-    and the posted body is read back byte-for-byte. A same-repository PR run
-    must post the artifact links before closure.
+    read-only and splits commenting into no-checkout jobs: PR runs receive only
+    `pull-requests: write`, while explicit issue dispatches receive only
+    `issues: write`. Fork PRs cannot enter the PR job, denied comments classify
+    as `comment-permission`, and posted bodies are read back byte-for-byte. A
+    same-repository PR run must post the artifact links before closure.
 
 - [#44 - Make all-files pre-commit deterministic and one-shot](https://github.com/iMelki/mission-control-kanban/issues/44)
   - `pre-commit run --all-files` caused unrelated line-ending rewrites and

@@ -12,25 +12,36 @@ const {
   runGh,
 } = require("../scripts/comment-runtime-regression-artifacts.js");
 
-test("workflow isolates issue-write permission in a no-checkout comment job", () => {
+test("workflow isolates PR and issue write permissions in no-checkout jobs", () => {
   const workflow = fs.readFileSync(
     path.join(repoRoot, ".github/workflows/runtime-regression.yml"),
     "utf8",
   );
 
   const topPermissions = workflow.match(/permissions:[\s\S]*?(?=\n\non:)/)?.[0] ?? "";
-  const commentJob = workflow.match(/\n  comment-runtime-artifacts:[\s\S]*$/)?.[0] ?? "";
+  const prCommentJob = workflow.match(
+    /\n  comment-runtime-artifacts-pr:[\s\S]*?(?=\n  comment-runtime-artifacts-issue:)/,
+  )?.[0] ?? "";
+  const issueCommentJob = workflow.match(
+    /\n  comment-runtime-artifacts-issue:[\s\S]*$/,
+  )?.[0] ?? "";
 
   assert.doesNotMatch(topPermissions, /issues:\s*write|pull-requests:\s*write/);
-  assert.match(commentJob, /needs:\s*runtime-regression/);
-  assert.match(commentJob, /permissions:[\s\S]*?actions:\s*read[\s\S]*?issues:\s*write/);
-  assert.doesNotMatch(commentJob, /actions\/checkout/);
+  assert.match(prCommentJob, /needs:\s*runtime-regression/);
+  assert.match(prCommentJob, /permissions:[\s\S]*?actions:\s*read[\s\S]*?pull-requests:\s*write/);
+  assert.doesNotMatch(prCommentJob, /issues:\s*write|actions\/checkout/);
   assert.match(
-    commentJob,
+    prCommentJob,
     /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/,
   );
-  assert.match(commentJob, /gh api --method POST/);
-  assert.match(commentJob, /gh api "repos\/\$\{GH_REPO\}\/issues\/\$\{COMMENT_TARGET\}\/comments\/\$\{comment_id\}"/);
+  assert.match(issueCommentJob, /needs:\s*runtime-regression/);
+  assert.match(issueCommentJob, /permissions:[\s\S]*?actions:\s*read[\s\S]*?issues:\s*write/);
+  assert.doesNotMatch(issueCommentJob, /pull-requests:\s*write|actions\/checkout/);
+  assert.match(issueCommentJob, /github\.event_name == 'workflow_dispatch'/);
+  for (const commentJob of [prCommentJob, issueCommentJob]) {
+    assert.match(commentJob, /gh api --method POST/);
+    assert.match(commentJob, /gh api "repos\/\$\{GH_REPO\}\/issues\/\$\{COMMENT_TARGET\}\/comments\/\$\{comment_id\}"/);
+  }
 });
 
 test("classifies a denied PR comment separately from runtime validation", () => {
