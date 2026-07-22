@@ -14,6 +14,14 @@ the local operator entrypoint; historical task notes remain in
     smoke entities were cleaned up. Failed-job-only attempt 2 passed unchanged,
     so preserve both receipts and identify the empty/partial JSON source rather
     than weakening the smoke gate.
+  - Root cause: the failure log shows Next.js `next dev` compiling the route
+    and reading a truncated internal JSON manifest before returning HTTP 500;
+    no application fixture file or SQLite JSON value was partial. The runner
+    now uses a fresh webpack `next build` plus isolated `next start` by default,
+    rejects an occupied port, and retains `MCK_REGRESSION_SERVER_MODE=dev` only
+    for local diagnosis.
+  - Local validation: server-plan contract `2/2`; full runtime smoke remains
+    pending remote CI proof after the pushed fix.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.

@@ -1,5 +1,6 @@
 const { spawn, spawnSync } = require('node:child_process');
 const net = require('node:net');
+const { getRuntimeRegressionServerPlan } = require('./runtime-regression-server');
 
 const port = Number(process.env.MCK_REGRESSION_PORT || 3021);
 const host = '127.0.0.1';
@@ -98,20 +99,32 @@ async function waitForServer(timeoutMs = 45_000) {
 async function main() {
   const startedAt = new Date().toISOString();
   const checks = [];
+  const serverPlan = getRuntimeRegressionServerPlan({ port });
 
   const reactDoctor = await run('node', ['scripts/run-react-doctor.js']);
   checks.push({ name: 'React Doctor changed-file gate', ok: reactDoctor.code === 0 });
 
   let server;
   const alreadyRunning = await isPortOpen();
+  if (alreadyRunning && serverPlan.mode === 'production') {
+    throw new Error(`Runtime Regression requires an isolated production server; ${baseUrl} is already in use.`);
+  }
+
   if (!alreadyRunning) {
+    if (serverPlan.build) {
+      const build = await run(serverPlan.build.command, serverPlan.build.args);
+      if (build.code !== 0) {
+        throw new Error(`Runtime Regression production build failed with exit code ${build.code}.`);
+      }
+    }
+
     server = isWindows
-      ? spawn(process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe', windowsCommandArgs('npm', ['run', 'dev:n8n']), {
+      ? spawn(process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe', windowsCommandArgs(serverPlan.start.command, serverPlan.start.args), {
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
       })
-      : spawn('npm', ['run', 'dev:n8n'], {
+      : spawn(serverPlan.start.command, serverPlan.start.args, {
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
@@ -120,7 +133,7 @@ async function main() {
     server.stderr.on('data', (chunk) => process.stderr.write(chunk));
     if (!await waitForServer()) {
       killProcessTree(server);
-      throw new Error(`MCK dev server did not become ready on ${baseUrl}`);
+      throw new Error(`MCK ${serverPlan.mode} server did not become ready on ${baseUrl}`);
     }
   }
 

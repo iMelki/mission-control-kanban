@@ -1,6 +1,6 @@
 # MCK Runtime UX + Regression Workflow
 
-Updated: 2026-07-02
+Updated: 2026-07-22
 
 Use this workflow when adding runtime dispatch UI, dense workspace refinements, or regression automation to Mission Control Kanban.
 
@@ -59,11 +59,21 @@ npm run comment:runtime-artifacts -- --dry-run
 npm run comment:runtime-artifacts -- --issue <issue-or-pr-number>
 ```
 
+`npm run check:runtime-regressions` builds the webpack production output and
+starts it with `next start` before creating smoke entities. This keeps the
+test away from `next dev`'s on-demand manifest writes, which can expose a
+partially written JSON manifest during route compilation. The runner fails if
+port 3021 is already occupied, so it cannot silently test an unrelated server.
+Use `MCK_REGRESSION_SERVER_MODE=dev` only for an explicitly local diagnostic;
+that mode is not the CI contract.
+
 Runtime Regression CI comments on PRs after successful workflow completion. Local screenshot thumbnails and metadata live at `/runtime-regression`.
 
 ## 6. Turbopack inventory policy
 
 - `npm run build` remains webpack-backed and blocking.
-- `npm run dev:n8n` is also webpack-backed on port 3021; Next dev/Turbopack can serve the shell while breaking file-backed SQLite route APIs, so do not remove `--webpack` without a route-level smoke proof.
+- `npm run dev:n8n` remains available for ordinary local development and the
+  explicit diagnostic override on port 3021; it is not the Runtime Regression
+  server because `next dev` compiles routes on demand.
 - `npm run build:turbo` remains non-blocking inventory until the `next.config.mjs` → `src/lib/db/index.ts` output-file-tracing path is resolved.
 - Upload or inspect `mck-turbopack-inventory` artifacts for trace warnings rather than blocking operator work.
