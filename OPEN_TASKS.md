@@ -1,12 +1,45 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-07-22
+Last updated: 2026-07-29
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
+
+- [#48 - Adopt ReUI/shadcn kanban+Card+Tabs primitives instead of hand-rolled equivalents](https://github.com/iMelki/mission-control-kanban/issues/48)
+  - 2026-07-29 workspace-wide UI reuse audit: `MissionQueue.tsx`'s native
+    HTML5-drag kanban board should move to a ReUI/dnd-kit kanban block;
+    `ui/Panel.tsx` duplicates shadcn `Card`; `WorkspaceSectionTabs.tsx` should
+    use shadcn `Tabs` for correct `role="tab"` semantics. `ui/DataTable.tsx`
+    is already built on `@tanstack/react-table` (headless) and is only a
+    low-priority render-layer note, not a violation. Report-only, no code
+    changed yet.
+
+- [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
+  - Local implementation now provides opt-in dispatch v2 with a
+    pending-before-send attempt, stable attempt/delivery/correlation/revision
+    IDs, raw-body HMAC, replay conflict detection, lifecycle v2 callbacks, and
+    receipt-gated completion while preserving v1. The v2 revision now binds
+    the final live `origin/dev` SHA read from the owned remote immediately
+    before dispatch.
+  - The installable `integrations/paperclip-bridge` plugin creates the
+    sequential plan/build/validate/review/release graph, persists linkage and
+    retry evidence, preserves and reads back the exact raw dispatch JSON before
+    activating the parent, signs Mission Control outcomes with a dedicated
+    secret reference, leaves initial Mission Control apply pending after the
+    synchronous MCK `started` callback, and exposes redacted Paperclip
+    dashboard, issue-linkage, and diagnostics surfaces.
+  - Final independent-review hardening now pins current host compatibility,
+    routes every outbound request through company-scoped Paperclip policy,
+    rejects non-exact loopback identities and non-canonical paths before
+    orchestration, preserves immutable per-channel retry envelopes, replays
+    current lifecycle evidence on same-revision redispatch, and bounds callback
+    body size plus total/inactivity time.
+  - Remaining closure evidence: install into the owned Paperclip runtime,
+    prove a signed health ping and real dispatch, reconcile the returned
+    receipt across control surfaces, then commit/push and read back `origin/dev`.
 
 - [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
   - Runtime Regression run `29887043238` attempt 1 failed while rendering
