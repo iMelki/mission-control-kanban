@@ -400,7 +400,10 @@ export default function WorkspacePage() {
     : 'no recorded runs yet';
 
   return (
-    <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
+    <div
+      className="h-screen flex flex-col bg-mc-bg overflow-hidden"
+      data-workspace-ready={loadedWorkspace ? 'true' : 'false'}
+    >
       <Header workspace={workspace} />
       <WorkspaceSectionTabs section={section} onSectionChange={setSection} />
       {section === 'settings' && <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />}
