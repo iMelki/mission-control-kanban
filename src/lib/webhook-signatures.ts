@@ -14,11 +14,12 @@ export interface WebhookSignatureVerificationInput extends WebhookSignatureInput
   signature: string | null | undefined;
   nowMs?: number;
   toleranceSeconds?: number;
+  requireDeliveryIdBinding?: boolean;
 }
 
 export interface WebhookSignatureVerificationResult {
   ok: boolean;
-  reason?: 'missing_signature' | 'missing_secret' | 'bad_timestamp' | 'stale_timestamp' | 'bad_signature';
+  reason?: 'missing_signature' | 'missing_secret' | 'missing_delivery_id' | 'bad_timestamp' | 'stale_timestamp' | 'bad_signature';
 }
 
 export function buildWebhookSignatureBaseString({ rawBody, timestamp, version = 'v1', deliveryId }: WebhookSignatureInput) {
@@ -51,9 +52,11 @@ export function verifyWebhookSignature({
   deliveryId,
   nowMs = Date.now(),
   toleranceSeconds = DEFAULT_TOLERANCE_SECONDS,
+  requireDeliveryIdBinding = false,
 }: WebhookSignatureVerificationInput): WebhookSignatureVerificationResult {
   if (!secret) return { ok: false, reason: 'missing_secret' };
   if (!signature) return { ok: false, reason: 'missing_signature' };
+  if (requireDeliveryIdBinding && !deliveryId) return { ok: false, reason: 'missing_delivery_id' };
 
   const timestampText = String(timestamp);
   const timestampSeconds = Number(timestampText);
@@ -67,8 +70,9 @@ export function verifyWebhookSignature({
     return { ok: true };
   }
 
-  // Backward compatibility for bridge authors already using the pre-delivery-id v1 signature.
-  if (deliveryId) {
+  // Backward compatibility for v1 bridge authors already using the
+  // pre-delivery-id signature. Lifecycle v2 callers must bind the delivery ID.
+  if (deliveryId && !requireDeliveryIdBinding) {
     const legacyExpected = signWebhookPayload({ rawBody, secret, timestamp: timestampText });
     if (timingSafeTextEqual(signature, legacyExpected)) {
       return { ok: true };

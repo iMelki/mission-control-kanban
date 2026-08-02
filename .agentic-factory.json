@@ -1,0 +1,185 @@
+{
+  "$schema": "https://raw.githubusercontent.com/iMelki/agent-settings/dev/shared/schemas/software-factory/factory-repository-manifest.v1.schema.json",
+  "schemaVersion": "agent-settings.agentic-factory-repository.v1",
+  "repositorySlug": "iMelki/mission-control-kanban",
+  "allowedOrigin": "git@github.com:iMelki/mission-control-kanban.git",
+  "activeBranch": "dev",
+  "newFileModes": {
+    ".agentic-factory.json": "100644",
+    "docs/PAPERCLIP_FACTORY_BRIDGE.md": "100644",
+    "integrations/paperclip-bridge/esbuild.config.mjs": "100644",
+    "integrations/paperclip-bridge/migrations/001_mck_factory_bridge.sql": "100644",
+    "integrations/paperclip-bridge/migrations/002_lifecycle_retry_evidence.sql": "100644",
+    "integrations/paperclip-bridge/migrations/003_independent_lifecycle_channels.sql": "100644",
+    "integrations/paperclip-bridge/migrations/004_owner_fenced_leases.sql": "100644",
+    "integrations/paperclip-bridge/migrations/005_company_isolation.sql": "100644",
+    "integrations/paperclip-bridge/package-lock.json": "100644",
+    "integrations/paperclip-bridge/package.json": "100644",
+    "integrations/paperclip-bridge/README.md": "100644",
+    "integrations/paperclip-bridge/scripts/validate-migrations.mjs": "100644",
+    "integrations/paperclip-bridge/scripts/validate-paperclip-host-migrations.ts": "100644",
+    "integrations/paperclip-bridge/src/constants.ts": "100644",
+    "integrations/paperclip-bridge/src/contracts.ts": "100644",
+    "integrations/paperclip-bridge/src/evidence.ts": "100644",
+    "integrations/paperclip-bridge/src/factory-paths.ts": "100644",
+    "integrations/paperclip-bridge/src/graph.ts": "100644",
+    "integrations/paperclip-bridge/src/host-http.ts": "100644",
+    "integrations/paperclip-bridge/src/manifest.ts": "100644",
+    "integrations/paperclip-bridge/src/ui/DashboardWidget.tsx": "100644",
+    "integrations/paperclip-bridge/src/ui/DataState.tsx": "100644",
+    "integrations/paperclip-bridge/src/ui/index.tsx": "100644",
+    "integrations/paperclip-bridge/src/ui/IssueLinkagePanel.tsx": "100644",
+    "integrations/paperclip-bridge/src/ui/Mapping.tsx": "100644",
+    "integrations/paperclip-bridge/src/ui/model.ts": "100644",
+    "integrations/paperclip-bridge/src/ui/SettingsPage.tsx": "100644",
+    "integrations/paperclip-bridge/src/ui/State.tsx": "100644",
+    "integrations/paperclip-bridge/src/ui/Summary.tsx": "100644",
+    "integrations/paperclip-bridge/src/worker.ts": "100644",
+    "integrations/paperclip-bridge/tests/plugin.spec.ts": "100644",
+    "integrations/paperclip-bridge/tsconfig.json": "100644",
+    "integrations/paperclip-bridge/vendor/paperclipai-plugin-sdk-1.0.0-021ab2f08e07463b038c3d1472f227d2d5f68ca4.provenance.json": "100644",
+    "integrations/paperclip-bridge/vendor/paperclipai-plugin-sdk-1.0.0-021ab2f08e07463b038c3d1472f227d2d5f68ca4.tgz": "100644",
+    "integrations/paperclip-bridge/vendor/paperclipai-shared-0.3.1-021ab2f08e07463b038c3d1472f227d2d5f68ca4.provenance.json": "100644",
+    "integrations/paperclip-bridge/vendor/paperclipai-shared-0.3.1-021ab2f08e07463b038c3d1472f227d2d5f68ca4.tgz": "100644",
+    "tests/factory-webhooks.test.ts": "100644"
+  },
+  "validations": [
+    {
+      "id": "paperclip-bridge-install",
+      "argv": [
+        "npm",
+        "ls",
+        "--package-lock-only",
+        "--offline",
+        "--ignore-scripts",
+        "--package-lock=false"
+      ],
+      "workingDirectory": "integrations/paperclip-bridge",
+      "timeoutSeconds": 300,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "factory-webhook-tests",
+      "argv": [
+        "npm",
+        "run",
+        "test:factory-webhooks"
+      ],
+      "workingDirectory": ".",
+      "timeoutSeconds": 180,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "paperclip-bridge-typecheck",
+      "argv": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "workingDirectory": "integrations/paperclip-bridge",
+      "timeoutSeconds": 180,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "paperclip-bridge-tests",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "workingDirectory": "integrations/paperclip-bridge",
+      "timeoutSeconds": 180,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "paperclip-host-migration-policy",
+      "argv": [
+        "npm",
+        "run",
+        "test:paperclip-host-migrations"
+      ],
+      "workingDirectory": ".",
+      "timeoutSeconds": 180,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "paperclip-bridge-migrations",
+      "argv": [
+        "npm",
+        "run",
+        "test:migrations"
+      ],
+      "workingDirectory": "integrations/paperclip-bridge",
+      "timeoutSeconds": 300,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "paperclip-bridge-build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "workingDirectory": "integrations/paperclip-bridge",
+      "timeoutSeconds": 180,
+      "expectedArtifacts": [
+        "integrations/paperclip-bridge/dist/manifest.js",
+        "integrations/paperclip-bridge/dist/worker.js",
+        "integrations/paperclip-bridge/dist/ui/index.js"
+      ]
+    },
+    {
+      "id": "mck-typecheck",
+      "argv": [
+        "npx",
+        "tsc",
+        "--noEmit",
+        "--incremental",
+        "false",
+        "--pretty",
+        "false"
+      ],
+      "workingDirectory": ".",
+      "timeoutSeconds": 300,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "mck-full-tests",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "workingDirectory": ".",
+      "timeoutSeconds": 900,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "mck-lint",
+      "argv": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "workingDirectory": ".",
+      "timeoutSeconds": 600,
+      "expectedArtifacts": []
+    },
+    {
+      "id": "mck-production-build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "workingDirectory": ".",
+      "timeoutSeconds": 900,
+      "expectedArtifacts": [
+        ".next/BUILD_ID"
+      ]
+    }
+  ],
+  "release": {
+    "pushRemote": "origin",
+    "pushBranch": "dev",
+    "requireRemoteReadback": true
+  }
+}

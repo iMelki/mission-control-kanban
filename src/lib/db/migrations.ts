@@ -577,6 +577,84 @@ const migrations: Migration[] = [
       `);
     }
   },
+  {
+    id: '018',
+    name: 'add_factory_dispatch_lifecycle',
+    up: (db) => {
+      console.log('[Migration 018] Adding factory dispatch identities and lifecycle receipts...');
+      const dispatchColumns = db.prepare("PRAGMA table_info(task_dispatch_attempts)").all() as { name: string }[];
+      const hasDispatchColumn = (name: string) => dispatchColumns.some((column) => column.name === name);
+      const dispatchAdditions: Array<[string, string]> = [
+        ['delivery_id', 'ALTER TABLE task_dispatch_attempts ADD COLUMN delivery_id TEXT'],
+        ['correlation_id', 'ALTER TABLE task_dispatch_attempts ADD COLUMN correlation_id TEXT'],
+        ['task_revision', 'ALTER TABLE task_dispatch_attempts ADD COLUMN task_revision TEXT'],
+        ['payload_hash', 'ALTER TABLE task_dispatch_attempts ADD COLUMN payload_hash TEXT'],
+        ['lifecycle_status', 'ALTER TABLE task_dispatch_attempts ADD COLUMN lifecycle_status TEXT'],
+        ['receipt_id', 'ALTER TABLE task_dispatch_attempts ADD COLUMN receipt_id TEXT'],
+        ['receipt_json', 'ALTER TABLE task_dispatch_attempts ADD COLUMN receipt_json TEXT'],
+        ['updated_at', 'ALTER TABLE task_dispatch_attempts ADD COLUMN updated_at TEXT'],
+      ];
+      for (const [name, sql] of dispatchAdditions) {
+        if (!hasDispatchColumn(name)) db.exec(sql);
+      }
+
+      const deliveryColumns = db.prepare("PRAGMA table_info(webhook_callback_deliveries)").all() as { name: string }[];
+      if (!deliveryColumns.some((column) => column.name === 'payload_hash')) {
+        db.exec('ALTER TABLE webhook_callback_deliveries ADD COLUMN payload_hash TEXT');
+      }
+
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatch_attempts_delivery
+          ON task_dispatch_attempts(delivery_id)
+          WHERE delivery_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_correlation
+          ON task_dispatch_attempts(correlation_id, created_at DESC);
+      `);
+    }
+  },
+  {
+    id: '019',
+    name: 'add_webhook_callback_processing_state',
+    up: (db) => {
+      console.log('[Migration 019] Adding transactional webhook callback processing state...');
+      const table = db.prepare(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'webhook_callback_deliveries'"
+      ).get() as { sql?: string } | undefined;
+      if (table?.sql?.includes("'processing'")) return;
+
+      db.exec(`
+        ALTER TABLE webhook_callback_deliveries RENAME TO webhook_callback_deliveries_legacy_019;
+        CREATE TABLE webhook_callback_deliveries (
+          id TEXT PRIMARY KEY,
+          delivery_id TEXT NOT NULL UNIQUE,
+          task_id TEXT,
+          attempt_id TEXT,
+          event_type TEXT NOT NULL DEFAULT 'unknown',
+          status TEXT NOT NULL CHECK (
+            status IN ('processing', 'accepted', 'duplicate', 'rejected', 'schema_invalid', 'signature_invalid')
+          ),
+          payload_hash TEXT,
+          reason TEXT,
+          expires_at TEXT NOT NULL,
+          received_at TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO webhook_callback_deliveries (
+          id, delivery_id, task_id, attempt_id, event_type, status,
+          payload_hash, reason, expires_at, received_at, created_at
+        )
+        SELECT
+          id, delivery_id, task_id, attempt_id, event_type, status,
+          payload_hash, reason, expires_at, received_at, created_at
+        FROM webhook_callback_deliveries_legacy_019;
+        DROP TABLE webhook_callback_deliveries_legacy_019;
+        CREATE INDEX idx_webhook_callback_deliveries_received
+          ON webhook_callback_deliveries(received_at DESC);
+        CREATE INDEX idx_webhook_callback_deliveries_expires
+          ON webhook_callback_deliveries(expires_at);
+      `);
+    }
+  },
 ];
 
 /**

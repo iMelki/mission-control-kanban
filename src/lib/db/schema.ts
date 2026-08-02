@@ -183,7 +183,15 @@ CREATE TABLE IF NOT EXISTS task_dispatch_attempts (
   error_message TEXT,
   request_payload TEXT,
   response_body TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
+  delivery_id TEXT,
+  correlation_id TEXT,
+  task_revision TEXT,
+  payload_hash TEXT,
+  lifecycle_status TEXT,
+  receipt_id TEXT,
+  receipt_json TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT
 );
 
 
@@ -205,7 +213,8 @@ CREATE TABLE IF NOT EXISTS webhook_callback_deliveries (
   task_id TEXT,
   attempt_id TEXT,
   event_type TEXT NOT NULL DEFAULT 'unknown',
-  status TEXT NOT NULL CHECK (status IN ('accepted', 'duplicate', 'rejected', 'schema_invalid', 'signature_invalid')),
+  status TEXT NOT NULL CHECK (status IN ('processing', 'accepted', 'duplicate', 'rejected', 'schema_invalid', 'signature_invalid')),
+  payload_hash TEXT,
   reason TEXT,
   expires_at TEXT NOT NULL,
   received_at TEXT NOT NULL,
@@ -286,6 +295,7 @@ CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
 CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_task ON task_dispatch_attempts(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_status ON task_dispatch_attempts(status, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatch_attempts_delivery ON task_dispatch_attempts(delivery_id) WHERE delivery_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_webhook_callback_deliveries_received ON webhook_callback_deliveries(received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_webhook_callback_deliveries_expires ON webhook_callback_deliveries(expires_at);
 CREATE INDEX IF NOT EXISTS idx_runtime_maintenance_runs_type ON runtime_maintenance_runs(run_type, created_at DESC);

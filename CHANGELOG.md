@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Kept factory base-SHA resolution on an authoritative `origin/dev`
+  `git ls-remote` read while increasing its finite child-process allowance from
+  10 to 30 seconds. This matches the existing factory webhook default and
+  avoids false dispatch failures on verified 10–14 second SSH reads.
+- Hardened the Paperclip factory bridge's final independent-review boundary:
+  all host HTTP requests are company-scoped against Paperclip `021ab2f`; apply
+  mode and dispatch v2 require exact loopback identities; immutable persisted
+  rows drive retry and same-revision replay; MCK and Mission Control retry
+  independently; source occurrences no longer collapse; factory paths are
+  canonical and scope-bound; lifecycle v2 requires the canonical delivery
+  header; and callback bodies are bounded by size, total time, and inactivity.
+- Closed two P1 Paperclip bridge boundaries: completion now requires exact
+  latest Validator- and Reviewer-authored, schema-valid, body-hash-bound
+  evidence tied to the current successful stage runs instead of trusting the
+  Integrator receipt alone; and migration 005 plus every SQL/tool/event/UI
+  path now scopes mappings, deliveries, retries, keys, counts, and diagnostics
+  by authorized `company_id` with fail-closed legacy backfill. The context-free
+  health hook validates configuration without querying or aggregating tenant
+  runtime state. Exact-host SQL-policy validation and a digest-pinned
+  PostgreSQL 17 harness now reproduce the empty install, legacy backfill and
+  composite constraints, cross-company rejection, and unresolved-row failure
+  with `ON_ERROR_STOP` in the deterministic factory gate.
 - Runtime Regression now builds a fresh webpack production output, stages the
   standalone runtime assets, and launches `.next/standalone/server.js` with the
   same host/port contract as Docker. This avoids both the intermittent
@@ -28,6 +50,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Opt-in Paperclip software-factory dispatch v2 for
+  [#47](https://github.com/iMelki/mission-control-kanban/issues/47), including
+  pending-before-send attempt identity, task-revision hashing, raw-body HMAC
+  and payload-hash replay protection, signed lifecycle stages, stale-task
+  rejection, a live owned-remote `origin/dev` base-SHA freeze bound into the
+  task revision and receipt, receipt-gated completion, and factory linkage in
+  the MCK Dispatch timeline.
+- Installable `integrations/paperclip-bridge` plugin with a sequential
+  plan/build/deterministic-validation/independent-review/release issue graph,
+  idempotent plugin storage, event-driven stage wakeups, exact-byte bounded
+  lifecycle reconciliation, independently retryable MCK/Mission Control
+  publications, live Paperclip run/role/decision-bound completion,
+  strict canonical receipt/envelope identity gates, host-compatible
+  object-shaped secret-reference configuration, a separately scoped exact-byte
+  Mission Control outcome signature, raw markdown envelope readback before
+  parent activation, fast MCK acceptance with deferred Mission Control
+  reconciliation, explicit 2xx failure detection, redacted
+  run/cost/decision dashboard/linkage/diagnostics UI, pinned SDK lockfile,
+  focused tests, and a dedicated CI job.
+- Repository-owned `.agentic-factory.json` exact-argv validation and
+  `origin/dev` release-readback policy, plus the Paperclip bridge runbook and
+  v2 dispatch/callback examples.
 - Least-privilege Runtime Regression artifact comments for #43: validation jobs
   stay read-only; separate no-checkout jobs receive only `pull-requests: write`
   for same-repository PRs or `issues: write` for explicit dispatches, and each

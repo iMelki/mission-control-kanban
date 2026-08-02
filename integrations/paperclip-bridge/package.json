@@ -1,0 +1,61 @@
+{
+  "name": "@imelki/paperclip-plugin-mck-bridge",
+  "version": "0.1.0",
+  "description": "Signed, replay-safe Mission Control Kanban bridge for Paperclip",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node ./esbuild.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:migrations": "node ./scripts/validate-migrations.mjs"
+  },
+  "paperclipPlugin": {
+    "manifest": "./dist/manifest.js",
+    "worker": "./dist/worker.js",
+    "ui": "./dist/ui/"
+  },
+  "paperclipHostCompatibility": {
+    "testedCommit": "c5a4ba43368439f5e05c1c7f5cdf74758a2f8a53",
+    "testedFiles": [
+      {
+        "path": "server/src/services/plugin-database.ts",
+        "blobSha": "d6b4cdda10e34726c58d4e3b71e1f6ce2397a84f",
+        "sha256": "6ab593f7b75e8844d1113504a7db039567a7626bc7a2718314441b3ded7e313b"
+      }
+    ],
+    "pluginSdkApi": "1.0.0",
+    "requiresCompanyScopedHttpFetch": true,
+    "vendoredSdkSha256": "3544d8114996db361a0afbfd437f59d20b84eee3f1dba2b35083e2e2579ea924",
+    "vendoredSharedSha256": "7a4360a89a913d98f0adb175d39a9b88eec4ddface480b86e8c6e74c5ff6092d",
+    "knownAuditAdvisories": [
+      {
+        "id": "GHSA-3pw3-v88x-xj24",
+        "packageVersionClassifier": "0.3.1",
+        "hostFixCommit": "32a9165ddf6308f3b46eae0653b6f583e502e538",
+        "hostFixIncluded": true
+      }
+    ]
+  },
+  "dependencies": {
+    "@paperclipai/plugin-sdk": "file:vendor/paperclipai-plugin-sdk-1.0.0-021ab2f08e07463b038c3d1472f227d2d5f68ca4.tgz"
+  },
+  "devDependencies": {
+    "@paperclipai/shared": "file:vendor/paperclipai-shared-0.3.1-021ab2f08e07463b038c3d1472f227d2d5f68ca4.tgz",
+    "@types/node": "^24.6.0",
+    "@types/react": "^19.2.17",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "keywords": [
+    "paperclip",
+    "mission-control-kanban",
+    "agentic-factory",
+    "webhook"
+  ],
+  "license": "MIT"
+}

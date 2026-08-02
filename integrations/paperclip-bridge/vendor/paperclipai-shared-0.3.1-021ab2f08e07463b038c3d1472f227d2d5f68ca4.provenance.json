@@ -1,0 +1,19 @@
+{
+  "package": "@paperclipai/shared",
+  "version": "0.3.1",
+  "sourceRepository": "https://github.com/iMelki/paperclip",
+  "sourceCommit": "021ab2f08e07463b038c3d1472f227d2d5f68ca4",
+  "sourcePath": "packages/shared",
+  "packCommand": "pnpm pack --pack-destination <vendor>",
+  "tarball": "paperclipai-shared-0.3.1-021ab2f08e07463b038c3d1472f227d2d5f68ca4.tgz",
+  "sha256": "7a4360a89a913d98f0adb175d39a9b88eec4ddface480b86e8c6e74c5ff6092d",
+  "reason": "The SDK package manifest resolves @paperclipai/shared@0.3.1; the matching owned build is pinned so npm ci cannot select a stale registry artifact from a different source state.",
+  "knownAuditAdvisory": {
+    "id": "GHSA-3pw3-v88x-xj24",
+    "officialUrl": "https://github.com/advisories/GHSA-3pw3-v88x-xj24",
+    "npmAffectedRange": "<2026.416.0",
+    "hostFixCommit": "32a9165ddf6308f3b46eae0653b6f583e502e538",
+    "hostFixIncludedInSourceCommit": true,
+    "explanation": "npm classifies the retained 0.3.1 package label as affected. The compatible host is pinned to a descendant of the route-authority fix that blocks agent-authenticated instructions path and bundle mutations; older hosts are unsupported."
+  }
+}

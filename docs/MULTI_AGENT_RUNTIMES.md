@@ -1,6 +1,6 @@
 # Multi-Agent Runtime Dispatch
 
-Last updated: 2026-07-01
+Last updated: 2026-07-29
 
 Mission Control Kanban (MCK) can represent many kinds of agents on the board. Runtime-aware dispatch now separates **ownership tracking** from **runtime launch** so operators can safely use OpenClaw, webhook bridges, and manual/native surfaces such as Hermes, Codex, Copilot, or Claude Code.
 
@@ -91,7 +91,7 @@ Webhook agents use `runtime_config.webhook_url` or `runtime_config.url`.
 The payload includes:
 
 - `event: "mck.task.dispatch"`
-- `version: 1`
+- `version: 1` by default, or opt-in factory `version: 2`
 - task summary and dispatch metadata
 - assigned agent summary
 - callback URLs
@@ -104,12 +104,19 @@ Webhook auth uses environment indirection:
 ```json
 {
   "webhook_url": "https://example.test/mck-dispatch",
+  "dispatch_version": 2,
   "bearer_token_env": "MCK_WEBHOOK_TOKEN",
   "headers": {
     "X-MCK-Bridge": "hermes"
   }
 }
 ```
+
+Use `dispatch_version: 2` for the Paperclip bridge only after its signed health
+ping is verified. V2 creates a pending attempt before network I/O and carries
+stable attempt, delivery, correlation, task-revision, factory-contract, and
+lifecycle-callback fields. Existing webhook agents remain on v1 unless
+explicitly opted in.
 
 MCK reads the token from the named environment variable at dispatch time. Raw bearer tokens, API keys, and secrets should not be stored in `runtime_config`. Webhook calls are bounded by a default 30 second timeout (`timeout_ms` / `webhook_timeout_ms`, capped at 120 seconds), and API responses redact query strings/fragments from webhook URLs.
 
@@ -167,6 +174,35 @@ Migration `016_add_webhook_callback_delivery_and_runtime_maintenance` adds callb
 - `runtime_maintenance_runs` records retention cleanup dry-runs/applies for metrics and operator audit.
 
 Signed callbacks use `X-MCK-Delivery-ID`, `X-MCK-Timestamp`, and `X-MCK-Signature`. The HMAC base string is `<delivery-id>.<timestamp>.<raw-json-body>`. See [WEBHOOK_BRIDGE_CALLBACK_EXAMPLES.md](WEBHOOK_BRIDGE_CALLBACK_EXAMPLES.md) and `/api/schemas/webhook-callback-completion` for bridge-author examples.
+
+Migration `018_add_factory_dispatch_lifecycle` extends this ledger and the
+dispatch-attempt table with payload hashes, stable factory identity, lifecycle
+stage, and receipt evidence. V2 callback replay uses delivery ID plus payload
+hash: identical redeliveries are idempotent; changed bytes under the same ID
+are rejected.
+
+## Paperclip software-factory bridge
+
+The installable plugin lives at
+`integrations/paperclip-bridge`. It accepts signed health and v1/v2 dispatch
+webhooks at:
+
+```text
+/api/plugins/imelki.mck-paperclip-bridge/webhooks/mck-dispatch
+```
+
+For v2 it creates one parent issue and a sequential
+plan → build → deterministic validation → independent review → release graph.
+Only the Builder is the mutating source stage. The plugin persists delivery
+and cross-system mappings, wakes the plan stage, publishes signed lifecycle
+callbacks, forwards normalized outcomes to Mission Control, and exposes
+redacted dashboard/linkage/diagnostic UI surfaces.
+
+Completion remains fail closed: MCK only advances to `done` after
+`factory-run-receipt.v1` proves passed validation, an independent accepted
+review, and a pushed `dev` commit. See
+[PAPERCLIP_FACTORY_BRIDGE.md](PAPERCLIP_FACTORY_BRIDGE.md) for installation,
+configuration, and recovery.
 
 ## Runtime Ops Admin Surfaces
 
