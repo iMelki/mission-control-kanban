@@ -324,6 +324,18 @@ as a failed publication.
 
 ## Validation
 
+Paperclip execution workspaces are disposable and do not inherit a checkout's
+`node_modules`. Configure the project workspace provision command to run
+`node scripts/prepare-factory-workspace.mjs` before the Builder or Validator
+starts. The same exact argv is the first entry in `.agentic-factory.json`, so
+an independently invoked deterministic Validator repairs a clean workspace as
+well. The script installs both lockfiles with lifecycle scripts disabled and
+rebuilds only the checked-in native `better-sqlite3` dependency for the host
+runtime. A lockfile-, Node-, OS-, and architecture-bound marker under ignored
+`node_modules` makes repeated setup and validation calls reuse the same
+provision, while a short-lived lock prevents concurrent Windows `npm ci`
+races. It never edits a package lockfile or executes model-generated shell.
+
 Run the repository manifest in order or use the equivalent commands:
 
 ```powershell
