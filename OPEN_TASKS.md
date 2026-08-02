@@ -65,12 +65,20 @@ the local operator entrypoint; historical task notes remain in
 - [#128 - Make Runtime Regression workspace readiness deterministic in CI](https://github.com/iMelki/mission-control-kanban/issues/128)
   - CI run `30759413222` failed only at the Settings-tab visibility wait while
     bridge, gitleaks, pre-commit, and inventory checks passed. A clean clone of
-    the exact PR head passed the production regression locally, identifying an
-    initialization race rather than a missing control.
+    the exact PR head initially passed the production regression locally, but
+    that clone was on the older feature head and did not include the merged
+    Tabs primitive.
   - The fix adds a page-owned `data-workspace-ready="true"` marker after the
-    workspace API loads, waits on that marker before role assertions, and logs
-    a bounded URL/marker/nav diagnostic on timeout. It does not weaken the
-    Settings assertion or add an unbounded retry.
+    workspace API loads, waits on that marker before role assertions, uses the
+    canonical Radix/shadcn `tab` role after the #48 UI consolidation, and logs
+    a bounded URL/marker/nav/geometry diagnostic on timeout. The diagnostic
+    proved the original Settings element was visible (`117x34`) but had role
+    `tab`, not `button`; no CSS or application control defect was found.
+  - The same #48 dnd-kit consolidation exposes a separate reorder-handle
+    `role="button"` alongside each task-card `role="button"`. The smoke now
+    scopes task-card locators to the direct `li > [role="button"]` card root
+    and its visible title text so the handle cannot create a strict-mode
+    collision.
   - Closure gate: PR checks and at least three consecutive production smoke
     runs pass before PR #119 is eligible for merge into `dev`.
 

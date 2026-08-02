@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime UI smoke now waits for an explicit workspace-ready marker before
   asserting the Settings section, and emits bounded DOM diagnostics when the
   readiness contract is not reached (`#128`).
+- The smoke follows the consolidated shadcn/Radix Tabs accessibility contract
+  (`role="tab"`) for the workspace Settings and Board controls, preventing a
+  stale `role="button"` selector from failing CI after the UI reuse merge.
+- Task-card smoke assertions now scope to the direct list-item card root and
+  visible card text to distinguish the dnd-kit reorder-handle button
+  introduced by the same UI consolidation.
 - Successful Runtime Regression artifact receipts now update one marker-based
   PR/issue comment and read it back exactly instead of appending a notification
   on every run.
