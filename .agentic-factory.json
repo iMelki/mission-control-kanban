@@ -6,6 +6,7 @@
   "activeBranch": "dev",
   "newFileModes": {
     ".agentic-factory.json": "100644",
+    "scripts/prepare-factory-workspace.mjs": "100644",
     "docs/PAPERCLIP_FACTORY_BRIDGE.md": "100644",
     "integrations/paperclip-bridge/esbuild.config.mjs": "100644",
     "integrations/paperclip-bridge/migrations/001_mck_factory_bridge.sql": "100644",
@@ -44,6 +45,16 @@
     "tests/factory-webhooks.test.ts": "100644"
   },
   "validations": [
+    {
+      "id": "factory-workspace-provisioning",
+      "argv": [
+        "node",
+        "scripts/prepare-factory-workspace.mjs"
+      ],
+      "workingDirectory": ".",
+      "timeoutSeconds": 900,
+      "expectedArtifacts": []
+    },
     {
       "id": "paperclip-bridge-install",
       "argv": [
