@@ -583,6 +583,7 @@ export function parseEvidenceDocument<T>(
 ): EvidenceDocumentReadback<T> {
   const createdAtMs = Date.parse(String(document?.createdAt ?? ""));
   const updatedAtMs = Date.parse(String(document?.updatedAt ?? ""));
+  const lockedAtMs = Date.parse(String(document?.lockedAt ?? ""));
   const latestRevision = expected.latestRevision;
   if (
     !document
@@ -601,7 +602,8 @@ export function parseEvidenceDocument<T>(
     || !Number.isFinite(createdAtMs)
     || !Number.isFinite(updatedAtMs)
     || createdAtMs > updatedAtMs
-    || document.lockedAt === null
+    || !Number.isFinite(lockedAtMs)
+    || lockedAtMs < updatedAtMs
     || latestRevision.createdByAgentId !== expected.agentId
     || latestRevision.createdByRunId === null
     || !id(latestRevision.createdByRunId)
