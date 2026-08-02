@@ -7,6 +7,7 @@ import {
 export const FACTORY_MCK_BASE_URL = "http://127.0.0.1:3021";
 export const FACTORY_MCK_LIFECYCLE_URL = `${FACTORY_MCK_BASE_URL}/api/webhooks/agent-completion`;
 export const FACTORY_MISSION_CONTROL_BASE_URL = "http://127.0.0.1:3001";
+export const FACTORY_PAPERCLIP_BASE_URL = "http://127.0.0.1:5113";
 
 export type LifecycleStatus =
   | "started"

@@ -572,6 +572,12 @@ describe("MCK Paperclip bridge", () => {
 
   it("accepts only the exact latest agent-authored company-scoped evidence document", () => {
     const body = JSON.stringify({ status: "passed" });
+    const latestRevision = {
+      id: "revision-id-1",
+      revisionNumber: 1,
+      createdByAgentId: "validator-agent",
+      createdByRunId: "validator-run",
+    };
     const document = {
       id: "document-id-1",
       companyId: "company-1",
@@ -585,8 +591,8 @@ describe("MCK Paperclip bridge", () => {
       createdByUserId: null,
       updatedByAgentId: "validator-agent",
       updatedByUserId: null,
-      lockedAt: null,
-      lockedByAgentId: null,
+      lockedAt: new Date("2026-07-29T12:02:30.500Z"),
+      lockedByAgentId: "validator-agent",
       lockedByUserId: null,
       createdAt: new Date("2026-07-29T12:02:30.000Z"),
       updatedAt: new Date("2026-07-29T12:02:31.000Z"),
@@ -597,6 +603,7 @@ describe("MCK Paperclip bridge", () => {
       issueId: "validate-issue",
       key: "factory-validation-evidence",
       agentId: "validator-agent",
+      latestRevision,
       parse: (value) => value,
     })).toMatchObject({
       evidence: { status: "passed" },
@@ -610,6 +617,7 @@ describe("MCK Paperclip bridge", () => {
         issueId: "validate-issue",
         key: "factory-validation-evidence",
         agentId: "validator-agent",
+        latestRevision,
         parse: (value) => value,
       },
     )).toThrow(/exact latest/);
@@ -620,6 +628,7 @@ describe("MCK Paperclip bridge", () => {
         issueId: "validate-issue",
         key: "factory-validation-evidence",
         agentId: "validator-agent",
+        latestRevision,
         parse: (value) => value,
       },
     )).toThrow(/exact latest/);
@@ -630,6 +639,7 @@ describe("MCK Paperclip bridge", () => {
         issueId: "validate-issue",
         key: "factory-validation-evidence",
         agentId: "validator-agent",
+        latestRevision,
         parse: (value) => value,
       },
     )).toThrow(/exact latest/);
@@ -640,6 +650,29 @@ describe("MCK Paperclip bridge", () => {
         issueId: "validate-issue",
         key: "factory-validation-evidence",
         agentId: "validator-agent",
+        latestRevision,
+        parse: (value) => value,
+      },
+    )).toThrow(/exact latest/);
+    expect(() => parseEvidenceDocument(
+      { ...document, lockedAt: null },
+      {
+        companyId: "company-1",
+        issueId: "validate-issue",
+        key: "factory-validation-evidence",
+        agentId: "validator-agent",
+        latestRevision,
+        parse: (value) => value,
+      },
+    )).toThrow(/exact latest/);
+    expect(() => parseEvidenceDocument(
+      document,
+      {
+        companyId: "company-1",
+        issueId: "validate-issue",
+        key: "factory-validation-evidence",
+        agentId: "validator-agent",
+        latestRevision: { ...latestRevision, createdByRunId: null },
         parse: (value) => value,
       },
     )).toThrow(/exact latest/);
