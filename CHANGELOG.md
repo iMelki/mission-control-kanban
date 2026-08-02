@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Adopt dnd-kit/shadcn for kanban, Card, and Tabs (2026-08-02, #48)** -
+  `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core`/`@dnd-kit/sortable`
+  instead of native HTML5 drag events (accessible keyboard reordering);
+  `ui/Panel.tsx` re-exports shadcn `Card`; `WorkspaceSectionTabs.tsx` uses
+  shadcn `Tabs`. Added `components.json`, `src/lib/utils.ts`,
+  `src/components/ui/{card,tabs}.tsx`. Lint, build, and the full test suite
+  (21/21) pass.
+
 ### Fixed
 
 - Added a deterministic Paperclip workspace provisioner for the factory path:
@@ -43,6 +53,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same host/port contract as Docker. This avoids both the intermittent
   development-manifest race and Next.js's unsupported `next start` warning for
   standalone output.
+- Runtime UI smoke now waits for an explicit workspace-ready marker before
+  asserting the Settings section, and emits bounded DOM diagnostics when the
+  readiness contract is not reached (`#128`).
+- The smoke follows the consolidated shadcn/Radix Tabs accessibility contract
+  (`role="tab"`) for the workspace Settings and Board controls, preventing a
+  stale `role="button"` selector from failing CI after the UI reuse merge.
+- Task-card smoke assertions now scope to the direct list-item card root and
+  visible card text to distinguish the dnd-kit reorder-handle button
+  introduced by the same UI consolidation.
 - Successful Runtime Regression artifact receipts now update one marker-based
   PR/issue comment and read it back exactly instead of appending a notification
   on every run.

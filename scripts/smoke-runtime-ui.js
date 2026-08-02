@@ -7,6 +7,39 @@ const workspaceSlug = process.env.MCK_SMOKE_WORKSPACE || 'default';
 const workspaceUrl = `${baseUrl.replace(/\/$/, '')}/workspace/${workspaceSlug}`;
 const artifactDir = process.env.MCK_SMOKE_ARTIFACT_DIR || path.join(process.cwd(), 'artifacts', 'runtime-ui-smoke', String(Date.now()));
 
+async function waitForWorkspaceReady(page) {
+  const readyShell = page.locator('[data-workspace-ready="true"]');
+  const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
+  const settingsTab = workspaceNav.getByRole('tab', { name: /^Settings$/i });
+  try {
+    await readyShell.waitFor({ timeout: 20_000 });
+    await workspaceNav.waitFor({ timeout: 10_000 });
+    await settingsTab.waitFor({ timeout: 20_000 });
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => ({
+      url: window.location.href,
+      readyState: document.querySelector('[data-workspace-ready]')?.getAttribute('data-workspace-ready') || null,
+      navHtml: document.querySelector('nav[aria-label="Workspace sections"]')?.outerHTML.slice(0, 4_000) || null,
+      settings: (() => {
+        const button = Array.from(document.querySelectorAll('nav[aria-label="Workspace sections"] button'))
+          .find((candidate) => candidate.textContent?.trim() === 'Settings');
+        if (!button) return null;
+        const rect = button.getBoundingClientRect();
+        const style = window.getComputedStyle(button);
+        return {
+          outerHtml: button.outerHTML,
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          display: style.display,
+          visibility: style.visibility,
+          opacity: style.opacity,
+        };
+      })(),
+    })).catch(() => ({ url: page.url(), readyState: null, navHtml: null }));
+    console.error(`Workspace shell readiness diagnostics: ${JSON.stringify(diagnostics)}`);
+    throw error;
+  }
+}
+
 async function requestJson(path, init) {
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
     ...init,
@@ -130,11 +163,12 @@ async function main() {
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForTimeout(1500);
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
+    await waitForWorkspaceReady(page);
     const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
     await workspaceNav.waitFor({ timeout: 20_000 });
-    const workspaceSettingsButton = workspaceNav.getByRole('button', { name: /^Settings$/i });
-    await workspaceSettingsButton.waitFor({ timeout: 20_000 });
-    await workspaceSettingsButton.click({ force: true });
+    const workspaceSettingsTab = workspaceNav.getByRole('tab', { name: /^Settings$/i });
+    await workspaceSettingsTab.waitFor({ timeout: 20_000 });
+    await workspaceSettingsTab.click({ force: true });
     await page.getByRole('heading', { name: /Workspace runtime defaults/i }).waitFor({ timeout: 20_000 });
     await page.screenshot({ path: path.join(artifactDir, 'desktop-runtime-workspace.png'), fullPage: true });
 
@@ -161,7 +195,7 @@ async function main() {
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForTimeout(1500);
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
-    await workspaceNav.getByRole('button', { name: /^Board$/i }).click();
+    await workspaceNav.getByRole('tab', { name: /^Board$/i }).click();
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
     await page.waitForTimeout(1500);
 
@@ -181,7 +215,7 @@ async function main() {
     await page.locator('div.fixed.inset-0 button').first().click();
     await page.getByLabel(/Runtime type/i).waitFor({ state: 'hidden', timeout: 10_000 });
 
-    const taskCard = page.getByRole('button', { name: new RegExp(task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) });
+    const taskCard = page.locator('li > [role="button"]').filter({ hasText: task.title });
     await taskCard.waitFor({ timeout: 10_000 });
     await taskCard.getByText(/Webhook auto/i).waitFor({ timeout: 10_000 });
     await taskCard.getByText(/Blocked by 1/i).waitFor({ timeout: 10_000 });
@@ -197,7 +231,7 @@ async function main() {
     await page.locator('div.fixed.inset-0 button').first().click();
     await page.getByRole('button', { name: /All runtimes/i }).click();
 
-    const checklistCard = page.getByRole('button', { name: new RegExp(checklistTask.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) });
+    const checklistCard = page.locator('li > [role="button"]').filter({ hasText: checklistTask.title });
     await checklistCard.waitFor({ timeout: 10_000 });
     await checklistCard.click();
     await page.getByRole('button', { name: /Apply ready-for-agent checklist/i }).click();
