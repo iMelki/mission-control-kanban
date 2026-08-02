@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same host/port contract as Docker. This avoids both the intermittent
   development-manifest race and Next.js's unsupported `next start` warning for
   standalone output.
+- Runtime UI smoke now waits for an explicit workspace-ready marker before
+  asserting the Settings section, and emits bounded DOM diagnostics when the
+  readiness contract is not reached (`#128`).
 - Successful Runtime Regression artifact receipts now update one marker-based
   PR/issue comment and read it back exactly instead of appending a notification
   on every run.

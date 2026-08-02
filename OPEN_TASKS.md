@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -58,6 +58,18 @@ the local operator entrypoint; historical task notes remain in
     updated and read back, preventing a new success notification on every run.
   - Local validation: server-plan contract `2/2`; full runtime smoke and three
     consecutive remote paths remain required before closure.
+
+- [#128 - Make Runtime Regression workspace readiness deterministic in CI](https://github.com/iMelki/mission-control-kanban/issues/128)
+  - CI run `30759413222` failed only at the Settings-tab visibility wait while
+    bridge, gitleaks, pre-commit, and inventory checks passed. A clean clone of
+    the exact PR head passed the production regression locally, identifying an
+    initialization race rather than a missing control.
+  - The fix adds a page-owned `data-workspace-ready="true"` marker after the
+    workspace API loads, waits on that marker before role assertions, and logs
+    a bounded URL/marker/nav diagnostic on timeout. It does not weaken the
+    Settings assertion or add an unbounded retry.
+  - Closure gate: PR checks and at least three consecutive production smoke
+    runs pass before PR #119 is eligible for merge into `dev`.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.

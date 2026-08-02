@@ -7,6 +7,22 @@ const workspaceSlug = process.env.MCK_SMOKE_WORKSPACE || 'default';
 const workspaceUrl = `${baseUrl.replace(/\/$/, '')}/workspace/${workspaceSlug}`;
 const artifactDir = process.env.MCK_SMOKE_ARTIFACT_DIR || path.join(process.cwd(), 'artifacts', 'runtime-ui-smoke', String(Date.now()));
 
+async function waitForWorkspaceReady(page) {
+  const readyShell = page.locator('[data-workspace-ready="true"]');
+  try {
+    await readyShell.waitFor({ timeout: 20_000 });
+    await page.locator('nav[aria-label="Workspace sections"]').waitFor({ timeout: 10_000 });
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => ({
+      url: window.location.href,
+      readyState: document.querySelector('[data-workspace-ready]')?.getAttribute('data-workspace-ready') || null,
+      navHtml: document.querySelector('nav[aria-label="Workspace sections"]')?.outerHTML.slice(0, 2_000) || null,
+    })).catch(() => ({ url: page.url(), readyState: null, navHtml: null }));
+    console.error(`Workspace shell readiness diagnostics: ${JSON.stringify(diagnostics)}`);
+    throw error;
+  }
+}
+
 async function requestJson(path, init) {
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
     ...init,
@@ -130,6 +146,7 @@ async function main() {
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForTimeout(1500);
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
+    await waitForWorkspaceReady(page);
     const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
     await workspaceNav.waitFor({ timeout: 20_000 });
     const workspaceSettingsButton = workspaceNav.getByRole('button', { name: /^Settings$/i });
