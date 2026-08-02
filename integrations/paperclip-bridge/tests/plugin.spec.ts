@@ -591,7 +591,7 @@ describe("MCK Paperclip bridge", () => {
       createdByUserId: null,
       updatedByAgentId: "validator-agent",
       updatedByUserId: null,
-      lockedAt: new Date("2026-07-29T12:02:30.500Z"),
+      lockedAt: new Date("2026-07-29T12:02:31.500Z"),
       lockedByAgentId: "validator-agent",
       lockedByUserId: null,
       createdAt: new Date("2026-07-29T12:02:30.000Z"),
@@ -656,6 +656,28 @@ describe("MCK Paperclip bridge", () => {
     )).toThrow(/exact latest/);
     expect(() => parseEvidenceDocument(
       { ...document, lockedAt: null },
+      {
+        companyId: "company-1",
+        issueId: "validate-issue",
+        key: "factory-validation-evidence",
+        agentId: "validator-agent",
+        latestRevision,
+        parse: (value) => value,
+      },
+    )).toThrow(/exact latest/);
+    expect(() => parseEvidenceDocument(
+      { ...document, lockedAt: new Date("invalid") },
+      {
+        companyId: "company-1",
+        issueId: "validate-issue",
+        key: "factory-validation-evidence",
+        agentId: "validator-agent",
+        latestRevision,
+        parse: (value) => value,
+      },
+    )).toThrow(/exact latest/);
+    expect(() => parseEvidenceDocument(
+      { ...document, lockedAt: new Date("2026-07-29T12:02:30.500Z") },
       {
         companyId: "company-1",
         issueId: "validate-issue",
