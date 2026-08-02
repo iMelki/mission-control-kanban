@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a deterministic Paperclip workspace provisioner for the factory path:
   clean workspaces install the root and plugin lockfiles with lifecycle scripts
   disabled, rebuild only `better-sqlite3`, and expose the same exact argv as the
-  first repository-manifest validation (`#124`).
+  first repository-manifest validation (`#124`). Repeated setup/validation calls
+  now reuse a lockfile/runtime-bound marker and serialize Windows installs.
 - Kept factory base-SHA resolution on an authoritative `origin/dev`
   `git ls-remote` read while increasing its finite child-process allowance from
   10 to 30 seconds. This matches the existing factory webhook default and

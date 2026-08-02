@@ -331,7 +331,10 @@ starts. The same exact argv is the first entry in `.agentic-factory.json`, so
 an independently invoked deterministic Validator repairs a clean workspace as
 well. The script installs both lockfiles with lifecycle scripts disabled and
 rebuilds only the checked-in native `better-sqlite3` dependency for the host
-runtime. It never edits a package lockfile or executes model-generated shell.
+runtime. A lockfile-, Node-, OS-, and architecture-bound marker under ignored
+`node_modules` makes repeated setup and validation calls reuse the same
+provision, while a short-lived lock prevents concurrent Windows `npm ci`
+races. It never edits a package lockfile or executes model-generated shell.
 
 Run the repository manifest in order or use the equivalent commands:
 
