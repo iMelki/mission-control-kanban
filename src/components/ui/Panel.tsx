@@ -1,26 +1,9 @@
-import type { ReactNode } from 'react';
+// Thin re-exports over the shadcn `Card` primitives (src/components/ui/card.tsx).
+// Kept for backwards compatibility with existing call sites (see mission-control-kanban#48);
+// prefer importing `Card`/`CardHeader`/`CardContent`/`CardFooter` directly in new code.
+import { Card, CardHeader, CardContent, CardFooter } from './card';
 
-interface PanelProps {
-  children: ReactNode;
-  className?: string;
-}
-
-export function Panel({ children, className = '' }: PanelProps) {
-  return (
-    <section className={`rounded-lg border border-mc-border bg-mc-bg-secondary/80 ${className}`}>
-      {children}
-    </section>
-  );
-}
-
-export function PanelHeader({ children, className = '' }: PanelProps) {
-  return <div className={`border-b border-mc-border px-3 py-2 ${className}`}>{children}</div>;
-}
-
-export function PanelBody({ children, className = '' }: PanelProps) {
-  return <div className={`p-3 ${className}`}>{children}</div>;
-}
-
-export function PanelFooter({ children, className = '' }: PanelProps) {
-  return <div className={`border-t border-mc-border px-3 py-2 ${className}`}>{children}</div>;
-}
+export const Panel = Card;
+export const PanelHeader = CardHeader;
+export const PanelBody = CardContent;
+export const PanelFooter = CardFooter;

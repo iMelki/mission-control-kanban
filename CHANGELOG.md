@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Adopt dnd-kit/shadcn for kanban, Card, and Tabs (2026-08-02, #48)** -
+  `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core`/`@dnd-kit/sortable`
+  instead of native HTML5 drag events (accessible keyboard reordering);
+  `ui/Panel.tsx` re-exports shadcn `Card`; `WorkspaceSectionTabs.tsx` uses
+  shadcn `Tabs`. Added `components.json`, `src/lib/utils.ts`,
+  `src/components/ui/{card,tabs}.tsx`. Lint, build, and the full test suite
+  (21/21) pass.
+
 ### Fixed
 
 - Runtime Regression now builds a fresh webpack production output, stages the

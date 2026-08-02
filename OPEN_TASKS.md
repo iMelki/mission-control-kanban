@@ -9,13 +9,16 @@ the local operator entrypoint; historical task notes remain in
 ## Active
 
 - [#48 - Adopt ReUI/shadcn kanban+Card+Tabs primitives instead of hand-rolled equivalents](https://github.com/iMelki/mission-control-kanban/issues/48)
-  - 2026-07-29 workspace-wide UI reuse audit: `MissionQueue.tsx`'s native
-    HTML5-drag kanban board should move to a ReUI/dnd-kit kanban block;
-    `ui/Panel.tsx` duplicates shadcn `Card`; `WorkspaceSectionTabs.tsx` should
-    use shadcn `Tabs` for correct `role="tab"` semantics. `ui/DataTable.tsx`
-    is already built on `@tanstack/react-table` (headless) and is only a
-    low-priority render-layer note, not a violation. Report-only, no code
-    changed yet.
+  - Implemented: `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core` +
+    `@dnd-kit/sortable` (`DndContext`/`SortableContext`/keyboard sensor)
+    instead of native HTML5 drag events, giving accessible keyboard
+    reordering; `ui/Panel.tsx` now re-exports shadcn `Card` primitives
+    (`class-variance-authority`); `WorkspaceSectionTabs.tsx` now uses shadcn
+    `Tabs` (Radix) for correct `role="tab"`/`aria-selected` semantics. Added
+    `components.json`, `src/lib/utils.ts`, `src/components/ui/{card,tabs}.tsx`.
+    `ui/DataTable.tsx` intentionally left as-is (low-priority render-layer
+    note, not a violation). `npm run lint`, `npm run build`, and `npm test`
+    (21/21) all pass.
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
   - Local implementation now provides opt-in dispatch v2 with a

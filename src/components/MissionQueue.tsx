@@ -1,6 +1,25 @@
 'use client';
 
-import { useReducer } from 'react';
+import { useReducer, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Plus, ChevronRight, GripVertical, AlertTriangle, Github } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import {
@@ -44,11 +63,12 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: 'done', label: 'DONE', color: 'border-t-mc-accent-green' },
 ];
 
+const COLUMN_IDS = new Set<string>(COLUMNS.map((column) => column.id));
+
 interface MissionQueueUiState {
   showCreateModal: boolean;
   showGitHubImportModal: boolean;
   editingTask: Task | null;
-  draggedTask: Task | null;
   dropError: string | null;
   runtimeFilter: RuntimeFilter;
 }
@@ -60,8 +80,6 @@ type MissionQueueUiAction =
   | { type: 'close_github_import_modal' }
   | { type: 'edit_task'; task: Task }
   | { type: 'clear_editing_task' }
-  | { type: 'drag_task'; task: Task }
-  | { type: 'clear_dragged_task' }
   | { type: 'set_drop_error'; error: string | null }
   | { type: 'set_runtime_filter'; filter: RuntimeFilter };
 
@@ -69,7 +87,6 @@ const initialMissionQueueUiState: MissionQueueUiState = {
   showCreateModal: false,
   showGitHubImportModal: false,
   editingTask: null,
-  draggedTask: null,
   dropError: null,
   runtimeFilter: 'all',
 };
@@ -91,10 +108,6 @@ function missionQueueUiReducer(
       return { ...state, editingTask: action.task };
     case 'clear_editing_task':
       return { ...state, editingTask: null };
-    case 'drag_task':
-      return { ...state, draggedTask: action.task };
-    case 'clear_dragged_task':
-      return { ...state, draggedTask: null };
     case 'set_drop_error':
       return { ...state, dropError: action.error };
     case 'set_runtime_filter':
@@ -114,11 +127,16 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     showCreateModal,
     showGitHubImportModal,
     editingTask,
-    draggedTask,
     dropError,
     runtimeFilter,
   } = uiState;
 
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const matchesRuntimeFilter = (task: Task) => {
     if (runtimeFilter === 'all') return true;
@@ -132,68 +150,58 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const getTasksByStatus = (status: TaskStatus) =>
     visibleTasks.filter((task) => task.status === status);
 
-  const handleDragStart = (e: React.DragEvent, task: Task) => {
-    dispatchUi({ type: 'drag_task', task });
-    e.dataTransfer.effectAllowed = 'move';
+  const resolveTargetStatus = (overId: string): TaskStatus | null => {
+    if (COLUMN_IDS.has(overId)) return overId as TaskStatus;
+    const overTask = tasks.find((task) => task.id === overId);
+    return overTask ? overTask.status : null;
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
-    e.preventDefault();
-    if (!draggedTask || draggedTask.status === targetStatus) {
-      dispatchUi({ type: 'clear_dragged_task' });
-      return;
-    }
+  const moveTask = async (task: Task, targetStatus: TaskStatus) => {
+    if (task.status === targetStatus) return;
 
     dispatchUi({ type: 'set_drop_error', error: null });
 
-    if (draggedTask.github_source && requiresDispatchContractBeforeWorkStarts(targetStatus)) {
-      const validation = validateDispatchMetadata(draggedTask.dispatch_metadata);
+    if (task.github_source && requiresDispatchContractBeforeWorkStarts(targetStatus)) {
+      const validation = validateDispatchMetadata(task.dispatch_metadata);
       if (!validation.canDispatch) {
-        const summary = summarizeDispatchContract(draggedTask.dispatch_metadata);
-        const message = `${draggedTask.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
+        const summary = summarizeDispatchContract(task.dispatch_metadata);
+        const message = `${task.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
 
         dispatchUi({ type: 'set_drop_error', error: `${message} ${validation.blockers.join('; ')}`.trim() });
         addEvent({
           id: crypto.randomUUID(),
           type: 'system',
-          task_id: draggedTask.id,
+          task_id: task.id,
           message,
           created_at: new Date().toISOString(),
         });
-        dispatchUi({ type: 'clear_dragged_task' });
         return;
       }
     }
 
     // Optimistic update
-    updateTaskStatus(draggedTask.id, targetStatus);
+    updateTaskStatus(task.id, targetStatus);
 
     // Persist to API
     try {
-      const res = await fetch(`/api/tasks/${draggedTask.id}`, {
+      const res = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: targetStatus }),
       });
 
       if (res.ok) {
-        // Add event
         addEvent({
           id: crypto.randomUUID(),
           type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
-          task_id: draggedTask.id,
-          message: `Task \"${draggedTask.title}\" moved to ${targetStatus}`,
+          task_id: task.id,
+          message: `Task \"${task.title}\" moved to ${targetStatus}`,
           created_at: new Date().toISOString(),
         });
       } else {
         const data = await res.json().catch(() => ({}));
         dispatchUi({ type: 'set_drop_error', error: data.error || 'Failed to move task' });
-        updateTaskStatus(draggedTask.id, draggedTask.status);
+        updateTaskStatus(task.id, task.status);
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
@@ -202,10 +210,31 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         error: error instanceof Error ? error.message : 'Failed to update task status',
       });
       // Revert on error
-      updateTaskStatus(draggedTask.id, draggedTask.status);
+      updateTaskStatus(task.id, task.status);
     }
+  };
 
-    dispatchUi({ type: 'clear_dragged_task' });
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = tasks.find((candidate) => candidate.id === event.active.id);
+    setActiveTask(task ?? null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveTask(null);
+    if (!over) return;
+
+    const task = tasks.find((candidate) => candidate.id === active.id);
+    if (!task) return;
+
+    const targetStatus = resolveTargetStatus(String(over.id));
+    if (!targetStatus) return;
+
+    void moveTask(task, targetStatus);
+  };
+
+  const handleDragCancel = () => {
+    setActiveTask(null);
   };
 
   return (
@@ -289,42 +318,29 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       )}
 
       {/* Kanban Columns */}
-      <div className="flex-1 flex gap-3 p-3 overflow-x-auto">
-        {COLUMNS.map((column) => {
-          const columnTasks = getTasksByStatus(column.id);
-          return (
-            <div
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="flex-1 flex gap-3 p-3 overflow-x-auto">
+          {COLUMNS.map((column) => (
+            <KanbanColumn
               key={column.id}
-              className={`flex-1 min-w-[220px] max-w-[300px] flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 ${column.color}`}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, column.id)}
-            >
-              {/* Column Header */}
-              <div className="p-2 border-b border-mc-border flex items-center justify-between">
-                <span className="text-xs font-medium uppercase text-mc-text-secondary">
-                  {column.label}
-                </span>
-                <span className="text-xs bg-mc-bg-tertiary px-2 py-0.5 rounded text-mc-text-secondary">
-                  {columnTasks.length}
-                </span>
-              </div>
+              column={column}
+              tasks={getTasksByStatus(column.id)}
+              activeTaskId={activeTask?.id ?? null}
+              onCardClick={(task) => dispatchUi({ type: 'edit_task', task })}
+            />
+          ))}
+        </div>
 
-              {/* Tasks */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {columnTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onDragStart={handleDragStart}
-                    onClick={() => dispatchUi({ type: 'edit_task', task })}
-                    isDragging={draggedTask?.id === task.id}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+        <DragOverlay>
+          {activeTask ? <TaskCard task={activeTask} isOverlay /> : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Modals */}
       {showCreateModal && (
@@ -340,14 +356,81 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   );
 }
 
-interface TaskCardProps {
-  task: Task;
-  onDragStart: (e: React.DragEvent, task: Task) => void;
-  onClick: () => void;
-  isDragging: boolean;
+interface KanbanColumnProps {
+  column: { id: TaskStatus; label: string; color: string };
+  tasks: Task[];
+  activeTaskId: string | null;
+  onCardClick: (task: Task) => void;
 }
 
-function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
+function KanbanColumn({ column, tasks, activeTaskId, onCardClick }: KanbanColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex-1 min-w-[220px] max-w-[300px] flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 transition-colors ${column.color} ${
+        isOver ? 'ring-2 ring-mc-accent/50' : ''
+      }`}
+    >
+      {/* Column Header */}
+      <div className="p-2 border-b border-mc-border flex items-center justify-between">
+        <span className="text-xs font-medium uppercase text-mc-text-secondary">
+          {column.label}
+        </span>
+        <span className="text-xs bg-mc-bg-tertiary px-2 py-0.5 rounded text-mc-text-secondary">
+          {tasks.length}
+        </span>
+      </div>
+
+      {/* Tasks */}
+      <ul className="flex-1 overflow-y-auto p-2 space-y-2 list-none" aria-label={`${column.label} tasks`}>
+        <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+          {tasks.map((task) => (
+            <SortableTaskCard
+              key={task.id}
+              task={task}
+              onClick={() => onCardClick(task)}
+              isActive={activeTaskId === task.id}
+            />
+          ))}
+        </SortableContext>
+      </ul>
+    </div>
+  );
+}
+
+function SortableTaskCard({ task, onClick, isActive }: { task: Task; onClick: () => void; isActive: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <li ref={setNodeRef} style={style}>
+      <TaskCard
+        task={task}
+        onClick={onClick}
+        isDragging={isDragging || isActive}
+        dragAttributes={attributes}
+        dragListeners={listeners}
+      />
+    </li>
+  );
+}
+
+interface TaskCardProps {
+  task: Task;
+  onClick?: () => void;
+  isDragging?: boolean;
+  isOverlay?: boolean;
+  dragAttributes?: ReturnType<typeof useSortable>['attributes'];
+  dragListeners?: ReturnType<typeof useSortable>['listeners'];
+}
+
+function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragListeners }: TaskCardProps) {
   const priorityStyles = {
     low: 'text-mc-text-secondary',
     normal: 'text-mc-accent',
@@ -388,18 +471,28 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
   };
 
   return (
-    <button
-      type="button"
-      draggable
-      onDragStart={(e) => onDragStart(e, task)}
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`group bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-all hover:shadow-lg hover:shadow-black/20 ${
+      onKeyDown={(event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && onClick) {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      className={`group w-full bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-all hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
-      } ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
+      } ${isOverlay ? 'shadow-xl shadow-black/40' : ''} ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
         {/* Drag handle bar */}
-        <div className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
-          <GripVertical className="size-4 text-mc-text-secondary/50 cursor-grab" />
+        <div
+          {...(dragAttributes ?? {})}
+          {...(dragListeners ?? {})}
+          className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+          aria-label={`Reorder task ${task.title}`}
+        >
+          <GripVertical className="size-4 text-mc-text-secondary/50" />
         </div>
 
       {/* Card content */}
@@ -491,6 +584,6 @@ function TaskCard({ task, onDragStart, onClick, isDragging }: TaskCardProps) {
           </span>
         </div>
       </div>
-    </button>
+    </div>
   );
 }

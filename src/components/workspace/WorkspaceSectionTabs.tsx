@@ -3,6 +3,8 @@
 import type { ComponentType } from 'react';
 import { Activity, Bot, KanbanSquare, RadioTower, Settings } from 'lucide-react';
 
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 export type WorkspaceSection = 'board' | 'agents' | 'dispatch' | 'settings' | 'activity';
 
 const sections: Array<{ id: WorkspaceSection; label: string; icon: ComponentType<{ className?: string }> }> = [
@@ -16,24 +18,19 @@ const sections: Array<{ id: WorkspaceSection; label: string; icon: ComponentType
 export function WorkspaceSectionTabs({ section, onSectionChange }: { section: WorkspaceSection; onSectionChange: (section: WorkspaceSection) => void }) {
   return (
     <nav className="border-b border-mc-border bg-mc-bg px-4 py-2" aria-label="Workspace sections">
-      <div className="flex flex-wrap gap-2">
-        {sections.map((item) => {
-          const Icon = item.icon;
-          const active = item.id === section;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSectionChange(item.id)}
-              className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-sm transition-colors ${active ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'}`}
-              aria-pressed={active}
-            >
-              <Icon className="size-4" />
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs value={section} onValueChange={(value) => onSectionChange(value as WorkspaceSection)}>
+        <TabsList>
+          {sections.map((item) => {
+            const Icon = item.icon;
+            return (
+              <TabsTrigger key={item.id} value={item.id}>
+                <Icon className="size-4" />
+                {item.label}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
     </nav>
   );
 }
