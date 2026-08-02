@@ -9,14 +9,31 @@ const artifactDir = process.env.MCK_SMOKE_ARTIFACT_DIR || path.join(process.cwd(
 
 async function waitForWorkspaceReady(page) {
   const readyShell = page.locator('[data-workspace-ready="true"]');
+  const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
+  const settingsButton = workspaceNav.getByRole('button', { name: /^Settings$/i });
   try {
     await readyShell.waitFor({ timeout: 20_000 });
-    await page.locator('nav[aria-label="Workspace sections"]').waitFor({ timeout: 10_000 });
+    await workspaceNav.waitFor({ timeout: 10_000 });
+    await settingsButton.waitFor({ timeout: 20_000 });
   } catch (error) {
     const diagnostics = await page.evaluate(() => ({
       url: window.location.href,
       readyState: document.querySelector('[data-workspace-ready]')?.getAttribute('data-workspace-ready') || null,
-      navHtml: document.querySelector('nav[aria-label="Workspace sections"]')?.outerHTML.slice(0, 2_000) || null,
+      navHtml: document.querySelector('nav[aria-label="Workspace sections"]')?.outerHTML.slice(0, 4_000) || null,
+      settings: (() => {
+        const button = Array.from(document.querySelectorAll('nav[aria-label="Workspace sections"] button'))
+          .find((candidate) => candidate.textContent?.trim() === 'Settings');
+        if (!button) return null;
+        const rect = button.getBoundingClientRect();
+        const style = window.getComputedStyle(button);
+        return {
+          outerHtml: button.outerHTML,
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          display: style.display,
+          visibility: style.visibility,
+          opacity: style.opacity,
+        };
+      })(),
     })).catch(() => ({ url: page.url(), readyState: null, navHtml: null }));
     console.error(`Workspace shell readiness diagnostics: ${JSON.stringify(diagnostics)}`);
     throw error;
