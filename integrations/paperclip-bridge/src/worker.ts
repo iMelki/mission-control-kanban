@@ -23,6 +23,7 @@ import {
   assertSuccessfulPublication,
   FACTORY_MCK_LIFECYCLE_URL,
   FACTORY_MISSION_CONTROL_BASE_URL,
+  FACTORY_PAPERCLIP_BASE_URL,
   parseDispatch,
   redactDiagnostic,
   sha256,
@@ -37,11 +38,13 @@ import {
 import {
   canonicalJson,
   canonicalSha256,
+  assertEvidenceRevisionRun,
   parseEvidenceDocument,
   parseFactoryReleaseEvidence,
   parseFactoryValidationEvidence,
   type FactoryReleaseEvidence,
   type FactoryValidationEvidence,
+  type LatestEvidenceRevision,
 } from "./evidence.js";
 import { buildStageDefinitions } from "./graph.js";
 import { scopedHostFetch } from "./host-http.js";
@@ -1768,6 +1771,46 @@ export function assertPaperclipCompletionEvidence(input: {
   }
 }
 
+interface PaperclipDocumentRevisionPayload {
+  id?: unknown;
+  revisionNumber?: unknown;
+  createdByAgentId?: unknown;
+  createdByRunId?: unknown;
+}
+
+async function latestEvidenceRevision(
+  ctx: PluginContext,
+  companyId: string,
+  issueId: string,
+  key: string,
+): Promise<LatestEvidenceRevision> {
+  const url = `${FACTORY_PAPERCLIP_BASE_URL}/api/issues/${encodeURIComponent(issueId)}/documents/${encodeURIComponent(key)}/revisions`;
+  const response = await scopedHostFetch(ctx, companyId, url);
+  if (!response.ok) {
+    throw new Error(`Paperclip evidence revision readback failed (${response.status})`);
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!Array.isArray(payload)) {
+    throw new Error("Paperclip evidence revision readback is not an array");
+  }
+  const revisions = payload.filter((value): value is PaperclipDocumentRevisionPayload => (
+    typeof value === "object" && value !== null && !Array.isArray(value)
+  ));
+  const latest = revisions
+    .filter((value) => Number.isInteger(value.revisionNumber))
+    .sort((left, right) => Number(left.revisionNumber) - Number(right.revisionNumber))
+    .at(-1);
+  if (!latest || typeof latest.id !== "string") {
+    throw new Error("Paperclip evidence revision readback has no latest revision");
+  }
+  return {
+    id: latest.id,
+    revisionNumber: Number(latest.revisionNumber),
+    createdByAgentId: typeof latest.createdByAgentId === "string" ? latest.createdByAgentId : null,
+    createdByRunId: typeof latest.createdByRunId === "string" ? latest.createdByRunId : null,
+  };
+}
+
 async function validateReceiptForMapping(
   ctx: PluginContext,
   config: BridgeConfig,
@@ -1839,13 +1882,24 @@ async function validateReceiptForMapping(
       config.companyId,
     ),
   ]);
+  const [receiptRevision, validationRevision, releaseRevision] = await Promise.all([
+    latestEvidenceRevision(ctx, config.companyId, mapping.release_issue_id, "factory-run-receipt"),
+    latestEvidenceRevision(ctx, config.companyId, mapping.validate_issue_id, "factory-validation-evidence"),
+    latestEvidenceRevision(ctx, config.companyId, mapping.review_issue_id, "factory-release-evidence"),
+  ]);
   const receiptReadback = parseEvidenceDocument(receiptDocument, {
     companyId: config.companyId,
     issueId: mapping.release_issue_id,
     key: "factory-run-receipt",
     agentId: config.integratorAgentId,
+    latestRevision: receiptRevision,
     parse: (value) => validateReceipt(value, expectedReceipt),
   });
+  assertEvidenceRevisionRun(
+    receiptReadback,
+    receiptReadback.evidence.run.paperclipRunId,
+    "Factory run receipt",
+  );
   if (canonicalJson(receiptInput) !== canonicalJson(receiptReadback.evidence)) {
     throw new Error("Completion input is not the exact latest Integrator-authored receipt document");
   }
@@ -1854,15 +1908,27 @@ async function validateReceiptForMapping(
     issueId: mapping.validate_issue_id,
     key: "factory-validation-evidence",
     agentId: config.validatorAgentId,
+    latestRevision: validationRevision,
     parse: parseFactoryValidationEvidence,
   });
+  assertEvidenceRevisionRun(
+    validationReadback,
+    validationReadback.evidence.paperclip.validatorRunId,
+    "Factory validation evidence",
+  );
   const releaseReadback = parseEvidenceDocument(releaseDocument, {
     companyId: config.companyId,
     issueId: mapping.review_issue_id,
     key: "factory-release-evidence",
     agentId: config.reviewerAgentId,
+    latestRevision: releaseRevision,
     parse: parseFactoryReleaseEvidence,
   });
+  assertEvidenceRevisionRun(
+    releaseReadback,
+    releaseReadback.evidence.review.reviewerRunId,
+    "Factory release evidence",
+  );
   const receipt = receiptReadback.evidence;
   assertPaperclipCompletionEvidence({
     receipt,

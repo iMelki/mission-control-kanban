@@ -221,6 +221,20 @@ export function canonicalSha256(value: unknown) {
   return prefixedSha256(canonicalJson(value));
 }
 
+export interface LatestEvidenceRevision {
+  id: string;
+  revisionNumber: number;
+  createdByAgentId: string | null;
+  createdByRunId: string | null;
+}
+
+export interface EvidenceDocumentReadback<T> {
+  evidence: T;
+  bodySha256: string;
+  updatedAtMs: number;
+  latestRevision: LatestEvidenceRevision;
+}
+
 export function parseFactoryValidationEvidence(value: unknown): FactoryValidationEvidence {
   if (
     !record(value)
@@ -563,11 +577,13 @@ export function parseEvidenceDocument<T>(
     issueId: string;
     key: string;
     agentId: string;
+    latestRevision: LatestEvidenceRevision;
     parse: (value: unknown) => T;
   },
-) {
+): EvidenceDocumentReadback<T> {
   const createdAtMs = Date.parse(String(document?.createdAt ?? ""));
   const updatedAtMs = Date.parse(String(document?.updatedAt ?? ""));
+  const latestRevision = expected.latestRevision;
   if (
     !document
     || document.companyId !== expected.companyId
@@ -576,6 +592,8 @@ export function parseEvidenceDocument<T>(
     || document.format !== "markdown"
     || !text(document.latestRevisionId)
     || !integer(document.latestRevisionNumber, 1)
+    || document.latestRevisionId !== latestRevision.id
+    || document.latestRevisionNumber !== latestRevision.revisionNumber
     || document.createdByAgentId !== expected.agentId
     || document.updatedByAgentId !== expected.agentId
     || document.createdByUserId !== null
@@ -583,6 +601,10 @@ export function parseEvidenceDocument<T>(
     || !Number.isFinite(createdAtMs)
     || !Number.isFinite(updatedAtMs)
     || createdAtMs > updatedAtMs
+    || document.lockedAt === null
+    || latestRevision.createdByAgentId !== expected.agentId
+    || latestRevision.createdByRunId === null
+    || !id(latestRevision.createdByRunId)
   ) {
     throw new Error(
       `${expected.key} is not the exact latest ${expected.agentId}-authored Paperclip document`,
@@ -598,5 +620,16 @@ export function parseEvidenceDocument<T>(
     evidence: expected.parse(parsed),
     bodySha256: prefixedSha256(document.body),
     updatedAtMs,
+    latestRevision,
   };
+}
+
+export function assertEvidenceRevisionRun(
+  readback: EvidenceDocumentReadback<unknown>,
+  expectedRunId: string,
+  label: string,
+) {
+  if (readback.latestRevision.createdByRunId !== expectedRunId) {
+    throw new Error(`${label} latest revision is not authored by its recorded Paperclip run`);
+  }
 }
