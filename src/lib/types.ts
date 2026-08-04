@@ -17,6 +17,7 @@ export interface AgentRuntimeConfig {
   webhook_url?: string;
   bearer_token_env?: string;
   signature_secret_env?: string;
+  dispatch_version?: 1 | 2 | '1' | '2';
   headers?: Record<string, string>;
   [key: string]: unknown;
 }
@@ -58,7 +59,15 @@ export interface TaskDispatchAttempt {
   error_message?: string | null;
   request_payload?: string | null;
   response_body?: string | null;
+  delivery_id?: string | null;
+  correlation_id?: string | null;
+  task_revision?: string | null;
+  payload_hash?: string | null;
+  lifecycle_status?: string | null;
+  receipt_id?: string | null;
+  receipt_json?: string | null;
   created_at: string;
+  updated_at?: string | null;
 }
 
 export interface Agent {

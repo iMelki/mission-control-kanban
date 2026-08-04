@@ -1,3 +1,8 @@
+import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+import { promisify } from 'node:util';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
@@ -10,13 +15,18 @@ import {
   buildCallbackUrls,
   buildManualHandoffPrompt,
   buildWebhookDispatchPayload,
+  buildWebhookDispatchPayloadV2,
   buildWebhookHeaders,
   getWebhookSignatureSecret,
   getWebhookUrl,
+  normalizeAgentRuntimeType,
+  normalizeDispatchEnabled,
   parseAgentRuntimeConfig,
   resolveAgentRuntime,
+  resolveWebhookDispatchVersion,
+  type FactoryDispatchIdentity,
 } from '@/lib/agent-runtimes';
-import { validateWebhookDispatchPayload } from '@/lib/webhook-dispatch-schema';
+import { validateWebhookDispatchPayload, validateWebhookDispatchPayloadV2 } from '@/lib/webhook-dispatch-schema';
 import { checkDispatchRetryBudget } from '@/lib/runtime-operations';
 import { buildSignedWebhookHeaders } from '@/lib/webhook-signatures';
 import type { Agent, AgentRuntimeType, DispatchAttemptStatus, OpenClawSession, Task, TaskDispatchAttempt } from '@/lib/types';
@@ -33,6 +43,9 @@ type TaskDispatchRow = Omit<Task, 'dispatch_metadata' | 'github_source' | 'assig
 const DEFAULT_WEBHOOK_TIMEOUT_MS = 30_000;
 const MAX_WEBHOOK_TIMEOUT_MS = 120_000;
 const MIN_WEBHOOK_TIMEOUT_MS = 100;
+const FACTORY_GIT_READ_TIMEOUT_MS = 30_000;
+const GIT_SHA_PATTERN = /^[a-f0-9]{40}$/;
+const execFileAsync = promisify(execFile);
 
 export interface DispatchOptions {
   retry?: boolean;
@@ -41,6 +54,7 @@ export interface DispatchOptions {
 }
 
 interface RecordDispatchAttemptInput {
+  id?: string;
   task: Task;
   agent: Agent;
   runtimeType: AgentRuntimeType;
@@ -53,6 +67,10 @@ interface RecordDispatchAttemptInput {
   errorMessage?: string | null;
   requestPayload?: unknown;
   responseBody?: string | null;
+  deliveryId?: string | null;
+  correlationId?: string | null;
+  taskRevision?: string | null;
+  payloadHash?: string | null;
 }
 
 function redactUrlForResponse(rawUrl: string) {
@@ -90,7 +108,199 @@ function safeJsonStringify(value: unknown) {
   }
 }
 
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, canonicalize(child)])
+    );
+  }
+  return value;
+}
+
+export function sha256Text(value: string) {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+export interface TaskRevisionAgentIdentity {
+  id: string;
+  name?: string | null;
+  role?: string | null;
+  runtime_type?: unknown;
+  runtime_config?: unknown;
+  dispatch_enabled?: unknown;
+}
+
+export function computeTaskRevision(
+  task: Task,
+  agent?: TaskRevisionAgentIdentity | null,
+  repositoryBaseSha?: string | null,
+) {
+  const rawTask = task as Task & {
+    source_repo_owner?: string | null;
+    source_repo_name?: string | null;
+    source_issue_number?: number | null;
+    source_issue_url?: string | null;
+    source_project_item_id?: string | null;
+  };
+  const githubSource = task.github_source ?? normalizeGitHubSourceIdentity({
+    repo_owner: rawTask.source_repo_owner,
+    repo_name: rawTask.source_repo_name,
+    issue_number: rawTask.source_issue_number,
+    issue_url: rawTask.source_issue_url,
+    project_item_id: rawTask.source_project_item_id,
+  });
+  return sha256Text(JSON.stringify(canonicalize({
+    id: task.id,
+    title: task.title,
+    description: task.description ?? null,
+    priority: task.priority,
+    due_date: task.due_date ?? null,
+    workspace_id: task.workspace_id,
+    github_source: githubSource ?? null,
+    dispatch_metadata: parseDispatchMetadata(task.dispatch_metadata) ?? null,
+    repository_base_sha: repositoryBaseSha ?? null,
+    assigned_runtime: {
+      agent_id: task.assigned_agent_id ?? null,
+      name: agent?.name ?? null,
+      role: agent?.role ?? null,
+      runtime_type: agent ? normalizeAgentRuntimeType(agent.runtime_type) : null,
+      runtime_config: agent ? parseAgentRuntimeConfig(agent.runtime_config) : null,
+      dispatch_enabled: agent ? normalizeDispatchEnabled(agent.dispatch_enabled) : null,
+    },
+  })));
+}
+
+function buildFactoryDispatchIdentity(
+  task: Task,
+  agent: Agent,
+  repositoryBaseSha: string,
+): FactoryDispatchIdentity {
+  const attemptId = uuidv4();
+  return {
+    attempt_id: attemptId,
+    delivery_id: `dispatch-${attemptId}`,
+    correlation_id: `mck:${task.workspace_id}:${task.id}`,
+    task_revision: computeTaskRevision(task, agent, repositoryBaseSha),
+  };
+}
+
+function normalizedProjectsPath(projectsPath: string) {
+  return path.resolve(projectsPath.replace(/^~(?=$|[\\/])/, os.homedir()));
+}
+
+function repositoryName(task: Task) {
+  const targetRepo = task.dispatch_metadata?.target_repo?.trim();
+  const sourceRepo = task.github_source
+    ? `${task.github_source.repo_owner}/${task.github_source.repo_name}`
+    : '';
+  const slug = targetRepo || sourceRepo;
+  const match = /^iMelki\/([A-Za-z0-9._-]+)$/.exec(slug);
+  if (!match) {
+    throw new Error('Factory repository must be an owned iMelki repository slug');
+  }
+  return { slug, name: match[1] };
+}
+
+function ownedOriginMatches(remoteUrl: string, slug: string) {
+  const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    `^(?:git@github\\.com:|ssh://git@github\\.com/|https://github\\.com/)${escapedSlug}(?:\\.git)?/?$`,
+    'i',
+  ).test(remoteUrl.trim());
+}
+
+function gitEnvironment() {
+  const env: NodeJS.ProcessEnv = { ...process.env, GIT_OPTIONAL_LOCKS: '0' };
+  for (const key of [
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_COMMON_DIR',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_PREFIX',
+  ]) {
+    delete env[key];
+  }
+  return env;
+}
+
+async function gitRead(cwd: string, args: string[]) {
+  const { stdout } = await execFileAsync('git', ['-C', cwd, ...args], {
+    env: gitEnvironment(),
+    windowsHide: true,
+    timeout: FACTORY_GIT_READ_TIMEOUT_MS,
+    maxBuffer: 1024 * 1024,
+  });
+  return stdout.trim();
+}
+
+export async function resolveFactoryRepositoryBase(
+  task: Task,
+  projectsPath: string,
+) {
+  const repository = repositoryName(task);
+  const projectsRoot = normalizedProjectsPath(projectsPath);
+  const cwd = path.resolve(process.cwd());
+  const cwdParent = path.dirname(cwd);
+  const inferredWorkspaceRoot = path.basename(cwdParent).toLowerCase() === 'tools'
+    ? path.dirname(cwdParent)
+    : cwdParent;
+  const candidates = [...new Set([
+    cwd,
+    path.join(projectsRoot, repository.name),
+    path.join(projectsRoot, 'tools', repository.name),
+    path.join(projectsRoot, 'tools', 'Memory', repository.name),
+    path.join(inferredWorkspaceRoot, repository.name),
+    path.join(inferredWorkspaceRoot, 'tools', repository.name),
+    path.join(inferredWorkspaceRoot, 'tools', 'Memory', repository.name),
+  ].map((candidate) => path.resolve(candidate)))];
+  const diagnostics: string[] = [];
+
+  for (const candidate of candidates) {
+    try {
+      const root = path.resolve(await gitRead(candidate, ['rev-parse', '--show-toplevel']));
+      const originUrl = await gitRead(root, ['remote', 'get-url', 'origin']);
+      if (!ownedOriginMatches(originUrl, repository.slug)) {
+        diagnostics.push(`${candidate}: origin does not match ${repository.slug}`);
+        continue;
+      }
+      const remoteReadback = await gitRead(root, [
+        'ls-remote',
+        '--exit-code',
+        'origin',
+        'refs/heads/dev',
+      ]);
+      const remoteLines = remoteReadback.split(/\r?\n/).filter(Boolean);
+      const [baseSha = '', remoteRef = ''] = remoteLines[0]?.split(/\s+/, 2) ?? [];
+      if (
+        remoteLines.length !== 1
+        || remoteRef !== 'refs/heads/dev'
+        || !GIT_SHA_PATTERN.test(baseSha)
+      ) {
+        diagnostics.push(`${candidate}: remote origin/dev is not one lowercase 40-hex commit`);
+        continue;
+      }
+      return {
+        repositoryPath: root,
+        repositorySlug: repository.slug,
+        baseSha,
+      };
+    } catch (error) {
+      diagnostics.push(`${candidate}: ${error instanceof Error ? error.message.split(/\r?\n/, 1)[0] : 'unavailable'}`);
+    }
+  }
+
+  throw new Error(
+    `Could not freeze ${repository.slug} origin/dev from an owned local checkout (${diagnostics.join('; ')})`,
+  );
+}
+
 function recordDispatchAttempt({
+  id,
   task,
   agent,
   runtimeType,
@@ -103,14 +313,20 @@ function recordDispatchAttempt({
   errorMessage,
   requestPayload,
   responseBody,
+  deliveryId,
+  correlationId,
+  taskRevision,
+  payloadHash,
 }: RecordDispatchAttemptInput) {
+  const attemptId = id ?? uuidv4();
   run(
     `INSERT INTO task_dispatch_attempts (
       id, task_id, agent_id, runtime_type, adapter_name, status, attempt_number,
-      message, http_status, webhook_url, error_message, request_payload, response_body, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      message, http_status, webhook_url, error_message, request_payload, response_body,
+      delivery_id, correlation_id, task_revision, payload_hash, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      uuidv4(),
+      attemptId,
       task.id,
       agent.id,
       runtimeType,
@@ -123,7 +339,40 @@ function recordDispatchAttempt({
       errorMessage ?? null,
       requestPayload ? safeJsonStringify(requestPayload) : null,
       responseBody ?? null,
+      deliveryId ?? null,
+      correlationId ?? null,
+      taskRevision ?? null,
+      payloadHash ?? null,
       now,
+      now,
+    ]
+  );
+  return attemptId;
+}
+
+function updateFactoryDispatchAttempt(
+  attemptId: string,
+  input: {
+    status: DispatchAttemptStatus;
+    message: string;
+    now: string;
+    httpStatus?: number | null;
+    errorMessage?: string | null;
+    responseBody?: string | null;
+  }
+) {
+  run(
+    `UPDATE task_dispatch_attempts
+     SET status = ?, message = ?, http_status = ?, error_message = ?, response_body = ?, updated_at = ?
+     WHERE id = ?`,
+    [
+      input.status,
+      input.message,
+      input.httpStatus ?? null,
+      input.errorMessage ?? null,
+      input.responseBody ?? null,
+      input.now,
+      attemptId,
     ]
   );
 }
@@ -166,6 +415,12 @@ export interface DispatchResult {
   would_dispatch?: boolean;
   request_payload?: unknown;
   validation_errors?: string[];
+  attempt_id?: string;
+  delivery_id?: string;
+  correlation_id?: string;
+  task_revision?: string;
+  payload_hash?: string;
+  bridge_response?: unknown;
 }
 
 export class DispatchAdapterError extends Error {
@@ -439,7 +694,12 @@ async function dispatchOpenClaw(task: Task, agent: Agent): Promise<DispatchResul
   };
 }
 
-function buildDispatchDryRunPreview(task: Task, agent: Agent, effectiveRuntimeType: AgentRuntimeType, reason?: string): DispatchResult {
+async function buildDispatchDryRunPreview(
+  task: Task,
+  agent: Agent,
+  effectiveRuntimeType: AgentRuntimeType,
+  reason?: string,
+): Promise<DispatchResult> {
   const missionControlUrl = getMissionControlUrl();
   const projectsPath = getProjectsPath();
   const handoffPrompt = buildManualHandoffPrompt({
@@ -455,8 +715,50 @@ function buildDispatchDryRunPreview(task: Task, agent: Agent, effectiveRuntimeTy
     const config = parseAgentRuntimeConfig(agent.runtime_config);
     const webhookUrl = getWebhookUrl(config, process.env);
     const signature = getWebhookSignatureSecret(config, process.env);
-    const payload = buildWebhookDispatchPayload(task, agent, missionControlUrl, new Date().toISOString(), projectsPath);
-    const validation = validateWebhookDispatchPayload(payload);
+    const dispatchVersion = resolveWebhookDispatchVersion(config);
+    let factoryRepository: Awaited<ReturnType<typeof resolveFactoryRepositoryBase>> | undefined;
+    if (dispatchVersion === 2) {
+      try {
+        factoryRepository = await resolveFactoryRepositoryBase(task, projectsPath);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Could not freeze the factory repository base';
+        return {
+          success: false,
+          task_id: task.id,
+          agent_id: agent.id,
+          runtime_type: 'webhook',
+          requested_runtime_type: agent.runtime_type,
+          dispatched: false,
+          dry_run: true,
+          would_dispatch: false,
+          webhook_url: webhookUrl ? redactUrlForResponse(webhookUrl) : undefined,
+          validation_errors: [message],
+          message: 'Dry-run preview: factory repository origin/dev could not be frozen.',
+          handoff_prompt: handoffPrompt,
+          callbacks,
+          reason: message,
+        };
+      }
+    }
+    const identity = dispatchVersion === 2 && factoryRepository
+      ? buildFactoryDispatchIdentity(task, agent, factoryRepository.baseSha)
+      : undefined;
+    const payload = dispatchVersion === 2 && identity
+      ? buildWebhookDispatchPayloadV2(
+        task,
+        agent,
+        missionControlUrl,
+        new Date().toISOString(),
+        projectsPath,
+        identity,
+        factoryRepository!.baseSha,
+        factoryRepository!.repositoryPath,
+      )
+      : buildWebhookDispatchPayload(task, agent, missionControlUrl, new Date().toISOString(), projectsPath);
+    const validation = dispatchVersion === 2
+      ? validateWebhookDispatchPayloadV2(payload)
+      : validateWebhookDispatchPayload(payload);
+    const payloadHash = sha256Text(JSON.stringify(payload));
     const ready = validation.valid && Boolean(webhookUrl) && signature.configured;
     return {
       success: ready,
@@ -469,6 +771,11 @@ function buildDispatchDryRunPreview(task: Task, agent: Agent, effectiveRuntimeTy
       would_dispatch: ready,
       webhook_url: webhookUrl ? redactUrlForResponse(webhookUrl) : undefined,
       request_payload: payload,
+      attempt_id: identity?.attempt_id,
+      delivery_id: identity?.delivery_id,
+      correlation_id: identity?.correlation_id,
+      task_revision: identity?.task_revision,
+      payload_hash: dispatchVersion === 2 ? payloadHash : undefined,
       validation_errors: validation.valid ? undefined : validation.errors,
       message: ready
         ? 'Dry-run preview: webhook payload is valid; no request was sent.'
@@ -511,10 +818,33 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
   const now = new Date().toISOString();
   const missionControlUrl = getMissionControlUrl();
   const projectsPath = getProjectsPath();
-  const payload = buildWebhookDispatchPayload(task, agent, missionControlUrl, now, projectsPath);
-  const payloadValidation = validateWebhookDispatchPayload(payload);
+  const dispatchVersion = resolveWebhookDispatchVersion(config);
+  const factoryRepository = dispatchVersion === 2
+    ? await resolveFactoryRepositoryBase(task, projectsPath)
+    : undefined;
+  const identity = dispatchVersion === 2 && factoryRepository
+    ? buildFactoryDispatchIdentity(task, agent, factoryRepository.baseSha)
+    : undefined;
+  const payload = dispatchVersion === 2 && identity
+    ? buildWebhookDispatchPayloadV2(
+      task,
+      agent,
+      missionControlUrl,
+      now,
+      projectsPath,
+      identity,
+      factoryRepository!.baseSha,
+      factoryRepository!.repositoryPath,
+    )
+    : buildWebhookDispatchPayload(task, agent, missionControlUrl, now, projectsPath);
+  const payloadValidation = dispatchVersion === 2
+    ? validateWebhookDispatchPayloadV2(payload)
+    : validateWebhookDispatchPayload(payload);
+  const payloadBody = JSON.stringify(payload);
+  const payloadHash = sha256Text(payloadBody);
   if (!payloadValidation.valid) {
     recordDispatchAttempt({
+      id: identity?.attempt_id,
       task,
       agent,
       runtimeType: 'webhook',
@@ -525,17 +855,21 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
       errorMessage: payloadValidation.errors.join('; '),
       requestPayload: payload,
       webhookUrl: redactUrlForResponse(webhookUrl),
+      deliveryId: identity?.delivery_id,
+      correlationId: identity?.correlation_id,
+      taskRevision: identity?.task_revision,
+      payloadHash: dispatchVersion === 2 ? payloadHash : undefined,
     });
     throw new DispatchAdapterError('Webhook dispatch payload failed schema validation', 500, {
       validation_errors: payloadValidation.errors,
     });
   }
-  const payloadBody = JSON.stringify(payload);
   const headers = buildWebhookHeaders(config, process.env);
   const signature = getWebhookSignatureSecret(config, process.env);
   if (!signature.secret) {
     const errorMessage = `Webhook signing secret env ${signature.env_name} is not configured.`;
     recordDispatchAttempt({
+      id: identity?.attempt_id,
       task,
       agent,
       runtimeType: 'webhook',
@@ -546,14 +880,37 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
       webhookUrl: redactUrlForResponse(webhookUrl),
       errorMessage,
       requestPayload: payload,
+      deliveryId: identity?.delivery_id,
+      correlationId: identity?.correlation_id,
+      taskRevision: identity?.task_revision,
+      payloadHash: dispatchVersion === 2 ? payloadHash : undefined,
     });
     throw new DispatchAdapterError(errorMessage, 400, { secret_env: signature.env_name });
   }
+  const deliveryId = identity?.delivery_id ?? `dispatch-${task.id}-${now}`;
   Object.assign(headers, buildSignedWebhookHeaders({
     rawBody: payloadBody,
     secret: signature.secret,
-    deliveryId: `dispatch-${task.id}-${now}`,
+    deliveryId,
   }));
+  if (identity) {
+    recordDispatchAttempt({
+      id: identity.attempt_id,
+      task,
+      agent,
+      runtimeType: 'webhook',
+      status: 'retrying',
+      message: `Factory webhook dispatch attempt ${identity.attempt_id} is pending runtime acceptance.`,
+      now,
+      adapterName: 'paperclip-webhook-v2',
+      webhookUrl: redactUrlForResponse(webhookUrl),
+      requestPayload: payload,
+      deliveryId: identity.delivery_id,
+      correlationId: identity.correlation_id,
+      taskRevision: identity.task_revision,
+      payloadHash,
+    });
+  }
   const timeoutMs = getWebhookTimeoutMs(config);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -572,18 +929,27 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
     const errorMessage = wasAbort
       ? `Webhook dispatch timed out after ${timeoutMs}ms`
       : `Webhook dispatch failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
-    recordDispatchAttempt({
-      task,
-      agent,
-      runtimeType: 'webhook',
-      status: wasAbort ? 'timeout' : 'failed',
-      message: wasAbort ? 'Webhook dispatch timed out.' : 'Webhook dispatch failed before receiving a response.',
-      now,
-      adapterName: 'webhook',
-      webhookUrl: redactUrlForResponse(webhookUrl),
-      errorMessage,
-      requestPayload: payload,
-    });
+    if (identity) {
+      updateFactoryDispatchAttempt(identity.attempt_id, {
+        status: wasAbort ? 'timeout' : 'failed',
+        message: wasAbort ? 'Factory webhook dispatch timed out.' : 'Factory webhook dispatch failed before receiving a response.',
+        now: new Date().toISOString(),
+        errorMessage,
+      });
+    } else {
+      recordDispatchAttempt({
+        task,
+        agent,
+        runtimeType: 'webhook',
+        status: wasAbort ? 'timeout' : 'failed',
+        message: wasAbort ? 'Webhook dispatch timed out.' : 'Webhook dispatch failed before receiving a response.',
+        now,
+        adapterName: 'webhook',
+        webhookUrl: redactUrlForResponse(webhookUrl),
+        errorMessage,
+        requestPayload: payload,
+      });
+    }
     throw new DispatchAdapterError(
       errorMessage,
       wasAbort ? 504 : 502
@@ -594,20 +960,31 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
 
   if (!response.ok) {
     const responseText = await response.text().catch(() => '');
-    recordDispatchAttempt({
-      task,
-      agent,
-      runtimeType: 'webhook',
-      status: 'failed',
-      message: `Webhook dispatch returned HTTP ${response.status}.`,
-      now,
-      adapterName: 'webhook',
-      httpStatus: response.status,
-      webhookUrl: redactUrlForResponse(webhookUrl),
-      errorMessage: response.statusText || `HTTP ${response.status}`,
-      requestPayload: payload,
-      responseBody: responseText.slice(0, 1000),
-    });
+    if (identity) {
+      updateFactoryDispatchAttempt(identity.attempt_id, {
+        status: 'failed',
+        message: `Factory webhook dispatch returned HTTP ${response.status}.`,
+        now: new Date().toISOString(),
+        httpStatus: response.status,
+        errorMessage: response.statusText || `HTTP ${response.status}`,
+        responseBody: responseText.slice(0, 1000),
+      });
+    } else {
+      recordDispatchAttempt({
+        task,
+        agent,
+        runtimeType: 'webhook',
+        status: 'failed',
+        message: `Webhook dispatch returned HTTP ${response.status}.`,
+        now,
+        adapterName: 'webhook',
+        httpStatus: response.status,
+        webhookUrl: redactUrlForResponse(webhookUrl),
+        errorMessage: response.statusText || `HTTP ${response.status}`,
+        requestPayload: payload,
+        responseBody: responseText.slice(0, 1000),
+      });
+    }
     throw new DispatchAdapterError(
       `Webhook dispatch returned HTTP ${response.status}`,
       502,
@@ -615,19 +992,61 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
     );
   }
 
+  const responseText = await response.text().catch(() => '');
+  let bridgeResponse: unknown;
+  if (responseText) {
+    try {
+      bridgeResponse = JSON.parse(responseText);
+    } catch {
+      bridgeResponse = { accepted: true };
+    }
+  }
+  const explicitFailure = bridgeResponse
+    && typeof bridgeResponse === 'object'
+    && !Array.isArray(bridgeResponse)
+    ? (bridgeResponse as { accepted?: unknown; success?: unknown })
+    : undefined;
+  if (explicitFailure?.success === false || explicitFailure?.accepted === false) {
+    const rejectedField = explicitFailure.success === false ? 'success:false' : 'accepted:false';
+    const errorMessage = `Paperclip factory bridge returned ${rejectedField}`;
+    if (identity) {
+      updateFactoryDispatchAttempt(identity.attempt_id, {
+        status: 'failed',
+        message: errorMessage,
+        now: new Date().toISOString(),
+        httpStatus: response.status,
+        errorMessage,
+        responseBody: responseText.slice(0, 1000),
+      });
+    }
+    throw new DispatchAdapterError(errorMessage, 502, {
+      status: response.status,
+      body: responseText.slice(0, 1000),
+    });
+  }
   markTaskDispatched(task, agent, 'webhook', `Task "${task.title}" dispatched to ${agent.name} via webhook`, now);
-  recordDispatchAttempt({
-    task,
-    agent,
-    runtimeType: 'webhook',
-    status: 'success',
-    message: `Task "${task.title}" dispatched to ${agent.name} via webhook`,
-    now,
-    adapterName: 'webhook',
-    httpStatus: response.status,
-    webhookUrl: redactUrlForResponse(webhookUrl),
-    requestPayload: payload,
-  });
+  if (identity) {
+    updateFactoryDispatchAttempt(identity.attempt_id, {
+      status: 'success',
+      message: `Task "${task.title}" accepted by the Paperclip factory bridge`,
+      now: new Date().toISOString(),
+      httpStatus: response.status,
+      responseBody: responseText.slice(0, 1000),
+    });
+  } else {
+    recordDispatchAttempt({
+      task,
+      agent,
+      runtimeType: 'webhook',
+      status: 'success',
+      message: `Task "${task.title}" dispatched to ${agent.name} via webhook`,
+      now,
+      adapterName: 'webhook',
+      httpStatus: response.status,
+      webhookUrl: redactUrlForResponse(webhookUrl),
+      requestPayload: payload,
+    });
+  }
 
   return {
     success: true,
@@ -638,7 +1057,13 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
     dispatched: true,
     webhook_status: response.status,
     webhook_url: redactUrlForResponse(webhookUrl),
-    message: 'Task dispatched through webhook adapter',
+    message: identity ? 'Task accepted by Paperclip through webhook adapter v2' : 'Task dispatched through webhook adapter',
+    attempt_id: identity?.attempt_id,
+    delivery_id: identity?.delivery_id,
+    correlation_id: identity?.correlation_id,
+    task_revision: identity?.task_revision,
+    payload_hash: identity ? payloadHash : undefined,
+    bridge_response: bridgeResponse,
   };
 }
 
@@ -656,7 +1081,7 @@ export async function dispatchTaskToAssignedAgent(taskId: string, options: Dispa
       const validation = validateDispatchMetadata(task.dispatch_metadata);
       if (!validation.canDispatch) {
         return {
-          ...buildDispatchDryRunPreview(task, agent, resolved.effective_type, resolved.reason),
+          ...await buildDispatchDryRunPreview(task, agent, resolved.effective_type, resolved.reason),
           success: false,
           would_dispatch: false,
           message: `Dry-run preview: dispatch contract is incomplete: ${validation.blockers.join('; ')}`,

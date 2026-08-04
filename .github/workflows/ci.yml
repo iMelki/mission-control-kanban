@@ -18,3 +18,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pre-commit/action@v3.0.1
+
+  paperclip-bridge:
+    name: Paperclip bridge
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integrations/paperclip-bridge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+          cache: npm
+          cache-dependency-path: integrations/paperclip-bridge/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:migrations
+      - run: npm run build

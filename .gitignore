@@ -1,5 +1,6 @@
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -13,6 +14,7 @@
 
 # production
 /build
+/integrations/paperclip-bridge/dist/
 
 # misc
 .DS_Store

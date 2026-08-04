@@ -1,17 +1,21 @@
 # Webhook Dispatch Payload Schema
 
-Last updated: 2026-07-01
+Last updated: 2026-07-29
 
 Mission Control Kanban webhook runtimes receive one canonical outbound payload from `/api/tasks/:id/dispatch`.
 
 ## Contract
 
 - Event: `mck.task.dispatch`
-- Version: `1`
+- Version `1`: backward-compatible default
+- Version `2`: opt-in Paperclip software-factory envelope
 - Schema source: `src/lib/webhook-dispatch-schema.ts`
 - Runtime docs: `docs/MULTI_AGENT_RUNTIMES.md`
 
-The route builds the payload with `buildWebhookDispatchPayload`, validates it locally before sending, then records the outcome in `task_dispatch_attempts`.
+The route selects v2 only when the assigned webhook agent has
+`"dispatch_version": 2`. It creates the v2 attempt row before network I/O,
+signs the exact serialized bytes, and updates that same attempt after the
+bridge responds.
 
 ## Required payload shape
 
@@ -55,6 +59,103 @@ The route builds the payload with `buildWebhookDispatchPayload`, validates it lo
 
 `callbacks` and `callback_urls` intentionally contain the same object for compatibility with simpler webhook consumers and future schema evolution.
 
+## Opt-in factory dispatch v2
+
+Factory dispatch adds stable delivery identity, a task-revision hash, a
+lifecycle callback, and the reviewed task contract. The complete schema is
+published by the application; this shortened example highlights the added
+fields:
+
+```json
+{
+  "event": "mck.task.dispatch",
+  "version": 2,
+  "dispatch": {
+    "attempt_id": "596c0f76-3a87-42fc-b5b3-95cd38f540c8",
+    "delivery_id": "dispatch-596c0f76-3a87-42fc-b5b3-95cd38f540c8",
+    "correlation_id": "mck:assistants:task-id",
+    "task_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "task": {
+    "id": "task-id",
+    "title": "Implement the bridge",
+    "priority": "high",
+    "github_source": {
+      "repo_owner": "iMelki",
+      "repo_name": "mission-control-kanban",
+      "issue_number": 47,
+      "issue_url": "https://github.com/iMelki/mission-control-kanban/issues/47"
+    }
+  },
+  "agent": {
+    "id": "paperclip-factory",
+    "name": "Paperclip Factory",
+    "role": "Execution control plane",
+    "runtime_type": "webhook"
+  },
+  "callbacks": {
+    "activity": "http://127.0.0.1:3021/api/tasks/task-id/activities",
+    "deliverable": "http://127.0.0.1:3021/api/tasks/task-id/deliverables",
+    "status": "http://127.0.0.1:3021/api/tasks/task-id",
+    "dispatch": "http://127.0.0.1:3021/api/tasks/task-id/dispatch",
+    "lifecycle": "http://127.0.0.1:3021/api/webhooks/agent-completion"
+  },
+  "callback_urls": {
+    "activity": "http://127.0.0.1:3021/api/tasks/task-id/activities",
+    "deliverable": "http://127.0.0.1:3021/api/tasks/task-id/deliverables",
+    "status": "http://127.0.0.1:3021/api/tasks/task-id",
+    "dispatch": "http://127.0.0.1:3021/api/tasks/task-id/dispatch",
+    "lifecycle": "http://127.0.0.1:3021/api/webhooks/agent-completion"
+  },
+  "mission_control_url": "http://127.0.0.1:3021",
+  "output_directory": "S:/source/CCAI/Assistants/tools/mission-control-kanban",
+  "prompt_markdown": "# Mission Control handoff\n...",
+  "issued_at": "2026-07-29T00:00:00.000Z",
+  "factory_contract": {
+    "schema_version": "factory-task-envelope.v1",
+    "envelope_id": "factory:596c0f76-3a87-42fc-b5b3-95cd38f540c8",
+    "repository": {
+      "slug": "iMelki/mission-control-kanban",
+      "owner": "iMelki",
+      "name": "mission-control-kanban",
+      "active_branch": "dev",
+      "base_sha": "5b4d1b2d7eb6fa193cffee9255794c5eea8d3a77",
+      "allowed_file_scope": ["src/**", "tests/**", "integrations/paperclip-bridge/**"]
+    },
+    "acceptance_criteria": ["Signed dispatch is replay safe"],
+    "test_requirements": ["npm run test:factory-webhooks"],
+    "risk_level": "high",
+    "review_mode": "pair_review",
+    "impact": "Enables governed Paperclip execution.",
+    "rollback_plan": "Set dispatch_version to 1.",
+    "safety_rules": ["Only mutate iMelki repositories."],
+    "limits": {
+      "max_repair_attempts": 2,
+      "concurrent_mutating_builders": 1
+    }
+  }
+}
+```
+
+The revision is a SHA-256 digest of canonical task intent plus the frozen
+lowercase 40-hex `origin/dev` base commit and excludes
+operational fields such as current board status and `updated_at`. It changes
+when the title, description, source identity, reviewed dispatch contract, or
+assigned agent identity/runtime configuration changes. The bound runtime
+identity includes the agent ID, name, role, runtime type, normalized runtime
+config, and dispatch-enabled state. Bridges must reject a different revision
+for an existing correlation instead of silently reusing the old execution
+graph.
+
+Factory v2 binds both `callbacks.lifecycle` and
+`callback_urls.lifecycle` to the exact value
+`http://127.0.0.1:3021/api/webhooks/agent-completion`; the aliases must be
+identical. `mission_control_url` is exactly `http://127.0.0.1:3021`.
+Alternate hostnames, userinfo, query strings, and fragments are invalid.
+`allowed_file_scope` entries must be canonical repository-relative
+forward-slash paths or globs: absolute, drive, UNC, empty-segment,
+dot/dot-dot, encoded-separator, backslash, and non-NFC values are rejected.
+
 ## Secret handling
 
 Webhook agent config should store references, not secrets:
@@ -62,7 +163,9 @@ Webhook agent config should store references, not secrets:
 ```json
 {
   "webhook_url": "https://example.test/mck-dispatch",
+  "dispatch_version": 2,
   "bearer_token_env": "MCK_WEBHOOK_TOKEN",
+  "signature_secret_env": "MCK_WEBHOOK_SIGNATURE_SECRET",
   "headers": {
     "X-MCK-Bridge": "hermes"
   },
@@ -90,6 +193,11 @@ Every dispatch creates a row in `task_dispatch_attempts` with:
 - bounded response/error text
 - request payload JSON for audit/replay context
 
+Factory v2 additionally records `attempt_id`, `delivery_id`,
+`correlation_id`, `task_revision`, payload hash, lifecycle stage, receipt ID,
+and an update timestamp. The initial `retrying` row exists before the POST is
+made, so a process failure cannot create an untracked downstream execution.
+
 The Task modal renders these rows in the Dispatch timeline and only enables **Retry webhook** when the latest attempt is a failed/timeout webhook dispatch.
 
 
@@ -99,6 +207,9 @@ Bridge authors can fetch the exact schema that MCK uses for outbound dispatch va
 
 - Inline: `GET /api/schemas/webhook-dispatch-payload`
 - Download: `GET /api/schemas/webhook-dispatch-payload?download=1`
+- Factory v2 inline: `GET /api/schemas/webhook-dispatch-payload?version=2`
+- Factory v2 download:
+  `GET /api/schemas/webhook-dispatch-payload?version=2&download=1`
 
 The route returns `application/schema+json` and includes `X-Schema-Id` so bridge code can cache or pin the contract version.
 
@@ -130,7 +241,9 @@ For current delivery-ID-aware requests, the signature base string is:
 The signature value is `sha256=<hex-hmac-sha256>`. Consumers should reject
 stale timestamps, verify with a timing-safe comparison, and store delivery IDs
 briefly for replay protection. The verifier retains the earlier
-`v1.<timestamp>.<raw-json-body>` form only for bridge compatibility.
+`v1.<timestamp>.<raw-json-body>` form only for dispatch/callback v1
+compatibility. Lifecycle callback v2 requires the delivery-bound form and the
+exact `X-MCK-Delivery-ID` header.
 
 If the signing secret is absent, dry-run reports `would_dispatch=false`, live
 dispatch records a failed attempt without making a network request, and the

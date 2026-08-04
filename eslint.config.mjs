@@ -6,6 +6,8 @@ const eslintConfig = [
     ignores: [
       '.next/**',
       'node_modules/**',
+      'integrations/paperclip-bridge/dist/**',
+      'integrations/paperclip-bridge/node_modules/**',
       'artifacts/**',
       'scripts/**/*.js',
       'react-doctor-report.json',

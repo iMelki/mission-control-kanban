@@ -12,6 +12,12 @@ Mission Control is a task management system that lets you create tasks, plan the
 > workflow in this workspace, start with
 > [docs/FIRST_RUN_OPERATOR_GUIDE.md](docs/FIRST_RUN_OPERATOR_GUIDE.md).
 
+> **Paperclip factory:** opt-in webhook dispatch v2 adds a pending-before-send
+> attempt, a live `origin/dev` base bound into the stable correlation/revision,
+> signed lifecycle and Mission Control callbacks, and a receipt-gated
+> completion path. The installable bridge and operator runbook are in
+> [docs/PAPERCLIP_FACTORY_BRIDGE.md](docs/PAPERCLIP_FACTORY_BRIDGE.md).
+
 ![Mission Control Screenshot](mission-control.png)
 
 ---

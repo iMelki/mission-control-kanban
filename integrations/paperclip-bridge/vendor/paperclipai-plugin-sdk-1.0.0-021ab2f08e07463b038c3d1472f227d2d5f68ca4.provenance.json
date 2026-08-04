@@ -1,0 +1,17 @@
+{
+  "package": "@paperclipai/plugin-sdk",
+  "version": "1.0.0",
+  "sourceRepository": "https://github.com/iMelki/paperclip",
+  "sourceCommit": "021ab2f08e07463b038c3d1472f227d2d5f68ca4",
+  "sourcePath": "packages/plugins/sdk",
+  "packCommand": "pnpm pack --pack-destination <vendor>",
+  "tarball": "paperclipai-plugin-sdk-1.0.0-021ab2f08e07463b038c3d1472f227d2d5f68ca4.tgz",
+  "sha256": "3544d8114996db361a0afbfd437f59d20b84eee3f1dba2b35083e2e2579ea924",
+  "workspaceDependencyRewrite": {
+    "@paperclipai/shared": "0.3.1"
+  },
+  "resolvedWorkspaceDependency": {
+    "@paperclipai/shared": "file:paperclipai-shared-0.3.1-021ab2f08e07463b038c3d1472f227d2d5f68ca4.tgz",
+    "sha256": "7a4360a89a913d98f0adb175d39a9b88eec4ddface480b86e8c6e74c5ff6092d"
+  }
+}
