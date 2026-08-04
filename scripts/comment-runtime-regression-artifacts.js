@@ -1,0 +1,143 @@
+#!/usr/bin/env node
+const { spawnSync } = require('node:child_process');
+const { appendFileSync } = require('node:fs');
+
+function classifyGhFailure(args, result) {
+  const output = `${result.stderr || ''}\n${result.stdout || ''}`;
+  if (
+    args[0] === 'issue' &&
+    args[1] === 'comment' &&
+    /Resource not accessible by integration|addComment|HTTP 403/i.test(output)
+  ) {
+    return 'comment-permission';
+  }
+  return 'gh-command';
+}
+
+function runGh(args, { allowFailure = false } = {}, spawn = spawnSync) {
+  const result = spawn('gh', args, { encoding: 'utf8' });
+  if (result.status !== 0 && !allowFailure) {
+    const failureKind = classifyGhFailure(args, result);
+    throw new Error(`[${failureKind}] ${['gh', ...args].join(' ')} failed:\n${result.stderr || result.stdout}`);
+  }
+  return String(result.stdout || '').trim();
+}
+
+function parseArgs(argv) {
+  const options = {
+    repo: process.env.GITHUB_REPOSITORY || 'iMelki/mission-control-kanban',
+    workflow: 'Runtime Regression',
+    branch: 'dev',
+    issue: process.env.MCK_RUNTIME_ARTIFACT_ISSUE || '',
+    runId: process.env.GITHUB_RUN_ID || '',
+    publicBaseUrl: process.env.MCK_PUBLIC_BASE_URL || process.env.MISSION_CONTROL_URL || 'http://127.0.0.1:3021',
+    dryRun: false,
+    githubStepSummary: false,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--repo') options.repo = argv[++index];
+    else if (arg === '--workflow') options.workflow = argv[++index];
+    else if (arg === '--branch') options.branch = argv[++index];
+    else if (arg === '--issue') options.issue = argv[++index];
+    else if (arg === '--run-id') options.runId = argv[++index];
+    else if (arg === '--public-base-url') options.publicBaseUrl = argv[++index];
+    else if (arg === '--github-step-summary') options.githubStepSummary = true;
+    else if (arg === '--dry-run') options.dryRun = true;
+    else throw new Error(`Unknown argument: ${arg}`);
+  }
+
+  return options;
+}
+
+function buildRunUrl(repo, runId) {
+  return `https://github.com/${repo}/actions/runs/${runId}`;
+}
+
+function buildArtifactUrl(repo, runId, artifact) {
+  return artifact.id ? `${buildRunUrl(repo, runId)}/artifacts/${artifact.id}` : `${buildRunUrl(repo, runId)}#artifacts`;
+}
+
+function buildBody({ options, run, artifacts }) {
+  const artifactLines = artifacts.length
+    ? artifacts.map((artifact) => `- [${artifact.name}](${buildArtifactUrl(options.repo, run.databaseId, artifact)}); expires ${artifact.expires_at}`).join('\n')
+    : '- No unexpired artifacts found for this run.';
+  const baseUrl = options.publicBaseUrl.replace(/\/$/, '');
+  return [
+    'Runtime regression artifact evidence:',
+    '',
+    `- Workflow: ${options.workflow}`,
+    `- Run: ${run.url || buildRunUrl(options.repo, run.databaseId)}`,
+    `- Status: ${run.status}; conclusion: ${run.conclusion || 'pending'}`,
+    `- Commit: ${run.headSha}`,
+    `- Local drilldown: ${baseUrl}/runtime-regression`,
+    `- Runtime health: ${baseUrl}/api/runtime/health`,
+    '- Artifacts:',
+    artifactLines,
+  ].join('\n');
+}
+
+function main() {
+  const options = parseArgs(process.argv.slice(2));
+  const runJson = options.runId
+    ? runGh([
+      'run', 'view', options.runId,
+      '--repo', options.repo,
+      '--json', 'databaseId,displayTitle,conclusion,status,createdAt,headSha,url',
+    ])
+    : runGh([
+      'run', 'list',
+      '--repo', options.repo,
+      '--workflow', options.workflow,
+      '--branch', options.branch,
+      '--limit', '1',
+      '--json', 'databaseId,displayTitle,conclusion,status,createdAt,headSha,url',
+    ]);
+  const run = options.runId ? JSON.parse(runJson || '{}') : JSON.parse(runJson || '[]')[0];
+  if (!run) throw new Error(`No workflow run found for ${options.workflow} on ${options.repo}@${options.branch}`);
+
+  const artifactsJson = runGh([
+    'api',
+    `repos/${options.repo}/actions/runs/${run.databaseId}/artifacts`,
+    '--jq', '.artifacts[] | {id, name, expired, size_in_bytes, created_at, expires_at, archive_download_url}',
+  ], { allowFailure: true });
+
+  const artifacts = artifactsJson
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter((artifact) => !artifact.expired);
+
+  const body = buildBody({ options, run, artifacts });
+
+  if (options.githubStepSummary && process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${body}\n`);
+  }
+
+  if (!options.issue || options.dryRun) {
+    console.log(body);
+    return;
+  }
+
+  runGh(['issue', 'comment', options.issue, '--repo', options.repo, '--body', body]);
+  console.log(`Commented runtime regression artifacts on ${options.repo}#${options.issue}`);
+}
+
+module.exports = {
+  buildArtifactUrl,
+  buildBody,
+  buildRunUrl,
+  classifyGhFailure,
+  parseArgs,
+  runGh,
+};
+
+if (require.main === module) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getOpenClawClient } from '@/lib/openclaw/client';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // File system imports removed - using OpenClaw API instead
+
+type OpenClawMessage = { role: string; content: Array<{ type: string; text?: string }> };
+type AssistantMessage = { role: 'assistant'; content: string };
 
 // Planning session prefix for OpenClaw (must match agent:main: format)
 const PLANNING_SESSION_PREFIX = 'agent:main:planning:';
@@ -39,8 +46,18 @@ function extractJSON(text: string): object | null {
   return null;
 }
 
+function getFirstTextContent(content: OpenClawMessage['content'] | undefined): string | undefined {
+  for (const part of content ?? []) {
+    if (part.type === 'text' && part.text) {
+      return part.text;
+    }
+  }
+
+  return undefined;
+}
+
 // Helper to get messages from OpenClaw API
-async function getMessagesFromOpenClaw(sessionKey: string): Promise<Array<{ role: string; content: string }>> {
+async function getMessagesFromOpenClaw(sessionKey: string): Promise<AssistantMessage[]> {
   try {
     const client = getOpenClawClient();
     if (!client.isConnected()) {
@@ -48,25 +65,19 @@ async function getMessagesFromOpenClaw(sessionKey: string): Promise<Array<{ role
     }
 
     // Use chat.history API to get session messages
-    const result = await client.call<{ messages: Array<{ role: string; content: Array<{ type: string; text?: string }> }> }>('chat.history', {
+    const result = await client.call<{ messages: OpenClawMessage[] }>('chat.history', {
       sessionKey,
       limit: 20,
     });
 
-    const messages: Array<{ role: string; content: string }> = [];
-
-    for (const msg of result.messages || []) {
-      if (msg.role === 'assistant') {
-        // Extract text content from assistant messages
-        const textContent = msg.content?.find((c) => c.type === 'text');
-        if (textContent?.text) {
-          messages.push({
-            role: 'assistant',
-            content: textContent.text
-          });
-        }
+    const messages = (result.messages || []).flatMap((msg) => {
+      if (msg.role !== 'assistant') {
+        return [];
       }
-    }
+
+      const text = getFirstTextContent(msg.content);
+      return text ? [{ role: 'assistant' as const, content: text }] : [];
+    });
 
     console.log('[Planning] Found', messages.length, 'assistant messages via API');
     return messages;
@@ -74,6 +85,30 @@ async function getMessagesFromOpenClaw(sessionKey: string): Promise<Array<{ role
     console.error('[Planning] Failed to get messages from OpenClaw:', err);
     return [];
   }
+}
+
+async function waitForAssistantMessage(sessionKey: string): Promise<string | null> {
+  const poll = async (remainingAttempts: number): Promise<string | null> => {
+    if (remainingAttempts <= 0) {
+      return null;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Get messages via OpenClaw API
+    const transcriptMessages = await getMessagesFromOpenClaw(sessionKey);
+    console.log('[Planning] API messages:', transcriptMessages.length);
+
+    const lastAssistant = transcriptMessages.at(-1);
+    if (lastAssistant) {
+      console.log('[Planning] Found response in transcript');
+      return lastAssistant.content;
+    }
+
+    return poll(remainingAttempts - 1);
+  };
+
+  return poll(30);
 }
 
 // GET /api/tasks/[id]/planning - Get planning state
@@ -113,7 +148,7 @@ export async function GET(
       console.log('[Planning GET] No assistant message in DB, checking OpenClaw...');
       const openclawMessages = await getMessagesFromOpenClaw(task.planning_session_key);
       if (openclawMessages.length > 0) {
-        const newAssistant = [...openclawMessages].reverse().find(m => m.role === 'assistant');
+        const newAssistant = openclawMessages.at(-1);
         if (newAssistant) {
           console.log('[Planning GET] Found assistant message in OpenClaw, syncing to DB');
           messages.push({ role: 'assistant', content: newAssistant.content, timestamp: Date.now() });
@@ -227,24 +262,7 @@ Respond with ONLY valid JSON in this format:
 
     // Poll for response (give OpenClaw time to process)
     // Use OpenClaw API to get messages
-    let response = null;
-    for (let i = 0; i < 30; i++) { // Poll for up to 30 seconds
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Get messages via OpenClaw API
-      const transcriptMessages = await getMessagesFromOpenClaw(sessionKey);
-      console.log('[Planning] API messages:', transcriptMessages.length);
-
-      if (transcriptMessages.length > 0) {
-        // Get the last assistant message
-        const lastAssistant = [...transcriptMessages].reverse().find(m => m.role === 'assistant');
-        if (lastAssistant) {
-          response = lastAssistant.content;
-          console.log('[Planning] Found response in transcript');
-          break;
-        }
-      }
-    }
+    const response = await waitForAssistantMessage(sessionKey);
 
     if (response) {
       // Parse and store the response using extractJSON to handle code blocks

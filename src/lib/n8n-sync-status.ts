@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { mkdir, appendFile } from 'fs/promises';
-import { dirname, resolve } from 'path';
+import { dirname } from 'path';
 import { queryAll, queryOne, run } from './db';
 import type {
   MckN8nSyncAlertLevel,
@@ -97,7 +97,7 @@ function asNumber(value: unknown): number {
 }
 
 function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function parseJson<T>(value: string | null, fallback: T): T {
@@ -139,9 +139,10 @@ function normalizeWorkspaces(raw: Record<string, unknown>, results: unknown[]): 
   }
 
   return Array.from(new Set(
-    candidates
-      .map((workspace) => asString(workspace).trim())
-      .filter(Boolean)
+    candidates.flatMap((workspace) => {
+      const normalized = asString(workspace).trim();
+      return normalized ? [normalized] : [];
+    })
   ));
 }
 
@@ -219,7 +220,7 @@ function getAlertLogPath(): string | null {
     return null;
   }
 
-  return resolve(process.cwd(), configured?.trim() || DEFAULT_ALERT_LOG_PATH);
+  return configured?.trim() || DEFAULT_ALERT_LOG_PATH;
 }
 
 export async function notifyMckN8nSyncAlert(run: MckN8nSyncRun): Promise<void> {

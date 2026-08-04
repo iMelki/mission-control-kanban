@@ -78,6 +78,7 @@ export function SSEDebugPanel() {
   return (
     <div className="fixed bottom-4 left-4 z-50">
       <button
+              type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg text-sm"
       >
@@ -93,6 +94,7 @@ export function SSEDebugPanel() {
           <div className="p-2 border-b border-mc-border flex justify-between items-center">
             <span className="text-sm font-medium">Debug Events</span>
             <button
+              type="button"
               onClick={() => setLogs([])}
               className="text-xs text-mc-text-secondary hover:text-mc-text"
             >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lucide-react';
@@ -9,10 +9,21 @@ import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { MissionQueue } from '@/components/MissionQueue';
 import { LiveFeed } from '@/components/LiveFeed';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
+import { WorkspaceRuntimePolicyPanel } from '@/components/WorkspaceRuntimePolicyPanel';
+import { DispatchFailureQueue } from '@/components/DispatchFailureQueue';
+import { RuntimeAuditPanel } from '@/components/RuntimeAuditPanel';
+import { WorkspaceSectionTabs, type WorkspaceSection } from '@/components/workspace/WorkspaceSectionTabs';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
 import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
+
+const SYNC_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 function formatSyncTimestamp(value?: string): string {
   if (!value) {
@@ -24,12 +35,7 @@ function formatSyncTimestamp(value?: string): string {
     return 'unknown time';
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(parsed);
+  return SYNC_TIMESTAMP_FORMATTER.format(parsed);
 }
 
 function formatSyncCount(value: unknown): number {
@@ -39,17 +45,23 @@ function formatSyncCount(value: unknown): number {
 
 function extractGitHubSyncStatusNotes(payload: Record<string, unknown>): string[] {
   const details = Array.isArray(payload.details) ? payload.details : [];
+  const notes: string[] = [];
 
-  return details
-    .filter((detail): detail is Record<string, unknown> => Boolean(detail) && typeof detail === 'object')
-    .filter((detail) => detail.action === 'status_reconcile' || detail.action === 'drift')
-    .map((detail) => {
-      const issue = typeof detail.issue === 'string' ? `${detail.issue}: ` : '';
-      const reason = typeof detail.reason === 'string' ? detail.reason : String(detail.action);
-      return `${issue}${reason}`;
-    })
-    .filter(Boolean)
-    .slice(0, 3);
+  for (const detail of details) {
+    if (!detail || typeof detail !== 'object') continue;
+    const detailRecord = detail as Record<string, unknown>;
+    if (detailRecord.action !== 'status_reconcile' && detailRecord.action !== 'drift') continue;
+
+    const issue = typeof detailRecord.issue === 'string' ? `${detailRecord.issue}: ` : '';
+    const reason = typeof detailRecord.reason === 'string'
+      ? detailRecord.reason
+      : String(detailRecord.action);
+    notes.push(`${issue}${reason}`);
+
+    if (notes.length === 3) break;
+  }
+
+  return notes;
 }
 
 function formatSyncCadence(status: MckN8nSyncStatusResponse['latest']): string {
@@ -67,6 +79,31 @@ function formatSyncCadence(status: MckN8nSyncStatusResponse['latest']): string {
   return [schedule, timezone].filter(Boolean).join(' ') || 'configured schedule';
 }
 
+
+type WorkspacePageState = {
+  workspace: Workspace | null;
+  notFound: boolean;
+  githubSyncState: {
+    state: 'idle' | 'syncing' | 'success' | 'error';
+    message?: string;
+    statusNotes?: string[];
+  };
+  n8nSyncStatus: MckN8nSyncStatusResponse | null;
+  section: WorkspaceSection;
+};
+
+const initialWorkspacePageState: WorkspacePageState = {
+  workspace: null,
+  notFound: false,
+  githubSyncState: { state: 'idle' },
+  n8nSyncStatus: null,
+  section: 'board',
+};
+
+function workspacePageReducer(state: WorkspacePageState, patch: Partial<WorkspacePageState>): WorkspacePageState {
+  return { ...state, ...patch };
+}
+
 export default function WorkspacePage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -80,14 +117,13 @@ export default function WorkspacePage() {
     isLoading,
   } = useMissionControl();
 
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [githubSyncState, setGitHubSyncState] = useState<{
-    state: 'idle' | 'syncing' | 'success' | 'error';
-    message?: string;
-    statusNotes?: string[];
-  }>({ state: 'idle' });
-  const [n8nSyncStatus, setN8nSyncStatus] = useState<MckN8nSyncStatusResponse | null>(null);
+  const [pageState, setPageState] = useReducer(workspacePageReducer, initialWorkspacePageState);
+  const { workspace: loadedWorkspace, notFound, githubSyncState, n8nSyncStatus, section } = pageState;
+  const setWorkspace = useCallback((nextWorkspace: Workspace | null) => setPageState({ workspace: nextWorkspace }), []);
+  const setNotFound = useCallback((nextNotFound: boolean) => setPageState({ notFound: nextNotFound }), []);
+  const setGitHubSyncState = useCallback((nextGitHubSyncState: WorkspacePageState['githubSyncState']) => setPageState({ githubSyncState: nextGitHubSyncState }), []);
+  const setN8nSyncStatus = useCallback((nextN8nSyncStatus: MckN8nSyncStatusResponse | null) => setPageState({ n8nSyncStatus: nextN8nSyncStatus }), []);
+  const setSection = useCallback((nextSection: WorkspaceSection) => setPageState({ section: nextSection }), []);
   const autoSyncedWorkspaceRef = useRef<string | null>(null);
 
   const loadWorkspaceTasks = useCallback(async (workspaceIdToLoad: string) => {
@@ -145,7 +181,7 @@ export default function WorkspacePage() {
         message: error instanceof Error ? error.message : 'GitHub Project refresh failed',
       });
     }
-  }, [loadWorkspaceTasks]);
+  }, [loadWorkspaceTasks, setGitHubSyncState]);
 
   const loadN8nSyncStatus = useCallback(async () => {
     try {
@@ -158,12 +194,13 @@ export default function WorkspacePage() {
     } catch (error) {
       console.error('Failed to load n8n sync status:', error);
     }
-  }, []);
+  }, [setN8nSyncStatus]);
 
   // Connect to SSE for real-time updates
   useSSE();
 
   // Load workspace data
+  // react-doctor-disable-next-line -- Client-only operator shell keeps live workspace state and local interactions hydrated after the initial route render.
   useEffect(() => {
     async function loadWorkspace() {
       try {
@@ -171,6 +208,7 @@ export default function WorkspacePage() {
         if (res.ok) {
           const data = await res.json();
           setWorkspace(data);
+          setIsLoading(false);
         } else if (res.status === 404) {
           setNotFound(true);
           setIsLoading(false);
@@ -185,14 +223,14 @@ export default function WorkspacePage() {
     }
 
     loadWorkspace();
-  }, [slug, setIsLoading]);
+  }, [slug, setIsLoading, setNotFound, setWorkspace]);
 
   // Load workspace-specific data
   useEffect(() => {
-    if (!workspace) return;
+    if (!loadedWorkspace) return;
 
-    const currentWorkspace = workspace;
-    const workspaceId = workspace.id;
+    const currentWorkspace = loadedWorkspace;
+    const workspaceId = currentWorkspace.id;
 
     async function loadData() {
       try {
@@ -311,7 +349,7 @@ export default function WorkspacePage() {
         clearInterval(n8nStatusPoll);
       }
     };
-  }, [workspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading, loadWorkspaceTasks, runGitHubProjectSync, loadN8nSyncStatus]);
+  }, [loadedWorkspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading, loadWorkspaceTasks, runGitHubProjectSync, loadN8nSyncStatus]);
 
   if (notFound) {
     return (
@@ -334,16 +372,23 @@ export default function WorkspacePage() {
     );
   }
 
-  if (isLoading || !workspace) {
-    return (
-      <div className="min-h-screen bg-mc-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4 animate-pulse">🦞</div>
-          <p className="text-mc-text-secondary">Loading {slug}...</p>
-        </div>
-      </div>
-    );
-  }
+  const workspace = loadedWorkspace ?? {
+    id: slug,
+    name: `${slug} Workspace`,
+    slug,
+    description: 'Loading workspace metadata…',
+    icon: '🦞',
+    created_at: new Date(0).toISOString(),
+    updated_at: new Date(0).toISOString(),
+    github_project_owner: null,
+    github_project_number: null,
+    github_project_title: null,
+    github_project_url: null,
+    github_project_auto_refresh: 0,
+    default_runtime_type: 'manual',
+    default_runtime_config: null,
+    default_dispatch_enabled: 0,
+  } satisfies Workspace;
 
   const latestN8nSync = n8nSyncStatus?.latest ?? null;
   const n8nSummary = (latestN8nSync?.summary ?? {}) as Record<string, unknown>;
@@ -355,8 +400,13 @@ export default function WorkspacePage() {
     : 'no recorded runs yet';
 
   return (
-    <div className="h-screen flex flex-col bg-mc-bg overflow-hidden">
+    <div
+      className="h-screen flex flex-col bg-mc-bg overflow-hidden"
+      data-workspace-ready={loadedWorkspace ? 'true' : 'false'}
+    >
       <Header workspace={workspace} />
+      <WorkspaceSectionTabs section={section} onSectionChange={setSection} />
+      {section === 'settings' && <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />}
 
       {workspace.github_project_owner && workspace.github_project_number && (
         <div className="border-b border-mc-border bg-mc-bg-secondary px-4 py-2">
@@ -387,7 +437,7 @@ export default function WorkspacePage() {
                   <AlertTriangle className="size-4 mt-0.5 shrink-0" />
                   <div className="space-y-0.5">
                     <span className="block">GitHub/MCK status reconciliation is visible for this sync.</span>
-                    {githubSyncState.statusNotes.map((note) => (
+                    {githubSyncState.statusNotes.map((note: string) => (
                       <span key={note} className="block text-xs text-amber-100/90">{note}</span>
                     ))}
                   </div>
@@ -428,15 +478,36 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Agents Sidebar */}
-        <AgentsSidebar workspaceId={workspace.id} />
-
-        {/* Main Content Area */}
-        <MissionQueue workspaceId={workspace.id} />
-
-        {/* Live Feed */}
-        <LiveFeed />
+      <div className="flex-1 overflow-hidden">
+        {section === 'board' && (
+          <div className="flex h-full overflow-hidden">
+            <AgentsSidebar workspaceId={workspace.id} />
+            <MissionQueue workspaceId={workspace.id} />
+            <LiveFeed />
+          </div>
+        )}
+        {section === 'agents' && (
+          <div className="flex h-full overflow-hidden">
+            <AgentsSidebar workspaceId={workspace.id} />
+            <div className="flex-1 overflow-auto p-4">
+              <RuntimeAuditPanel />
+            </div>
+          </div>
+        )}
+        {section === 'dispatch' && <DispatchFailureQueue workspaceId={workspace.id} />}
+        {section === 'settings' && (
+          <div className="h-full overflow-auto p-4">
+            <RuntimeAuditPanel />
+          </div>
+        )}
+        {section === 'activity' && (
+          <div className="flex h-full overflow-hidden">
+            <div className="flex-1 overflow-auto p-4">
+              <DispatchFailureQueue workspaceId={workspace.id} />
+            </div>
+            <LiveFeed />
+          </div>
+        )}
       </div>
 
       {/* Debug Panel - only shows when debug mode enabled */}

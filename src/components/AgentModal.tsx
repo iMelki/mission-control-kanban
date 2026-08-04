@@ -3,7 +3,12 @@
 import { useState } from 'react';
 import { X, Save, Trash2 } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
-import type { Agent, AgentStatus } from '@/lib/types';
+import {
+  parseAgentRuntimeConfig,
+  serializeAgentRuntimeConfig,
+} from '@/lib/agent-runtimes';
+import type { Agent, AgentRuntimeType, AgentStatus } from '@/lib/types';
+import { RuntimeDispatchSection, type AgentFormState } from './agent-modal/RuntimeDispatchSection';
 
 interface AgentModalProps {
   agent?: Agent;
@@ -13,19 +18,33 @@ interface AgentModalProps {
 }
 
 const EMOJI_OPTIONS = ['🤖', '🦞', '💻', '🔍', '✍️', '🎨', '📊', '🧠', '⚡', '🚀', '🎯', '🔧'];
+const AGENT_MODAL_TABS = [
+  { id: 'info', label: 'Info' },
+  { id: 'soul', label: 'SOUL.md' },
+  { id: 'user', label: 'USER.md' },
+  { id: 'agents', label: 'AGENTS.md' },
+] as const;
+
+function formatRuntimeConfig(value: Agent['runtime_config']) {
+  const parsed = parseAgentRuntimeConfig(value);
+  return Object.keys(parsed).length ? JSON.stringify(parsed, null, 2) : '';
+}
 
 export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: AgentModalProps) {
-  const { addAgent, updateAgent, agents } = useMissionControl();
+  const { addAgent, updateAgent } = useMissionControl();
   const [activeTab, setActiveTab] = useState<'info' | 'soul' | 'user' | 'agents'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<AgentFormState>({
     name: agent?.name || '',
     role: agent?.role || '',
     description: agent?.description || '',
     avatar_emoji: agent?.avatar_emoji || '🤖',
     status: agent?.status || 'standby' as AgentStatus,
     is_master: agent?.is_master || false,
+    runtime_type: agent?.runtime_type || 'manual' as AgentRuntimeType,
+    runtime_config: formatRuntimeConfig(agent?.runtime_config),
+    dispatch_enabled: Boolean(agent?.dispatch_enabled),
     soul_md: agent?.soul_md || '',
     user_md: agent?.user_md || '',
     agents_md: agent?.agents_md || '',
@@ -44,6 +63,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          runtime_config: serializeAgentRuntimeConfig(form.runtime_config),
           workspace_id: workspaceId || agent?.workspace_id || 'default',
         }),
       });
@@ -86,13 +106,6 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
     }
   };
 
-  const tabs = [
-    { id: 'info', label: 'Info' },
-    { id: 'soul', label: 'SOUL.md' },
-    { id: 'user', label: 'USER.md' },
-    { id: 'agents', label: 'AGENTS.md' },
-  ] as const;
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
@@ -102,7 +115,9 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
             {agent ? `Edit ${agent.name}` : 'Create New Agent'}
           </h2>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close agent modal"
             className="p-1 hover:bg-mc-bg-tertiary rounded"
           >
             <X className="w-5 h-5" />
@@ -111,9 +126,10 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
 
         {/* Tabs */}
         <div className="flex border-b border-mc-border">
-          {tabs.map((tab) => (
+          {AGENT_MODAL_TABS.map((tab) => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
@@ -127,18 +143,19 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4">
+        <form id="agent-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4">
           {activeTab === 'info' && (
             <div className="space-y-4">
               {/* Avatar Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Avatar</label>
+              <fieldset>
+                <legend className="block text-sm font-medium mb-2">Avatar</legend>
                 <div className="flex flex-wrap gap-2">
                   {EMOJI_OPTIONS.map((emoji) => (
                     <button
                       key={emoji}
                       type="button"
                       onClick={() => setForm({ ...form, avatar_emoji: emoji })}
+                      aria-label={`Select ${emoji} avatar`}
                       className={`text-2xl p-2 rounded hover:bg-mc-bg-tertiary ${
                         form.avatar_emoji === emoji
                           ? 'bg-mc-accent/20 ring-2 ring-mc-accent'
@@ -149,12 +166,13 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                     </button>
                   ))}
                 </div>
-              </div>
+              </fieldset>
 
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
+                <label htmlFor="agent-name" className="block text-sm font-medium mb-1">Name</label>
                 <input
+                  id="agent-name"
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -166,8 +184,9 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
 
               {/* Role */}
               <div>
-                <label className="block text-sm font-medium mb-1">Role</label>
+                <label htmlFor="agent-role" className="block text-sm font-medium mb-1">Role</label>
                 <input
+                  id="agent-role"
                   type="text"
                   value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value })}
@@ -179,8 +198,9 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label htmlFor="agent-description" className="block text-sm font-medium mb-1">Description</label>
                 <textarea
+                  id="agent-description"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={2}
@@ -191,8 +211,9 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
 
               {/* Status */}
               <div>
-                <label className="block text-sm font-medium mb-1">Status</label>
+                <label htmlFor="agent-status" className="block text-sm font-medium mb-1">Status</label>
                 <select
+                  id="agent-status"
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as AgentStatus })}
                   className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
@@ -216,15 +237,19 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                   Master Orchestrator (can coordinate other agents)
                 </label>
               </div>
+
+              {/* Runtime & dispatch */}
+              <RuntimeDispatchSection form={form} setForm={setForm} agentId={agent?.id} />
             </div>
           )}
 
           {activeTab === 'soul' && (
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label htmlFor="agent-soul-md" className="block text-sm font-medium mb-2">
                 SOUL.md - Agent Personality & Identity
               </label>
               <textarea
+                id="agent-soul-md"
                 value={form.soul_md}
                 onChange={(e) => setForm({ ...form, soul_md: e.target.value })}
                 rows={15}
@@ -236,10 +261,11 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
 
           {activeTab === 'user' && (
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label htmlFor="agent-user-md" className="block text-sm font-medium mb-2">
                 USER.md - Context About the Human
               </label>
               <textarea
+                id="agent-user-md"
                 value={form.user_md}
                 onChange={(e) => setForm({ ...form, user_md: e.target.value })}
                 rows={15}
@@ -251,10 +277,11 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
 
           {activeTab === 'agents' && (
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label htmlFor="agent-agents-md" className="block text-sm font-medium mb-2">
                 AGENTS.md - Team Awareness
               </label>
               <textarea
+                id="agent-agents-md"
                 value={form.agents_md}
                 onChange={(e) => setForm({ ...form, agents_md: e.target.value })}
                 rows={15}
@@ -288,7 +315,8 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
               Cancel
             </button>
             <button
-              onClick={handleSubmit}
+              type="submit"
+              form="agent-form"
               disabled={isSubmitting}
               className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
             >

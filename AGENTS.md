@@ -9,7 +9,7 @@ This repo is a Next.js Mission Control / OpenClaw kanban application. Treat it a
 - Use short-lived feature branches from `main`.
 - Keep `dev` aligned with `main` unless a specific release flow says otherwise.
 - Open a pull request for reviewable work; do not push directly to protected branches.
-- Link cross-repo governance work to `projects-ops` because GitHub Issues are disabled here.
+- Link cross-repo governance work to the appropriate GitHub issue or Project board; GitHub Issues are enabled for this repo and the root `OPEN_TASKS.md` is the local index.
 
 ## Local Safety
 

@@ -62,6 +62,18 @@ export const GITHUB_PROJECT_WORKSPACE_MAPPINGS: GitHubProjectWorkspaceMapping[] 
     github_project_url: 'https://github.com/users/iMelki/projects/14',
     github_project_auto_refresh: true,
   },
+  {
+    id: 'asimtop',
+    name: 'Asimtop',
+    slug: 'asimtop',
+    description: 'Asimtop cockpit mapped to GitHub Project #8.',
+    icon: 'A',
+    github_project_owner: 'iMelki',
+    github_project_number: 8,
+    github_project_title: 'Asimtop Trading Automation',
+    github_project_url: 'https://github.com/users/iMelki/projects/8',
+    github_project_auto_refresh: false,
+  },
 ];
 
 interface WorkspaceProjectRow {
@@ -138,7 +150,10 @@ export interface GitHubProjectWorkspaceSyncResult {
   project_number: number;
   project_title: string;
   dry_run: boolean;
+  selection: 'all' | 'targeted';
+  requested_issue_refs: string[];
   scanned_items: number;
+  selected_items: number;
   imported: number;
   updated: number;
   moved: number;
@@ -153,6 +168,11 @@ export interface GitHubProjectWorkspaceSyncResult {
     task_id?: string;
     reason?: string;
   }>;
+}
+
+export interface GitHubProjectWorkspaceSyncOptions {
+  dryRun?: boolean;
+  issueRefs?: string[];
 }
 
 function getGitHubToken(): string | undefined {
@@ -369,6 +389,39 @@ function buildIssueRef(owner: string, repo: string, issueNumber: number): string
   return `${owner}/${repo}#${issueNumber}`;
 }
 
+function normalizeRequestedIssueRefs(values: string[] | undefined): string[] | undefined {
+  if (values === undefined) {
+    return undefined;
+  }
+
+  const normalized = [...new Set(values.flatMap((value) => {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }))];
+  if (normalized.length === 0) {
+    throw new Error('Targeted GitHub Project sync requires at least one issue ref.');
+  }
+  for (const value of normalized) {
+    if (!/^[^/#\s]+\/[^/#\s]+#[1-9]\d*$/.test(value)) {
+      throw new Error(`Invalid targeted GitHub issue ref '${value}'. Expected owner/repo#number.`);
+    }
+  }
+  return normalized;
+}
+
+function getProjectItemIssueRef(item: GitHubProjectItemNode): string | undefined {
+  if (item.isArchived || item.content?.__typename !== 'Issue') {
+    return undefined;
+  }
+  const owner = item.content.repository?.owner?.login;
+  const repo = item.content.repository?.name;
+  const issueNumber = item.content.number;
+  if (!owner || !repo || !issueNumber) {
+    return undefined;
+  }
+  return buildIssueRef(owner, repo, issueNumber);
+}
+
 export type GitHubProjectStatusKind = 'ready' | 'review' | 'blocked' | 'done' | 'other';
 
 export interface GitHubProjectStatusReconciliation {
@@ -484,7 +537,7 @@ export function reconcileGitHubProjectStatus(input: {
 
 export async function syncGitHubProjectWorkspace(
   workspaceIdOrSlug: string,
-  options: { dryRun?: boolean } = {}
+  options: GitHubProjectWorkspaceSyncOptions = {}
 ): Promise<GitHubProjectWorkspaceSyncResult> {
   if (!getGitHubToken()) {
     throw new Error('Missing GH_GENERAL_TOKEN or GITHUB_TOKEN.');
@@ -500,6 +553,49 @@ export async function syncGitHubProjectWorkspace(
   }
 
   const project = await loadProjectItems(workspace.github_project_owner, workspace.github_project_number);
+  return syncLoadedGitHubProjectWorkspace(workspaceIdOrSlug, project, options);
+}
+
+export async function syncLoadedGitHubProjectWorkspace(
+  workspaceIdOrSlug: string,
+  project: Pick<ProjectItemsPage, 'title'> & { allItems: GitHubProjectItemNode[] },
+  options: GitHubProjectWorkspaceSyncOptions = {}
+): Promise<GitHubProjectWorkspaceSyncResult> {
+  const workspace = findWorkspaceProject(workspaceIdOrSlug);
+  if (!workspace) {
+    throw new Error(`Workspace '${workspaceIdOrSlug}' was not found.`);
+  }
+
+  if (!workspace.github_project_owner || !workspace.github_project_number) {
+    throw new Error(`Workspace '${workspace.slug}' is not linked to a GitHub Project.`);
+  }
+
+  const requestedIssueRefs = normalizeRequestedIssueRefs(options.issueRefs);
+  const requestedKeys = requestedIssueRefs
+    ? new Set(requestedIssueRefs.map((value) => value.toLowerCase()))
+    : undefined;
+  const matchingCounts = new Map<string, number>();
+  if (requestedKeys) {
+    for (const item of project.allItems) {
+      const issueRef = getProjectItemIssueRef(item)?.toLowerCase();
+      if (issueRef && requestedKeys.has(issueRef)) {
+        matchingCounts.set(issueRef, (matchingCounts.get(issueRef) ?? 0) + 1);
+      }
+    }
+    for (const issueRef of requestedIssueRefs ?? []) {
+      const count = matchingCounts.get(issueRef.toLowerCase()) ?? 0;
+      if (count !== 1) {
+        throw new Error(`Targeted GitHub issue ref '${issueRef}' must match exactly one active Project item; found ${count}.`);
+      }
+    }
+  }
+  const selectedItems = requestedKeys
+    ? project.allItems.filter((item) => {
+        const issueRef = getProjectItemIssueRef(item)?.toLowerCase();
+        return Boolean(issueRef && requestedKeys.has(issueRef));
+      })
+    : project.allItems;
+
   const result: GitHubProjectWorkspaceSyncResult = {
     workspace_id: workspace.id,
     workspace_slug: workspace.slug,
@@ -507,7 +603,10 @@ export async function syncGitHubProjectWorkspace(
     project_number: workspace.github_project_number,
     project_title: project.title,
     dry_run: Boolean(options.dryRun),
+    selection: requestedIssueRefs ? 'targeted' : 'all',
+    requested_issue_refs: requestedIssueRefs ?? [],
     scanned_items: project.allItems.length,
+    selected_items: selectedItems.length,
     imported: 0,
     updated: 0,
     moved: 0,
@@ -519,7 +618,7 @@ export async function syncGitHubProjectWorkspace(
     details: [],
   };
 
-  for (const item of project.allItems) {
+  for (const item of selectedItems) {
     if (item.isArchived || item.content?.__typename !== 'Issue') {
       result.skipped += 1;
       result.details.push({ action: 'skip', reason: item.isArchived ? 'archived project item' : 'not a GitHub issue' });

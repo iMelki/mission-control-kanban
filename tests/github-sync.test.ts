@@ -22,6 +22,12 @@ import {
   normalizeMckN8nSyncPayload,
   shouldNotifyMckN8nSyncAlert,
 } from '../src/lib/n8n-sync-status';
+import {
+  LOCAL_CONTROL_SURFACES,
+  mapGitHubDiagnosticsToHealth,
+  mapN8nSyncStatusToHealth,
+  mapOpenClawStatusToHealth,
+} from '../src/lib/local-control-panel';
 
 test('GitHub diagnostics treats missing tokens as blocked', () => {
   const payload = buildMissingTokenDiagnostics();
@@ -32,16 +38,59 @@ test('GitHub diagnostics treats missing tokens as blocked', () => {
   assert.equal(payload.project_read_available, false);
 });
 
+test('Local Control surface list keeps launch-only cards separate from MCK diagnostics', () => {
+  const surfaces = new Map(LOCAL_CONTROL_SURFACES.map((surface) => [surface.id, surface]));
+
+  assert.equal(surfaces.get('mck-assistants')?.href, '/workspace/assistants');
+  assert.equal(surfaces.get('managed-sync-route')?.displayUrl, '3021 / mck.host:3021');
+  assert.equal(surfaces.get('mission-control')?.href, 'http://127.0.0.1:3001');
+  assert.equal(surfaces.get('command-center')?.href, 'http://127.0.0.1:3088');
+  assert.equal(surfaces.get('memsys-console')?.href, 'http://127.0.0.1:5111');
+  assert.equal(surfaces.get('hermes-native')?.href, 'http://127.0.0.1:9119');
+  assert.equal(surfaces.get('n8n-local')?.href, 'http://127.0.0.1:5678');
+
+  for (const surface of LOCAL_CONTROL_SURFACES) {
+    assert.ok(!/start|stop|restart|kill|railway/i.test(`${surface.name} ${surface.description} ${surface.href}`));
+  }
+});
+
+test('Local Control health mapping degrades GitHub, OpenClaw, and n8n states safely', () => {
+  assert.deepEqual(mapGitHubDiagnosticsToHealth({ status: 'ok', viewer_login: 'iMelki' }), {
+    state: 'ok',
+    label: 'Ready',
+    detail: 'Authenticated as @iMelki',
+  });
+
+  assert.equal(mapGitHubDiagnosticsToHealth({ status: 'limited', message: 'Project reads failed' }).state, 'limited');
+  assert.equal(mapGitHubDiagnosticsToHealth({ status: 'missing_token', message: 'Missing token' }).state, 'attention');
+
+  assert.deepEqual(mapOpenClawStatusToHealth({ connected: true, sessions_count: 2 }), {
+    state: 'ok',
+    label: 'Connected',
+    detail: '2 sessions visible',
+  });
+  assert.equal(mapOpenClawStatusToHealth({ connected: true, error: 'List failed' }).state, 'limited');
+  assert.equal(mapOpenClawStatusToHealth({ connected: false, error: 'Gateway down' }).state, 'attention');
+
+  assert.equal(mapN8nSyncStatusToHealth({ latest: null }).state, 'unknown');
+  assert.equal(mapN8nSyncStatusToHealth({ latest: { ok: true, alert_level: 'ok', summary: { updated: 4, errors: 0 } } }).state, 'ok');
+  assert.equal(mapN8nSyncStatusToHealth({ latest: { ok: true, alert_level: 'warning', summary: { updated: 4 } } }).state, 'limited');
+  assert.equal(mapN8nSyncStatusToHealth({ latest: { ok: false, alert_level: 'error', summary: { updated: 4, errors: 1 } } }).state, 'attention');
+});
+
 test('GitHub Project workspace mappings cover the operator boards without duplicating source of truth', () => {
   const mappings = new Map(GITHUB_PROJECT_WORKSPACE_MAPPINGS.map((mapping) => [mapping.slug, mapping]));
 
   assert.equal(mappings.get('assistants')?.github_project_number, 13);
   assert.equal(mappings.get('memsys')?.github_project_number, 12);
   assert.equal(mappings.get('content-factory')?.github_project_number, 14);
+  assert.equal(mappings.get('asimtop')?.github_project_number, 8);
+  assert.equal(mappings.get('asimtop')?.github_project_title, 'Asimtop Trading Automation');
+  assert.equal(mappings.get('asimtop')?.github_project_auto_refresh, false);
 
   for (const mapping of GITHUB_PROJECT_WORKSPACE_MAPPINGS) {
     assert.equal(mapping.github_project_owner, 'iMelki');
-    assert.equal(mapping.github_project_auto_refresh, true);
+    assert.equal(mapping.github_project_auto_refresh, mapping.slug === 'asimtop' ? false : true);
     assert.match(mapping.description, /mapped to GitHub Project/i);
   }
 });
@@ -90,7 +139,7 @@ test('MCK n8n sync payload normalization records alert state and run scope', () 
       dryRun: false,
       receivedAt: '2026-06-10T07:00:00.000Z',
       mode: 'local-mck-sync',
-      baseUrl: 'http://mck.host:3002',
+      baseUrl: 'http://mck.host:3021',
       workspaces: ['assistants', 'memsys'],
       summary: {
         scanned_items: 90,

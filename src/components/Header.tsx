@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Zap, Settings, ChevronLeft, LayoutGrid } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
+import { RuntimeHealthBadges } from '@/components/RuntimeHealthBadges';
 import type { Workspace } from '@/lib/types';
 
 interface HeaderProps {
@@ -88,7 +89,8 @@ export function Header({ workspace }: HeaderProps) {
 
       {/* Center: Stats - only show in workspace view */}
       {workspace && (
-        <div className="flex items-center gap-8">
+        <div className="hidden xl:flex items-center gap-4">
+          <RuntimeHealthBadges />
           <div className="text-center">
             <div className="text-2xl font-bold text-mc-accent-cyan">{activeAgents}</div>
             <div className="text-xs text-mc-text-secondary uppercase">Agents Active</div>
@@ -102,7 +104,7 @@ export function Header({ workspace }: HeaderProps) {
 
       {/* Right: Time & Status */}
       <div className="flex items-center gap-4">
-        <span className="text-mc-text-secondary text-sm font-mono">
+        <span className="text-mc-text-secondary text-sm font-mono" suppressHydrationWarning>
           {format(currentTime, 'HH:mm:ss')}
         </span>
         <div
@@ -120,6 +122,7 @@ export function Header({ workspace }: HeaderProps) {
           {isOnline ? 'ONLINE' : 'OFFLINE'}
         </div>
         <button
+              type="button"
           onClick={() => router.push('/settings')}
           className="p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary"
           title="Settings"

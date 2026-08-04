@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, AlertTriangle } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
 import { DeliverablesList } from './DeliverablesList';
@@ -9,6 +9,13 @@ import { SessionsList } from './SessionsList';
 import { PlanningTab } from './PlanningTab';
 import { AgentModal } from './AgentModal';
 import { GitHubWritebackPanel } from './GitHubWritebackPanel';
+import { DispatchTimeline } from './DispatchTimeline';
+import { TaskDependenciesPanel } from './TaskDependenciesPanel';
+import { RuntimeActionsPanel } from './task-modal/RuntimeActionsPanel';
+import { GitHubIssueDraftPanel } from './task-modal/GitHubIssueDraftPanel';
+import { DispatchContractSection } from './task-modal/DispatchContractSection';
+import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
+import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
 import {
   READINESS_LABELS,
   REVIEW_MODE_LABELS,
@@ -79,6 +86,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   const [activeTab, setActiveTab] = useState<TabType>(initialTask?.status === 'planning' ? 'planning' : 'overview');
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
+  const [isPreviewingDispatch, setIsPreviewingDispatch] = useState(false);
 
   useEffect(() => {
     setCurrentTask(initialTask);
@@ -112,6 +122,74 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
       : 'border-rose-500/25 bg-rose-500/10 text-rose-100';
   const fieldIdPrefix = currentTask?.id ? `task-modal-${currentTask.id}` : 'task-modal-new';
   const inputId = (name: string) => `${fieldIdPrefix}-${name}`;
+  const assignedAgent = agents.find((candidate) => candidate.id === form.assigned_agent_id) || currentTask?.assigned_agent || null;
+  const assignedRuntime = resolveAgentRuntime(assignedAgent);
+  const canCopyHandoff = Boolean(currentTask?.id && assignedAgent);
+
+  const handleCopyHandoffPrompt = async () => {
+    if (!currentTask || !assignedAgent) return;
+
+    const prompt = buildManualHandoffPrompt({
+      task: {
+        ...currentTask,
+        title: form.title,
+        description: form.description,
+        priority: form.priority,
+        due_date: form.due_date || undefined,
+        dispatch_metadata: {
+          source_issue_url: form.dispatch_source_issue_url,
+          target_repo: form.dispatch_target_repo,
+          project_workstream: form.dispatch_project_workstream,
+          allowed_file_scope: splitLines(form.dispatch_allowed_file_scope),
+          acceptance_criteria: splitLines(form.dispatch_acceptance_criteria),
+          test_requirements: splitLines(form.dispatch_test_requirements),
+          risk_level: form.dispatch_risk_level,
+          readiness: form.dispatch_readiness,
+          review_mode: form.dispatch_review_mode,
+          impact: form.dispatch_impact,
+          rollback_plan: form.dispatch_rollback_plan,
+          safety_rules: splitLines(form.dispatch_safety_rules),
+        },
+      },
+      agent: assignedAgent,
+      missionControlUrl: getMissionControlUrl(),
+      projectsPath: getProjectsPath(),
+    });
+
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setHandoffCopyState('copied');
+      window.setTimeout(() => setHandoffCopyState('idle'), 2000);
+    } catch (error) {
+      console.error('Failed to copy handoff prompt:', error);
+      setHandoffCopyState('error');
+    }
+  };
+
+  const handleDispatchDryRun = async () => {
+    if (!currentTask?.id) return;
+    setIsPreviewingDispatch(true);
+    try {
+      const response = await fetch(`/api/tasks/${currentTask.id}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: true }),
+      });
+      setDispatchDryRun(await response.json());
+    } finally {
+      setIsPreviewingDispatch(false);
+    }
+  };
+
+  const applyReadyForAgentChecklist = () => {
+    updateFormField('dispatch_readiness', 'ready_for_agent');
+    updateFormField('dispatch_review_mode', form.dispatch_review_mode === 'human_required' ? 'pair_review' : form.dispatch_review_mode);
+    if (!form.dispatch_acceptance_criteria.trim()) updateFormField('dispatch_acceptance_criteria', '- Operator can verify the requested behavior end-to-end');
+    if (!form.dispatch_test_requirements.trim()) updateFormField('dispatch_test_requirements', '- Run relevant automated tests\n- Capture browser smoke evidence when UI changes');
+    if (!form.dispatch_safety_rules.trim()) updateFormField('dispatch_safety_rules', '- Preserve unrelated dirty work\n- Stage and commit only scoped files');
+    if (!form.dispatch_rollback_plan.trim()) updateFormField('dispatch_rollback_plan', 'Revert the scoped commit or disable the feature flag/config path introduced by this task.');
+    if (!form.dispatch_impact.trim()) updateFormField('dispatch_impact', 'Scoped app/runtime behavior change; verify local UX and regression suite before merge.');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,8 +333,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-2 sm:items-center sm:p-4">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-lg sm:rounded-lg w-full max-w-5xl max-h-[96vh] sm:max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
           <h2 className="text-lg font-semibold">
@@ -273,7 +351,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
         {/* Tabs - only show for existing tasks */}
         {currentTask && (
-          <div className="flex border-b border-mc-border flex-shrink-0">
+          <div className="flex overflow-x-auto border-b border-mc-border flex-shrink-0">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -296,7 +374,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
         <div className="flex-1 overflow-y-auto p-4">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form id={`${fieldIdPrefix}-form`} onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div>
             <label htmlFor={inputId('title')} className="block text-sm font-medium mb-1">Title</label>
@@ -387,7 +465,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             {/* Status */}
             <div>
               <label htmlFor={inputId('status')} className="block text-sm font-medium mb-1">Status</label>
@@ -448,6 +526,27 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 ➕ Add new agent…
               </option>
             </select>
+            {assignedAgent && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-mc-border bg-mc-bg-secondary px-3 py-2 text-xs">
+                <span className="font-medium text-mc-text">Runtime: {assignedRuntime.label}</span>
+                {assignedRuntime.reason && (
+                  <details className="text-mc-text-secondary">
+                    <summary className="cursor-pointer text-amber-100">Why dispatch is disabled / manual</summary>
+                    <p className="mt-1 max-w-xl">{assignedRuntime.reason}. Assignment still tracks ownership; use Copy handoff unless this agent is configured for OpenClaw/webhook dispatch and auto-dispatch is enabled.</p>
+                  </details>
+                )}
+                <button
+                  type="button"
+                  onClick={handleCopyHandoffPrompt}
+                  disabled={!canCopyHandoff}
+                  className="ml-auto inline-flex items-center gap-1 rounded border border-mc-border px-2 py-1 text-xs text-mc-text hover:bg-mc-bg-tertiary disabled:opacity-50"
+                  title={currentTask ? 'Copy a handoff prompt for this task' : 'Save the task before copying a handoff prompt'}
+                >
+                  {handoffCopyState === 'copied' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {handoffCopyState === 'copied' ? 'Copied' : handoffCopyState === 'error' ? 'Copy failed' : 'Copy handoff'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Due Date */}
@@ -463,203 +562,29 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           </div>
 
           <div className="pt-2 border-t border-mc-border space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold">Dispatch Contract</h3>
-              <p className="text-xs text-mc-text-secondary mt-1">
-                These fields mirror the GitHub-native readiness contract used to decide whether auto-dispatch is safe.
-              </p>
-              {currentTask?.status === 'inbox' && currentTask.dispatch_blockers && currentTask.dispatch_blockers.length > 0 && (
-                <p className="text-xs text-amber-200 mt-2">
-                  Why this task is still in Inbox: it is missing one or more required dispatch fields. Fill the scope,
-                  acceptance criteria, tests, review mode, impact, and rollback plan here, then save before moving it forward.
-                </p>
-              )}
-            </div>
+            <DispatchContractSection
+              form={form}
+              updateFormField={updateFormField}
+              inputId={inputId}
+              currentTask={currentTask}
+              dispatchPreview={dispatchPreview}
+              dispatchSummaryClass={dispatchSummaryClass}
+              readinessOptions={readinessOptions}
+              reviewModeOptions={reviewModeOptions}
+              riskOptions={riskOptions}
+            />
 
-            <div className={`rounded-lg border px-3 py-3 ${dispatchSummaryClass}`}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">{dispatchPreview.headline}</p>
-                  <p className="mt-1 text-xs opacity-90">
-                    Readiness: {dispatchPreview.readinessLabel}
-                    {dispatchPreview.reviewModeLabel ? ` · Review: ${dispatchPreview.reviewModeLabel}` : ''}
-                    {dispatchPreview.riskLevelLabel ? ` · Risk: ${dispatchPreview.riskLevelLabel}` : ''}
-                  </p>
-                </div>
-                {dispatchPreview.state !== 'ready' && (
-                  <span className="text-[11px] font-medium uppercase tracking-wide opacity-90">
-                    Save after filling the missing contract fields
-                  </span>
-                )}
-              </div>
+            <RuntimeActionsPanel
+              onApplyReadyChecklist={applyReadyForAgentChecklist}
+              onDispatchDryRun={handleDispatchDryRun}
+              isPreviewingDispatch={isPreviewingDispatch}
+              dispatchDryRun={dispatchDryRun}
+              disabled={!currentTask}
+            />
 
-              {dispatchPreview.blockers.length > 0 && (
-                <ul className="mt-3 space-y-1 text-xs list-disc list-inside">
-                  {dispatchPreview.blockers.slice(0, 4).map((blocker) => (
-                    <li key={blocker}>{blocker}</li>
-                  ))}
-                </ul>
-              )}
+            {currentTask && <GitHubIssueDraftPanel taskId={currentTask.id} fallbackTitle={form.title} />}
 
-              {dispatchPreview.warnings.length > 0 && (
-                <ul className="mt-2 space-y-1 text-xs list-disc list-inside opacity-90">
-                  {dispatchPreview.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor={inputId('source-issue-url')} className="block text-sm font-medium mb-1">Source Issue URL</label>
-              <input
-                id={inputId('source-issue-url')}
-                type="url"
-                value={form.dispatch_source_issue_url}
-                onChange={(e) => updateFormField('dispatch_source_issue_url', e.target.value)}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                placeholder="https://github.com/owner/repo/issues/123"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor={inputId('target-repo')} className="block text-sm font-medium mb-1">Target Repo</label>
-                <input
-                  id={inputId('target-repo')}
-                  type="text"
-                  value={form.dispatch_target_repo}
-                  onChange={(e) => updateFormField('dispatch_target_repo', e.target.value)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                  placeholder="iMelki/mission-control"
-                />
-              </div>
-              <div>
-                <label htmlFor={inputId('project-workstream')} className="block text-sm font-medium mb-1">Project / Workstream</label>
-                <input
-                  id={inputId('project-workstream')}
-                  type="text"
-                  value={form.dispatch_project_workstream}
-                  onChange={(e) => updateFormField('dispatch_project_workstream', e.target.value)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                  placeholder="projects-ops rollout"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label htmlFor={inputId('readiness')} className="block text-sm font-medium mb-1">Readiness</label>
-                <select
-                  id={inputId('readiness')}
-                  value={form.dispatch_readiness}
-                  onChange={(e) => updateFormField('dispatch_readiness', e.target.value as DispatchReadiness)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  {readinessOptions.map((value) => (
-                    <option key={value} value={value}>{READINESS_LABELS[value]}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor={inputId('review-mode')} className="block text-sm font-medium mb-1">Review Mode</label>
-                <select
-                  id={inputId('review-mode')}
-                  value={form.dispatch_review_mode}
-                  onChange={(e) => updateFormField('dispatch_review_mode', e.target.value as DispatchReviewMode)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  {reviewModeOptions.map((value) => (
-                    <option key={value} value={value}>{REVIEW_MODE_LABELS[value]}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor={inputId('risk-level')} className="block text-sm font-medium mb-1">Risk Level</label>
-                <select
-                  id={inputId('risk-level')}
-                  value={form.dispatch_risk_level}
-                  onChange={(e) => updateFormField('dispatch_risk_level', e.target.value as DispatchRiskLevel)}
-                  className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                >
-                  {riskOptions.map((value) => (
-                    <option key={value} value={value}>{RISK_LEVEL_LABELS[value]}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor={inputId('impact')} className="block text-sm font-medium mb-1">Impact</label>
-              <input
-                id={inputId('impact')}
-                type="text"
-                value={form.dispatch_impact}
-                onChange={(e) => updateFormField('dispatch_impact', e.target.value)}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
-                placeholder="Docs only / code / infra / security"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('allowed-file-scope')} className="block text-sm font-medium mb-1">Allowed File Scope</label>
-              <textarea
-                id={inputId('allowed-file-scope')}
-                value={form.dispatch_allowed_file_scope}
-                onChange={(e) => updateFormField('dispatch_allowed_file_scope', e.target.value)}
-                rows={3}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="One file or path per line"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('acceptance-criteria')} className="block text-sm font-medium mb-1">Acceptance Criteria</label>
-              <textarea
-                id={inputId('acceptance-criteria')}
-                value={form.dispatch_acceptance_criteria}
-                onChange={(e) => updateFormField('dispatch_acceptance_criteria', e.target.value)}
-                rows={3}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="One acceptance criterion per line"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('test-requirements')} className="block text-sm font-medium mb-1">Test Requirements</label>
-              <textarea
-                id={inputId('test-requirements')}
-                value={form.dispatch_test_requirements}
-                onChange={(e) => updateFormField('dispatch_test_requirements', e.target.value)}
-                rows={3}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="One verification command or expected test per line"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('safety-rules')} className="block text-sm font-medium mb-1">Safety Rules</label>
-              <textarea
-                id={inputId('safety-rules')}
-                value={form.dispatch_safety_rules}
-                onChange={(e) => updateFormField('dispatch_safety_rules', e.target.value)}
-                rows={2}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="One guardrail per line"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={inputId('rollback-plan')} className="block text-sm font-medium mb-1">Rollback / Fallback Plan</label>
-              <textarea
-                id={inputId('rollback-plan')}
-                value={form.dispatch_rollback_plan}
-                onChange={(e) => updateFormField('dispatch_rollback_plan', e.target.value)}
-                rows={3}
-                className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent resize-none"
-                placeholder="How to contain or revert the change if dispatch goes wrong"
-              />
-            </div>
+            {currentTask && <TaskDependenciesPanel task={currentTask} />}
 
             {currentTask?.github_source && (
               <GitHubWritebackPanel
@@ -671,6 +596,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 }}
               />
             )}
+
+            {currentTask && <DispatchTimeline taskId={currentTask.id} />}
           </div>
             </form>
           )}
@@ -704,7 +631,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
 
         {/* Footer - only show on overview tab */}
         {activeTab === 'overview' && (
-          <div className="flex items-center justify-between p-4 border-t border-mc-border flex-shrink-0">
+          <div className="flex flex-col gap-3 p-4 border-t border-mc-border flex-shrink-0 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2">
               {currentTask && (
                 <>
@@ -728,8 +655,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={handleSubmit}
+                type="submit"
+                form={`${fieldIdPrefix}-form`}
                 disabled={isSubmitting}
                 className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
               >

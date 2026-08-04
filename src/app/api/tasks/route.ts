@@ -10,10 +10,15 @@ import {
 } from '@/lib/dispatch-contract';
 import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import type { Task, CreateTaskRequest, Agent } from '@/lib/types';
+import { normalizeAgentRuntimeType, normalizeDispatchEnabled } from '@/lib/agent-runtimes';
+import { listTaskDependenciesForTasks } from '@/lib/task-dependencies';
 
 type TaskRow = Task & {
   assigned_agent_name?: string;
   assigned_agent_emoji?: string;
+  assigned_agent_runtime_type?: string | null;
+  assigned_agent_runtime_config?: string | null;
+  assigned_agent_dispatch_enabled?: boolean | number | null;
   created_by_agent_name?: string;
   dispatch_metadata?: string | null;
   source_repo_owner?: string | null;
@@ -54,6 +59,9 @@ function decorateTask(task: TaskRow) {
           id: task.assigned_agent_id,
           name: task.assigned_agent_name,
           avatar_emoji: task.assigned_agent_emoji,
+          runtime_type: normalizeAgentRuntimeType(task.assigned_agent_runtime_type),
+          runtime_config: task.assigned_agent_runtime_config,
+          dispatch_enabled: normalizeDispatchEnabled(task.assigned_agent_dispatch_enabled),
         }
       : undefined,
   };
@@ -73,6 +81,9 @@ export async function GET(request: NextRequest) {
         t.*,
         aa.name as assigned_agent_name,
         aa.avatar_emoji as assigned_agent_emoji,
+        aa.runtime_type as assigned_agent_runtime_type,
+        aa.runtime_config as assigned_agent_runtime_config,
+        aa.dispatch_enabled as assigned_agent_dispatch_enabled,
         ca.name as created_by_agent_name
       FROM tasks t
       LEFT JOIN agents aa ON t.assigned_agent_id = aa.id
@@ -83,7 +94,10 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       // Support comma-separated status values (e.g., status=inbox,testing,in_progress)
-      const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+      const statuses = status.split(',').flatMap((s) => {
+        const trimmed = s.trim();
+        return trimmed ? [trimmed] : [];
+      });
       if (statuses.length === 1) {
         sql += ' AND t.status = ?';
         params.push(statuses[0]);
@@ -108,7 +122,12 @@ export async function GET(request: NextRequest) {
     sql += ' ORDER BY t.created_at DESC';
 
     const tasks = queryAll<TaskRow>(sql, params);
-    return NextResponse.json(tasks.map(decorateTask));
+    const dependencies = listTaskDependenciesForTasks(tasks.map((task) => task.id));
+    return NextResponse.json(tasks.map((task) => {
+      const decorated = decorateTask(task);
+      const taskDependencies = dependencies.get(task.id);
+      return taskDependencies ? { ...decorated, ...taskDependencies } : decorated;
+    }));
   } catch (error) {
     console.error('Failed to fetch tasks:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
@@ -215,6 +234,9 @@ export async function POST(request: NextRequest) {
       `SELECT t.*,
         aa.name as assigned_agent_name,
         aa.avatar_emoji as assigned_agent_emoji,
+        aa.runtime_type as assigned_agent_runtime_type,
+        aa.runtime_config as assigned_agent_runtime_config,
+        aa.dispatch_enabled as assigned_agent_dispatch_enabled,
         ca.name as created_by_agent_name,
         ca.avatar_emoji as created_by_agent_emoji
        FROM tasks t

@@ -12,7 +12,7 @@ import type { SSEEvent, Task } from '@/lib/types';
 
 export function useSSE() {
   const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const {
     updateTask,
     addTask,
@@ -20,6 +20,11 @@ export function useSSE() {
     selectedTask,
     setSelectedTask,
   } = useMissionControl();
+  const selectedTaskRef = useRef(selectedTask);
+
+  useEffect(() => {
+    selectedTaskRef.current = selectedTask;
+  }, [selectedTask]);
 
   useEffect(() => {
     let isConnecting = false;
@@ -71,7 +76,7 @@ export function useSSE() {
               updateTask(incomingTask);
 
               // Update selected task if viewing this task (for modal)
-              if (selectedTask?.id === incomingTask.id) {
+              if (selectedTaskRef.current?.id === incomingTask.id) {
                 debug.sse('Also updating selectedTask for modal');
                 setSelectedTask(incomingTask);
               }
@@ -126,14 +131,15 @@ export function useSSE() {
 
     // Cleanup on unmount
     return () => {
-      if (eventSourceRef.current) {
+      const eventSource = eventSourceRef.current;
+      if (eventSource) {
         debug.sse('Disconnecting...');
-        eventSourceRef.current.close();
+        eventSource.close();
         eventSourceRef.current = null;
       }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [addTask, updateTask, setIsOnline, selectedTask, setSelectedTask]);
+  }, [addTask, updateTask, setIsOnline, setSelectedTask]);
 }

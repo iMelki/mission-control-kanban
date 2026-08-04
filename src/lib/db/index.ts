@@ -1,18 +1,30 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import type { Database as SqliteDatabase, RunResult } from 'better-sqlite3';
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { schema } from './schema';
 import { runMigrations } from './migrations';
 
-const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'mission-control.db');
+const require = createRequire(__filename);
+let db: SqliteDatabase | null = null;
 
-let db: Database.Database | null = null;
+type DatabaseConstructor = new (filename: string) => SqliteDatabase;
 
-export function getDb(): Database.Database {
+function getDbPath() {
+  return process.env.DATABASE_PATH || 'mission-control.db';
+}
+
+function loadDatabase(): DatabaseConstructor {
+  const required = require('better-sqlite3') as { default?: DatabaseConstructor } | DatabaseConstructor;
+  return typeof required === 'function' ? required : required.default as DatabaseConstructor;
+}
+
+export function getDb(): SqliteDatabase {
   if (!db) {
-    const isNewDb = !fs.existsSync(DB_PATH);
+    const dbPath = getDbPath();
+    const isNewDb = !existsSync(dbPath);
+    const Database = loadDatabase();
 
-    db = new Database(DB_PATH);
+    db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
 
@@ -24,7 +36,7 @@ export function getDb(): Database.Database {
     runMigrations(db);
 
     if (isNewDb) {
-      console.log('[DB] New database created at:', DB_PATH);
+      console.log('[DB] New database created at:', dbPath);
     }
   }
   return db;
@@ -48,7 +60,7 @@ export function queryOne<T>(sql: string, params: unknown[] = []): T | undefined 
   return stmt.get(...params) as T | undefined;
 }
 
-export function run(sql: string, params: unknown[] = []): Database.RunResult {
+export function run(sql: string, params: unknown[] = []): RunResult {
   const stmt = getDb().prepare(sql);
   return stmt.run(...params);
 }

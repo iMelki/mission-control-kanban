@@ -2,7 +2,7 @@
 
 **AI Agent Orchestration Dashboard**
 
-Mission Control is a task management system that lets you create tasks, plan them through an AI-guided Q&A process, and automatically dispatch them to AI agents for execution. Think of it as a project manager for AI workers.
+Mission Control is a task management system that lets you create tasks, plan them through an AI-guided Q&A process, and dispatch them to AI agents for execution. Runtime dispatch is adapter-based: manual agents get copyable handoff prompts, OpenClaw agents use the existing gateway/session path, and webhook agents receive canonical dispatch payloads with schema validation, attempt history, safe retry controls, HMAC signing support, runtime-health reporting, and workspace-level default runtime policy. Think of it as a project manager for AI workers.
 
 ![Version](https://img.shields.io/badge/Version-1.0.0-green) ![Next.js](https://img.shields.io/badge/Next.js-15-black) ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -11,6 +11,12 @@ Mission Control is a task management system that lets you create tasks, plan the
 > **Workspace operator note:** for the current local-first GitHub and OpenClaw
 > workflow in this workspace, start with
 > [docs/FIRST_RUN_OPERATOR_GUIDE.md](docs/FIRST_RUN_OPERATOR_GUIDE.md).
+
+> **Paperclip factory:** opt-in webhook dispatch v2 adds a pending-before-send
+> attempt, a live `origin/dev` base bound into the stable correlation/revision,
+> signed lifecycle and Mission Control callbacks, and a receipt-gated
+> completion path. The installable bridge and operator runbook are in
+> [docs/PAPERCLIP_FACTORY_BRIDGE.md](docs/PAPERCLIP_FACTORY_BRIDGE.md).
 
 ![Mission Control Screenshot](mission-control.png)
 
@@ -21,7 +27,7 @@ Mission Control is a task management system that lets you create tasks, plan the
 1. **Create Tasks** - Add tasks with a title and description
 2. **AI Planning** - An AI asks you clarifying questions to understand exactly what you need
 3. **Agent Creation** - Based on your answers, the AI creates a specialized agent for the job
-4. **Auto-Dispatch** - The task is automatically sent to the agent
+4. **Runtime-Aware Dispatch** - Manual agents get copyable handoff prompts, OpenClaw agents use the gateway adapter, and webhook agents receive canonical callback-ready payloads
 5. **Execution** - The agent works on your task (browses web, writes code, creates files, etc.)
 6. **Delivery** - Completed work is delivered back to Mission Control
 
@@ -36,7 +42,7 @@ Mission Control is a task management system that lets you create tasks, plan the
 │  ┌─────────────────┐         ┌─────────────────────────────┐   │
 │  │ Mission Control │ ◄─────► │     OpenClaw Gateway        │   │
 │  │   (Next.js)     │   WS    │  (AI Agent Runtime)         │   │
-│  │   Port 3002     │         │  Port 28789                 │   │
+│  │   Port 3021     │         │  Port 28789                 │   │
 │  └─────────────────┘         └─────────────────────────────┘   │
 │         │                              │                        │
 │         ▼                              ▼                        │
@@ -114,7 +120,17 @@ OPENCLAW_GATEWAY_URL=ws://127.0.0.1:28789
 OPENCLAW_GATEWAY_TOKEN=your-openclaw-token-here
 
 # Workspace default port for Mission Control Kanban
-PORT=3002
+PORT=3021
+
+# Required for webhook auto-dispatch (store env-var names in agent config, never raw secrets)
+MCK_WEBHOOK_SIGNATURE_SECRET=replace-with-outbound-hmac-secret
+MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET=replace-with-inbound-callback-hmac-secret
+
+# Dispatch attempt retention defaults
+MCK_DISPATCH_RETENTION_SUCCEEDED_DAYS=30
+MCK_DISPATCH_RETENTION_FAILED_DAYS=90
+MCK_DISPATCH_RETENTION_MANUAL_DAYS=30
+MCK_DISPATCH_RETENTION_BATCH_SIZE=500
 ```
 
 **How to get these values:**
@@ -149,12 +165,12 @@ npm run dev
 You should see:
 ```
 ▲ Next.js 15.x.x
-- Local: http://localhost:3002
+- Local: http://localhost:3021
 ```
 
 ### Step 6: Open in Browser
 
-Go to: **http://localhost:3002**
+Go to: **http://localhost:3021**
 
 🎉 You should see the Mission Control dashboard!
 
@@ -178,7 +194,10 @@ Go to: **http://localhost:3002**
    - Who's the audience?
    - Any constraints?
 4. Answer each question by selecting an option or typing your own
-5. When planning is complete, an agent is automatically created and assigned
+5. When planning is complete, an agent is automatically created and assigned.
+   If the agent is OpenClaw-backed, MCK can dispatch through OpenClaw. For
+   other runtimes, use the manual handoff flow in
+   [docs/MULTI_AGENT_RUNTIMES.md](docs/MULTI_AGENT_RUNTIMES.md).
 
 ### Watching Your Agent Work
 
@@ -205,7 +224,7 @@ You can drag tasks between columns manually, or let the system auto-advance them
 |----------|----------|---------|-------------|
 | `OPENCLAW_GATEWAY_URL` | Yes | `ws://127.0.0.1:28789` | WebSocket URL to OpenClaw Gateway |
 | `OPENCLAW_GATEWAY_TOKEN` | Yes | - | Authentication token for OpenClaw |
-| `PORT` | No | `3002` | Port for Mission Control Kanban web server in this workspace |
+| `PORT` | No | `3021` | Port for Mission Control Kanban web server in this workspace |
 
 ### OpenClaw Configuration
 
@@ -311,6 +330,15 @@ SELECT * FROM tasks;
 
 ---
 
+## Security
+
+Secret handling and the staged/CI enforcement contract are documented in
+[`docs/SECRET_SCANNING_POLICY.md`](docs/SECRET_SCANNING_POLICY.md). The
+repository uses scanning-only enforcement and does not rely on Git clean/smudge
+filters or a plaintext repository-local secret store.
+
+---
+
 ## 🔧 Troubleshooting
 
 ### "Failed to connect to OpenClaw Gateway"
@@ -344,14 +372,14 @@ SELECT * FROM tasks;
 ### Port Already in Use
 
 ```bash
-# Find what's using port 3002
-lsof -i :3002
+# Find what's using port 3021
+lsof -i :3021
 
 # Kill it (replace PID with the actual number)
 kill -9 PID
 
 # Or use a different port
-PORT=3002 npm run dev
+PORT=3021 npm run dev
 ```
 
 ---

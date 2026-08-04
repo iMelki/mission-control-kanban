@@ -14,10 +14,10 @@ import type { TaskActivity } from '@/lib/types';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const taskId = params.id;
+    const { id: taskId } = await params;
     const db = getDb();
 
     // Get activities with agent info
@@ -49,6 +49,9 @@ export async function GET(
         role: '',
         status: 'working' as const,
         is_master: false,
+        runtime_type: 'manual' as const,
+        runtime_config: null,
+        dispatch_enabled: false,
         workspace_id: 'default',
         description: '',
         created_at: '',
@@ -72,10 +75,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const taskId = params.id;
+    const { id: taskId } = await params;
     const body = await request.json();
 
     const { activity_type, message, agent_id, metadata } = body;
@@ -130,6 +133,9 @@ export async function POST(
         role: '',
         status: 'working' as const,
         is_master: false,
+        runtime_type: 'manual' as const,
+        runtime_config: null,
+        dispatch_enabled: false,
         workspace_id: 'default',
         description: '',
         created_at: '',

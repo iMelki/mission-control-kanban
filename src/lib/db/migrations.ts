@@ -7,12 +7,12 @@
  * 3. Never runs the same migration twice
  */
 
-import Database from 'better-sqlite3';
+import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 interface Migration {
   id: string;
   name: string;
-  up: (db: Database.Database) => void;
+  up: (db: SqliteDatabase) => void;
 }
 
 // All migrations in order - NEVER remove or reorder existing migrations
@@ -392,13 +392,275 @@ const migrations: Migration[] = [
         'mck-sync-test-assistants'
       );
     }
-  }
+  },
+  {
+    id: '012',
+    name: 'add_asimtop_project_workspace',
+    up: (db) => {
+      console.log('[Migration 012] Adding Asimtop GitHub Project-backed workspace...');
+
+      db.prepare(`
+        INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        'asimtop',
+        'Asimtop',
+        'asimtop',
+        'Asimtop cockpit mapped to GitHub Project #8.',
+        'A'
+      );
+
+      db.prepare(`
+        UPDATE workspaces
+        SET name = ?,
+            description = ?,
+            icon = ?,
+            github_project_owner = ?,
+            github_project_number = ?,
+            github_project_title = ?,
+            github_project_url = ?,
+            github_project_auto_refresh = 0,
+            updated_at = datetime('now')
+        WHERE slug = ?
+      `).run(
+        'Asimtop',
+        'Asimtop cockpit mapped to GitHub Project #8.',
+        'A',
+        'iMelki',
+        8,
+        'Asimtop Trading Automation',
+        'https://github.com/users/iMelki/projects/8',
+        'asimtop'
+      );
+    }
+  },
+  {
+    id: '013',
+    name: 'add_agent_runtime_fields',
+    up: (db) => {
+      console.log('[Migration 013] Adding agent runtime dispatch fields...');
+
+      const agentsInfo = db.prepare("PRAGMA table_info(agents)").all() as { name: string }[];
+      const hasColumn = (name: string) => agentsInfo.some((col) => col.name === name);
+
+      if (!hasColumn('runtime_type')) {
+        db.exec(`ALTER TABLE agents ADD COLUMN runtime_type TEXT DEFAULT 'manual' CHECK (runtime_type IN ('manual', 'openclaw', 'webhook'))`);
+        console.log('[Migration 013] Added runtime_type');
+      }
+      if (!hasColumn('runtime_config')) {
+        db.exec('ALTER TABLE agents ADD COLUMN runtime_config TEXT');
+        console.log('[Migration 013] Added runtime_config');
+      }
+      if (!hasColumn('dispatch_enabled')) {
+        db.exec('ALTER TABLE agents ADD COLUMN dispatch_enabled INTEGER DEFAULT 0');
+        console.log('[Migration 013] Added dispatch_enabled');
+      }
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_agents_runtime_type ON agents(runtime_type)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_agents_dispatch_enabled ON agents(dispatch_enabled)');
+
+      // Preserve the pre-adapter behavior for existing rows: before this migration,
+      // all assigned auto-dispatch attempts were routed to OpenClaw.
+      db.exec(`
+        UPDATE agents
+        SET runtime_type = 'openclaw',
+            dispatch_enabled = 1
+        WHERE runtime_type IS NULL OR runtime_type = 'manual'
+      `);
+    }
+  },
+  {
+    id: '014',
+    name: 'add_task_dispatch_attempts',
+    up: (db) => {
+      console.log('[Migration 014] Adding task dispatch attempt timeline...');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_dispatch_attempts (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          agent_id TEXT REFERENCES agents(id),
+          runtime_type TEXT NOT NULL CHECK (runtime_type IN ('manual', 'openclaw', 'webhook')),
+          adapter_name TEXT,
+          status TEXT NOT NULL CHECK (status IN ('manual', 'success', 'failed', 'timeout', 'skipped', 'retrying')),
+          attempt_number INTEGER NOT NULL DEFAULT 1,
+          message TEXT NOT NULL,
+          http_status INTEGER,
+          webhook_url TEXT,
+          error_message TEXT,
+          request_payload TEXT,
+          response_body TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_task ON task_dispatch_attempts(task_id, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_status ON task_dispatch_attempts(status, created_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_runtime_status ON task_dispatch_attempts(runtime_type, status, created_at DESC)');
+    }
+  },
+  {
+    id: '015',
+    name: 'add_workspace_runtime_policy',
+    up: (db) => {
+      console.log('[Migration 015] Adding workspace default runtime policy...');
+      const workspacesInfo = db.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+      const hasColumn = (name: string) => workspacesInfo.some((col) => col.name === name);
+
+      if (!hasColumn('default_runtime_type')) {
+        db.exec(`ALTER TABLE workspaces ADD COLUMN default_runtime_type TEXT DEFAULT 'manual' CHECK (default_runtime_type IN ('manual', 'openclaw', 'webhook'))`);
+      }
+      if (!hasColumn('default_runtime_config')) {
+        db.exec('ALTER TABLE workspaces ADD COLUMN default_runtime_config TEXT');
+      }
+      if (!hasColumn('default_dispatch_enabled')) {
+        db.exec('ALTER TABLE workspaces ADD COLUMN default_dispatch_enabled INTEGER DEFAULT 0');
+      }
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_default_runtime ON workspaces(default_runtime_type, default_dispatch_enabled)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_runtime_status ON task_dispatch_attempts(runtime_type, status, created_at DESC)');
+    }
+  },
+
+  {
+    id: '016',
+    name: 'add_webhook_callback_delivery_and_runtime_maintenance',
+    up: (db) => {
+      console.log('[Migration 016] Adding webhook callback replay and runtime maintenance tables...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS webhook_callback_deliveries (
+          id TEXT PRIMARY KEY,
+          delivery_id TEXT NOT NULL UNIQUE,
+          task_id TEXT,
+          attempt_id TEXT,
+          event_type TEXT NOT NULL DEFAULT 'unknown',
+          status TEXT NOT NULL CHECK (status IN ('accepted', 'duplicate', 'rejected', 'schema_invalid', 'signature_invalid')),
+          reason TEXT,
+          expires_at TEXT NOT NULL,
+          received_at TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_webhook_callback_deliveries_received ON webhook_callback_deliveries(received_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_webhook_callback_deliveries_expires ON webhook_callback_deliveries(expires_at);
+
+        CREATE TABLE IF NOT EXISTS runtime_maintenance_runs (
+          id TEXT PRIMARY KEY,
+          run_type TEXT NOT NULL,
+          dry_run INTEGER NOT NULL DEFAULT 1,
+          status TEXT NOT NULL CHECK (status IN ('success', 'failed')),
+          deleted_count INTEGER DEFAULT 0,
+          summary TEXT,
+          error_message TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_runtime_maintenance_runs_type ON runtime_maintenance_runs(run_type, created_at DESC);
+      `);
+    }
+  },
+  {
+    id: '017',
+    name: 'add_task_dependencies',
+    up: (db) => {
+      console.log('[Migration 017] Adding task dependency blocked-by edges...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_dependencies (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          blocked_by_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          note TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(task_id, blocked_by_task_id),
+          CHECK(task_id <> blocked_by_task_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_task_dependencies_task ON task_dependencies(task_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_task_dependencies_blocker ON task_dependencies(blocked_by_task_id, created_at DESC);
+      `);
+    }
+  },
+  {
+    id: '018',
+    name: 'add_factory_dispatch_lifecycle',
+    up: (db) => {
+      console.log('[Migration 018] Adding factory dispatch identities and lifecycle receipts...');
+      const dispatchColumns = db.prepare("PRAGMA table_info(task_dispatch_attempts)").all() as { name: string }[];
+      const hasDispatchColumn = (name: string) => dispatchColumns.some((column) => column.name === name);
+      const dispatchAdditions: Array<[string, string]> = [
+        ['delivery_id', 'ALTER TABLE task_dispatch_attempts ADD COLUMN delivery_id TEXT'],
+        ['correlation_id', 'ALTER TABLE task_dispatch_attempts ADD COLUMN correlation_id TEXT'],
+        ['task_revision', 'ALTER TABLE task_dispatch_attempts ADD COLUMN task_revision TEXT'],
+        ['payload_hash', 'ALTER TABLE task_dispatch_attempts ADD COLUMN payload_hash TEXT'],
+        ['lifecycle_status', 'ALTER TABLE task_dispatch_attempts ADD COLUMN lifecycle_status TEXT'],
+        ['receipt_id', 'ALTER TABLE task_dispatch_attempts ADD COLUMN receipt_id TEXT'],
+        ['receipt_json', 'ALTER TABLE task_dispatch_attempts ADD COLUMN receipt_json TEXT'],
+        ['updated_at', 'ALTER TABLE task_dispatch_attempts ADD COLUMN updated_at TEXT'],
+      ];
+      for (const [name, sql] of dispatchAdditions) {
+        if (!hasDispatchColumn(name)) db.exec(sql);
+      }
+
+      const deliveryColumns = db.prepare("PRAGMA table_info(webhook_callback_deliveries)").all() as { name: string }[];
+      if (!deliveryColumns.some((column) => column.name === 'payload_hash')) {
+        db.exec('ALTER TABLE webhook_callback_deliveries ADD COLUMN payload_hash TEXT');
+      }
+
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatch_attempts_delivery
+          ON task_dispatch_attempts(delivery_id)
+          WHERE delivery_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_correlation
+          ON task_dispatch_attempts(correlation_id, created_at DESC);
+      `);
+    }
+  },
+  {
+    id: '019',
+    name: 'add_webhook_callback_processing_state',
+    up: (db) => {
+      console.log('[Migration 019] Adding transactional webhook callback processing state...');
+      const table = db.prepare(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'webhook_callback_deliveries'"
+      ).get() as { sql?: string } | undefined;
+      if (table?.sql?.includes("'processing'")) return;
+
+      db.exec(`
+        ALTER TABLE webhook_callback_deliveries RENAME TO webhook_callback_deliveries_legacy_019;
+        CREATE TABLE webhook_callback_deliveries (
+          id TEXT PRIMARY KEY,
+          delivery_id TEXT NOT NULL UNIQUE,
+          task_id TEXT,
+          attempt_id TEXT,
+          event_type TEXT NOT NULL DEFAULT 'unknown',
+          status TEXT NOT NULL CHECK (
+            status IN ('processing', 'accepted', 'duplicate', 'rejected', 'schema_invalid', 'signature_invalid')
+          ),
+          payload_hash TEXT,
+          reason TEXT,
+          expires_at TEXT NOT NULL,
+          received_at TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO webhook_callback_deliveries (
+          id, delivery_id, task_id, attempt_id, event_type, status,
+          payload_hash, reason, expires_at, received_at, created_at
+        )
+        SELECT
+          id, delivery_id, task_id, attempt_id, event_type, status,
+          payload_hash, reason, expires_at, received_at, created_at
+        FROM webhook_callback_deliveries_legacy_019;
+        DROP TABLE webhook_callback_deliveries_legacy_019;
+        CREATE INDEX idx_webhook_callback_deliveries_received
+          ON webhook_callback_deliveries(received_at DESC);
+        CREATE INDEX idx_webhook_callback_deliveries_expires
+          ON webhook_callback_deliveries(expires_at);
+      `);
+    }
+  },
 ];
 
 /**
  * Run all pending migrations
  */
-export function runMigrations(db: Database.Database): void {
+export function runMigrations(db: SqliteDatabase): void {
   // Create migrations tracking table
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -439,8 +701,9 @@ export function runMigrations(db: Database.Database): void {
 /**
  * Get migration status
  */
-export function getMigrationStatus(db: Database.Database): { applied: string[]; pending: string[] } {
+export function getMigrationStatus(db: SqliteDatabase): { applied: string[]; pending: string[] } {
   const applied = (db.prepare('SELECT id FROM _migrations ORDER BY id').all() as { id: string }[]).map(m => m.id);
-  const pending = migrations.filter(m => !applied.includes(m.id)).map(m => m.id);
+  const appliedIds = new Set(applied);
+  const pending = migrations.flatMap((m) => appliedIds.has(m.id) ? [] : [m.id]);
   return { applied, pending };
 }

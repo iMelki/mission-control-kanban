@@ -9,6 +9,19 @@ import type {
 
 export type AgentStatus = 'standby' | 'working' | 'offline';
 
+export type AgentRuntimeType = 'manual' | 'openclaw' | 'webhook';
+
+export interface AgentRuntimeConfig {
+  notes?: string;
+  url?: string;
+  webhook_url?: string;
+  bearer_token_env?: string;
+  signature_secret_env?: string;
+  dispatch_version?: 1 | 2 | '1' | '2';
+  headers?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 export type TaskStatus = 'planning' | 'inbox' | 'assigned' | 'in_progress' | 'testing' | 'review' | 'done';
 
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
@@ -25,7 +38,37 @@ export type EventType =
   | 'message_sent'
   | 'agent_status_changed'
   | 'agent_joined'
+  | 'task_dispatched'
+  | 'task_dispatch_failed'
+  | 'task_dispatch_retry'
   | 'system';
+
+export type DispatchAttemptStatus = 'manual' | 'success' | 'failed' | 'timeout' | 'skipped' | 'retrying';
+
+export interface TaskDispatchAttempt {
+  id: string;
+  task_id: string;
+  agent_id?: string | null;
+  runtime_type: AgentRuntimeType;
+  adapter_name?: string | null;
+  status: DispatchAttemptStatus;
+  attempt_number: number;
+  message: string;
+  http_status?: number | null;
+  webhook_url?: string | null;
+  error_message?: string | null;
+  request_payload?: string | null;
+  response_body?: string | null;
+  delivery_id?: string | null;
+  correlation_id?: string | null;
+  task_revision?: string | null;
+  payload_hash?: string | null;
+  lifecycle_status?: string | null;
+  receipt_id?: string | null;
+  receipt_json?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
 
 export interface Agent {
   id: string;
@@ -35,6 +78,9 @@ export interface Agent {
   avatar_emoji: string;
   status: AgentStatus;
   is_master: boolean;
+  runtime_type: AgentRuntimeType;
+  runtime_config?: AgentRuntimeConfig | string | null;
+  dispatch_enabled: boolean | number;
   workspace_id: string;
   soul_md?: string;
   user_md?: string;
@@ -49,6 +95,18 @@ export interface GitHubSourceIdentity {
   issue_number: number;
   issue_url: string;
   project_item_id?: string;
+}
+
+export interface TaskDependencySummary {
+  id: string;
+  task_id: string;
+  blocked_by_task_id: string;
+  note?: string | null;
+  created_at: string;
+  blocked_by_title?: string;
+  blocked_by_status?: TaskStatus;
+  blocking_title?: string;
+  blocking_status?: TaskStatus;
 }
 
 export interface Task {
@@ -68,6 +126,8 @@ export interface Task {
   dispatch_metadata?: DispatchMetadata;
   dispatch_ready?: boolean;
   dispatch_blockers?: string[];
+  blocked_by?: TaskDependencySummary[];
+  blocking?: TaskDependencySummary[];
   // Joined fields
   assigned_agent?: Agent;
   created_by_agent?: Agent;
@@ -117,6 +177,12 @@ export interface Business {
   created_at: string;
 }
 
+export interface WorkspaceRuntimePolicy {
+  default_runtime_type: AgentRuntimeType;
+  default_runtime_config?: AgentRuntimeConfig | string | null;
+  default_dispatch_enabled: boolean | number;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -128,6 +194,9 @@ export interface Workspace {
   github_project_title?: string | null;
   github_project_url?: string | null;
   github_project_auto_refresh?: boolean | number | null;
+  default_runtime_type?: AgentRuntimeType | string | null;
+  default_runtime_config?: AgentRuntimeConfig | string | null;
+  default_dispatch_enabled?: boolean | number | null;
   created_at: string;
   updated_at: string;
 }
@@ -143,6 +212,9 @@ export interface WorkspaceStats {
   github_project_title?: string | null;
   github_project_url?: string | null;
   github_project_auto_refresh?: boolean | number | null;
+  default_runtime_type?: AgentRuntimeType | string | null;
+  default_runtime_config?: AgentRuntimeConfig | string | null;
+  default_dispatch_enabled?: boolean | number | null;
   taskCounts: {
     planning: number;
     inbox: number;
@@ -309,12 +381,21 @@ export interface PlanningState {
 }
 
 // API request/response types
+export interface UpdateWorkspaceRuntimePolicyRequest {
+  default_runtime_type?: AgentRuntimeType;
+  default_runtime_config?: AgentRuntimeConfig | string | null;
+  default_dispatch_enabled?: boolean;
+}
+
 export interface CreateAgentRequest {
   name: string;
   role: string;
   description?: string;
   avatar_emoji?: string;
   is_master?: boolean;
+  runtime_type?: AgentRuntimeType;
+  runtime_config?: AgentRuntimeConfig | string | null;
+  dispatch_enabled?: boolean;
   soul_md?: string;
   user_md?: string;
   agents_md?: string;

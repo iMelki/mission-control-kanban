@@ -11,8 +11,9 @@ workspace is a local cockpit view of a GitHub Project, not a replacement board.
 | `assistants` | `iMelki` project `#13` | Cross-repo Assistants operator cockpit. |
 | `memsys` | `iMelki` project `#12` | Memory-system cockpit. |
 | `content-factory` | `iMelki` project `#14` | Content Factory cockpit. |
+| `asimtop` | `iMelki` project `#8` | Asimtop Trading Automation cockpit; starts with auto-refresh off and requires manual sync proof before scheduled sync. |
 
-The mappings are seeded by database migration `008` and are also declared in
+The initial mappings are seeded by database migration `008`; Asimtop is added by migration `012`. They are also declared in
 `src/lib/github-project-sync.ts` so tests can protect the expected project
 numbers.
 
@@ -23,6 +24,21 @@ When a project-backed workspace opens, MCK calls:
 ```http
 POST /api/workspaces/{workspaceId}/github-sync
 ```
+
+For a bounded import or refresh, pass exact GitHub issue refs. The server reads
+the full linked Project but mutates only refs that each match exactly one active
+Project item; missing or duplicate refs fail before any task write:
+
+```json
+{
+  "dry_run": true,
+  "issue_refs": ["iMelki/memsys#301"]
+}
+```
+
+Repeat the same body with `"dry_run": false` only after reviewing the targeted
+dry-run result. A targeted result reports `selection=targeted`, the requested
+refs, total `scanned_items`, and exact `selected_items`.
 
 The route reads the linked GitHub Project with the local GitHub token and:
 

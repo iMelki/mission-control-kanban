@@ -1,12 +1,20 @@
-# Agent Protocol
+# OpenClaw Agent Protocol
 
 This document describes how OpenClaw agents interact with Mission Control.
+
+> **Dispatch boundary:** this protocol is for OpenClaw-backed agents only. MCK
+> can track Hermes, Codex, Copilot, Claude Code, and other generic agents, but
+> the current `ASSIGNED` auto-dispatch path still calls OpenClaw. Do not rely on
+> `ASSIGNED` to launch a non-OpenClaw agent; use the manual handoff and callback
+> pattern in [MULTI_AGENT_RUNTIMES.md](MULTI_AGENT_RUNTIMES.md) until runtime
+> adapters exist.
 
 ## Task Assignment Flow
 
 1. **Human assigns task** in Mission Control UI
-   - Drag task card to agent in "ASSIGNED" column
-   - System auto-dispatches to agent's OpenClaw session
+   - Drag task card to an OpenClaw-backed agent in the "ASSIGNED" column
+   - System auto-dispatches to that agent's OpenClaw session when the dispatch contract is ready
+   - For non-OpenClaw agents, `ASSIGNED` only records ownership; launch the worker manually
 
 2. **Agent receives task notification**
    ```
@@ -113,7 +121,7 @@ If you're stuck or need clarification:
 
 ### Task Statuses
 - **INBOX**: Unassigned, awaiting triage
-- **ASSIGNED**: Assigned to agent, auto-dispatched
+- **ASSIGNED**: Assigned to an agent. OpenClaw-backed agents may auto-dispatch when the dispatch contract is ready; non-OpenClaw agents require manual handoff.
 - **IN PROGRESS**: Agent actively working
 - **REVIEW**: Completed, awaiting Charlie's approval
 - **DONE**: Approved and closed

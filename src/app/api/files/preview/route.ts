@@ -4,11 +4,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+async function readPreviewFile(filePath: string) {
+  const fs = await import('node:fs/promises');
+  return fs.readFile(filePath, 'utf-8');
+}
 
 export async function GET(request: NextRequest) {
   const filePath = request.nextUrl.searchParams.get('path');
@@ -40,18 +44,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Path not allowed' }, { status: 403 });
   }
 
-  if (!existsSync(normalizedPath)) {
-    return NextResponse.json({ error: 'File not found' }, { status: 404 });
-  }
-
   try {
-    const content = readFileSync(normalizedPath, 'utf-8');
+    const content = await readPreviewFile(normalizedPath);
     return new NextResponse(content, {
       headers: {
         'Content-Type': 'text/html',
       },
     });
   } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
+
     console.error('[FILE] Error reading file:', error);
     return NextResponse.json({ error: 'Failed to read file' }, { status: 500 });
   }
