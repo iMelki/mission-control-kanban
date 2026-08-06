@@ -54,3 +54,10 @@ next-env.d.ts
 /logs/
 /tmp/
 /artifacts/
+
+# Local agent run artifacts. Anchored and directory-only: the leading slash
+# confines the match to the repo root, the trailing slash means a FILE of that
+# name still gets scanned. Not '<dir>/**', which ignores the contents while
+# leaving the directory walkable -- gitignore(5) notes a file cannot be
+# re-included once a parent directory is excluded. See iMelki/agent-settings#551.
+/.local-logs/
