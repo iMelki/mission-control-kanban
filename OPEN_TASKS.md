@@ -8,17 +8,6 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#48 - Adopt ReUI/shadcn kanban+Card+Tabs primitives instead of hand-rolled equivalents](https://github.com/iMelki/mission-control-kanban/issues/48)
-  - Implemented: `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core` +
-    `@dnd-kit/sortable` (`DndContext`/`SortableContext`/keyboard sensor)
-    instead of native HTML5 drag events, giving accessible keyboard
-    reordering; `ui/Panel.tsx` now re-exports shadcn `Card` primitives
-    (`class-variance-authority`); `WorkspaceSectionTabs.tsx` now uses shadcn
-    `Tabs` (Radix) for correct `role="tab"`/`aria-selected` semantics. Added
-    `components.json`, `src/lib/utils.ts`, `src/components/ui/{card,tabs}.tsx`.
-    `ui/DataTable.tsx` intentionally left as-is (low-priority render-layer
-    note, not a violation). `npm run lint`, `npm run build`, and `npm test`
-    (21/21) all pass.
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
   - Local implementation now provides opt-in dispatch v2 with a
@@ -62,6 +51,25 @@ the local operator entrypoint; historical task notes remain in
   - Local validation: server-plan contract `2/2`; full runtime smoke and three
     consecutive remote paths remain required before closure.
 
+
+- [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
+  - Status: active on 2026-07-01.
+  - Scope: component-pool-first runtime UX improvements, artifact-link closeout automation, failure-rate charts, webhook validation/templates, dry-run previews, bulk migration diffs, dependency/readiness surfaces, mobile review, and scheduled runtime-regression summaries.
+  - First slice completed: restored local port 3021, updated Browserslist data, switched the default production build to webpack to remove the Turbopack NFT warning while retaining `npm run build:turbo` for Turbopack inventory, added runtime-regression artifact comment automation, added the home-page Runtime Regression card, and scheduled the daily Hermes runtime-regression summary job (`dea31c50c660`).
+  - Second slice completed: added per-runtime failure-rate trend cards in Runtime operations, created `/runtime-regression` as a local artifact drilldown UI, extended smoke coverage for the drilldown, added a non-blocking `turbopack-inventory` CI artifact job, and documented the research-first roadmap in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`.
+  - Third slice completed: added runtime config templates, webhook endpoint validation gating, dry-run dispatch previews, selected-agent runtime migration diffs, task dependency blocked-by UI/API, ready-for-agent checklist seeding, GitHub issue draft generation, runtime failure-threshold alerts, runtime-regression screenshot thumbnails, PR/requested-issue artifact comments after successful CI, and the reusable workflow doc `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`.
+  - Fourth slice completed: added explicit GitHub issue live create/update behind a plain-English confirmation checkbox, extracted Task modal runtime sections into reusable components, added dependency graph/badges with cycle-detection tests, added runtime migration audit history, runtime-template env diagnostics, local webhook mock receiver, Playwright browser-cache CI tuning, runtime artifact deep links, and expanded browser smoke coverage for dependency/checklist/webhook wizard states.
+  - Fifth slice completed: webhook validation now distinguishes unsigned
+    reachability from signed verification, auto-dispatch and live dispatch fail
+    closed without a resolved signing secret, runtime audit exposes the missing
+    secret without mutating agent records, and loopback route/adapter tests
+    cover signed success, unsigned 2xx, non-2xx, and no-network failure.
+  - Validation: `npm run lint`, `npm test`, `npm run build`, `npm run doctor:react`, `npm run smoke:runtime-ui`, and `npm run comment:runtime-artifacts -- --dry-run`.
+  - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
+
+## Recently Completed
+
+<!-- Cured 2026-08-06 via the workspace issue-state audit (projects-ops#101/#73): entries below were active while their issues were closed. -->
 - [#128 - Make Runtime Regression workspace readiness deterministic in CI](https://github.com/iMelki/mission-control-kanban/issues/128)
   - CI run `30759413222` failed only at the Settings-tab visibility wait while
     bridge, gitleaks, pre-commit, and inventory checks passed. A clean clone of
@@ -81,23 +89,17 @@ the local operator entrypoint; historical task notes remain in
     collision.
   - Closure gate: PR checks and at least three consecutive production smoke
     runs pass before PR #119 is eligible for merge into `dev`.
-
-- [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
-  - Status: active on 2026-07-01.
-  - Scope: component-pool-first runtime UX improvements, artifact-link closeout automation, failure-rate charts, webhook validation/templates, dry-run previews, bulk migration diffs, dependency/readiness surfaces, mobile review, and scheduled runtime-regression summaries.
-  - First slice completed: restored local port 3021, updated Browserslist data, switched the default production build to webpack to remove the Turbopack NFT warning while retaining `npm run build:turbo` for Turbopack inventory, added runtime-regression artifact comment automation, added the home-page Runtime Regression card, and scheduled the daily Hermes runtime-regression summary job (`dea31c50c660`).
-  - Second slice completed: added per-runtime failure-rate trend cards in Runtime operations, created `/runtime-regression` as a local artifact drilldown UI, extended smoke coverage for the drilldown, added a non-blocking `turbopack-inventory` CI artifact job, and documented the research-first roadmap in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`.
-  - Third slice completed: added runtime config templates, webhook endpoint validation gating, dry-run dispatch previews, selected-agent runtime migration diffs, task dependency blocked-by UI/API, ready-for-agent checklist seeding, GitHub issue draft generation, runtime failure-threshold alerts, runtime-regression screenshot thumbnails, PR/requested-issue artifact comments after successful CI, and the reusable workflow doc `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`.
-  - Fourth slice completed: added explicit GitHub issue live create/update behind a plain-English confirmation checkbox, extracted Task modal runtime sections into reusable components, added dependency graph/badges with cycle-detection tests, added runtime migration audit history, runtime-template env diagnostics, local webhook mock receiver, Playwright browser-cache CI tuning, runtime artifact deep links, and expanded browser smoke coverage for dependency/checklist/webhook wizard states.
-  - Fifth slice completed: webhook validation now distinguishes unsigned
-    reachability from signed verification, auto-dispatch and live dispatch fail
-    closed without a resolved signing secret, runtime audit exposes the missing
-    secret without mutating agent records, and loopback route/adapter tests
-    cover signed success, unsigned 2xx, non-2xx, and no-network failure.
-  - Validation: `npm run lint`, `npm test`, `npm run build`, `npm run doctor:react`, `npm run smoke:runtime-ui`, and `npm run comment:runtime-artifacts -- --dry-run`.
-  - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
-
-## Recently Completed
+- [#48 - Adopt ReUI/shadcn kanban+Card+Tabs primitives instead of hand-rolled equivalents](https://github.com/iMelki/mission-control-kanban/issues/48)
+  - Implemented: `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core` +
+    `@dnd-kit/sortable` (`DndContext`/`SortableContext`/keyboard sensor)
+    instead of native HTML5 drag events, giving accessible keyboard
+    reordering; `ui/Panel.tsx` now re-exports shadcn `Card` primitives
+    (`class-variance-authority`); `WorkspaceSectionTabs.tsx` now uses shadcn
+    `Tabs` (Radix) for correct `role="tab"`/`aria-selected` semantics. Added
+    `components.json`, `src/lib/utils.ts`, `src/components/ui/{card,tabs}.tsx`.
+    `ui/DataTable.tsx` intentionally left as-is (low-priority render-layer
+    note, not a violation). `npm run lint`, `npm run build`, and `npm test`
+    (21/21) all pass.
 
 - [#43 - Fix Runtime Regression PR artifact-comment permission](https://github.com/iMelki/mission-control-kanban/issues/43)
   - Completed on 2026-07-22 with least-privilege no-checkout comment jobs:
