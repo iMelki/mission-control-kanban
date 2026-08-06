@@ -175,12 +175,29 @@ export function normalizeMckN8nSyncPayload(payload: unknown, now = new Date()): 
   const alert = asRecord(raw.alert);
   const dryRun = asBoolean(raw.dryRun ?? raw.dry_run, false);
   const summaryHasErrors = asNumber(summary.errors) > 0 || asNumber(summary.failed) > 0;
+  const driftWarnings = asNumber(summary.upstream_drift_warnings);
+  const statusReconciled = asNumber(summary.status_reconciled);
   const ok = asBoolean(raw.ok, !summaryHasErrors) && !summaryHasErrors;
-  const alertLevel = normalizeAlertLevel(alert.level ?? raw.alert_level, ok);
-  const alertMessage = asString(
+  const normalizedAlertLevel = normalizeAlertLevel(alert.level ?? raw.alert_level, ok);
+  // Upstream drift is divergence, not a failed run: downgrade a clean level to
+  // 'warning' so the scheduled path surfaces it, but leave `ok` alone (flipping
+  // `ok` would fire the alert webhook) and never soften an existing warning/error.
+  const driftDowngraded = normalizedAlertLevel === 'ok' && driftWarnings > 0;
+  const alertLevel: MckN8nSyncAlertLevel = driftDowngraded ? 'warning' : normalizedAlertLevel;
+  const cleanOkMessage = 'MCK sync completed without errors.';
+  const okDefaultMessage = driftWarnings > 0 || statusReconciled > 0
+    ? `MCK sync completed: ${statusReconciled} status reconciled, ${driftWarnings} upstream drift warning${driftWarnings === 1 ? '' : 's'}.`
+    : cleanOkMessage;
+  let alertMessage = asString(
     alert.message ?? raw.alert_message,
-    ok ? 'MCK sync completed without errors.' : 'MCK sync returned errors; inspect the run history.'
+    ok ? okDefaultMessage : 'MCK sync returned errors; inspect the run history.'
   );
+  if (driftDowngraded && alertMessage === cleanOkMessage) {
+    // The scheduled n8n producer posts the generic success text even on drift
+    // runs; replace only that exact generic text so a warning-level run does
+    // not claim it completed without anything to review.
+    alertMessage = okDefaultMessage;
+  }
 
   return {
     workflow_id: asString(raw.workflowId ?? raw.workflow_id, DEFAULT_WORKFLOW_ID),

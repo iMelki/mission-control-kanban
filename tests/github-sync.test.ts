@@ -166,6 +166,65 @@ test('MCK n8n sync payload normalization records alert state and run scope', () 
   assert.equal(normalized.received_at, '2026-06-10T07:00:00.000Z');
 });
 
+test('MCK scheduled sync surfaces upstream drift instead of recording a clean run (#134)', () => {
+  const normalized = normalizeMckN8nSyncPayload(
+    {
+      ok: true,
+      dryRun: false,
+      mode: 'local-mck-sync',
+      workspaces: ['assistants'],
+      summary: {
+        scanned_items: 90,
+        updated: 3,
+        errors: 0,
+        status_reconciled: 2,
+        upstream_drift_warnings: 9,
+      },
+      alert: { level: 'ok' },
+    },
+    new Date('2026-08-05T07:00:00.000Z')
+  );
+
+  // Drift downgrades the alert level; the run itself still succeeded.
+  assert.equal(normalized.ok, true);
+  assert.equal(normalized.alert_level, 'warning');
+  assert.match(normalized.alert_message, /2 status reconciled/);
+  assert.match(normalized.alert_message, /9 upstream drift warnings/);
+  // Drift is divergence, not failure: the alert webhook must not fire.
+  assert.equal(
+    shouldNotifyMckN8nSyncAlert({ ok: normalized.ok, alert_level: normalized.alert_level }),
+    false
+  );
+
+  // A drift-free clean run still records alert_level 'ok'.
+  assert.equal(
+    normalizeMckN8nSyncPayload({ ok: true, summary: { updated: 4, errors: 0 } }).alert_level,
+    'ok'
+  );
+
+  // Drift never softens an error-level run.
+  assert.equal(
+    normalizeMckN8nSyncPayload({
+      ok: false,
+      summary: { errors: 2, upstream_drift_warnings: 1 },
+      alert: { level: 'error', message: 'MCK sync returned 2 errors.' },
+    }).alert_level,
+    'error'
+  );
+
+  // Historical rows recorded before this fix (alert_level 'ok' with drift in the
+  // stored summary) still degrade the Local Control panel.
+  const health = mapN8nSyncStatusToHealth({
+    latest: {
+      ok: true,
+      alert_level: 'ok',
+      summary: { updated: 3, status_reconciled: 2, upstream_drift_warnings: 9 },
+    },
+  });
+  assert.equal(health.state, 'limited');
+  assert.match(health.detail, /9 upstream drift warnings/);
+});
+
 test('MCK n8n sync history limit stays configurable and bounded', () => {
   const previousLimit = process.env.MCK_N8N_SYNC_HISTORY_LIMIT;
 

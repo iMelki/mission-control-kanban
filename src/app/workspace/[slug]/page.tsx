@@ -35,12 +35,23 @@ function formatSyncTimestamp(value?: string): string {
     return 'unknown time';
   }
 
+  // react-doctor-disable-next-line -- Client-only operator page; sync timestamps render in the operator's locale on purpose.
   return SYNC_TIMESTAMP_FORMATTER.format(parsed);
 }
 
 function formatSyncCount(value: unknown): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatReconciliationSuffix(summary: Record<string, unknown>): string {
+  const statusReconciled = formatSyncCount(summary.status_reconciled);
+  const driftWarnings = formatSyncCount(summary.upstream_drift_warnings);
+  if (statusReconciled === 0 && driftWarnings === 0) {
+    return '';
+  }
+
+  return `, ${statusReconciled} status reconciled, ${driftWarnings} upstream drift warning${driftWarnings === 1 ? '' : 's'}`;
 }
 
 function extractGitHubSyncStatusNotes(payload: Record<string, unknown>): string[] {
@@ -154,12 +165,12 @@ export default function WorkspacePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: false }),
       });
-      const payload = await res.json();
       if (!res.ok) {
-        throw new Error(payload.error || 'GitHub Project refresh failed');
+        const errorPayload = await res.json().catch(() => null);
+        throw new Error(errorPayload?.error || 'GitHub Project refresh failed');
       }
 
-      const syncPayload = payload as Record<string, unknown>;
+      const syncPayload = await res.json() as Record<string, unknown>;
       const imported = formatSyncCount(syncPayload.imported);
       const updated = formatSyncCount(syncPayload.updated);
       const moved = formatSyncCount(syncPayload.moved);
@@ -226,6 +237,7 @@ export default function WorkspacePage() {
   }, [slug, setIsLoading, setNotFound, setWorkspace]);
 
   // Load workspace-specific data
+  // react-doctor-disable-next-line -- Every polling interval created here is cleared in the returned cleanup; the OpenClaw abort timeout is bounded and cleared inline.
   useEffect(() => {
     if (!loadedWorkspace) return;
 
@@ -396,7 +408,7 @@ export default function WorkspacePage() {
     latestN8nSync && (!latestN8nSync.ok || latestN8nSync.alert_level === 'error')
   );
   const n8nSyncCounts = latestN8nSync
-    ? `${formatSyncCount(n8nSummary.scanned_items)} scanned, ${formatSyncCount(n8nSummary.updated)} updated, ${formatSyncCount(n8nSummary.errors)} errors`
+    ? `${formatSyncCount(n8nSummary.scanned_items)} scanned, ${formatSyncCount(n8nSummary.updated)} updated, ${formatSyncCount(n8nSummary.errors)} errors${formatReconciliationSuffix(n8nSummary)}`
     : 'no recorded runs yet';
 
   return (
