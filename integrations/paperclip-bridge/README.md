@@ -13,7 +13,8 @@ graph, and returns signed lifecycle evidence to MCK and Mission Control.
   file dependencies and their npm integrity values; adjacent provenance
   records pin their SHA-256 digests and source paths.
 - Host API validated against that exact owned commit and plugin SDK/API
-  version `1.0.0`. Do not replace the tarballs with a moving canary or a
+  version `1.0.0`; validation fails closed on any host SHA mismatch even when
+  partial file attestations are present. Do not replace the tarballs with a moving canary or a
   registry package without a fresh compatibility review and Worker RPC test.
 - `npm audit` reports
   [GHSA-3pw3-v88x-xj24](https://github.com/advisories/GHSA-3pw3-v88x-xj24)

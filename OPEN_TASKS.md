@@ -49,6 +49,11 @@ the local operator entrypoint; historical task notes remain in
     the returned receipt across control surfaces, and read back the resulting
     Paperclip/MCK receipts. The #127 owner-map gate is resolved with hash parity;
     do not replace the canonical checkout unless topology regresses.
+  - Host compatibility is now fail-closed on the exact `testedCommit` even
+    when a partial `testedFiles` attestation is present; the mismatch case is
+    covered by `tests/host-compatibility.spec.ts`. The current host remains
+    intentionally blocked until an owner-approved clean reviewed SHA matches
+    the package metadata.
 
 - [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
   - Runtime Regression run `29887043238` attempt 1 failed while rendering

@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Made Paperclip host compatibility exact-SHA fail-closed (2026-08-08, #135)** -
+  Host migration validation now requires the declared `testedCommit` to match
+  the actual host even when partial file attestations are supplied. Added
+  regression coverage for mismatched, missing, and malformed host metadata;
+  file attestations remain additive evidence rather than a compatibility
+  bypass.
+
 - **Revalidated persisted bridge envelopes before reuse (2026-08-08, #136)** -
   JSONB/string envelopes loaded by correlation and issue mappings now pass
   through the canonical `parseDispatch` validator before orchestration. Malformed

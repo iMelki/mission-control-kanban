@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { assertExactTestedHostCommit } from "../src/host-compatibility.js";
 
 const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
 const hostRoot = path.resolve(
@@ -111,16 +112,7 @@ if (!existsSync(validatorPath)) {
   throw new Error(`Paperclip host validator is unavailable at ${validatorPath}`);
 }
 const actualCommit = git(["rev-parse", "HEAD"]);
-if (testedFiles.length === 0) {
-  if (!expectedCommit.match(/^[a-f0-9]{40}$/)) {
-    throw new Error("Plugin package must declare testedFiles or one exact Paperclip host commit");
-  }
-  if (actualCommit !== expectedCommit) {
-    throw new Error(
-      `Paperclip host commit mismatch: expected ${expectedCommit}, got ${actualCommit}`,
-    );
-  }
-}
+assertExactTestedHostCommit(expectedCommit, actualCommit);
 const origin = git(["remote", "get-url", "origin"]);
 if (origin !== "git@github.com:iMelki/paperclip.git") {
   throw new Error("Paperclip host origin is not the expected owned fork");
