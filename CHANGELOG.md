@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Refresh Paperclip bridge topology truth (2026-08-08, #47/#119/#127)** -
+  Records that bridge PR #119 merged into `dev`, the canonical checkout is
+  non-bare and aligned with `origin/dev`, and the remaining gate is installed
+  runtime signed-ping/dispatch plus cross-surface receipt reconciliation.
+
 ### Added
 
 - **Adopt dnd-kit/shadcn for kanban, Card, and Tabs (2026-08-02, #48)** -

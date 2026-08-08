@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-02
+Last updated: 2026-08-08
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -10,6 +10,7 @@ the local operator entrypoint; historical task notes remain in
 
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
+  - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`; the canonical checkout is now non-bare, clean, unlocked, and aligned with `origin/dev` at `a0a7af1b541dc1b621b7215ced9f290b4c33a186`.
   - Local implementation now provides opt-in dispatch v2 with a
     pending-before-send attempt, stable attempt/delivery/correlation/revision
     IDs, raw-body HMAC, replay conflict detection, lifecycle v2 callbacks, and
@@ -31,7 +32,9 @@ the local operator entrypoint; historical task notes remain in
     body size plus total/inactivity time.
   - Remaining closure evidence: install into the owned Paperclip runtime,
     prove a signed health ping and real dispatch, reconcile the returned
-    receipt across control surfaces, then commit/push and read back `origin/dev`.
+    receipt across control surfaces, and read back the resulting Paperclip/MCK
+    receipts. The old #127 bare-checkout/rebind gate is resolved; do not create
+    another clone unless a fresh topology failure is observed.
 
 - [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
   - Runtime Regression run `29887043238` attempt 1 failed while rendering
@@ -87,8 +90,10 @@ the local operator entrypoint; historical task notes remain in
     scopes task-card locators to the direct `li > [role="button"]` card root
     and its visible title text so the handle cannot create a strict-mode
     collision.
-  - Closure gate: PR checks and at least three consecutive production smoke
-    runs pass before PR #119 is eligible for merge into `dev`.
+  - Closure gate: PR #119 and its dependent fixes are merged into `dev`; retain
+    the historical checks and now require the installed-host signed ping,
+    bridge receipt reconciliation, and natural runtime evidence before closing
+    the bridge workstream.
 - [#48 - Adopt ReUI/shadcn kanban+Card+Tabs primitives instead of hand-rolled equivalents](https://github.com/iMelki/mission-control-kanban/issues/48)
   - Implemented: `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core` +
     `@dnd-kit/sortable` (`DndContext`/`SortableContext`/keyboard sensor)
