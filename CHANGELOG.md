@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Hardened bridge diagnostics and callback byte boundaries (2026-08-08, #136)** -
+  Recursive diagnostic redaction now removes embedded URL queries, Bearer/HMAC
+  signatures, and common API-key-shaped values from arbitrary failure strings.
+  Callback intake rejects leading UTF-8 BOMs and non-canonical/invalid UTF-8
+  before HMAC verification, preserving exact signed-byte semantics. Added
+  focused Paperclip bridge and callback regression fixtures.
 - Added a deterministic Paperclip workspace provisioner for the factory path:
   clean workspaces install the root and plugin lockfiles with lifecycle scripts
   disabled, rebuild only `better-sqlite3`, and expose the same exact argv as the

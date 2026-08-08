@@ -899,15 +899,40 @@ export function redactDiagnostic(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactDiagnostic);
   if (!record(value)) {
     if (typeof value !== "string") return value;
-    try {
-      const url = new URL(value);
-      return `${url.protocol}//${url.host}${url.pathname}`;
-    } catch {
-      return value.length > 500 ? `${value.slice(0, 500)}…` : value;
-    }
+    return redactDiagnosticString(value);
   }
   return Object.fromEntries(Object.entries(value).map(([key, child]) => {
     if (/authorization|token|secret|password|api[_-]?key/i.test(key)) return [key, "[redacted]"];
     return [key, redactDiagnostic(child)];
   }));
+}
+
+const EMBEDDED_URL_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
+const BEARER_PATTERN = /\bBearer\s+[^\s,;)]*/gi;
+const HMAC_PATTERN = /\b((?:sha(?:1|224|256|384|512)|hmac(?:[-_](?:sha)?(?:1|224|256|384|512)?)|signature))\s*[:=]\s*[^\s,;)]*/gi;
+const SECRET_ASSIGNMENT_PATTERN = /\b((?:api[ _-]?key|access[ _-]?key|client[ _-]?secret|auth(?:entication)?[ _-]?token|secret|password))\s*([:=])\s*[^\s,;&)]+/gi;
+const API_KEY_PATTERN = /\b(?:sk_(?:live|test)_|pk_(?:live|test)_|gh[opsu]_|github_pat_|xox[baprs]-|AKIA)[A-Za-z0-9_\-]+/g;
+
+function redactEmbeddedUrl(input: string) {
+  return input.replace(EMBEDDED_URL_PATTERN, (candidate) => {
+    // Keep punctuation outside the URL so diagnostics remain readable while
+    // ensuring credentials, query strings, and fragments never survive.
+    const trailing = candidate.match(/[.,!?;:)\]}]+$/)?.[0] ?? "";
+    const urlText = trailing ? candidate.slice(0, -trailing.length) : candidate;
+    try {
+      const url = new URL(urlText);
+      return `${url.protocol}//${url.host}${url.pathname}${trailing}`;
+    } catch {
+      return candidate;
+    }
+  });
+}
+
+function redactDiagnosticString(input: string) {
+  let redacted = redactEmbeddedUrl(input);
+  redacted = redacted.replace(BEARER_PATTERN, "Bearer [redacted]");
+  redacted = redacted.replace(HMAC_PATTERN, "$1=[redacted]");
+  redacted = redacted.replace(SECRET_ASSIGNMENT_PATTERN, "$1$2[redacted]");
+  redacted = redacted.replace(API_KEY_PATTERN, "[redacted]");
+  return redacted.length > 500 ? `${redacted.slice(0, 500)}…` : redacted;
 }

@@ -8,6 +8,15 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
+- [#136 - Make bridge contracts v2-authoritative and byte-safe](https://github.com/iMelki/mission-control-kanban/issues/136)
+  - Bounded byte-safety/redaction slice completed on 2026-08-08: diagnostic
+    strings now recursively scrub embedded URL queries, Bearer/HMAC signatures,
+    and common API-key-shaped values; callback intake rejects leading UTF-8 BOMs
+    and non-canonical/invalid UTF-8 before signature verification.
+  - Focused regression coverage passes in the Paperclip bridge plugin and MCK
+    factory callback tests. Receipt-v2 authority and canonical envelope
+    persistence remain separately gated work under this issue.
+
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
   - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`; the canonical checkout is now non-bare, clean, unlocked, and aligned with `origin/dev` at `625cec7e1e92972523e43516bb0a2bea50f0b774`.

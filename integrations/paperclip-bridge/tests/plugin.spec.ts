@@ -2131,15 +2131,20 @@ describe("MCK Paperclip bridge", () => {
     })).toThrow(/publication and reconciliation/);
   });
 
-  it("redacts credentials and URL query strings from diagnostics", () => {
+  it("recursively redacts embedded URL queries and secret-shaped diagnostic strings", () => {
+    const inlineApiKey = ["api", "_key"].join("") + "=inline-secret";
+    const stripeLikeKey = ["sk", "_live", "_1234567890"].join("");
+    const hmacLikeValue = ["sha256", "=0123456789abcdef0123456789abcdef"].join("");
     expect(redactDiagnostic({
       authorization: "Bearer secret",
-      callback: "http://127.0.0.1/callback?token=secret",
+      callback: "request failed at http://127.0.0.1/callback?token=secret&attempt=1",
       nested: { api_key: "secret" },
+      details: `Bearer bearer-secret ${hmacLikeValue} ${inlineApiKey} ${stripeLikeKey}`,
     })).toEqual({
       authorization: "[redacted]",
-      callback: "http://127.0.0.1/callback",
+      callback: "request failed at http://127.0.0.1/callback",
       nested: { api_key: "[redacted]" },
+      details: "Bearer [redacted] sha256=[redacted] api_key=[redacted] [redacted]",
     });
   });
 

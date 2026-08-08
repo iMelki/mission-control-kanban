@@ -108,9 +108,30 @@ export async function readBoundedCallbackBody(
     bodyBytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
+
+  // HMAC verification must be over the exact request bytes. TextDecoder's
+  // default behavior strips a leading UTF-8 BOM, which would otherwise make
+  // the signed bytes differ from the bytes parsed by this endpoint.
+  if (
+    bodyBytes.byteLength >= 3
+    && bodyBytes[0] === 0xef
+    && bodyBytes[1] === 0xbb
+    && bodyBytes[2] === 0xbf
+  ) {
+    throw new CallbackBodyReadError('Callback body must not include a UTF-8 BOM', 400);
+  }
   try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bodyBytes);
-  } catch {
+    const decoded = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bodyBytes);
+    const canonicalBytes = new TextEncoder().encode(decoded);
+    if (
+      canonicalBytes.byteLength !== bodyBytes.byteLength
+      || canonicalBytes.some((byte, index) => byte !== bodyBytes[index])
+    ) {
+      throw new CallbackBodyReadError('Callback body must use canonical UTF-8', 400);
+    }
+    return decoded;
+  } catch (error) {
+    if (error instanceof CallbackBodyReadError) throw error;
     throw new CallbackBodyReadError('Callback body must be valid UTF-8', 400);
   }
 }

@@ -716,6 +716,50 @@ test('callback body reader rejects oversized declared and chunked bodies before 
   assert.equal(chunked.status, 413);
 });
 
+test('callback body reader rejects a leading UTF-8 BOM before authentication', async () => {
+  const body = new Uint8Array(new ArrayBuffer(5));
+  body.set([0xef, 0xbb, 0xbf, 0x7b, 0x7d]);
+  await assert.rejects(
+    readBoundedCallbackBody({
+      headers: new Headers({ 'content-length': String(body.byteLength) }),
+      body: new ReadableStream<Uint8Array<ArrayBuffer>>({
+        start(controller) {
+          controller.enqueue(body);
+          controller.close();
+        },
+      }),
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof CallbackBodyReadError);
+      assert.equal(error.status, 400);
+      assert.match(error.message, /UTF-8 BOM/);
+      return true;
+    },
+  );
+});
+
+test('callback body reader rejects non-canonical UTF-8 before authentication', async () => {
+  const body = new Uint8Array(new ArrayBuffer(2)); // overlong encoding of '/'
+  body.set([0xc0, 0xaf]);
+  await assert.rejects(
+    readBoundedCallbackBody({
+      headers: new Headers({ 'content-length': String(body.byteLength) }),
+      body: new ReadableStream<Uint8Array<ArrayBuffer>>({
+        start(controller) {
+          controller.enqueue(body);
+          controller.close();
+        },
+      }),
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof CallbackBodyReadError);
+      assert.equal(error.status, 400);
+      assert.match(error.message, /valid UTF-8/);
+      return true;
+    },
+  );
+});
+
 test('callback body reader accepts signed chunked lifecycle bytes without changing HMAC input', async () => {
   resetDb();
   seedFactoryTask();
