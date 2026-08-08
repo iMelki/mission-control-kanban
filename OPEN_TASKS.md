@@ -10,7 +10,7 @@ the local operator entrypoint; historical task notes remain in
 
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
-  - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`; the canonical checkout is now non-bare, clean, unlocked, and aligned with `origin/dev` at `a0a7af1b541dc1b621b7215ced9f290b4c33a186`.
+  - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`; the canonical checkout is now non-bare, clean, unlocked, and aligned with `origin/dev` at `625cec7e1e92972523e43516bb0a2bea50f0b774`.
   - Local implementation now provides opt-in dispatch v2 with a
     pending-before-send attempt, stable attempt/delivery/correlation/revision
     IDs, raw-body HMAC, replay conflict detection, lifecycle v2 callbacks, and
@@ -30,11 +30,14 @@ the local operator entrypoint; historical task notes remain in
     orchestration, preserves immutable per-channel retry envelopes, replays
     current lifecycle evidence on same-revision redispatch, and bounds callback
     body size plus total/inactivity time.
-  - Remaining closure evidence: install into the owned Paperclip runtime,
-    prove a signed health ping and real dispatch, reconcile the returned
-    receipt across control surfaces, and read back the resulting Paperclip/MCK
-    receipts. The old #127 bare-checkout/rebind gate is resolved; do not create
-    another clone unless a fresh topology failure is observed.
+  - Independent review is conditional for source/CI, not release acceptance.
+    MCK #135 tracks partial host-SHA attestation; MCK #136 tracks v2-authority,
+    canonical-envelope validation, recursive redaction, and byte-preserving
+    callback verification. Remaining closure evidence: install into the owned
+    Paperclip runtime, prove a signed health ping and real dispatch, reconcile
+    the returned receipt across control surfaces, and read back the resulting
+    Paperclip/MCK receipts. The #127 owner-map gate is resolved with hash parity;
+    do not replace the canonical checkout unless topology regresses.
 
 - [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
   - Runtime Regression run `29887043238` attempt 1 failed while rendering
