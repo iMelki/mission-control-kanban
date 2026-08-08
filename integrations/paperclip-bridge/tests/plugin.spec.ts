@@ -1047,6 +1047,46 @@ describe("MCK Paperclip bridge", () => {
     )).rejects.toThrow(/owner_fence_lost/);
   });
 
+  it("revalidates persisted JSONB envelopes before reusing a correlation mapping", async () => {
+    const dispatch = dispatchV2();
+    const namespace = "plugin_mck_factory_bridge_7ec566f3b4";
+    const validContext = {
+      db: {
+        namespace,
+        execute: vi.fn(async () => ({ rowCount: 0 })),
+        query: vi.fn(async () => [{
+          ...bridgeMapping(),
+          envelope: JSON.stringify(dispatch),
+        }]),
+      },
+    } as unknown as Parameters<typeof reserveMapping>[0];
+    await expect(reserveMapping(
+      validContext,
+      "company-1",
+      dispatch,
+      dispatch.dispatch,
+    )).resolves.toMatchObject({ createGraph: false, graph: expect.any(Object) });
+
+    const malformed = dispatchV2();
+    malformed.factory_contract.repository.owner = "not-iMelki";
+    const malformedContext = {
+      db: {
+        namespace,
+        execute: vi.fn(async () => ({ rowCount: 0 })),
+        query: vi.fn(async () => [{
+          ...bridgeMapping(),
+          envelope: JSON.stringify(malformed),
+        }]),
+      },
+    } as unknown as Parameters<typeof reserveMapping>[0];
+    await expect(reserveMapping(
+      malformedContext,
+      "company-1",
+      dispatch,
+      dispatch.dispatch,
+    )).rejects.toThrow("Persisted MCK task envelope failed canonical validation");
+  });
+
   it("builds one sequential plan/build/validate/review/release writer graph", () => {
     const stages = buildStageDefinitions("Bridge");
     expect(stages.map((stage) => stage.key)).toEqual(["plan", "build", "validate", "review", "release"]);

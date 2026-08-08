@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Revalidated persisted bridge envelopes before reuse (2026-08-08, #136)** -
+  JSONB/string envelopes loaded by correlation and issue mappings now pass
+  through the canonical `parseDispatch` validator before orchestration. Malformed
+  or owner-conflicting persisted contracts fail closed, with regression coverage.
+
 - **Hardened bridge diagnostics and callback byte boundaries (2026-08-08, #136)** -
   Recursive diagnostic redaction now removes embedded URL queries, Bearer/HMAC
   signatures, and common API-key-shaped values from arbitrary failure strings.

@@ -14,8 +14,10 @@ the local operator entrypoint; historical task notes remain in
     and common API-key-shaped values; callback intake rejects leading UTF-8 BOMs
     and non-canonical/invalid UTF-8 before signature verification.
   - Focused regression coverage passes in the Paperclip bridge plugin and MCK
-    factory callback tests. Receipt-v2 authority and canonical envelope
-    persistence remain separately gated work under this issue.
+    factory callback tests. Persisted JSONB envelopes are now revalidated by
+    the canonical `parseDispatch` path before correlation reuse or issue lookup;
+    malformed persisted contracts fail closed. Receipt-v2 authority and full
+    canonical envelope persistence remain separately gated work under this issue.
 
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)

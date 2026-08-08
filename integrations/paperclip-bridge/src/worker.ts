@@ -245,6 +245,22 @@ function identity(dispatch: MckDispatch, deliveryId: string, rawBody: string) {
   };
 }
 
+function parsePersistedEnvelope(value: BridgeMapping["envelope"]): MckDispatch {
+  let candidate: unknown = value;
+  if (typeof value === "string") {
+    try {
+      candidate = JSON.parse(value) as unknown;
+    } catch {
+      throw new Error("Persisted MCK task envelope is not valid JSON");
+    }
+  }
+  try {
+    return parseDispatch(candidate);
+  } catch {
+    throw new Error("Persisted MCK task envelope failed canonical validation");
+  }
+}
+
 async function getMapping(ctx: PluginContext, companyId: string, correlationId: string) {
   const rows = await ctx.db.query<BridgeMapping>(
     `SELECT * FROM ${table(ctx, "bridge_mappings")}
@@ -252,8 +268,8 @@ async function getMapping(ctx: PluginContext, companyId: string, correlationId: 
     [companyId, correlationId],
   );
   const mapping = rows[0];
-  if (mapping && typeof mapping.envelope === "string") {
-    mapping.envelope = JSON.parse(mapping.envelope) as MckDispatch;
+  if (mapping) {
+    mapping.envelope = parsePersistedEnvelope(mapping.envelope);
   }
   return mapping ?? null;
 }
@@ -270,8 +286,8 @@ async function mappingForIssue(ctx: PluginContext, companyId: string, issueId: s
     [companyId, issueId],
   );
   const mapping = rows[0];
-  if (mapping && typeof mapping.envelope === "string") {
-    mapping.envelope = JSON.parse(mapping.envelope) as MckDispatch;
+  if (mapping) {
+    mapping.envelope = parsePersistedEnvelope(mapping.envelope);
   }
   return mapping ?? null;
 }
