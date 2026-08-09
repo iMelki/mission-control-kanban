@@ -16,7 +16,7 @@ jobs:
     name: pre-commit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: pre-commit/action@v3.0.1
 
   paperclip-bridge:
@@ -26,8 +26,8 @@ jobs:
       run:
         working-directory: integrations/paperclip-bridge
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "24.18.0"
           cache: npm

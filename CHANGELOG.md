@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Moved GitHub Actions to native Node 24 releases (2026-08-09, #138)** -
+  Upgrades checkout to v5.1.0, setup-node to v6.5.0, cache to v5.1.0, and
+  upload-artifact to v6.0.0 across CI, Runtime Regression, and secret scan.
+  Every external action reference is pinned to the reviewed release commit;
+  existing Node inputs, permissions, cache keys, artifacts, retention, and
+  failure semantics are unchanged.
+
 - **Made Doctor schema discovery public and warning-level sync state visible (2026-08-09, PR #137)** -
   Publishes a versioned public distribution mirror of the canonical private
   `doctor-genome.v1` contract, points the repository genome at that reachable

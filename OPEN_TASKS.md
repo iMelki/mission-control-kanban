@@ -85,6 +85,18 @@ the local operator entrypoint; historical task notes remain in
 
 ## Recently Completed
 
+- [#138 - Upgrade GitHub Actions to native Node 24 runtimes](https://github.com/iMelki/mission-control-kanban/issues/138)
+  - Replaced every Node-20-backed `actions/checkout@v4`,
+    `actions/setup-node@v4`, `actions/cache@v4`, and
+    `actions/upload-artifact@v4` reference across CI, Runtime Regression, and
+    secret scan with an official native-Node-24 release pinned to its reviewed
+    commit SHA.
+  - Preserved application Node versions, workflow permissions, dependency
+    caching, artifact names/retention, and runtime failure behavior. Official
+    release/tag and commit-signature readback is recorded in #138; closure
+    requires fresh PR and `dev` workflow proof without a forced Node 20
+    annotation.
+
 - [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
   - Closed on 2026-08-09 after the production standalone runner removed the
     Next.js development-manifest race and natural scheduled run `31243549448`
