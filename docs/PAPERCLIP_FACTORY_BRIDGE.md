@@ -1,6 +1,6 @@
 # Paperclip Software-Factory Bridge
 
-Last updated: 2026-07-29
+Last updated: 2026-08-09
 
 Issue [#47](https://github.com/iMelki/mission-control-kanban/issues/47)
 adds the Day-0 bridge between Mission Control Kanban (MCK) and Paperclip.
@@ -18,6 +18,16 @@ Upstream contract references used for this implementation:
 - [Paperclip plugin specification](https://github.com/paperclipai/paperclip/blob/master/doc/plugins/PLUGIN_SPEC.md)
   defines at-least-once event delivery, idempotent webhook handling,
   capability-gated SDK clients, and UI data/action bridges.
+- [JSON Schema 2020-12 core](https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-00)
+  and [validation](https://json-schema.org/draft/2020-12/json-schema-validation)
+  define the canonical envelope validation vocabulary.
+- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html) and the
+  [community reference implementations](https://github.com/cyberphone/json-canonicalization)
+  informed deterministic recursive-key canonicalization for the contract's
+  schema-constrained JSON value domain.
+- [GitHub webhook best practices](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks)
+  support stable delivery identities, signature verification before work, and
+  replay-safe processing.
 
 ## Golden path
 
@@ -43,6 +53,8 @@ limits repair to two attempts. MCK never treats HTTP acceptance as completion.
 - `src/lib/dispatch-adapters.ts` creates the pending v2 attempt before POST,
   calculates stable identity and task revision, signs exact bytes, then updates
   the same row.
+- `src/lib/factory-dispatch.ts` is the server-only canonical-envelope builder;
+  it keeps Node hashing and plugin contracts out of client runtime bundles.
 - `src/lib/webhook-dispatch-schema.ts` owns the v1 and v2 outbound schemas.
 - `src/app/api/webhooks/agent-completion/route.ts` verifies and reconciles
   lifecycle callbacks.
@@ -182,6 +194,13 @@ The plugin stores delivery ID plus payload hash before orchestration:
   and every changed path must match the accepted scope.
 - the contract carries `factory:<attempt-id>` as its stable envelope identity,
   and the final receipt must bind that exact identity.
+- the v2 dispatch carries the complete canonical Agent Settings
+  `factory-task-envelope.v1` alongside the existing snake_case compatibility
+  aliases. MCK validates the schema-constrained document, requires every alias
+  to match it, computes a deterministic canonical SHA-256, and persists the
+  envelope ID, digest, and exact JSON on the pending attempt before network
+  I/O. Lifecycle processing reparses the stored JSON, revalidates its identity,
+  and recomputes its digest before accepting it as authority.
 - MCK reads the owned local checkout's current `origin/dev` commit immediately
   before v2 dispatch, records it as lowercase 40-hex `repository.base_sha`,
   and includes it in the task revision. The authoritative remote read has a
@@ -226,19 +245,24 @@ so a transient persistence failure rolls the claim back for exact redelivery.
 It rejects regressive stages and recomputes current task intent to detect stale
 work.
 
-The `completed` receipt must pass the complete canonical Agent Settings schema,
-not merely the summary checks below. It must prove:
+The `completed` receipt must be
+`agent-settings.factory-run-receipt.v2` and pass the same authority projection
+used by Mission Control, not merely the summary checks below. Version 1 remains
+readable for historical/reconciliation evidence but is explicitly
+compatibility-only and cannot move a task to Done. Version 2 must prove:
 
 1. deterministic validation passed;
 2. a fresh independent reviewer accepted;
-3. the Paperclip run/workspace plus role-profile, effective-config, and
+3. the Builder run/workspace plus role-profile, effective-config, and
    tool-inventory hashes are present;
 4. `repository.candidateSnapshotSha256` still matches the validated candidate;
-5. the release commit SHA was pushed to `origin/dev` and remote readback
-   returned that exact SHA;
-6. Paperclip and git reconciliation are matched, while downstream MCK and
+5. exact index tree/entry evidence and Reviewer session-provenance evidence are
+   present;
+6. an identified Integrator/Release Steward pushed the release commit to
+   `refs/heads/dev`, and remote readback returned that exact SHA plus tree;
+7. Paperclip and git reconciliation are matched, while downstream MCK and
    Mission Control publication may still be pending during this callback;
-7. privacy flags prove that no secrets, direct contact/payment identifiers, or
+8. privacy flags prove that no secrets, direct contact/payment identifiers, or
    raw private logs were included.
 
 The receipt is not trusted by itself. Before publishing `completed`, the
@@ -246,7 +270,8 @@ plugin reads Paperclip's live orchestration, issue subtree, and three exact
 latest issue documents. Validator evidence must conform to
 `agent-settings.factory-validation-evidence.v1`; Reviewer evidence must
 conform to `agent-settings.factory-release-evidence.v1`; and the release
-receipt must conform to `agent-settings.factory-run-receipt.v1`. All three
+receipt must conform to authoritative `agent-settings.factory-run-receipt.v2`.
+All three
 documents must be company/issue/key scoped, current-revision Markdown, free of
 user authorship, and created/updated by the configured role.
 
@@ -282,7 +307,8 @@ Paperclip receives three plugin UI contributions:
 - settings diagnostics for configuration and redacted failure evidence.
 
 MCK's Dispatch timeline shows the delivery, correlation, task revision,
-lifecycle stage, and final receipt ID. Callback and dispatch ledgers preserve
+lifecycle stage, envelope ID/hash, receipt version/authority/hash, and final
+receipt ID. Callback and dispatch ledgers preserve
 payload hashes without displaying secrets.
 
 Lifecycle delivery persists the exact raw bytes, delivery ID, payload hash, and

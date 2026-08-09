@@ -154,10 +154,13 @@ The bridge reports:
   commit, and a successful push
 - blocked/failure states as evidence without falsely advancing MCK
 
-The release-stage `factory-run-receipt` must conform to
-`agent-settings.factory-run-receipt.v1`, be the exact latest
-Integrator-authored document, and prove candidate snapshot plus remote SHA
-readback. It is not sufficient by itself:
+The release-stage `factory-run-receipt` must use
+`agent-settings.factory-run-receipt.v2`, be the exact latest
+Integrator-authored document, and prove the exact release index, fresh
+independent-review session, release-steward identity, candidate snapshot, and
+remote `refs/heads/dev` SHA/tree readback. Version 1 remains readable for
+historical/reconciliation evidence but is compatibility-only and can never
+authorize `completed`. The v2 receipt is not sufficient by itself:
 
 - the Validator issue must contain the exact latest
   `factory-validation-evidence` document conforming to
@@ -201,6 +204,13 @@ publishes the required receipt. Agents can also call the contributed
 - Dispatch v2 freezes the owned checkout's current `origin/dev` commit as
   `factory_contract.repository.base_sha`; that commit participates in the task
   revision and must match the release receipt's base SHA.
+- Dispatch v2 also embeds the complete canonical Agent Settings
+  `factory-task-envelope.v1` document and its deterministic `sha256:` digest.
+  MCK persists the envelope ID, digest, and JSON on the pending attempt before
+  network I/O. Both MCK and Paperclip revalidate the stored document and
+  recompute the digest before using it as lifecycle authority; the existing
+  snake_case fields remain compatibility aliases and must match the canonical
+  document exactly.
 - The parent is created unassigned in `backlog`. Its full signed dispatch JSON
   is stored as the raw body of the markdown `mck-task-envelope` document,
   read back byte-for-byte, and only then moved to `todo` under the Director.

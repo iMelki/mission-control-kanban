@@ -1,5 +1,10 @@
-import type { WebhookDispatchPayload, WebhookDispatchPayloadV2 } from './agent-runtimes';
+import type { WebhookDispatchPayload } from './agent-runtimes';
+import type { WebhookDispatchPayloadV2 } from './factory-dispatch';
 import { factoryPathValidationError } from '../../integrations/paperclip-bridge/src/factory-paths';
+import {
+  canonicalFactorySha256,
+  validateCanonicalFactoryTaskEnvelope,
+} from '../../integrations/paperclip-bridge/src/contracts';
 
 export const WEBHOOK_DISPATCH_SCHEMA_ID = 'https://mission-control-kanban.local/schemas/webhook-dispatch-payload.v1.json';
 export const WEBHOOK_DISPATCH_V2_SCHEMA_ID = 'https://mission-control-kanban.local/schemas/webhook-dispatch-payload.v2.json';
@@ -140,6 +145,8 @@ export const webhookDispatchPayloadV2JsonSchema = {
         'rollback_plan',
         'safety_rules',
         'limits',
+        'envelope',
+        'envelope_sha256',
       ],
       properties: {
         schema_version: { const: 'factory-task-envelope.v1' },
@@ -173,6 +180,10 @@ export const webhookDispatchPayloadV2JsonSchema = {
             concurrent_mutating_builders: { const: 1 },
           },
         },
+        envelope: {
+          $ref: 'https://raw.githubusercontent.com/iMelki/agent-settings/dev/shared/schemas/software-factory/factory-task-envelope.v1.schema.json',
+        },
+        envelope_sha256: { type: 'string', pattern: '^sha256:[a-f0-9]{64}$' },
       },
     },
   },
@@ -368,6 +379,66 @@ export function validateWebhookDispatchPayloadV2(payload: unknown): WebhookPaylo
           }
         });
       }
+    }
+    try {
+      const envelope = validateCanonicalFactoryTaskEnvelope(contract.envelope, {
+        attemptId: isRecord(payload.dispatch) ? String(payload.dispatch.attempt_id ?? '') : '',
+        deliveryId: isRecord(payload.dispatch) ? String(payload.dispatch.delivery_id ?? '') : '',
+        correlationId: isRecord(payload.dispatch) ? String(payload.dispatch.correlation_id ?? '') : '',
+        taskRevision: isRecord(payload.dispatch) ? String(payload.dispatch.task_revision ?? '') : '',
+        taskId: isRecord(payload.task) ? String(payload.task.id ?? '') : '',
+        repositorySlug: isRecord(contract.repository)
+          ? String(contract.repository.slug ?? '')
+          : undefined,
+        repositoryBaseSha: isRecord(contract.repository)
+          ? String(contract.repository.base_sha ?? '')
+          : undefined,
+      });
+      if (
+        contract.envelope_id !== envelope.envelopeId
+        || contract.envelope_sha256 !== canonicalFactorySha256(envelope)
+        || (
+          isRecord(payload.task)
+          && isRecord(payload.task.github_source)
+          && (
+            envelope.origin.github.repository !== payload.task.github_source.repo_name
+            || envelope.origin.github.issueNumber !== payload.task.github_source.issue_number
+            || envelope.origin.github.projectItemId !== (payload.task.github_source.project_item_id ?? null)
+          )
+        )
+      ) {
+        errors.push('factory_contract canonical envelope hash or alias readback does not match');
+      }
+      const repositoryAliases = isRecord(contract.repository) ? contract.repository : null;
+      const allowedFileScopeAliases = repositoryAliases && Array.isArray(repositoryAliases.allowed_file_scope)
+        ? repositoryAliases.allowed_file_scope
+        : null;
+      const sameStringArray = (left: unknown, right: string[]) => (
+        Array.isArray(left)
+        && left.length === right.length
+        && left.every((item, index) => item === right[index])
+      );
+      const canonicalReviewMode = contract.review_mode === 'pair_review'
+        ? 'pair-review'
+        : contract.review_mode === 'human_required'
+          ? 'human-final'
+          : 'independent';
+      if (
+        !allowedFileScopeAliases
+        || !sameStringArray(allowedFileScopeAliases, envelope.repository.allowedPaths)
+        || !sameStringArray(contract.acceptance_criteria, envelope.work.acceptanceCriteria)
+        || !sameStringArray(contract.test_requirements, envelope.work.testRequirements)
+        || contract.risk_level !== envelope.work.risk
+        || canonicalReviewMode !== envelope.work.reviewMode
+        || contract.rollback_plan !== envelope.work.rollback.strategy
+        || !isRecord(contract.limits)
+        || contract.limits.max_repair_attempts !== envelope.execution.maxRepairAttempts
+        || contract.limits.concurrent_mutating_builders !== envelope.execution.concurrentMutatingBuilders
+      ) {
+        errors.push('factory_contract compatibility aliases do not match the canonical envelope');
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'factory_contract canonical envelope is invalid');
     }
     requireStringArray(contract.acceptance_criteria, 'factory_contract.acceptance_criteria', errors);
     requireStringArray(contract.test_requirements, 'factory_contract.test_requirements', errors);

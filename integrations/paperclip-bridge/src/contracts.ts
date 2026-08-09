@@ -19,6 +19,75 @@ export type LifecycleStatus =
   | "failed"
   | "cancelled";
 
+export const FACTORY_TASK_ENVELOPE_V1_SCHEMA_VERSION =
+  "agent-settings.factory-task-envelope.v1" as const;
+export const FACTORY_RUN_RECEIPT_V1_SCHEMA_VERSION =
+  "agent-settings.factory-run-receipt.v1" as const;
+export const FACTORY_RUN_RECEIPT_V2_SCHEMA_VERSION =
+  "agent-settings.factory-run-receipt.v2" as const;
+
+export interface CanonicalFactoryTaskEnvelopeV1 {
+  schemaVersion: typeof FACTORY_TASK_ENVELOPE_V1_SCHEMA_VERSION;
+  envelopeId: string;
+  correlationId: string;
+  createdAtUtc: string;
+  origin: {
+    source: "github-project" | "mck" | "manual" | "paperclip";
+    taskId: string;
+    attemptId: string;
+    deliveryId: string;
+    taskRevisionSha256: string;
+    github: {
+      owner: "iMelki";
+      repository: string;
+      issueNumber: number;
+      projectNumber: number;
+      projectItemId: string | null;
+    };
+  };
+  repository: {
+    path: string;
+    slug: string;
+    originRemote: string;
+    branch: "dev";
+    baseSha: string;
+    allowedPaths: string[];
+    preservedDirtyPaths?: string[];
+  };
+  work: {
+    title: string;
+    acceptanceCriteria: string[];
+    testRequirements: string[];
+    risk: "low" | "medium" | "high" | "critical";
+    reviewMode: "independent" | "pair-review" | "human-final";
+    rollback: {
+      strategy: string;
+      verification: string;
+    };
+  };
+  execution: {
+    capabilityProfile: string;
+    maxRepairAttempts: number;
+    timeoutSeconds: number;
+    concurrentMutatingBuilders: 1;
+    repositoryManifest: {
+      path: ".agentic-factory.json";
+      sha256: string;
+    };
+    callbacks: Array<{
+      kind: "mck-lifecycle" | "mission-control-outcome" | "paperclip-event";
+      url: string;
+      localOnly: true;
+      authenticationRef: string;
+    }>;
+  };
+  privacy: {
+    containsSecrets: false;
+    containsDirectPersonalIdentifiers: false;
+    rawPrivateLogsIncluded: false;
+  };
+}
+
 export interface MckDispatchV2 {
   event: "mck.task.dispatch";
   version: 2;
@@ -82,6 +151,8 @@ export interface MckDispatchV2 {
       max_repair_attempts: 2;
       concurrent_mutating_builders: 1;
     };
+    envelope: CanonicalFactoryTaskEnvelopeV1;
+    envelope_sha256: string;
   };
 }
 
@@ -101,7 +172,9 @@ export interface MckDispatchV1 {
 export type MckDispatch = MckDispatchV1 | MckDispatchV2;
 
 export interface FactoryReceipt {
-  schemaVersion: "agent-settings.factory-run-receipt.v1";
+  schemaVersion:
+    | typeof FACTORY_RUN_RECEIPT_V1_SCHEMA_VERSION
+    | typeof FACTORY_RUN_RECEIPT_V2_SCHEMA_VERSION;
   receiptId: string;
   envelopeId: string;
   correlationId: string;
@@ -134,6 +207,7 @@ export interface FactoryReceipt {
       mode: string | null;
       blobOid: string | null;
     }>;
+    modeEvidence?: unknown[];
     finalSha: string;
     changedPaths: string[];
   };
@@ -174,6 +248,7 @@ export interface FactoryReceipt {
     profileManifestSha256: string;
     effectiveConfigSha256: string;
     toolInventorySha256: string;
+    sessionProvenanceSha256?: string;
     decision: "accept";
     freshSession: true;
     builderSessionReused: false;
@@ -193,8 +268,14 @@ export interface FactoryReceipt {
     remoteRef: "refs/heads/dev";
     commitSha: string;
     remoteReadbackSha: string;
+    remoteReadbackTreeSha?: string;
     startedAtUtc: string;
     finishedAtUtc: string;
+    paperclipAgentId?: string;
+    paperclipRunId?: string;
+    roleProfile?: string;
+    effectiveConfigSha256?: string;
+    toolInventorySha256?: string;
   };
   publications: Array<{
     target: "mck" | "mission-control" | "github" | "github-project" | "paperclip";
@@ -356,6 +437,262 @@ function nonEmptyStringArray(value: unknown): value is string[] {
     && value.every((item) => text(item));
 }
 
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (record(value)) {
+    return Object.fromEntries(
+      Object.keys(value)
+        .filter((key) => value[key] !== undefined)
+        .sort()
+        .map((key) => [key, canonicalize(value[key])]),
+    );
+  }
+  return value;
+}
+
+export function canonicalJson(value: unknown): string {
+  const serialized = JSON.stringify(canonicalize(value));
+  if (serialized === undefined) throw new Error("Canonical factory JSON value is not serializable");
+  return serialized;
+}
+
+export function canonicalFactoryDigest(value: unknown) {
+  return sha256(canonicalJson(value));
+}
+
+export function canonicalFactorySha256(value: unknown) {
+  return `sha256:${canonicalFactoryDigest(value)}`;
+}
+
+function isUtc(value: unknown) {
+  return text(value) && value.endsWith("Z") && Number.isFinite(Date.parse(value));
+}
+
+function isLocalCallbackUrl(value: unknown) {
+  if (!text(value) || value.includes("\\") || /%(?:2f|5c|2e)/i.test(value)) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:"
+      && (parsed.hostname === "127.0.0.1" || parsed.hostname === "[::1]")
+      && Boolean(parsed.port)
+      && !parsed.username
+      && !parsed.password
+      && !parsed.search
+      && !parsed.hash
+      && !parsed.pathname.split("/").some((segment) => segment === "." || segment === "..");
+  } catch {
+    return false;
+  }
+}
+
+export interface FactoryEnvelopeExpectation {
+  attemptId: string;
+  deliveryId: string;
+  correlationId: string;
+  taskRevision: string;
+  taskId?: string;
+  repositorySlug?: string;
+  repositoryBaseSha?: string;
+}
+
+export function validateCanonicalFactoryTaskEnvelope(
+  value: unknown,
+  expected?: FactoryEnvelopeExpectation,
+): CanonicalFactoryTaskEnvelopeV1 {
+  const idPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$/;
+  const sha256Pattern = /^sha256:[a-f0-9]{64}$/;
+  const gitShaPattern = /^[a-f0-9]{40}$/;
+  const repositoryPattern = /^iMelki\/[A-Za-z0-9._-]{1,100}$/;
+  const remotePattern = /^(?:git@github\.com:iMelki\/|https:\/\/github\.com\/iMelki\/)[A-Za-z0-9._-]{1,100}(?:\.git)?$/;
+  const authenticationRefPattern = /^[a-z][a-z0-9._:/-]{2,159}$/;
+  const profilePattern = /^factory-[a-z0-9-]{2,64}$/;
+  const exactKeys = (candidate: unknown, keys: readonly string[]): candidate is Record<string, unknown> => (
+    record(candidate)
+    && hasOnlyKeys(candidate, keys)
+    && keys.every((key) => key in candidate)
+  );
+  const uniquePaths = (candidate: unknown, maximum: number, allowEmpty = false) => (
+    Array.isArray(candidate)
+    && (allowEmpty || candidate.length > 0)
+    && candidate.length <= maximum
+    && new Set(candidate).size === candidate.length
+    && candidate.every((item) => factoryPathValidationError(item, "scope") === null)
+  );
+
+  if (!exactKeys(value, [
+    "schemaVersion",
+    "envelopeId",
+    "correlationId",
+    "createdAtUtc",
+    "origin",
+    "repository",
+    "work",
+    "execution",
+    "privacy",
+  ])) {
+    throw new Error("Canonical factory task envelope top-level contract is invalid");
+  }
+  if (
+    value.schemaVersion !== FACTORY_TASK_ENVELOPE_V1_SCHEMA_VERSION
+    || !text(value.envelopeId)
+    || !idPattern.test(value.envelopeId)
+    || !text(value.correlationId)
+    || !idPattern.test(value.correlationId)
+    || !isUtc(value.createdAtUtc)
+  ) {
+    throw new Error("Canonical factory task envelope identity is invalid");
+  }
+
+  const origin = value.origin;
+  const github = record(origin) ? origin.github : undefined;
+  if (
+    !exactKeys(origin, ["source", "taskId", "attemptId", "deliveryId", "taskRevisionSha256", "github"])
+    || !["github-project", "mck", "manual", "paperclip"].includes(String(origin.source))
+    || !text(origin.taskId)
+    || !idPattern.test(origin.taskId)
+    || !text(origin.attemptId)
+    || !idPattern.test(origin.attemptId)
+    || !text(origin.deliveryId)
+    || !idPattern.test(origin.deliveryId)
+    || !text(origin.taskRevisionSha256)
+    || !sha256Pattern.test(origin.taskRevisionSha256)
+    || !exactKeys(github, ["owner", "repository", "issueNumber", "projectNumber", "projectItemId"])
+    || github.owner !== "iMelki"
+    || typeof github.repository !== "string"
+    || !/^[A-Za-z0-9._-]{1,100}$/.test(github.repository)
+    || !Number.isInteger(github.issueNumber)
+    || Number(github.issueNumber) < 1
+    || !Number.isInteger(github.projectNumber)
+    || Number(github.projectNumber) < 1
+    || (github.projectItemId !== null && (!text(github.projectItemId) || github.projectItemId.length > 160))
+  ) {
+    throw new Error("Canonical factory task envelope origin is invalid");
+  }
+
+  const repository = value.repository;
+  if (
+    !record(repository)
+    || !hasOnlyKeys(repository, [
+      "path",
+      "slug",
+      "originRemote",
+      "branch",
+      "baseSha",
+      "allowedPaths",
+      "preservedDirtyPaths",
+    ])
+    || !["path", "slug", "originRemote", "branch", "baseSha", "allowedPaths"].every((key) => key in repository)
+    || !text(repository.path)
+    || repository.path.length < 3
+    || repository.path.length > 1024
+    || !text(repository.slug)
+    || !repositoryPattern.test(repository.slug)
+    || !text(repository.originRemote)
+    || !remotePattern.test(repository.originRemote)
+    || repository.branch !== "dev"
+    || !text(repository.baseSha)
+    || !gitShaPattern.test(repository.baseSha)
+    || !uniquePaths(repository.allowedPaths, 512)
+    || (
+      repository.preservedDirtyPaths !== undefined
+      && !uniquePaths(repository.preservedDirtyPaths, 128, true)
+    )
+  ) {
+    throw new Error("Canonical factory task envelope repository is invalid");
+  }
+
+  const work = value.work;
+  const rollback = record(work) ? work.rollback : undefined;
+  const stringList = (candidate: unknown, minimumLength: number, maximumLength: number) => (
+    Array.isArray(candidate)
+    && candidate.length > 0
+    && candidate.length <= 64
+    && candidate.every((item) => text(item) && item.length >= minimumLength && item.length <= maximumLength)
+  );
+  if (
+    !exactKeys(work, ["title", "acceptanceCriteria", "testRequirements", "risk", "reviewMode", "rollback"])
+    || !text(work.title)
+    || work.title.length < 8
+    || work.title.length > 240
+    || !stringList(work.acceptanceCriteria, 8, 1_000)
+    || !stringList(work.testRequirements, 3, 500)
+    || !["low", "medium", "high", "critical"].includes(String(work.risk))
+    || !["independent", "pair-review", "human-final"].includes(String(work.reviewMode))
+    || !exactKeys(rollback, ["strategy", "verification"])
+    || !text(rollback.strategy)
+    || rollback.strategy.length < 8
+    || rollback.strategy.length > 1_000
+    || !text(rollback.verification)
+    || rollback.verification.length < 8
+    || rollback.verification.length > 1_000
+  ) {
+    throw new Error("Canonical factory task envelope work contract is invalid");
+  }
+
+  const execution = value.execution;
+  const manifest = record(execution) ? execution.repositoryManifest : undefined;
+  if (
+    !exactKeys(execution, [
+      "capabilityProfile",
+      "maxRepairAttempts",
+      "timeoutSeconds",
+      "concurrentMutatingBuilders",
+      "repositoryManifest",
+      "callbacks",
+    ])
+    || !text(execution.capabilityProfile)
+    || !profilePattern.test(execution.capabilityProfile)
+    || !Number.isInteger(execution.maxRepairAttempts)
+    || Number(execution.maxRepairAttempts) < 0
+    || Number(execution.maxRepairAttempts) > 2
+    || !Number.isInteger(execution.timeoutSeconds)
+    || Number(execution.timeoutSeconds) < 60
+    || Number(execution.timeoutSeconds) > 86_400
+    || execution.concurrentMutatingBuilders !== 1
+    || !exactKeys(manifest, ["path", "sha256"])
+    || manifest.path !== ".agentic-factory.json"
+    || !text(manifest.sha256)
+    || !sha256Pattern.test(manifest.sha256)
+    || !Array.isArray(execution.callbacks)
+    || execution.callbacks.length < 1
+    || execution.callbacks.length > 8
+    || execution.callbacks.some((callback) => (
+      !exactKeys(callback, ["kind", "url", "localOnly", "authenticationRef"])
+      || !["mck-lifecycle", "mission-control-outcome", "paperclip-event"].includes(String(callback.kind))
+      || !isLocalCallbackUrl(callback.url)
+      || callback.localOnly !== true
+      || !text(callback.authenticationRef)
+      || !authenticationRefPattern.test(callback.authenticationRef)
+    ))
+  ) {
+    throw new Error("Canonical factory task envelope execution contract is invalid");
+  }
+
+  const privacy = value.privacy;
+  if (
+    !exactKeys(privacy, ["containsSecrets", "containsDirectPersonalIdentifiers", "rawPrivateLogsIncluded"])
+    || privacy.containsSecrets !== false
+    || privacy.containsDirectPersonalIdentifiers !== false
+    || privacy.rawPrivateLogsIncluded !== false
+  ) {
+    throw new Error("Canonical factory task envelope privacy boundary is invalid");
+  }
+
+  if (expected && (
+    origin.attemptId !== expected.attemptId
+    || origin.deliveryId !== expected.deliveryId
+    || value.correlationId !== expected.correlationId
+    || origin.taskRevisionSha256 !== `sha256:${expected.taskRevision}`
+    || (expected.taskId !== undefined && origin.taskId !== expected.taskId)
+    || (expected.repositorySlug !== undefined && repository.slug !== expected.repositorySlug)
+    || (expected.repositoryBaseSha !== undefined && repository.baseSha !== expected.repositoryBaseSha)
+  )) {
+    throw new Error("Canonical factory task envelope does not match its dispatch identity");
+  }
+
+  return value as unknown as CanonicalFactoryTaskEnvelopeV1;
+}
+
 export function assertCorrelationRevision(
   existing: { task_revision: string } | null,
   incomingTaskRevision: string,
@@ -432,6 +769,9 @@ export function parseDispatch(value: unknown, allowedOwner = "iMelki"): MckDispa
     if (!record(repository)) {
       throw new Error("Factory contract repository is required");
     }
+    const legacyAllowedPaths = Array.isArray(repository.allowed_file_scope)
+      ? repository.allowed_file_scope
+      : [];
     if (
       contract.schema_version !== "factory-task-envelope.v1"
       || !text(contract.envelope_id)
@@ -445,6 +785,44 @@ export function parseDispatch(value: unknown, allowedOwner = "iMelki"): MckDispa
       || repository.slug !== `${repository.owner}/${repository.name}`
     ) {
       throw new Error("Factory contract repository identity is not allowed");
+    }
+    const envelope = validateCanonicalFactoryTaskEnvelope(contract.envelope, {
+      attemptId: String(value.dispatch.attempt_id),
+      deliveryId: String(value.dispatch.delivery_id),
+      correlationId: String(value.dispatch.correlation_id),
+      taskRevision: String(value.dispatch.task_revision),
+      taskId: String(value.task.id),
+      repositorySlug: String(repository.slug),
+      repositoryBaseSha: String(repository.base_sha),
+    });
+    const sameStringArray = (left: unknown, right: string[]) => (
+      Array.isArray(left)
+      && left.length === right.length
+      && left.every((item, index) => item === right[index])
+    );
+    const canonicalReviewMode = contract.review_mode === "pair_review"
+      ? "pair-review"
+      : contract.review_mode === "human_required"
+        ? "human-final"
+        : "independent";
+    if (
+      contract.envelope_id !== envelope.envelopeId
+      || !text(contract.envelope_sha256)
+      || contract.envelope_sha256 !== canonicalFactorySha256(envelope)
+      || envelope.origin.github.repository !== source.repo_name
+      || envelope.origin.github.issueNumber !== source.issue_number
+      || envelope.origin.github.projectItemId !== (source.project_item_id ?? null)
+      || !sameStringArray(legacyAllowedPaths, envelope.repository.allowedPaths)
+      || !sameStringArray(contract.acceptance_criteria, envelope.work.acceptanceCriteria)
+      || !sameStringArray(contract.test_requirements, envelope.work.testRequirements)
+      || contract.risk_level !== envelope.work.risk
+      || canonicalReviewMode !== envelope.work.reviewMode
+      || contract.rollback_plan !== envelope.work.rollback.strategy
+      || !record(contract.limits)
+      || contract.limits.max_repair_attempts !== envelope.execution.maxRepairAttempts
+      || contract.limits.concurrent_mutating_builders !== envelope.execution.concurrentMutatingBuilders
+    ) {
+      throw new Error("Factory contract aliases do not match the canonical envelope readback");
     }
     if (
       !nonEmptyStringArray(repository.allowed_file_scope)
@@ -478,6 +856,7 @@ export function validateReceipt(
     repositorySlug: string;
     repositoryBaseSha: string;
     allowedFileScope?: string[];
+    requireAuthoritativeCompletion?: boolean;
   },
 ): FactoryReceipt {
   const idPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$/;
@@ -492,6 +871,7 @@ export function validateReceipt(
     Number.isInteger(candidate)
     && Number(candidate) >= 0
   );
+  const isV2 = record(value) && value.schemaVersion === FACTORY_RUN_RECEIPT_V2_SCHEMA_VERSION;
   if (
     !record(value)
     || !hasOnlyKeys(value, [
@@ -515,7 +895,10 @@ export function validateReceipt(
       "privacy",
       "errors",
     ])
-    || value.schemaVersion !== "agent-settings.factory-run-receipt.v1"
+    || (
+      value.schemaVersion !== FACTORY_RUN_RECEIPT_V1_SCHEMA_VERSION
+      && value.schemaVersion !== FACTORY_RUN_RECEIPT_V2_SCHEMA_VERSION
+    )
     || !text(value.receiptId)
     || !idPattern.test(value.receiptId)
     || !text(value.envelopeId)
@@ -523,6 +906,9 @@ export function validateReceipt(
     || value.status !== "succeeded"
   ) {
     throw new Error("Factory receipt identity is invalid");
+  }
+  if (expected?.requireAuthoritativeCompletion && !isV2) {
+    throw new Error("factory-run-receipt v1 is compatibility-read-only; completion requires v2 release authority");
   }
   if (
     !text(value.correlationId)
@@ -590,6 +976,7 @@ export function validateReceipt(
       "candidateSnapshotSha256",
       "expectedIndexTreeSha",
       "expectedIndexEntries",
+      "modeEvidence",
       "finalSha",
       "changedPaths",
     ])
@@ -608,6 +995,16 @@ export function validateReceipt(
       && (
         !text(value.repository.expectedIndexTreeSha)
         || !gitShaPattern.test(value.repository.expectedIndexTreeSha)
+      )
+    )
+    || (
+      isV2
+      && (
+        !text(value.repository.expectedIndexTreeSha)
+        || !gitShaPattern.test(value.repository.expectedIndexTreeSha)
+        || !Array.isArray(value.repository.expectedIndexEntries)
+        || value.repository.expectedIndexEntries.length === 0
+        || !Array.isArray(value.repository.modeEvidence)
       )
     )
     || (
@@ -669,7 +1066,7 @@ export function validateReceipt(
     || value.commands.length === 0
     || value.commands.length > 256
     || !value.commands.some((command) => record(command) && command.stage === "validation")
-    || !value.commands.some((command) => record(command) && command.stage === "release")
+    || (!isV2 && !value.commands.some((command) => record(command) && command.stage === "release"))
     || value.commands.some((command) => (
       !record(command)
       || !hasOnlyKeys(command, [
@@ -776,6 +1173,7 @@ export function validateReceipt(
       "profileManifestSha256",
       "effectiveConfigSha256",
       "toolInventorySha256",
+      "sessionProvenanceSha256",
       "decision",
       "freshSession",
       "builderSessionReused",
@@ -796,6 +1194,13 @@ export function validateReceipt(
     || !sha256Pattern.test(value.review.effectiveConfigSha256)
     || !text(value.review.toolInventorySha256)
     || !sha256Pattern.test(value.review.toolInventorySha256)
+    || (
+      isV2
+      && (
+        !text(value.review.sessionProvenanceSha256)
+        || !sha256Pattern.test(value.review.sessionProvenanceSha256)
+      )
+    )
     || !isUtc(value.review.reviewedAtUtc)
     || !text(value.review.evidenceSha256)
     || !sha256Pattern.test(value.review.evidenceSha256)
@@ -836,8 +1241,14 @@ export function validateReceipt(
       "remoteRef",
       "commitSha",
       "remoteReadbackSha",
+      "remoteReadbackTreeSha",
       "startedAtUtc",
       "finishedAtUtc",
+      "paperclipAgentId",
+      "paperclipRunId",
+      "roleProfile",
+      "effectiveConfigSha256",
+      "toolInventorySha256",
     ])
     || value.release.attempted !== true
     || value.release.pushed !== true
@@ -846,6 +1257,22 @@ export function validateReceipt(
     || !gitShaPattern.test(value.release.commitSha)
     || value.release.remoteReadbackSha !== value.release.commitSha
     || value.repository.finalSha !== value.release.commitSha
+    || (
+      isV2
+      && (
+        !text(value.release.remoteReadbackTreeSha)
+        || !gitShaPattern.test(value.release.remoteReadbackTreeSha)
+        || !text(value.release.paperclipAgentId)
+        || !idPattern.test(value.release.paperclipAgentId)
+        || !text(value.release.paperclipRunId)
+        || !idPattern.test(value.release.paperclipRunId)
+        || value.release.roleProfile !== "factory-integrator-release-steward"
+        || !text(value.release.effectiveConfigSha256)
+        || !sha256Pattern.test(value.release.effectiveConfigSha256)
+        || !text(value.release.toolInventorySha256)
+        || !sha256Pattern.test(value.release.toolInventorySha256)
+      )
+    )
     || !isUtc(value.release.startedAtUtc)
     || !isUtc(value.release.finishedAtUtc)
   ) {
@@ -895,6 +1322,37 @@ export function validateReceipt(
   return value as unknown as FactoryReceipt;
 }
 
+export type FactoryReceiptAuthority =
+  | "v1-legacy-compatibility"
+  | "v2-release-authority";
+
+export interface FactoryReceiptAuthorityProjection {
+  schemaVersion: string;
+  authority: FactoryReceiptAuthority;
+  receiptId: string;
+  status: string;
+  canonicalSha256: string;
+  validationSucceeded: boolean;
+  independentReviewAccepted: boolean;
+  remoteCommitReadbackVerified: boolean;
+  privacyVerified: boolean;
+}
+
+export function projectFactoryReceiptAuthority(receipt: FactoryReceipt): FactoryReceiptAuthorityProjection {
+  const authoritative = receipt.schemaVersion === FACTORY_RUN_RECEIPT_V2_SCHEMA_VERSION;
+  return {
+    schemaVersion: receipt.schemaVersion,
+    authority: authoritative ? "v2-release-authority" : "v1-legacy-compatibility",
+    receiptId: receipt.receiptId,
+    status: receipt.status,
+    canonicalSha256: canonicalFactoryDigest(receipt),
+    validationSucceeded: authoritative,
+    independentReviewAccepted: authoritative,
+    remoteCommitReadbackVerified: authoritative,
+    privacyVerified: authoritative,
+  };
+}
+
 export function redactDiagnostic(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactDiagnostic);
   if (!record(value)) {
@@ -902,7 +1360,9 @@ export function redactDiagnostic(value: unknown): unknown {
     return redactDiagnosticString(value);
   }
   return Object.fromEntries(Object.entries(value).map(([key, child]) => {
-    if (/authorization|token|secret|password|api[_-]?key/i.test(key)) return [key, "[redacted]"];
+    if (/authorization|token|secret|password|signature|hmac|api[_-]?key/i.test(key)) {
+      return [key, "[redacted]"];
+    }
     return [key, redactDiagnostic(child)];
   }));
 }
@@ -923,7 +1383,12 @@ function redactEmbeddedUrl(input: string) {
       const url = new URL(urlText);
       return `${url.protocol}//${url.host}${url.pathname}${trailing}`;
     } catch {
-      return candidate;
+      const withoutQueryOrFragment = urlText.replace(/[?#].*$/, "");
+      const withoutUserInfo = withoutQueryOrFragment.replace(
+        /^(https?:\/\/)[^/?#\s]*@/i,
+        "$1[redacted]@",
+      );
+      return `${withoutUserInfo}${trailing}`;
     }
   });
 }

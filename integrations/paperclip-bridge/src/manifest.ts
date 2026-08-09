@@ -131,7 +131,7 @@ const manifest: PaperclipPluginManifestV1 = {
     {
       name: TOOL_REPORT_LIFECYCLE,
       displayName: "Report MCK Factory Lifecycle",
-      description: "Publish a signed lifecycle update for one MCK correlation ID. Completed requires current Validator/Reviewer evidence plus factory-run-receipt.v1.",
+      description: "Publish a signed lifecycle update for one MCK correlation ID. Completed requires current Validator/Reviewer evidence plus authoritative factory-run-receipt.v2.",
       parametersSchema: {
         type: "object",
         required: ["correlation_id", "status", "summary"],

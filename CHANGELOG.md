@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Made factory envelopes canonical and receipt v2 authoritative (2026-08-09, #136)** -
+  Dispatch v2 now embeds, validates, hashes, and persists the complete Agent
+  Settings `factory-task-envelope.v1` before network I/O, while retaining
+  exact-match snake_case aliases for installed-plugin compatibility. Lifecycle
+  readback revalidates the stored envelope and digest. Historical receipt v1
+  remains readable, but only receipt v2 with exact index, independent reviewer
+  session, release-steward identity, remote `refs/heads/dev` SHA/tree readback,
+  reconciliation, and privacy evidence can authorize Done. Receipt authority
+  and canonical digest are stored on the dispatch attempt and activity/event
+  records. The v2 builder now lives in a server-only module, while the webpack
+  resolver maps NodeNext `.js` specifiers to their TypeScript sources so the
+  shared plugin contract compiles in both the plugin and production app builds.
+
 - **Adopt dnd-kit/shadcn for kanban, Card, and Tabs (2026-08-02, #48)** -
   `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core`/`@dnd-kit/sortable`
   instead of native HTML5 drag events (accessible keyboard reordering);

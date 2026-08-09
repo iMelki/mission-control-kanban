@@ -63,8 +63,14 @@ export interface TaskDispatchAttempt {
   correlation_id?: string | null;
   task_revision?: string | null;
   payload_hash?: string | null;
+  envelope_id?: string | null;
+  envelope_sha256?: string | null;
+  envelope_json?: string | null;
   lifecycle_status?: string | null;
   receipt_id?: string | null;
+  receipt_schema_version?: string | null;
+  receipt_authority?: string | null;
+  receipt_sha256?: string | null;
   receipt_json?: string | null;
   created_at: string;
   updated_at?: string | null;

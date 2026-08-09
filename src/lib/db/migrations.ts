@@ -655,6 +655,33 @@ const migrations: Migration[] = [
       `);
     }
   },
+  {
+    id: '020',
+    name: 'add_canonical_factory_envelope_and_receipt_authority',
+    up: (db) => {
+      console.log('[Migration 020] Adding canonical factory envelope and receipt authority readback...');
+      const columns = db.prepare("PRAGMA table_info(task_dispatch_attempts)").all() as { name: string }[];
+      const additions: Array<[string, string]> = [
+        ['envelope_id', 'ALTER TABLE task_dispatch_attempts ADD COLUMN envelope_id TEXT'],
+        ['envelope_sha256', 'ALTER TABLE task_dispatch_attempts ADD COLUMN envelope_sha256 TEXT'],
+        ['envelope_json', 'ALTER TABLE task_dispatch_attempts ADD COLUMN envelope_json TEXT'],
+        ['receipt_schema_version', 'ALTER TABLE task_dispatch_attempts ADD COLUMN receipt_schema_version TEXT'],
+        ['receipt_authority', 'ALTER TABLE task_dispatch_attempts ADD COLUMN receipt_authority TEXT'],
+        ['receipt_sha256', 'ALTER TABLE task_dispatch_attempts ADD COLUMN receipt_sha256 TEXT'],
+      ];
+      for (const [name, sql] of additions) {
+        if (!columns.some((column) => column.name === name)) db.exec(sql);
+      }
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_envelope
+          ON task_dispatch_attempts(envelope_id)
+          WHERE envelope_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_receipt_authority
+          ON task_dispatch_attempts(receipt_authority, updated_at DESC)
+          WHERE receipt_authority IS NOT NULL;
+      `);
+    }
+  },
 ];
 
 /**

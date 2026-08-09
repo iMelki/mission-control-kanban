@@ -20,6 +20,11 @@ import {
   type TaskRevisionAgentIdentity,
 } from '@/lib/dispatch-adapters';
 import { factoryChangedPathsMatchScope } from '../../../../../integrations/paperclip-bridge/src/factory-paths';
+import {
+  canonicalFactorySha256,
+  projectFactoryReceiptAuthority,
+  validateCanonicalFactoryTaskEnvelope,
+} from '../../../../../integrations/paperclip-bridge/src/contracts';
 import type { Task, Agent, OpenClawSession } from '@/lib/types';
 
 interface TaskDispatchAttemptRow {
@@ -29,7 +34,11 @@ interface TaskDispatchAttemptRow {
   runtime_type: string;
   correlation_id: string | null;
   task_revision: string | null;
+  delivery_id: string | null;
   request_payload: string | null;
+  envelope_id: string | null;
+  envelope_sha256: string | null;
+  envelope_json: string | null;
   lifecycle_status: string | null;
   receipt_id: string | null;
 }
@@ -51,6 +60,40 @@ function receiptIdFrom(receipt?: Record<string, unknown>) {
 }
 
 function attemptedFactoryIdentity(attempt: TaskDispatchAttemptRow) {
+  if (attempt.envelope_json || attempt.envelope_id || attempt.envelope_sha256) {
+    if (!attempt.envelope_json || !attempt.envelope_id || !attempt.envelope_sha256 || !attempt.delivery_id) {
+      return { identity: null, error: 'canonical envelope persistence is incomplete' };
+    }
+    try {
+      const parsed = JSON.parse(attempt.envelope_json);
+      const envelope = validateCanonicalFactoryTaskEnvelope(parsed, {
+        attemptId: attempt.id,
+        deliveryId: attempt.delivery_id,
+        correlationId: attempt.correlation_id ?? '',
+        taskRevision: attempt.task_revision ?? '',
+        taskId: attempt.task_id,
+      });
+      if (
+        envelope.envelopeId !== attempt.envelope_id
+        || canonicalFactorySha256(envelope) !== attempt.envelope_sha256
+      ) {
+        return { identity: null, error: 'canonical envelope hash readback does not match persistence' };
+      }
+      return {
+        identity: {
+          repositorySlug: envelope.repository.slug,
+          repositoryBaseSha: envelope.repository.baseSha,
+          allowedFileScope: envelope.repository.allowedPaths,
+          envelopeId: envelope.envelopeId,
+        },
+      };
+    } catch (error) {
+      return {
+        identity: null,
+        error: error instanceof Error ? error.message : 'canonical envelope readback is invalid',
+      };
+    }
+  }
   if (!attempt.request_payload) return null;
   try {
     const payload = JSON.parse(attempt.request_payload) as {
@@ -64,7 +107,7 @@ function attemptedFactoryIdentity(attempt: TaskDispatchAttemptRow) {
     const allowedFileScope = payload.factory_contract?.repository?.allowed_file_scope;
     const envelopeId = payload.factory_contract?.envelope_id;
     return typeof repositorySlug === 'string' && typeof envelopeId === 'string'
-      ? {
+      ? { identity: {
         repositorySlug,
         repositoryBaseSha: (
           typeof repositoryBaseSha === 'string'
@@ -75,10 +118,10 @@ function attemptedFactoryIdentity(attempt: TaskDispatchAttemptRow) {
           ? allowedFileScope
           : [],
         envelopeId,
-      }
-      : null;
+      } }
+      : { identity: null, error: 'legacy factory contract identity is incomplete' };
   } catch {
-    return null;
+    return { identity: null, error: 'legacy factory contract readback is not valid JSON' };
   }
 }
 
@@ -120,7 +163,15 @@ function lifecycleRejection(
     };
   }
 
-  const expectedFactoryIdentity = attemptedFactoryIdentity(lifecycleAttempt);
+  const attemptedFactoryReadback = attemptedFactoryIdentity(lifecycleAttempt);
+  if (!attemptedFactoryReadback || attemptedFactoryReadback.error || !attemptedFactoryReadback.identity) {
+    return {
+      reason: 'dispatch_envelope_invalid',
+      message: 'Accepted factory dispatch envelope could not be verified from persistence',
+      status: 409,
+    };
+  }
+  const expectedFactoryIdentity = attemptedFactoryReadback.identity;
   const currentRevision = computeTaskRevision(
     task,
     taskRevisionAgentIdentity(task),
@@ -219,6 +270,7 @@ function recordLifecycleCallback({
   correlationId,
   taskRevision,
   receipt,
+  receiptAuthority,
   now,
 }: {
   task: Task;
@@ -230,6 +282,7 @@ function recordLifecycleCallback({
   correlationId: string;
   taskRevision: string;
   receipt?: Record<string, unknown>;
+  receiptAuthority?: ReturnType<typeof projectFactoryReceiptAuthority>;
   now: string;
 }) {
   const newStatus = taskStatusAfterLifecycle(task, callbackStatus);
@@ -257,6 +310,8 @@ function recordLifecycleCallback({
         correlation_id: correlationId,
         task_revision: taskRevision,
         receipt_id: receiptIdFrom(receipt),
+        receipt_authority: receiptAuthority?.authority,
+        receipt_sha256: receiptAuthority?.canonicalSha256,
       }),
       now,
     ]
@@ -275,17 +330,23 @@ function recordLifecycleCallback({
         correlation_id: correlationId,
         task_revision: taskRevision,
         receipt_id: receiptIdFrom(receipt),
+        receipt_authority: receiptAuthority?.authority,
+        receipt_sha256: receiptAuthority?.canonicalSha256,
       }),
       now,
     ]
   );
   run(
     `UPDATE task_dispatch_attempts
-     SET lifecycle_status = ?, receipt_id = ?, receipt_json = ?, updated_at = ?
+     SET lifecycle_status = ?, receipt_id = ?, receipt_schema_version = ?,
+         receipt_authority = ?, receipt_sha256 = ?, receipt_json = ?, updated_at = ?
      WHERE id = ? AND task_id = ?`,
     [
       callbackStatus,
       receiptIdFrom(receipt),
+      receiptAuthority?.schemaVersion ?? null,
+      receiptAuthority?.authority ?? null,
+      receiptAuthority?.canonicalSha256 ?? null,
       receipt ? JSON.stringify(receipt) : null,
       now,
       attemptId,
@@ -447,8 +508,9 @@ export async function POST(request: NextRequest) {
         }
 
         const lifecycleAttempt = queryOne<TaskDispatchAttemptRow>(
-          `SELECT id, task_id, agent_id, runtime_type, correlation_id, task_revision,
-                  request_payload, lifecycle_status, receipt_id
+          `SELECT id, task_id, agent_id, runtime_type, delivery_id, correlation_id, task_revision,
+                  request_payload, envelope_id, envelope_sha256, envelope_json,
+                  lifecycle_status, receipt_id
            FROM task_dispatch_attempts
            WHERE id = ? AND task_id = ?`,
           [normalized.attempt_id, normalized.task_id]
@@ -501,6 +563,7 @@ export async function POST(request: NextRequest) {
           correlationId: normalized.correlation_id || '',
           taskRevision: normalized.task_revision || '',
           receipt: normalized.receipt as Record<string, unknown> | undefined,
+          receiptAuthority: normalized.receipt_authority,
           now,
         });
         finishWebhookCallbackDelivery(deliveryId, { status: 'accepted' });

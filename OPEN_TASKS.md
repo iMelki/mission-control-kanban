@@ -16,8 +16,17 @@ the local operator entrypoint; historical task notes remain in
   - Focused regression coverage passes in the Paperclip bridge plugin and MCK
     factory callback tests. Persisted JSONB envelopes are now revalidated by
     the canonical `parseDispatch` path before correlation reuse or issue lookup;
-    malformed persisted contracts fail closed. Receipt-v2 authority and full
-    canonical envelope persistence remain separately gated work under this issue.
+    malformed persisted contracts fail closed.
+  - Canonical contract slice completed on 2026-08-09: dispatch v2 validates and
+    persists the complete Agent Settings `factory-task-envelope.v1` plus its
+    canonical digest before network I/O, then revalidates/hash-checks the stored
+    envelope for lifecycle readback. Receipt v1 remains readable but cannot
+    complete; only receipt v2 with exact index, independent session, release
+    steward, remote `dev` SHA/tree, reconciliation, and privacy authority moves
+    a task to Done.
+  - Remaining issue gate: prove the upgraded contract through the installed
+    Paperclip host and live MCK/Mission Control reconciliation under #47 after
+    the separately tracked exact host-SHA gate in #135 is refreshed.
 
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
@@ -52,8 +61,8 @@ the local operator entrypoint; historical task notes remain in
   - Host compatibility is now fail-closed on the exact `testedCommit` even
     when a partial `testedFiles` attestation is present; the mismatch case is
     covered by `tests/host-compatibility.spec.ts`. The current host remains
-    intentionally blocked until an owner-approved clean reviewed SHA matches
-    the package metadata.
+    intentionally blocked until an owner-approved SHA from a clean, reviewed
+    checkout matches the package metadata.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.

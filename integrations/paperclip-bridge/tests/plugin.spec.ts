@@ -31,7 +31,10 @@ import plugin, {
 import {
   assertSuccessfulPublication,
   assertCorrelationRevision,
+  canonicalFactoryDigest,
+  canonicalFactorySha256,
   parseDispatch,
+  projectFactoryReceiptAuthority,
   redactDiagnostic,
   signMissionControlOutcome,
   validateReceipt,
@@ -89,17 +92,78 @@ function createRpcTransport() {
 }
 
 function dispatchV2(): MckDispatchV2 {
+  const issuedAt = new Date().toISOString();
+  const envelope = {
+    schemaVersion: "agent-settings.factory-task-envelope.v1" as const,
+    envelopeId: "factory:attempt-1",
+    correlationId: "mck:default:task-0001",
+    createdAtUtc: issuedAt,
+    origin: {
+      source: "github-project" as const,
+      taskId: "task-0001",
+      attemptId: "attempt-1",
+      deliveryId: "delivery-1",
+      taskRevisionSha256: `sha256:${"a".repeat(64)}`,
+      github: {
+        owner: "iMelki" as const,
+        repository: "mission-control-kanban",
+        issueNumber: 47,
+        projectNumber: 13,
+        projectItemId: "PVTI_factory",
+      },
+    },
+    repository: {
+      path: "S:/source/CCAI/Assistants/tools/mission-control-kanban",
+      slug: "iMelki/mission-control-kanban",
+      originRemote: "git@github.com:iMelki/mission-control-kanban.git",
+      branch: "dev" as const,
+      baseSha: "9".repeat(40),
+      allowedPaths: ["src/**"],
+    },
+    work: {
+      title: "Build bridge",
+      acceptanceCriteria: ["Bridge works"],
+      testRequirements: ["npm test"],
+      risk: "high" as const,
+      reviewMode: "pair-review" as const,
+      rollback: {
+        strategy: "Disable v2",
+        verification: "Verify v1 dispatch remains healthy.",
+      },
+    },
+    execution: {
+      capabilityProfile: "factory-builder",
+      maxRepairAttempts: 2,
+      timeoutSeconds: 3_600,
+      concurrentMutatingBuilders: 1 as const,
+      repositoryManifest: {
+        path: ".agentic-factory.json" as const,
+        sha256: `sha256:${"b".repeat(64)}`,
+      },
+      callbacks: [{
+        kind: "mck-lifecycle" as const,
+        url: "http://127.0.0.1:3021/api/webhooks/agent-completion",
+        localOnly: true as const,
+        authenticationRef: "secret:mck-webhook-callback-signature",
+      }],
+    },
+    privacy: {
+      containsSecrets: false as const,
+      containsDirectPersonalIdentifiers: false as const,
+      rawPrivateLogsIncluded: false as const,
+    },
+  };
   return {
     event: "mck.task.dispatch",
     version: 2,
     dispatch: {
       attempt_id: "attempt-1",
       delivery_id: "delivery-1",
-      correlation_id: "mck:default:task-1",
+      correlation_id: "mck:default:task-0001",
       task_revision: "a".repeat(64),
     },
     task: {
-      id: "task-1",
+      id: "task-0001",
       title: "Build bridge",
       description: "Implement it",
       priority: "high",
@@ -108,6 +172,7 @@ function dispatchV2(): MckDispatchV2 {
         repo_name: "mission-control-kanban",
         issue_number: 47,
         issue_url: "https://github.com/iMelki/mission-control-kanban/issues/47",
+        project_item_id: "PVTI_factory",
       },
       dispatch_metadata: { readiness: "ready_for_agent" },
     },
@@ -122,7 +187,7 @@ function dispatchV2(): MckDispatchV2 {
     mission_control_url: "http://127.0.0.1:3021",
     output_directory: "S:/source/CCAI/Assistants/tools/mission-control-kanban",
     prompt_markdown: "# Work",
-    issued_at: new Date().toISOString(),
+    issued_at: issuedAt,
     factory_contract: {
       schema_version: "factory-task-envelope.v1",
       envelope_id: "factory:attempt-1",
@@ -142,6 +207,8 @@ function dispatchV2(): MckDispatchV2 {
       rollback_plan: "Disable v2",
       safety_rules: [],
       limits: { max_repair_attempts: 2, concurrent_mutating_builders: 1 },
+      envelope,
+      envelope_sha256: canonicalFactorySha256(envelope),
     },
   };
 }
@@ -832,6 +899,12 @@ describe("MCK Paperclip bridge", () => {
     const uppercaseBase = dispatchV2();
     uppercaseBase.factory_contract.repository.base_sha = "A".repeat(40);
     expect(() => parseDispatch(uppercaseBase)).toThrow(/repository identity/);
+    const changedEnvelopeHash = dispatchV2();
+    changedEnvelopeHash.factory_contract.envelope_sha256 = `sha256:${"0".repeat(64)}`;
+    expect(() => parseDispatch(changedEnvelopeHash)).toThrow(/aliases do not match/);
+    const changedWorkAlias = dispatchV2();
+    changedWorkAlias.factory_contract.acceptance_criteria = ["Ship a different result"];
+    expect(() => parseDispatch(changedWorkAlias)).toThrow(/aliases do not match/);
   });
 
   it("rejects callback alias drift and every non-canonical factory endpoint", () => {
@@ -880,7 +953,7 @@ describe("MCK Paperclip bridge", () => {
       expect(factoryPathValidationError(path, "scope"), path).not.toBeNull();
       const candidate = dispatchV2();
       candidate.factory_contract.repository.allowed_file_scope = [path];
-      expect(() => parseDispatch(candidate), path).toThrow(/contract is incomplete/);
+      expect(() => parseDispatch(candidate), path).toThrow(/contract is incomplete|aliases do not match/);
     }
     expect(factoryPathValidationError("src/**", "scope")).toBeNull();
     expect(factoryPathValidationError("src/worker.ts", "changed")).toBeNull();
@@ -895,7 +968,7 @@ describe("MCK Paperclip bridge", () => {
   it("rejects incomplete contracts and changed revisions before graph creation", () => {
     const incomplete = dispatchV2();
     incomplete.factory_contract.acceptance_criteria = [];
-    expect(() => parseDispatch(incomplete)).toThrow(/contract is incomplete/);
+    expect(() => parseDispatch(incomplete)).toThrow(/contract is incomplete|aliases do not match/);
     expect(() => assertCorrelationRevision(
       { task_revision: "a".repeat(64) },
       "b".repeat(64),
@@ -1771,7 +1844,7 @@ describe("MCK Paperclip bridge", () => {
     });
     const releaseBody = JSON.stringify(releaseEvidence);
     const receipt = {
-      schemaVersion: "agent-settings.factory-run-receipt.v1",
+      schemaVersion: "agent-settings.factory-run-receipt.v2",
       receiptId: "receipt-1",
       envelopeId: "factory:attempt-1",
       correlationId: "mck:default:task-1",
@@ -1797,6 +1870,14 @@ describe("MCK Paperclip bridge", () => {
         baseSha: "9".repeat(40),
         headBeforeReleaseSha: "8".repeat(40),
         candidateSnapshotSha256: `sha256:${"c".repeat(64)}`,
+        expectedIndexTreeSha: "e".repeat(40),
+        expectedIndexEntries: [{
+          path: "src/worker.ts",
+          state: "present",
+          mode: "100644",
+          blobOid: "f".repeat(40),
+        }],
+        modeEvidence: [],
         finalSha: "b".repeat(40),
         changedPaths: ["src/worker.ts"],
       },
@@ -1840,6 +1921,7 @@ describe("MCK Paperclip bridge", () => {
         profileManifestSha256: releaseEvidence.review.profileManifestSha256,
         effectiveConfigSha256: releaseEvidence.review.effectiveConfigSha256,
         toolInventorySha256: releaseEvidence.review.toolInventorySha256,
+        sessionProvenanceSha256: `sha256:${"0".repeat(64)}`,
         decision: "accept",
         freshSession: true,
         builderSessionReused: false,
@@ -1853,8 +1935,14 @@ describe("MCK Paperclip bridge", () => {
         remoteRef: "refs/heads/dev",
         commitSha: "b".repeat(40),
         remoteReadbackSha: "b".repeat(40),
+        remoteReadbackTreeSha: "e".repeat(40),
         startedAtUtc: times.releaseCommandStart,
         finishedAtUtc: times.releaseCommandFinish,
+        paperclipAgentId: "release-agent",
+        paperclipRunId: "release-run",
+        roleProfile: "factory-integrator-release-steward",
+        effectiveConfigSha256: `sha256:${"a".repeat(64)}`,
+        toolInventorySha256: `sha256:${"b".repeat(64)}`,
       },
       publications: [],
       reconciliation: {
@@ -1879,8 +1967,49 @@ describe("MCK Paperclip bridge", () => {
       repositorySlug: "iMelki/mission-control-kanban",
       repositoryBaseSha: "9".repeat(40),
       allowedFileScope: ["src/**"],
+      requireAuthoritativeCompletion: true,
     });
     expect(validatedReceipt).toEqual(receipt);
+    expect(projectFactoryReceiptAuthority(validatedReceipt)).toMatchObject({
+      authority: "v2-release-authority",
+      canonicalSha256: canonicalFactoryDigest(receipt),
+      validationSucceeded: true,
+      independentReviewAccepted: true,
+      remoteCommitReadbackVerified: true,
+      privacyVerified: true,
+    });
+    expect(canonicalFactorySha256({ z: 1, a: { y: 2, b: 3 } }))
+      .toBe(canonicalFactorySha256({ a: { b: 3, y: 2 }, z: 1 }));
+    const legacyReceipt = structuredClone(receipt) as Record<string, unknown>;
+    legacyReceipt.schemaVersion = "agent-settings.factory-run-receipt.v1";
+    for (const key of ["expectedIndexTreeSha", "expectedIndexEntries", "modeEvidence"]) {
+      delete (legacyReceipt.repository as Record<string, unknown>)[key];
+    }
+    delete (legacyReceipt.review as Record<string, unknown>).sessionProvenanceSha256;
+    for (const key of [
+      "remoteReadbackTreeSha",
+      "paperclipAgentId",
+      "paperclipRunId",
+      "roleProfile",
+      "effectiveConfigSha256",
+      "toolInventorySha256",
+    ]) {
+      delete (legacyReceipt.release as Record<string, unknown>)[key];
+    }
+    const legacyRead = validateReceipt(legacyReceipt);
+    expect(projectFactoryReceiptAuthority(legacyRead)).toMatchObject({
+      authority: "v1-legacy-compatibility",
+      validationSucceeded: false,
+    });
+    expect(() => validateReceipt(legacyReceipt, {
+      envelopeId: "factory:attempt-1",
+      correlationId: "mck:default:task-1",
+      taskRevision: "a".repeat(64),
+      repositorySlug: "iMelki/mission-control-kanban",
+      repositoryBaseSha: "9".repeat(40),
+      allowedFileScope: ["src/**"],
+      requireAuthoritativeCompletion: true,
+    })).toThrow(/compatibility-read-only/);
     const hostEvidence = {
       receipt: validatedReceipt,
       validationEvidence,
@@ -2177,12 +2306,18 @@ describe("MCK Paperclip bridge", () => {
     const hmacLikeValue = ["sha256", "=0123456789abcdef0123456789abcdef"].join("");
     expect(redactDiagnostic({
       authorization: "Bearer secret",
+      signature: "sha256=structured-secret",
+      hmac: "structured-secret",
       callback: "request failed at http://127.0.0.1/callback?token=secret&attempt=1",
+      malformedCallback: "request failed at http://user:secret@?token=secret#fragment",
       nested: { api_key: "secret" },
       details: `Bearer bearer-secret ${hmacLikeValue} ${inlineApiKey} ${stripeLikeKey}`,
     })).toEqual({
       authorization: "[redacted]",
+      signature: "[redacted]",
+      hmac: "[redacted]",
       callback: "request failed at http://127.0.0.1/callback",
+      malformedCallback: "request failed at http://[redacted]@",
       nested: { api_key: "[redacted]" },
       details: "Bearer [redacted] sha256=[redacted] api_key=[redacted] [redacted]",
     });

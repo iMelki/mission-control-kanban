@@ -457,7 +457,7 @@ export async function createExecutionGraph(
     status: "backlog",
     issuePriority: priority(dispatch.task.priority),
   });
-  const envelopeDocument = await ctx.issues.documents.upsert({
+  const { envelopeDocument, envelopeReadback } = await ctx.issues.documents.upsert({
     issueId: root.id,
     companyId: config.companyId,
     key: "mck-task-envelope",
@@ -465,12 +465,15 @@ export async function createExecutionGraph(
     format: "markdown",
     body: rawDispatchBody,
     changeSummary: "Recorded signed MCK dispatch envelope",
-  });
-  const envelopeReadback = await ctx.issues.documents.get(
-    root.id,
-    "mck-task-envelope",
-    config.companyId,
-  );
+  }).then(async (envelopeDocument) => ({
+    envelopeDocument,
+    // Readback intentionally starts only after the upsert is acknowledged.
+    envelopeReadback: await ctx.issues.documents.get(
+      root.id,
+      "mck-task-envelope",
+      config.companyId,
+    ),
+  }));
   if (
     envelopeDocument.format !== "markdown"
     || envelopeReadback?.format !== "markdown"
@@ -1855,6 +1858,7 @@ async function validateReceiptForMapping(
     allowedFileScope: envelope.version === 2
       ? envelope.factory_contract.repository.allowed_file_scope
       : undefined,
+    requireAuthoritativeCompletion: true,
   };
   if (
     !mapping.parent_issue_id
@@ -1871,6 +1875,9 @@ async function validateReceiptForMapping(
     receiptDocument,
     validationDocument,
     releaseDocument,
+    receiptRevision,
+    validationRevision,
+    releaseRevision,
   ] = await Promise.all([
     ctx.issues.summaries.getOrchestration({
       issueId: mapping.parent_issue_id,
@@ -1897,8 +1904,6 @@ async function validateReceiptForMapping(
       "factory-release-evidence",
       config.companyId,
     ),
-  ]);
-  const [receiptRevision, validationRevision, releaseRevision] = await Promise.all([
     latestEvidenceRevision(ctx, config.companyId, mapping.release_issue_id, "factory-run-receipt"),
     latestEvidenceRevision(ctx, config.companyId, mapping.validate_issue_id, "factory-validation-evidence"),
     latestEvidenceRevision(ctx, config.companyId, mapping.review_issue_id, "factory-release-evidence"),
@@ -2065,7 +2070,7 @@ async function publishFromIssueEvent(ctx: PluginContext, event: PluginEvent) {
         config,
         mapping,
         "needs_human",
-        "Release finished without factory-run-receipt.v1",
+        "Release finished without authoritative factory-run-receipt.v2",
         undefined,
         { occurrenceIdentity },
       );
