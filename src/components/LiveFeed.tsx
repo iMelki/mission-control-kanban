@@ -1,7 +1,22 @@
 'use client';
 
 import { useCallback, useSyncExternalStore, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  Bell,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  MessageSquare,
+  Pin,
+  RefreshCw,
+  Settings,
+  UserPlus,
+  UserRound,
+} from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Event } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -97,7 +112,7 @@ function LiveFeedCollapsedRail({ eventCount, onExpand }: { eventCount: number; o
       >
         <ChevronLeft className="w-4 h-4" />
       </button>
-      <div className="text-2xl" aria-hidden="true">📡</div>
+      <Activity aria-hidden="true" className="w-5 h-5 text-mc-text-secondary" />
       <span
         className="rounded bg-mc-bg-tertiary px-2 py-0.5 text-xs text-mc-text-secondary"
         title={`${eventCount} events`}
@@ -178,7 +193,7 @@ function EventItem({ event }: { event: Event }) {
       }`}
     >
       <div className="flex items-start gap-2">
-        <span className="text-sm">{getEventIcon(event.type)}</span>
+        {getEventIcon(event.type)}
         <div className="flex-1 min-w-0">
           <p className={`text-sm ${isTaskEvent ? 'text-mc-accent-pink' : 'text-mc-text'}`}>
             {event.message}
@@ -193,25 +208,18 @@ function EventItem({ event }: { event: Event }) {
   );
 }
 
+const EVENT_ICONS: Record<string, LucideIcon> = {
+  task_created: ClipboardList,
+  task_assigned: UserRound,
+  task_status_changed: RefreshCw,
+  task_completed: CheckCircle2,
+  message_sent: MessageSquare,
+  agent_joined: UserPlus,
+  agent_status_changed: Bell,
+  system: Settings,
+};
+
 function getEventIcon(type: string) {
-  switch (type) {
-    case 'task_created':
-      return '📋';
-    case 'task_assigned':
-      return '👤';
-    case 'task_status_changed':
-      return '🔄';
-    case 'task_completed':
-      return '✅';
-    case 'message_sent':
-      return '💬';
-    case 'agent_joined':
-      return '🎉';
-    case 'agent_status_changed':
-      return '🔔';
-    case 'system':
-      return '⚙️';
-    default:
-      return '📌';
-  }
+  const Icon = EVENT_ICONS[type] ?? Pin;
+  return <Icon aria-hidden="true" className="mt-0.5 w-4 h-4 shrink-0 text-mc-text-secondary" />;
 }

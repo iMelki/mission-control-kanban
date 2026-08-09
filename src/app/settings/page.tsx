@@ -202,7 +202,7 @@ export default function SettingsPage() {
         {/* Environment Variables Note */}
         <section className="p-6 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <h3 className="text-lg font-semibold text-blue-400 mb-2">
-            📝 Environment Variables
+            Environment Variables
           </h3>
           <p className="text-sm text-blue-300 mb-3">
             Some settings are also configurable via environment variables in <code className="px-2 py-1 bg-mc-bg rounded">.env.local</code>:

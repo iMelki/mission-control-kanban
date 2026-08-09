@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
@@ -175,6 +175,10 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: true }),
       });
+      if (!response.ok) {
+        setDispatchDryRun(await response.json().catch(() => null));
+        return;
+      }
       setDispatchDryRun(await response.json());
     } finally {
       setIsPreviewingDispatch(false);
@@ -274,7 +278,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               id: crypto.randomUUID(),
               type: 'task_status_changed',
               task_id: savedTask.id,
-              message: `📋 Planning started for: ${savedTask.title}`,
+              message: `Planning started for: ${savedTask.title}`,
               created_at: new Date().toISOString(),
             });
           }
@@ -296,9 +300,12 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     }
   };
 
+  const deleteInFlight = useRef(false);
   const handleDelete = async () => {
+    if (deleteInFlight.current) return;
     if (!currentTask || !confirm(`Delete \"${currentTask.title}\"?`)) return;
 
+    deleteInFlight.current = true;
     setSubmitError(null);
 
     try {
@@ -315,6 +322,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     } catch (error) {
       console.error('Failed to delete task:', error);
       setSubmitError(error instanceof Error ? error.message : 'Failed to delete task');
+    } finally {
+      deleteInFlight.current = false;
     }
   };
 
@@ -519,11 +528,11 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               <option value="">Unassigned</option>
               {agents.map((agent) => (
                 <option key={agent.id} value={agent.id}>
-                  {agent.avatar_emoji} {agent.name} - {agent.role}
+                  {agent.name} - {agent.role}
                 </option>
               ))}
               <option value="__add_new__" className="text-mc-accent">
-                ➕ Add new agent…
+                + Add new agent…
               </option>
             </select>
             {assignedAgent && (

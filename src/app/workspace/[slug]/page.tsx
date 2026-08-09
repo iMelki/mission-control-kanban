@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw, SearchX } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { MissionQueue } from '@/components/MissionQueue';
@@ -368,7 +368,7 @@ export default function WorkspacePage() {
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔍</div>
+          <SearchX aria-hidden="true" className="w-14 h-14 mx-auto mb-4 text-mc-text-secondary" />
           <h1 className="text-2xl font-bold mb-2">Workspace Not Found</h1>
           <p className="text-mc-text-secondary mb-6">
             The workspace &ldquo;{slug}&rdquo; doesn&apos;t exist.

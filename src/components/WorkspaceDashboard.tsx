@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle, Github } from 'lucide-react';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import Link from 'next/link';
 import { LocalControlPanel } from '@/components/LocalControlPanel';
 import type { WorkspaceStats } from '@/lib/types';
@@ -163,7 +164,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
       <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-[border-color,box-shadow] hover:shadow-lg cursor-pointer group relative">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <span className="text-3xl">{workspace.icon}</span>
+            <EntityEmoji emoji={workspace.icon} kind="workspace" hidden className="text-3xl" />
             <div>
               <h3 className="font-semibold text-lg group-hover:text-mc-accent transition-colors">
                 {workspace.name}
@@ -243,7 +244,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
             Are you sure you want to delete <strong>{workspace.name}</strong>?
             {workspace.taskCounts.total > 0 && (
               <span className="block mt-2 text-mc-accent-red">
-                ⚠️ This workspace has {workspace.taskCounts.total} task(s). Delete them first.
+                This workspace has {workspace.taskCounts.total} task(s). Delete them first.
               </span>
             )}
           </p>
@@ -322,7 +323,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
                   key={workspaceIcon}
                   type="button"
                   onClick={() => setIcon(workspaceIcon)}
-                  aria-label={`Select ${workspaceIcon} workspace icon`}
+                  aria-pressed={icon === workspaceIcon}
                   className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-colors ${
                     icon === workspaceIcon
                       ? 'bg-mc-accent/20 border-2 border-mc-accent'

@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Zap, ZapOff, Loader2 } from 'lucide-react';
+import { Plus, Bot, ChevronLeft, ChevronRight, Zap, ZapOff, Loader2 } from 'lucide-react';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentRuntimeType, AgentStatus, OpenClawSession } from '@/lib/types';
 import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes';
@@ -215,7 +216,7 @@ function AgentsCollapsedRail({
       >
         <ChevronRight className="w-4 h-4" />
       </button>
-      <div className="text-2xl" aria-hidden="true">🤖</div>
+      <Bot aria-hidden="true" className="w-5 h-5 text-mc-text-secondary" />
       <span className="rounded bg-mc-bg-tertiary px-2 py-0.5 text-xs text-mc-text-secondary">
         {agentCount}
       </span>
@@ -447,7 +448,7 @@ function AgentRow({
     >
       <button type="button" onClick={onSelect} className="w-full flex items-center gap-3 p-2 text-left">
         <div className="text-2xl relative">
-          {agent.avatar_emoji}
+          <EntityEmoji emoji={agent.avatar_emoji} hidden />
           {openclawSession && (
             <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />
           )}

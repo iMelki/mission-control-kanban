@@ -155,7 +155,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                       key={emoji}
                       type="button"
                       onClick={() => setForm({ ...form, avatar_emoji: emoji })}
-                      aria-label={`Select ${emoji} avatar`}
+                      aria-pressed={form.avatar_emoji === emoji}
                       className={`text-2xl p-2 rounded hover:bg-mc-bg-tertiary ${
                         form.avatar_emoji === emoji
                           ? 'bg-mc-accent/20 ring-2 ring-mc-accent'

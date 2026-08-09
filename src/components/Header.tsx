@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Zap, Settings, ChevronLeft, LayoutGrid } from 'lucide-react';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import { RuntimeHealthBadges } from '@/components/RuntimeHealthBadges';
@@ -72,7 +73,7 @@ export function Header({ workspace }: HeaderProps) {
             </Link>
             <span className="text-mc-text-secondary">/</span>
             <div className="flex items-center gap-2 px-3 py-1 bg-mc-bg-tertiary rounded">
-              <span className="text-lg">{workspace.icon}</span>
+              <EntityEmoji emoji={workspace.icon} kind="workspace" hidden className="text-lg" />
               <span className="font-medium">{workspace.name}</span>
             </div>
           </div>

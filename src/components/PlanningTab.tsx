@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, Circle, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { CheckCircle, Circle, ClipboardList, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 
 interface PlanningOption {
   id: string;
@@ -81,28 +82,34 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
   }, [loadState]);
 
   // Start planning session
+  const startInFlight = useRef(false);
   const startPlanning = async () => {
+    if (startInFlight.current) return;
+    startInFlight.current = true;
     setStarting(true);
     setError(null);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}/planning`, { method: 'POST' });
-      const data = await res.json();
 
-      if (res.ok) {
-        setState(prev => ({
-          ...prev!,
-          sessionKey: data.sessionKey,
-          messages: data.messages || [],
-          currentQuestion: data.currentQuestion,
-          isStarted: true,
-        }));
-      } else {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
         setError(data.error || 'Failed to start planning');
+        return;
       }
+
+      const data = await res.json();
+      setState(prev => ({
+        ...prev!,
+        sessionKey: data.sessionKey,
+        messages: data.messages || [],
+        currentQuestion: data.currentQuestion,
+        isStarted: true,
+      }));
     } catch (err) {
       setError('Failed to start planning');
     } finally {
+      startInFlight.current = false;
       setStarting(false);
     }
   };
@@ -124,34 +131,35 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
         }),
       });
 
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Failed to submit answer');
+        return;
+      }
+
       const data = await res.json();
+      setSelectedOption(null);
+      setOtherText('');
 
-      if (res.ok) {
-        setSelectedOption(null);
-        setOtherText('');
+      if (data.complete) {
+        setState(prev => ({
+          ...prev!,
+          isComplete: true,
+          spec: data.spec,
+          agents: data.agents,
+          messages: data.messages,
+          currentQuestion: undefined,
+        }));
 
-        if (data.complete) {
-          setState(prev => ({
-            ...prev!,
-            isComplete: true,
-            spec: data.spec,
-            agents: data.agents,
-            messages: data.messages,
-            currentQuestion: undefined,
-          }));
-
-          if (onSpecLocked) {
-            onSpecLocked();
-          }
-        } else {
-          setState(prev => ({
-            ...prev!,
-            currentQuestion: data.currentQuestion,
-            messages: data.messages,
-          }));
+        if (onSpecLocked) {
+          onSpecLocked();
         }
       } else {
-        setError(data.error || 'Failed to submit answer');
+        setState(prev => ({
+          ...prev!,
+          currentQuestion: data.currentQuestion,
+          messages: data.messages,
+        }));
       }
     } catch (err) {
       setError('Failed to submit answer');
@@ -213,7 +221,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
             <div className="space-y-2">
               {state.agents.map((agent, i) => (
                 <div key={i} className="bg-mc-bg border border-mc-border rounded-lg p-3 flex items-center gap-3">
-                  <span className="text-2xl">{agent.avatar_emoji}</span>
+                  <EntityEmoji emoji={agent.avatar_emoji} hidden className="text-2xl" />
                   <div>
                     <p className="font-medium">{agent.name}</p>
                     <p className="text-sm text-mc-text-secondary">{agent.role}</p>
@@ -258,7 +266,10 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
               Starting...
             </>
           ) : (
-            <>📋 Start Planning</>
+            <>
+              <ClipboardList aria-hidden="true" className="w-5 h-5" />
+              Start Planning
+            </>
           )}
         </button>
       </div>
@@ -295,7 +306,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
               type="button"
                       onClick={() => setSelectedOption(option.label)}
                       disabled={submitting}
-                      className={`w-full flex items-center gap-3 p-4 rounded-lg border transition-all text-left ${
+                      className={`w-full flex items-center gap-3 p-4 rounded-lg border transition-colors text-left ${
                         isSelected
                           ? 'border-mc-accent bg-mc-accent/10'
                           : 'border-mc-border hover:border-mc-accent/50'
@@ -313,7 +324,11 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
                     {/* Other text input */}
                     {isOther && isSelected && (
                       <div className="mt-2 ml-11">
+                        <label htmlFor="planning-other-text" className="mb-1 block text-xs text-mc-text-secondary">
+                          Your answer
+                        </label>
                         <input
+                          id="planning-other-text"
                           type="text"
                           value={otherText}
                           onChange={(e) => setOtherText(e.target.value)}

@@ -21,6 +21,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Plus, ChevronRight, GripVertical, AlertTriangle, Github } from 'lucide-react';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import { useMissionControl } from '@/lib/store';
 import {
   READINESS_LABELS,
@@ -54,7 +55,7 @@ const RUNTIME_FILTERS: { id: RuntimeFilter; label: string }[] = [
 ];
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
-  { id: 'planning', label: '📋 PLANNING', color: 'border-t-mc-accent-purple' },
+  { id: 'planning', label: 'PLANNING', color: 'border-t-mc-accent-purple' },
   { id: 'inbox', label: 'INBOX', color: 'border-t-mc-accent-pink' },
   { id: 'assigned', label: 'ASSIGNED', color: 'border-t-mc-accent-yellow' },
   { id: 'in_progress', label: 'IN PROGRESS', color: 'border-t-mc-accent' },
@@ -481,7 +482,7 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
           onClick();
         }
       }}
-      className={`group w-full bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-all hover:shadow-lg hover:shadow-black/20 ${
+      className={`group w-full bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${isOverlay ? 'shadow-xl shadow-black/40' : ''} ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
@@ -514,7 +515,7 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
         {task.assigned_agent && (
           <div className="mb-3 rounded bg-mc-bg-tertiary/50 px-2 py-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-base">{(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji}</span>
+              <EntityEmoji emoji={(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji} hidden className="text-base" />
               <span className="text-xs text-mc-text-secondary truncate">
                 {(task.assigned_agent as unknown as { name: string }).name}
               </span>

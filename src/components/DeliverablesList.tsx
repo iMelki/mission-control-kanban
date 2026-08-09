@@ -30,7 +30,7 @@ function getDeliverableIcon(type: string) {
 async function handleOpen(deliverable: TaskDeliverable) {
   // URLs open directly in new tab
   if (deliverable.deliverable_type === 'url' && deliverable.path) {
-    window.open(deliverable.path, '_blank');
+    window.open(deliverable.path, '_blank', 'noopener');
     return;
   }
 
@@ -44,21 +44,21 @@ async function handleOpen(deliverable: TaskDeliverable) {
         body: JSON.stringify({ filePath: deliverable.path }),
       });
 
-      if (res.ok) {
-        debug.file('Opened in Finder successfully');
+      if (!res.ok) {
+        const error = await res.json();
+        debug.file('Failed to open', error);
+
+        if (res.status === 404) {
+          alert(`File not found:\n${deliverable.path}\n\nThe file may have been moved or deleted.`);
+        } else if (res.status === 403) {
+          alert(`Cannot open this location:\n${deliverable.path}\n\nPath is outside allowed directories.`);
+        } else {
+          throw new Error(error.error || 'Unknown error');
+        }
         return;
       }
 
-      const error = await res.json();
-      debug.file('Failed to open', error);
-
-      if (res.status === 404) {
-        alert(`File not found:\n${deliverable.path}\n\nThe file may have been moved or deleted.`);
-      } else if (res.status === 403) {
-        alert(`Cannot open this location:\n${deliverable.path}\n\nPath is outside allowed directories.`);
-      } else {
-        throw new Error(error.error || 'Unknown error');
-      }
+      debug.file('Opened in Finder successfully');
     } catch (error) {
       console.error('Failed to open file:', error);
       // Fallback: copy path to clipboard
@@ -137,7 +137,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const handleOpen = async (deliverable: TaskDeliverable) => {
     // URLs open directly in new tab
     if (deliverable.deliverable_type === 'url' && deliverable.path) {
-      window.open(deliverable.path, '_blank');
+      window.open(deliverable.path, '_blank', 'noopener');
       return;
     }
 
@@ -151,21 +151,21 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           body: JSON.stringify({ filePath: deliverable.path }),
         });
 
-        if (res.ok) {
-          debug.file('Opened in Finder successfully');
+        if (!res.ok) {
+          const error = await res.json();
+          debug.file('Failed to open', error);
+
+          if (res.status === 404) {
+            alert(`File not found:\n${deliverable.path}\n\nThe file may have been moved or deleted.`);
+          } else if (res.status === 403) {
+            alert(`Cannot open this location:\n${deliverable.path}\n\nPath is outside allowed directories.`);
+          } else {
+            throw new Error(error.error || 'Unknown error');
+          }
           return;
         }
 
-        const error = await res.json();
-        debug.file('Failed to open', error);
-
-        if (res.status === 404) {
-          alert(`File not found:\n${deliverable.path}\n\nThe file may have been moved or deleted.`);
-        } else if (res.status === 403) {
-          alert(`Cannot open this location:\n${deliverable.path}\n\nPath is outside allowed directories.`);
-        } else {
-          throw new Error(error.error || 'Unknown error');
-        }
+        debug.file('Opened in Finder successfully');
       } catch (error) {
         console.error('Failed to open file:', error);
         // Fallback: copy path to clipboard
@@ -207,7 +207,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   if (deliverables.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-4xl mb-2">📦</div>
+        <Package aria-hidden="true" className="w-10 h-10 mb-2" />
         <p>No deliverables yet</p>
       </div>
     );

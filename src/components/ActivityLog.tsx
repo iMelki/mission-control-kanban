@@ -6,11 +6,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { Rocket, Pencil, CheckCircle2, FilePlus2, RefreshCw, FileText } from 'lucide-react';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import type { TaskActivity } from '@/lib/types';
 
 interface ActivityLogProps {
   taskId: string;
 }
+
+const ACTIVITY_ICONS: Record<string, LucideIcon> = {
+  spawned: Rocket,
+  updated: Pencil,
+  completed: CheckCircle2,
+  file_created: FilePlus2,
+  status_changed: RefreshCw,
+};
 
 export function ActivityLog({ taskId }: ActivityLogProps) {
   const [activities, setActivities] = useState<TaskActivity[]>([]);
@@ -45,20 +56,8 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   }, [taskId]);
 
   const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'spawned':
-        return '🚀';
-      case 'updated':
-        return '✏️';
-      case 'completed':
-        return '✅';
-      case 'file_created':
-        return '📄';
-      case 'status_changed':
-        return '🔄';
-      default:
-        return '📝';
-    }
+    const Icon = ACTIVITY_ICONS[type] ?? FileText;
+    return <Icon aria-hidden="true" className="w-5 h-5" />;
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -103,7 +102,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
   if (activities.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-4xl mb-2">📝</div>
+        <FileText aria-hidden="true" className="w-10 h-10 mb-2" />
         <p>No activity yet</p>
       </div>
     );
@@ -117,7 +116,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
           className="flex gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border"
         >
           {/* Icon */}
-          <div className="text-2xl flex-shrink-0">
+          <div className="flex-shrink-0 text-mc-text-secondary">
             {getActivityIcon(activity.activity_type)}
           </div>
 
@@ -126,7 +125,7 @@ export function ActivityLog({ taskId }: ActivityLogProps) {
             {/* Agent info */}
             {activity.agent && (
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm">{activity.agent.avatar_emoji}</span>
+                <EntityEmoji emoji={activity.agent.avatar_emoji} hidden className="text-sm" />
                 <span className="text-sm font-medium text-mc-text">
                   {activity.agent.name}
                 </span>

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { Bot, CheckCircle, Circle, XCircle, Trash2, Check } from 'lucide-react';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 
 interface SessionWithAgent {
   id: string;
@@ -151,7 +152,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
   if (sessions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-4xl mb-2">🤖</div>
+        <Bot aria-hidden="true" className="w-10 h-10 mb-2" />
         <p>No sub-agent sessions yet</p>
       </div>
     );
@@ -166,11 +167,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
         >
           {/* Agent Avatar */}
           <div className="flex-shrink-0">
-            {session.agent_avatar_emoji ? (
-              <span className="text-2xl">{session.agent_avatar_emoji}</span>
-            ) : (
-              <Bot className="w-8 h-8 text-mc-accent" />
-            )}
+            <EntityEmoji emoji={session.agent_avatar_emoji} hidden className="text-2xl" />
           </div>
 
           {/* Content */}
