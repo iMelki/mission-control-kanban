@@ -86,16 +86,24 @@ the local operator entrypoint; historical task notes remain in
 ## Recently Completed
 
 - [#138 - Upgrade GitHub Actions to native Node 24 runtimes](https://github.com/iMelki/mission-control-kanban/issues/138)
-  - Replaced every Node-20-backed `actions/checkout@v4`,
+  - Replaced every direct Node-20-backed `actions/checkout@v4`,
     `actions/setup-node@v4`, `actions/cache@v4`, and
     `actions/upload-artifact@v4` reference across CI, Runtime Regression, and
     secret scan with an official native-Node-24 release pinned to its reviewed
     commit SHA.
+  - Fresh annotation readback then exposed `pre-commit/action@v3.0.1`'s nested
+    `actions/cache@v4`. CI now reproduces that maintenance-only composite's
+    install/cache/run steps explicitly with pinned native-Node-24
+    `setup-python@v6.3.0` and `cache@v5.1.0`, preserving the upstream cache key
+    and `pre-commit --all-files` behavior without the hidden Node 20 action.
   - Preserved application Node versions, workflow permissions, dependency
     caching, artifact names/retention, and runtime failure behavior. Official
     release/tag and commit-signature readback is recorded in #138; closure
     requires fresh PR and `dev` workflow proof without a forced Node 20
     annotation.
+  - A focused regression test now rejects mutable external-action refs,
+    pin drift for the reviewed native-Node-24 actions, and reintroduction of
+    the maintenance-only pre-commit composite.
 
 - [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
   - Closed on 2026-08-09 after the production standalone runner removed the

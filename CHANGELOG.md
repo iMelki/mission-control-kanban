@@ -46,7 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   upload-artifact to v6.0.0 across CI, Runtime Regression, and secret scan.
   Every external action reference is pinned to the reviewed release commit;
   existing Node inputs, permissions, cache keys, artifacts, retention, and
-  failure semantics are unchanged.
+  failure semantics are unchanged. Replaces the maintenance-only
+  `pre-commit/action@v3.0.1` composite after live annotation readback exposed
+  its nested `actions/cache@v4`; explicit setup-python, cache, install, and run
+  steps preserve its behavior using native Node 24 action releases. A focused
+  workflow test now rejects mutable action refs, reviewed-pin drift, and
+  reintroduction of that hidden Node 20 dependency.
 
 - **Made Doctor schema discovery public and warning-level sync state visible (2026-08-09, PR #137)** -
   Publishes a versioned public distribution mirror of the canonical private
