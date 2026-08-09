@@ -412,7 +412,7 @@ export default function WorkspacePage() {
 
   return (
     <div
-      className="h-screen flex flex-col bg-mc-bg overflow-hidden"
+      className="min-h-[100dvh] max-h-[100dvh] flex flex-col bg-mc-bg overflow-hidden"
       data-workspace-ready={loadedWorkspace ? 'true' : 'false'}
     >
       <Header workspace={workspace} />

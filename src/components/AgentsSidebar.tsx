@@ -145,7 +145,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
   return (
     <>
       <aside
-        className={`shrink-0 bg-mc-bg-secondary border-r border-mc-border flex flex-col transition-[width] duration-200 ease-in-out overflow-hidden ${
+        className={`shrink-0 bg-mc-bg-secondary border-r border-mc-border flex flex-col overflow-hidden ${
           isCollapsed ? 'w-12' : 'w-64'
         }`}
         aria-label="Agents sidebar"

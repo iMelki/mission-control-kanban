@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle, Github } from 'lucide-react';
 import Link from 'next/link';
 import { LocalControlPanel } from '@/components/LocalControlPanel';
@@ -132,8 +132,11 @@ export function WorkspaceDashboard() {
 function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onDelete: (id: string) => void }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const deleteInFlight = useRef(false);
 
   const handleDelete = async (e: React.MouseEvent) => {
+    if (deleteInFlight.current) return;
+    deleteInFlight.current = true;
     e.preventDefault();
     e.stopPropagation();
     setDeleting(true);
@@ -148,6 +151,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
     } catch {
       alert('Failed to delete workspace');
     } finally {
+      deleteInFlight.current = false;
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -156,7 +160,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
   return (
     <>
     <Link href={`/workspace/${workspace.slug}`}>
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-all hover:shadow-lg cursor-pointer group relative">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-[border-color,box-shadow] hover:shadow-lg cursor-pointer group relative">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{workspace.icon}</span>
@@ -339,7 +343,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Acme Corp"
+              placeholder="e.g., Assistants"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
           </div>

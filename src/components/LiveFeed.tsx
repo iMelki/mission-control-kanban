@@ -66,7 +66,7 @@ export function LiveFeed() {
 
   return (
     <aside
-      className={`shrink-0 bg-mc-bg-secondary border-l border-mc-border flex flex-col transition-[width] duration-200 ease-in-out overflow-hidden ${
+      className={`shrink-0 bg-mc-bg-secondary border-l border-mc-border flex flex-col overflow-hidden ${
         isCollapsed ? 'w-12' : 'w-80'
       }`}
       aria-label="Live feed sidebar"
