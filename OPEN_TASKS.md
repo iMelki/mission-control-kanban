@@ -277,3 +277,11 @@ the local operator entrypoint; historical task notes remain in
 ## Legacy Index
 
 - [docs/OPEN_TASKS.md](docs/OPEN_TASKS.md)
+
+## Active GitHub Issues
+
+- [#139 Expand UI/UX Awwwards report (2026-08-09) into practical tasks](https://github.com/iMelki/mission-control-kanban/issues/139)
+  - Fleet-wide code-only audit scored this app 4.9/10 against the shared
+    Awwwards rubric. Full report: `docs/uiux-awwwards-report-2026-08-09.md`.
+    Scores are code-inspection estimates pending a Frontend Proof Bundle.
+    Fleet rollup: iMelki/agent-settings#586.
