@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fails on deletion/readback/receipt-write/browser-close errors, and preserves
   simultaneous UI and cleanup failures with an aggregate error. Added focused
   success, residual-agent, transport-failure, and deterministic-writer tests.
+  Current-sha PR run `31296740445` and push run `31296738848` each uploaded a
+  four-entity receipt proving DELETE `200` plus GET `404` for three tasks and
+  one agent; issue #46 closed after exact artifact, comment, and state readback.
 
 - **Made Paperclip host compatibility exact-SHA fail-closed (2026-08-08, #135)** -
   Host migration validation now requires the declared `testedCommit` to match

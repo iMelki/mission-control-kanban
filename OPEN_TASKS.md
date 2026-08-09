@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -55,37 +55,6 @@ the local operator entrypoint; historical task notes remain in
     intentionally blocked until an owner-approved clean reviewed SHA matches
     the package metadata.
 
-- [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
-  - Runtime Regression run `29887043238` attempt 1 failed while rendering
-    `/workspace/default` with `Unexpected end of JSON input`; all temporary
-    smoke entities were cleaned up. Failed-job-only attempt 2 passed unchanged,
-    so preserve both receipts and identify the empty/partial JSON source rather
-    than weakening the smoke gate.
-  - Root cause: the failure log shows Next.js `next dev` compiling the route
-    and reading a truncated internal JSON manifest before returning HTTP 500;
-    no application fixture file or SQLite JSON value was partial. The runner
-    now uses a fresh webpack `next build`, stages `public` and `.next/static`
-    into `.next/standalone`, and launches the same standalone server entrypoint
-    as Docker with explicit host and port settings. It rejects an occupied port
-    and retains `MCK_REGRESSION_SERVER_MODE=dev` only for local diagnosis.
-  - Runtime artifact receipts use one marker-based PR/issue comment that is
-    updated and read back, preventing a new success notification on every run.
-  - Natural scheduled run `31243549448` passed on the exact PR #42 promotion
-    merge SHA `8efab30d87e566d71f8574af458f04edac692c58`, uploaded four valid
-    screenshots, passed 15 UI checks, and logged deletion of all three tasks.
-    The old smoke did not explicitly read back temporary-agent absence, so that
-    run is not sufficient to close the issue.
-  - The smoke now writes `mck.runtime-smoke-cleanup.v1`: every created task and
-    agent receives an exact-path DELETE plus a required `404` GET readback;
-    transport, visibility, receipt-write, and browser-close failures fail the
-    run without swallowing the original UI error. The JSON receipt is uploaded
-    beside the screenshots.
-  - Closure gate: focused cleanup tests and local validation must pass, then a
-    current authoritative runtime run must upload a receipt with all four
-    entities proven absent. A natural scheduled run remains the preferred final
-    proof after promotion to `main`; do not close from source evidence alone.
-
-
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.
   - Scope: component-pool-first runtime UX improvements, artifact-link closeout automation, failure-rate charts, webhook validation/templates, dry-run previews, bulk migration diffs, dependency/readiness surfaces, mobile review, and scheduled runtime-regression summaries.
@@ -102,6 +71,18 @@ the local operator entrypoint; historical task notes remain in
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 
 ## Recently Completed
+
+- [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
+  - Closed on 2026-08-09 after the production standalone runner removed the
+    Next.js development-manifest race and natural scheduled run `31243549448`
+    passed on the exact PR #42 merge SHA.
+  - Commit `546ae8c` added blocking `mck.runtime-smoke-cleanup.v1` receipts.
+    Current-sha PR run `31296740445` and push run `31296738848` independently
+    proved all three temporary tasks and the runtime agent deleted with HTTP
+    `200`, then absent with exact-path GET `404`; each uploaded four screenshots.
+  - Validation: focused cleanup tests `5/5`, complete `npm test`, lint,
+    production build, normal commit/push hooks, deep secret scan, remote SHA
+    readback, and exact closeout-comment/state readback all passed.
 
 <!-- Cured 2026-08-06 via the workspace issue-state audit (projects-ops#101/#73): entries below were active while their issues were closed. -->
 - [#128 - Make Runtime Regression workspace readiness deterministic in CI](https://github.com/iMelki/mission-control-kanban/issues/128)
