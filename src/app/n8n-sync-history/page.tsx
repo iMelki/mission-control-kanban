@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lucide-react';
 import { Header } from '@/components/Header';
+import { presentMckN8nSyncRun } from '@/lib/n8n-sync-presentation';
 import type { MckN8nSyncRun, MckN8nSyncStatusResponse } from '@/lib/types';
 
 const SYNC_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -91,7 +92,7 @@ export default function N8nSyncHistoryPage() {
 
   const latest = status?.latest ?? null;
   const latestSummary = (latest?.summary ?? {}) as Record<string, unknown>;
-  const latestHasAlert = Boolean(latest && (!latest.ok || latest.alert_level === 'error'));
+  const latestPresentation = latest ? presentMckN8nSyncRun(latest) : null;
 
   return (
     <div className="min-h-screen bg-mc-bg">
@@ -136,12 +137,14 @@ export default function N8nSyncHistoryPage() {
             <div>
               <div className="text-xs uppercase text-mc-text-secondary">Latest result</div>
               <div className="mt-1 flex items-center gap-2 font-medium">
-                {latestHasAlert ? (
+                {latestPresentation?.state === 'error' ? (
                   <AlertTriangle className="size-4 text-rose-300" />
+                ) : latestPresentation?.state === 'warning' ? (
+                  <AlertTriangle className="size-4 text-amber-300" />
                 ) : (
                   <CheckCircle2 className="size-4 text-emerald-300" />
                 )}
-                {latest ? (latestHasAlert ? 'Attention needed' : 'OK') : 'No runs'}
+                {latestPresentation?.label ?? 'No runs'}
               </div>
             </div>
             <div>
@@ -182,7 +185,12 @@ export default function N8nSyncHistoryPage() {
               ) : status?.history.length ? (
                 status.history.map((run) => {
                   const summary = (run.summary ?? {}) as Record<string, unknown>;
-                  const hasAlert = !run.ok || run.alert_level === 'error';
+                  const presentation = presentMckN8nSyncRun(run);
+                  const alertClassName = presentation.state === 'error'
+                    ? 'px-4 py-3 align-top text-rose-200'
+                    : presentation.state === 'warning'
+                      ? 'px-4 py-3 align-top text-amber-200'
+                      : 'px-4 py-3 align-top text-emerald-200';
                   return (
                     <tr key={run.id} className="bg-mc-bg hover:bg-mc-bg-secondary/70">
                       <td className="px-4 py-3 align-top">
@@ -197,10 +205,10 @@ export default function N8nSyncHistoryPage() {
                       <td className="px-4 py-3 align-top">
                         {formatCount(summary.scanned_items)} scanned, {formatCount(summary.imported)} imported, {formatCount(summary.updated)} updated, {formatCount(summary.errors)} errors{formatReconciliationSuffix(summary)}
                       </td>
-                      <td className={hasAlert ? 'px-4 py-3 align-top text-rose-200' : 'px-4 py-3 align-top text-emerald-200'}>
+                      <td className={alertClassName}>
                         <div className="flex items-center gap-2">
-                          {hasAlert ? <AlertTriangle className="size-4" /> : <CheckCircle2 className="size-4" />}
-                          {run.alert_level}
+                          {presentation.state === 'ok' ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
+                          {presentation.label}
                         </div>
                         {run.alert_message && (
                           <div className="mt-1 max-w-xl text-xs text-mc-text-secondary">{run.alert_message}</div>

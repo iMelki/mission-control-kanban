@@ -76,6 +76,10 @@ the local operator entrypoint; historical task notes remain in
     closed without a resolved signing secret, runtime audit exposes the missing
     secret without mutating agent records, and loopback route/adapter tests
     cover signed success, unsigned 2xx, non-2xx, and no-network failure.
+  - PR #137 review follow-up publishes a reachable public Doctor v1 schema
+    mirror, restores TypeScript component-barrel coverage, and renders clean
+    warning/unknown n8n runs as amber `Review needed` states with their message
+    visible instead of presenting them as green success.
   - Validation: `npm run lint`, `npm test`, `npm run build`, `npm run doctor:react`, `npm run smoke:runtime-ui`, and `npm run comment:runtime-artifacts -- --dry-run`.
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 

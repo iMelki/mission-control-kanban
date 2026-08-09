@@ -16,6 +16,7 @@ import { WorkspaceSectionTabs, type WorkspaceSection } from '@/components/worksp
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
+import { presentMckN8nSyncRun } from '@/lib/n8n-sync-presentation';
 import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
 
 const SYNC_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -404,9 +405,7 @@ export default function WorkspacePage() {
 
   const latestN8nSync = n8nSyncStatus?.latest ?? null;
   const n8nSummary = (latestN8nSync?.summary ?? {}) as Record<string, unknown>;
-  const n8nSyncHasAlert = Boolean(
-    latestN8nSync && (!latestN8nSync.ok || latestN8nSync.alert_level === 'error')
-  );
+  const n8nSyncPresentation = latestN8nSync ? presentMckN8nSyncRun(latestN8nSync) : null;
   const n8nSyncCounts = latestN8nSync
     ? `${formatSyncCount(n8nSummary.scanned_items)} scanned, ${formatSyncCount(n8nSummary.updated)} updated, ${formatSyncCount(n8nSummary.errors)} errors${formatReconciliationSuffix(n8nSummary)}`
     : 'no recorded runs yet';
@@ -455,14 +454,20 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               )}
-              <div className={n8nSyncHasAlert ? 'flex flex-wrap items-center gap-2 text-rose-200' : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
-                {n8nSyncHasAlert ? (
+              <div className={n8nSyncPresentation?.state === 'error'
+                ? 'flex flex-wrap items-center gap-2 text-rose-200'
+                : n8nSyncPresentation?.state === 'warning'
+                  ? 'flex flex-wrap items-center gap-2 text-amber-200'
+                  : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
+                {n8nSyncPresentation?.state === 'error' ? (
                   <AlertTriangle className="size-4 shrink-0" />
+                ) : n8nSyncPresentation?.state === 'warning' ? (
+                  <AlertTriangle className="size-4 shrink-0 text-amber-300" />
                 ) : (
                   <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
                 )}
                 <span>
-                  n8n sync: {latestN8nSync ? (n8nSyncHasAlert ? 'attention needed' : 'ok') : 'waiting for first scheduled run'}
+                  n8n sync: {n8nSyncPresentation?.label ?? 'waiting for first scheduled run'}
                 </span>
                 <span>
                   Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - {formatSyncCadence(latestN8nSync)}
@@ -470,7 +475,7 @@ export default function WorkspacePage() {
                 <Link href="/n8n-sync-history" className="text-mc-accent-cyan hover:text-mc-accent">
                   View history
                 </Link>
-                {latestN8nSync?.alert_message && n8nSyncHasAlert && (
+                {latestN8nSync?.alert_message && n8nSyncPresentation?.showMessage && (
                   <span>{latestN8nSync.alert_message}</span>
                 )}
               </div>

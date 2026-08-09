@@ -22,6 +22,7 @@ import {
   normalizeMckN8nSyncPayload,
   shouldNotifyMckN8nSyncAlert,
 } from '../src/lib/n8n-sync-status';
+import { presentMckN8nSyncRun } from '../src/lib/n8n-sync-presentation';
 import {
   LOCAL_CONTROL_SURFACES,
   mapGitHubDiagnosticsToHealth,
@@ -36,6 +37,29 @@ test('GitHub diagnostics treats missing tokens as blocked', () => {
   assert.equal(payload.authenticated, false);
   assert.equal(payload.issue_read_available, false);
   assert.equal(payload.project_read_available, false);
+});
+
+test('n8n sync presentation distinguishes warning review from errors and success', () => {
+  assert.deepEqual(presentMckN8nSyncRun({ ok: true, alert_level: 'ok' }), {
+    state: 'ok',
+    label: 'OK',
+    showMessage: false,
+  });
+  assert.deepEqual(presentMckN8nSyncRun({ ok: true, alert_level: 'warning' }), {
+    state: 'warning',
+    label: 'Review needed',
+    showMessage: true,
+  });
+  assert.deepEqual(presentMckN8nSyncRun({ ok: true, alert_level: 'unknown' }), {
+    state: 'warning',
+    label: 'Review needed',
+    showMessage: true,
+  });
+  assert.deepEqual(presentMckN8nSyncRun({ ok: false, alert_level: 'warning' }), {
+    state: 'error',
+    label: 'Attention needed',
+    showMessage: true,
+  });
 });
 
 test('Local Control surface list keeps launch-only cards separate from MCK diagnostics', () => {

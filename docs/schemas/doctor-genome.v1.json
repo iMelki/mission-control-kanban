@@ -1,0 +1,273 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/iMelki/mission-control-kanban/dev/docs/schemas/doctor-genome.v1.json",
+  "$comment": "Public distribution mirror. Canonical source: iMelki/projects-ops docs/schemas/doctor-genome.v1.json.",
+  "x-canonical-source-sha256": "afe8676e1c3c78c8d3c2a52915bea4246a09da2f82770fbe115ee2722323d272",
+  "title": "DoctorGenome",
+  "description": "Public distribution mirror of the canonical Projects Ops doctor-genome.v1 contract. Repository capabilities, pinned quality packs, bounded gates, and expiring exceptions are validated without embedding pack commands.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "profile",
+    "capabilities",
+    "packs",
+    "gates",
+    "exceptions"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "pattern": "^https://raw\\.githubusercontent\\.com/iMelki/mission-control-kanban/(main|dev)/docs/schemas/doctor-genome\\.v1\\.json$"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["doctor-genome.v1"]
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["observe", "protect", "enforce"]
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)*$"
+      }
+    },
+    "sourceSets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "globContract", "includeGlobs", "excludeGlobs", "reason"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{2,63}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "authored-runtime",
+              "raw-template",
+              "generated-fixture",
+              "generated-output",
+              "example",
+              "vendored",
+              "documentation",
+              "infrastructure"
+            ]
+          },
+          "globContract": {
+            "type": "string",
+            "enum": ["repo-doctor-glob.v1"]
+          },
+          "includeGlobs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._*?/-]+$"
+            }
+          },
+          "excludeGlobs": {
+            "type": "array",
+            "maxItems": 256,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._*?/-]+$"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
+      }
+    },
+    "packs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version", "required"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+          },
+          "required": { "type": "boolean" },
+          "catalog": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+$"
+          },
+          "digest": {
+            "type": ["string", "null"],
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "scope", "timeoutSeconds", "packs"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["editor", "pre_commit", "pre_push", "pull_request", "nightly", "release", "on_demand"]
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["staged", "changed", "repository", "workspace", "artifact", "runtime"]
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7200
+          },
+          "maxParallel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          },
+          "findingBudget": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "packs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+$"
+            }
+          },
+          "sourceSets": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{2,63}$"
+            }
+          }
+        }
+      }
+    },
+    "exceptions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "targetType", "targetId", "scope", "owner", "reason", "issue", "createdAt", "expiresAt"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{2,63}$"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": ["pack", "rule"]
+          },
+          "targetId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+$"
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          },
+          "issue": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://github\\.com/[^/]+/[^/]+/issues/[1-9][0-9]*$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+          }
+        }
+      }
+    },
+    "severityOverrides": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["targetId", "severity", "reason"],
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+$"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "low", "medium", "high", "critical"]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          }
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "sourceSets": {
+      "properties": {
+        "gates": {
+          "items": {
+            "required": ["sourceSets"]
+          }
+        }
+      }
+    }
+  }
+}

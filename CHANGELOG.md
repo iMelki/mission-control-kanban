@@ -41,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Made Doctor schema discovery public and warning-level sync state visible (2026-08-09, PR #137)** -
+  Publishes a versioned public distribution mirror of the canonical private
+  `doctor-genome.v1` contract, points the repository genome at that reachable
+  URI, and covers TypeScript component barrels such as
+  `src/components/index.ts`. The workspace and n8n history views now render
+  warning or unknown clean runs in amber as `Review needed`, preserve their
+  message, and keep failed/error runs distinct in red.
+
 - **Made Runtime Regression cleanup receipt-gated (2026-08-09, #46)** -
   The UI smoke now tracks partially created fixtures, deletes every temporary
   task and agent in unconditional teardown, and requires an exact-path `404`
