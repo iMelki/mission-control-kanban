@@ -1,0 +1,142 @@
+[
+  {
+    "file": "src/components/ActivityLog.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/agent-modal/RuntimeDispatchSection.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/AgentModal.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/AgentsSidebar.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/DeliverablesList.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/DependencyBadges.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/DispatchFailureQueue.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/DispatchTimeline.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/GitHubConnectionStatus.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/GitHubImportModal.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/GitHubReadinessCard.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/GitHubWritebackPanel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/Header.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/LiveFeed.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/LocalControlPanel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/MissionQueue.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/PlanningTab.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/runtime/RuntimeConfigTemplateGallery.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/RuntimeAuditPanel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/RuntimeHealthBadges.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/RuntimeOpsSettings.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/SessionsList.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/SSEDebugPanel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/task-modal/DispatchContractSection.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/task-modal/GitHubIssueDraftPanel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/task-modal/RuntimeActionsPanel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/TaskDependenciesPanel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/TaskModal.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/ui/card.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/ui/DataTable.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/ui/Panel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/ui/tabs.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/workspace/WorkspaceSectionTabs.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/WorkspaceDashboard.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  },
+  {
+    "file": "src/components/WorkspaceRuntimePolicyPanel.tsx",
+    "reason": "pre-gate baseline 2026-08-09"
+  }
+]
