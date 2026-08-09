@@ -1,6 +1,10 @@
 const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
+const {
+  verifyRuntimeSmokeCleanup,
+  writeRuntimeSmokeCleanupReceipt,
+} = require('./runtime-smoke-cleanup');
 
 const baseUrl = process.env.MCK_SMOKE_URL || 'http://127.0.0.1:3021';
 const workspaceSlug = process.env.MCK_SMOKE_WORKSPACE || 'default';
@@ -66,78 +70,86 @@ async function assertJsonEndpoint(path) {
 
 async function main() {
   const stamp = Date.now();
-  const agent = await requestJson('/api/agents', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: `Runtime Smoke ${stamp}`,
-      role: 'Webhook Smoke Agent',
-      description: 'Temporary smoke-test agent for runtime UI verification.',
-      avatar_emoji: '🧪',
-      workspace_id: workspaceSlug,
-      runtime_type: 'webhook',
-      runtime_config: {
-        webhook_url: 'https://example.test/mck-runtime-smoke',
-        bearer_token_env: 'MCK_SMOKE_TOKEN',
-      },
-      dispatch_enabled: true,
-    }),
-  });
-
-  const task = await requestJson('/api/tasks', {
-    method: 'POST',
-    body: JSON.stringify({
-      title: `Runtime UI smoke ${stamp}`,
-      description: 'Temporary task for runtime badge and handoff copy UI smoke coverage.',
-      priority: 'normal',
-      status: 'inbox',
-      workspace_id: workspaceSlug,
-      assigned_agent_id: agent.id,
-      dispatch_metadata: {
-        target_repo: 'iMelki/mission-control-kanban',
-        project_workstream: 'runtime smoke',
-        allowed_file_scope: ['src/components/**'],
-        acceptance_criteria: ['Runtime badge is visible'],
-        test_requirements: ['browser smoke'],
-        risk_level: 'low',
-        readiness: 'ready_for_agent',
-        review_mode: 'human_required',
-        impact: 'local smoke only',
-        rollback_plan: 'delete smoke task and agent',
-        safety_rules: ['do not dispatch externally'],
-      },
-    }),
-  });
-
-
-  const blockerTask = await requestJson('/api/tasks', {
-    method: 'POST',
-    body: JSON.stringify({
-      title: `Runtime UI blocker ${stamp}`,
-      description: 'Temporary blocker task for dependency graph smoke coverage.',
-      priority: 'normal',
-      status: 'in_progress',
-      workspace_id: workspaceSlug,
-    }),
-  });
-
-  await requestJson(`/api/tasks/${task.id}/dependencies`, {
-    method: 'POST',
-    body: JSON.stringify({ blocked_by_task_id: blockerTask.id, note: 'Smoke dependency edge' }),
-  });
-
-  const checklistTask = await requestJson('/api/tasks', {
-    method: 'POST',
-    body: JSON.stringify({
-      title: `Runtime checklist smoke ${stamp}`,
-      description: 'Temporary sparse task for ready checklist smoke coverage.',
-      priority: 'normal',
-      status: 'inbox',
-      workspace_id: workspaceSlug,
-    }),
-  });
-
+  let agent;
+  let task;
+  let blockerTask;
+  let checklistTask;
   let browser;
+  let primaryError;
+  let browserCloseError;
+  let cleanupReceipt;
+  let cleanupReceiptPath;
+  let cleanupReceiptWriteError;
   try {
+    agent = await requestJson('/api/agents', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: `Runtime Smoke ${stamp}`,
+        role: 'Webhook Smoke Agent',
+        description: 'Temporary smoke-test agent for runtime UI verification.',
+        avatar_emoji: '🧪',
+        workspace_id: workspaceSlug,
+        runtime_type: 'webhook',
+        runtime_config: {
+          webhook_url: 'https://example.test/mck-runtime-smoke',
+          bearer_token_env: 'MCK_SMOKE_TOKEN',
+        },
+        dispatch_enabled: true,
+      }),
+    });
+
+    task = await requestJson('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: `Runtime UI smoke ${stamp}`,
+        description: 'Temporary task for runtime badge and handoff copy UI smoke coverage.',
+        priority: 'normal',
+        status: 'inbox',
+        workspace_id: workspaceSlug,
+        assigned_agent_id: agent.id,
+        dispatch_metadata: {
+          target_repo: 'iMelki/mission-control-kanban',
+          project_workstream: 'runtime smoke',
+          allowed_file_scope: ['src/components/**'],
+          acceptance_criteria: ['Runtime badge is visible'],
+          test_requirements: ['browser smoke'],
+          risk_level: 'low',
+          readiness: 'ready_for_agent',
+          review_mode: 'human_required',
+          impact: 'local smoke only',
+          rollback_plan: 'delete smoke task and agent',
+          safety_rules: ['do not dispatch externally'],
+        },
+      }),
+    });
+
+    blockerTask = await requestJson('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: `Runtime UI blocker ${stamp}`,
+        description: 'Temporary blocker task for dependency graph smoke coverage.',
+        priority: 'normal',
+        status: 'in_progress',
+        workspace_id: workspaceSlug,
+      }),
+    });
+
+    await requestJson(`/api/tasks/${task.id}/dependencies`, {
+      method: 'POST',
+      body: JSON.stringify({ blocked_by_task_id: blockerTask.id, note: 'Smoke dependency edge' }),
+    });
+
+    checklistTask = await requestJson('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: `Runtime checklist smoke ${stamp}`,
+        description: 'Temporary sparse task for ready checklist smoke coverage.',
+        priority: 'normal',
+        status: 'inbox',
+        workspace_id: workspaceSlug,
+      }),
+    });
+
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const consoleErrors = [];
@@ -296,23 +308,43 @@ async function main() {
         'no browser console errors',
       ],
     }, null, 2));
+  } catch (error) {
+    primaryError = error;
   } finally {
     if (browser) {
-      await browser.close();
+      try {
+        await browser.close();
+      } catch (error) {
+        browserCloseError = error;
+      }
     }
-    await requestJson(`/api/tasks/${task.id}`, { method: 'DELETE' }).catch((error) => {
-      console.error(`Failed to clean up smoke task ${task.id}:`, error);
-    });
-    await requestJson(`/api/tasks/${blockerTask.id}`, { method: 'DELETE' }).catch((error) => {
-      console.error(`Failed to clean up smoke blocker task ${blockerTask.id}:`, error);
-    });
-    await requestJson(`/api/tasks/${checklistTask.id}`, { method: 'DELETE' }).catch((error) => {
-      console.error(`Failed to clean up smoke checklist task ${checklistTask.id}:`, error);
-    });
-    await requestJson(`/api/agents/${agent.id}`, { method: 'DELETE' }).catch((error) => {
-      console.error(`Failed to clean up smoke agent ${agent.id}:`, error);
-    });
+
+    const entities = [
+      task && { kind: 'task', role: 'primary', id: task.id, path: `/api/tasks/${task.id}` },
+      blockerTask && { kind: 'task', role: 'blocker', id: blockerTask.id, path: `/api/tasks/${blockerTask.id}` },
+      checklistTask && { kind: 'task', role: 'checklist', id: checklistTask.id, path: `/api/tasks/${checklistTask.id}` },
+      agent && { kind: 'agent', role: 'runtime', id: agent.id, path: `/api/agents/${agent.id}` },
+    ].filter(Boolean);
+
+    cleanupReceipt = await verifyRuntimeSmokeCleanup({ baseUrl, entities });
+    try {
+      cleanupReceiptPath = writeRuntimeSmokeCleanupReceipt({ artifactDir, receipt: cleanupReceipt });
+    } catch (error) {
+      cleanupReceiptWriteError = error;
+    }
+
+    console.log(`RUNTIME_SMOKE_CLEANUP_RECEIPT ${JSON.stringify({
+      ...cleanupReceipt,
+      artifact_path: cleanupReceiptPath || null,
+    })}`);
   }
+
+  const failures = [primaryError, browserCloseError, cleanupReceiptWriteError].filter(Boolean);
+  if (cleanupReceipt && !cleanupReceipt.ok) {
+    failures.push(new Error('Runtime smoke cleanup did not prove every temporary entity absent'));
+  }
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, 'Runtime UI smoke and cleanup reported multiple failures');
 }
 
 main().catch((error) => {

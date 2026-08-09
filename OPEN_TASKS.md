@@ -70,8 +70,20 @@ the local operator entrypoint; historical task notes remain in
     and retains `MCK_REGRESSION_SERVER_MODE=dev` only for local diagnosis.
   - Runtime artifact receipts use one marker-based PR/issue comment that is
     updated and read back, preventing a new success notification on every run.
-  - Local validation: server-plan contract `2/2`; full runtime smoke and three
-    consecutive remote paths remain required before closure.
+  - Natural scheduled run `31243549448` passed on the exact PR #42 promotion
+    merge SHA `8efab30d87e566d71f8574af458f04edac692c58`, uploaded four valid
+    screenshots, passed 15 UI checks, and logged deletion of all three tasks.
+    The old smoke did not explicitly read back temporary-agent absence, so that
+    run is not sufficient to close the issue.
+  - The smoke now writes `mck.runtime-smoke-cleanup.v1`: every created task and
+    agent receives an exact-path DELETE plus a required `404` GET readback;
+    transport, visibility, receipt-write, and browser-close failures fail the
+    run without swallowing the original UI error. The JSON receipt is uploaded
+    beside the screenshots.
+  - Closure gate: focused cleanup tests and local validation must pass, then a
+    current authoritative runtime run must upload a receipt with all four
+    entities proven absent. A natural scheduled run remains the preferred final
+    proof after promotion to `main`; do not close from source evidence alone.
 
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)

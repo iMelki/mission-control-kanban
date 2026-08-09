@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Made Runtime Regression cleanup receipt-gated (2026-08-09, #46)** -
+  The UI smoke now tracks partially created fixtures, deletes every temporary
+  task and agent in unconditional teardown, and requires an exact-path `404`
+  readback before reporting success. It emits the structured
+  `mck.runtime-smoke-cleanup.v1` receipt into the uploaded artifact directory,
+  fails on deletion/readback/receipt-write/browser-close errors, and preserves
+  simultaneous UI and cleanup failures with an aggregate error. Added focused
+  success, residual-agent, transport-failure, and deterministic-writer tests.
+
 - **Made Paperclip host compatibility exact-SHA fail-closed (2026-08-08, #135)** -
   Host migration validation now requires the declared `testedCommit` to match
   the actual host even when partial file attestations are supplied. Added

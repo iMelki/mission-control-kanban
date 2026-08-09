@@ -1,6 +1,6 @@
 # MCK Runtime UX + Regression Workflow
 
-Updated: 2026-07-22
+Updated: 2026-08-09
 
 Use this workflow when adding runtime dispatch UI, dense workspace refinements, or regression automation to Mission Control Kanban.
 
@@ -72,6 +72,31 @@ Runtime Regression CI maintains one marker-based PR or requested-issue comment
 after successful workflow completion, updates it on later runs, and reads the
 exact body back. Local screenshot thumbnails and metadata live at
 `/runtime-regression`.
+
+The smoke treats fixture cleanup as a blocking validation step rather than a
+best-effort `finally` callback. It records every temporary task and agent ID,
+sends the matching `DELETE`, then performs an exact-path `GET` that must return
+`404`. All entity results are written to
+`artifacts/runtime-ui-smoke/<run>/cleanup-receipt.json`, logged with the
+`RUNTIME_SMOKE_CLEANUP_RECEIPT` marker, and uploaded with the screenshots. A
+delete error, readable entity, receipt-write error, or browser-close error
+fails the smoke while preserving any earlier UI failure in an aggregate error.
+
+Design basis:
+
+- [RFC 9110 DELETE semantics](https://www.rfc-editor.org/rfc/rfc9110.html#name-delete)
+  distinguishes a successful delete request from later resource visibility,
+  so the smoke verifies absence separately.
+- [Playwright fixture teardown](https://playwright.dev/docs/test-fixtures#execution-order)
+  keeps cleanup paired with setup even when the test body fails.
+- [GitHub Actions artifact guidance](https://docs.github.com/en/actions/tutorials/store-and-share-data)
+  recommends storing test output as workflow artifacts and exposes a digest
+  for upload/download validation.
+- Playwright community reports about
+  [manual setup/teardown scope](https://github.com/microsoft/playwright/issues/35234)
+  and [dangling resources after process-group shutdown](https://github.com/microsoft/playwright/issues/33377)
+  reinforce that process success or teardown intent is not proof that external
+  state is gone.
 
 ## 6. Turbopack inventory policy
 
