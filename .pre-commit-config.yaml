@@ -40,4 +40,4 @@ repos:
         entry: node scripts/verify-component-sourcing-preflight.mjs
         language: system
         pass_filenames: false
-        files: ^src/components/.*\.(tsx|jsx)$
+        files: ^(src/components/.*\.(tsx|jsx)|docs/preflight/(component-baseline\.json|records/.*\.md)|scripts/verify-component-sourcing-preflight\.mjs)$

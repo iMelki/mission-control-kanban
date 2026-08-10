@@ -1,6 +1,7 @@
 # Mission Control Kanban — Awwwards-Level UI/UX Audit
 
 Date: 2026-08-09
+Audited commit: `f8840e1` (dev, 2026-08-09). **Historical snapshot** — all findings and scores describe that commit only. Subsequent commits remediate several findings (`6c368c8` sourcing-preflight gate, `f2dc97e` anti-slop quick wins, `b29a391` emoji-boundary migration, `2710f96`/`e6ec360` ActionReviewDialog replacing `confirm()`/`alert()`, `75c88bd` scroll containment); remediation is tracked in #139 and this report is intentionally not re-scored.
 Auditor: senior product designer + frontend architect (fleet design audit rubric v1.0)
 App: `S:\source\CCAI\Assistants\tools\mission-control-kanban` — live at http://127.0.0.1:3021 (not exercised)
 Audit mode: **CODE-ONLY.** No server was started and no browser evidence was captured. All scores below are **code-inspection estimates**, not browser-proven scores. Per rubric Section 2.8, no visible frontend work may be called complete from code inspection alone; any score of 8+ in this report would be marked "provisional pending browser proof" — none reached that bar. A Frontend Proof Bundle (desktop 1440x900 + mobile 390x844, dark, reduced-motion states) is required before any of these estimates are treated as verified.
