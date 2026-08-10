@@ -570,7 +570,6 @@ function validateFactoryReceiptV1(value: unknown, errors: string[]): value is Fa
     !Array.isArray(value.commands)
     || value.commands.length === 0
     || !value.commands.some((command) => isObject(command) && command.stage === 'validation')
-    || !value.commands.some((command) => isObject(command) && command.stage === 'release')
     || value.commands.length > 256
     || value.commands.some((command) => (
       !isObject(command)
@@ -783,7 +782,9 @@ function validateFactoryReceipt(
   requireAuthoritativeCompletion: boolean,
 ): { receipt?: FactoryRunReceipt; authority?: FactoryReceiptAuthorityProjection } {
   if (!isObject(value)) {
-    errors.push('completed lifecycle callbacks require receipt proof');
+    errors.push(requireAuthoritativeCompletion
+      ? 'completed lifecycle callbacks require receipt proof'
+      : 'receipt must be an object when provided');
     return {};
   }
   if (value.schemaVersion === FACTORY_RUN_RECEIPT_V1_SCHEMA_VERSION) {

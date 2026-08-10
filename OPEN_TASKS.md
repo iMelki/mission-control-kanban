@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-09
+Last updated: 2026-08-10
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -27,6 +27,26 @@ the local operator entrypoint; historical task notes remain in
   - Remaining issue gate: prove the upgraded contract through the installed
     Paperclip host and live MCK/Mission Control reconciliation under #47 after
     the separately tracked exact host-SHA gate in #135 is refreshed.
+  - CodeRabbit PR #137 follow-ups (recorded 2026-08-10, non-trivial; each links
+    the source review comment):
+    - `integrations/paperclip-bridge/src/contracts.ts`: `validateDispatchMetadata`
+      checks field presence only — mirror the v2 length limits (title 8-240,
+      acceptance/test items, rollback 8-1000) before building the envelope so
+      short text fails fast instead of 500ing in `validateWebhookDispatchPayloadV2`
+      ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190577)).
+    - `integrations/paperclip-bridge/src/worker.ts` `validateReceiptForMapping`:
+      reject `dispatch_version: 1` mappings before authoritative completion —
+      a v2 receipt against a v1 mapping self-compares `repositoryBaseSha`
+      ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190580)).
+    - `src/lib/webhook-callback-schema.ts`: the `expected` identity passed to
+      `validateBridgeReceipt` is derived from the receipt itself and verifies
+      nothing — accept the persisted dispatch identity as a parameter of
+      `validateWebhookCallbackPayload` (route-level binding currently compensates)
+      ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190622)).
+    - `src/lib/webhook-dispatch-schema.ts`: the published v2 schema's `envelope`
+      uses a remote `$ref` to a mutable `dev` URL — inline the envelope schema or
+      use a local `$defs` entry with a stable `$id`
+      ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190626)).
 
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)

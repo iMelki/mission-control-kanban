@@ -127,11 +127,14 @@ export function buildWebhookDispatchPayloadV2(
       acceptanceCriteria: metadata?.acceptance_criteria ?? [],
       testRequirements: metadata?.test_requirements ?? [],
       risk: metadata?.risk_level ?? 'medium',
+      // Keep this mapping aligned with the `review_mode` alias default below
+      // ('human_required' -> 'human-final'): absent metadata must produce the
+      // conservative human-review default on both sides or v2 alias readback fails.
       reviewMode: metadata?.review_mode === 'pair_review'
         ? 'pair-review'
-        : metadata?.review_mode === 'human_required'
-          ? 'human-final'
-          : 'independent',
+        : metadata?.review_mode === 'auto_checks_only'
+          ? 'independent'
+          : 'human-final',
       rollback: {
         strategy: metadata?.rollback_plan ?? '',
         verification: 'Verify origin/dev and runtime health return to the accepted base state.',
