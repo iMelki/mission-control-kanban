@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { Plus, Bot, ChevronLeft, ChevronRight, Zap, ZapOff, Loader2 } from 'lucide-react';
+import { Plus, Bot, ChevronLeft, ChevronRight, Zap, ZapOff, Loader2, X } from 'lucide-react';
 import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentRuntimeType, AgentStatus, OpenClawSession } from '@/lib/types';
@@ -50,6 +50,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [connectingAgentId, setConnectingAgentId] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<{ agentName: string; message: string } | null>(null);
   const [activeSubAgents, setActiveSubAgents] = useState(0);
   const isCollapsed = useSyncExternalStore(
     subscribeCollapsedPreference,
@@ -111,6 +112,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
   const handleConnectToOpenClaw = async (agent: Agent, e: React.MouseEvent) => {
     e.stopPropagation();
     setConnectingAgentId(agent.id);
+    setConnectError(null);
 
     try {
       const existingSession = agentOpenClawSessions[agent.id];
@@ -128,11 +130,12 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
         } else {
           const error = await res.json();
           console.error('Failed to connect to OpenClaw:', error);
-          alert(`Failed to connect: ${error.error || 'Unknown error'}`);
+          setConnectError({ agentName: agent.name, message: error.error || 'Unknown error' });
         }
       }
     } catch (error) {
       console.error('OpenClaw connection error:', error);
+      setConnectError({ agentName: agent.name, message: 'Connection request failed' });
     } finally {
       setConnectingAgentId(null);
     }
@@ -159,24 +162,44 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
             onAddAgent={() => setShowCreateModal(true)}
           />
         ) : (
-          <AgentsExpandedPanel
-            agents={filteredAgents}
-            allAgents={agents}
-            allAgentCount={agents.length}
-            activeSubAgents={activeSubAgents}
-            filter={filter}
-            selectedAgent={selectedAgent}
-            connectingAgentId={connectingAgentId}
-            agentOpenClawSessions={agentOpenClawSessions}
-            onFilterChange={setFilter}
-            onCollapse={() => setIsCollapsed(true)}
-            onAddAgent={() => setShowCreateModal(true)}
-            onSelectAgent={(agent) => {
-              setSelectedAgent(agent);
-              setEditingAgent(agent);
-            }}
-            onConnectToOpenClaw={handleConnectToOpenClaw}
-          />
+          <>
+            {connectError && (
+              <div
+                role="alert"
+                className="m-2 flex items-start gap-2 rounded border border-mc-accent-red/40 bg-mc-accent-red/10 p-2 text-xs text-mc-text"
+              >
+                <p className="m-0 flex-1">
+                  Failed to connect {connectError.agentName} to OpenClaw: {connectError.message}
+                </p>
+                <button
+                  type="button"
+                  aria-label="Dismiss connection error"
+                  onClick={() => setConnectError(null)}
+                  className="rounded p-0.5 text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            <AgentsExpandedPanel
+              agents={filteredAgents}
+              allAgents={agents}
+              allAgentCount={agents.length}
+              activeSubAgents={activeSubAgents}
+              filter={filter}
+              selectedAgent={selectedAgent}
+              connectingAgentId={connectingAgentId}
+              agentOpenClawSessions={agentOpenClawSessions}
+              onFilterChange={setFilter}
+              onCollapse={() => setIsCollapsed(true)}
+              onAddAgent={() => setShowCreateModal(true)}
+              onSelectAgent={(agent) => {
+                setSelectedAgent(agent);
+                setEditingAgent(agent);
+              }}
+              onConnectToOpenClaw={handleConnectToOpenClaw}
+            />
+          </>
         )}
       </aside>
 

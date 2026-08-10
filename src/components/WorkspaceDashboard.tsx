@@ -133,6 +133,7 @@ export function WorkspaceDashboard() {
 function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onDelete: (id: string) => void }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteInFlight = useRef(false);
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -141,20 +142,22 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
     e.preventDefault();
     e.stopPropagation();
     setDeleting(true);
+    setDeleteError(null);
     try {
       const res = await fetch(`/api/workspaces/${workspace.id}`, { method: 'DELETE' });
       if (res.ok) {
         onDelete(workspace.id);
+        setShowDeleteConfirm(false);
       } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to delete workspace');
+        const data = await res.json().catch(() => ({}));
+        // Keep the confirmation open so the failure is visible in place.
+        setDeleteError(data.error || 'Failed to delete workspace');
       }
     } catch {
-      alert('Failed to delete workspace');
+      setDeleteError('Failed to delete workspace');
     } finally {
       deleteInFlight.current = false;
       setDeleting(false);
-      setShowDeleteConfirm(false);
     }
   };
 
@@ -179,6 +182,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  setDeleteError(null);
                   setShowDeleteConfirm(true);
                 }}
                 className="p-1.5 rounded hover:bg-mc-accent-red/20 text-mc-text-secondary hover:text-mc-accent-red transition-colors opacity-0 group-hover:opacity-100"
@@ -248,6 +252,15 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
               </span>
             )}
           </p>
+
+          {deleteError && (
+            <div
+              role="alert"
+              className="mb-4 rounded border border-mc-accent-red/40 bg-mc-accent-red/10 p-3 text-sm text-mc-text"
+            >
+              {deleteError}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3">
             <button

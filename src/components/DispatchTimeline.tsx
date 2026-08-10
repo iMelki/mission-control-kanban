@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCcw, RadioTower } from 'lucide-react';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
 import { Panel, PanelBody, PanelHeader } from './ui/Panel';
 
 interface DispatchAttempt {
@@ -54,6 +55,7 @@ export function DispatchTimeline({ taskId }: DispatchTimelineProps) {
   const [attempts, setAttempts] = useState<DispatchAttempt[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [retryState, setRetryState] = useState<'idle' | 'retrying' | 'error'>('idle');
+  const [showRetryReview, setShowRetryReview] = useState(false);
   const retryInFlight = useRef(false);
 
   const loadAttempts = useCallback(async () => {
@@ -75,14 +77,11 @@ export function DispatchTimeline({ taskId }: DispatchTimelineProps) {
 
   const latest = attempts[0];
   const canRetryWebhook = latest?.runtime_type === 'webhook' && ['failed', 'timeout'].includes(latest.status);
+  const repeatedRetry = Boolean(latest && latest.attempt_number > 1);
 
-  const handleRetry = async () => {
-    if (retryInFlight.current || retryState === 'retrying' || !canRetryWebhook) return;
-    const repeatedRetry = latest.attempt_number > 1;
-    const confirmRetry = repeatedRetry
-      ? window.confirm('Retry this webhook dispatch again? This can duplicate downstream work if the bridge already accepted it.')
-      : true;
-    if (!confirmRetry) return;
+  // Shared by the direct path and the ActionReviewDialog path; throws on
+  // failure so the review dialog can keep itself open with the error.
+  const performRetry = async () => {
     retryInFlight.current = true;
     setRetryState('retrying');
     try {
@@ -97,9 +96,22 @@ export function DispatchTimeline({ taskId }: DispatchTimelineProps) {
     } catch (error) {
       console.error('Dispatch retry failed:', error);
       setRetryState('error');
+      throw error instanceof Error ? error : new Error('Dispatch retry failed');
     } finally {
       retryInFlight.current = false;
     }
+  };
+
+  const handleRetry = () => {
+    if (retryInFlight.current || retryState === 'retrying' || !canRetryWebhook) return;
+    if (repeatedRetry) {
+      // A repeated retry can duplicate downstream work - route it through the
+      // action-review dialog instead of firing immediately.
+      setShowRetryReview(true);
+      return;
+    }
+    // First retry: the inline error banner already covers the failure path.
+    void performRetry().catch(() => undefined);
   };
 
   return (
@@ -120,9 +132,25 @@ export function DispatchTimeline({ taskId }: DispatchTimelineProps) {
             disabled={!canRetryWebhook || retryState === 'retrying'}
             className="inline-flex items-center gap-1 rounded border border-mc-border px-2 py-1 text-xs text-mc-text hover:bg-mc-bg-tertiary disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <RefreshCcw className={`size-3 ${retryState === 'retrying' ? 'animate-spin' : ''}`} />
+            <RefreshCcw className={`size-3 ${retryState === 'retrying' ? 'motion-safe:animate-spin' : ''}`} />
             Retry webhook
           </button>
+          <ActionReviewDialog
+            title="Retry this webhook dispatch again?"
+            confirmLabel="Retry webhook"
+            pendingLabel="Retrying..."
+            open={showRetryReview}
+            onOpenChange={setShowRetryReview}
+            consequences={{
+              immediateEffect: 'A new dispatch attempt for this task starts right away.',
+              confirmedEffect:
+                'The webhook payload is re-sent to the configured bridge and recorded as a new attempt in this timeline.',
+              resultLocation: 'This dispatch timeline, once it refreshes.',
+              willNotHappen:
+                'Earlier attempts are not cancelled or deduplicated - if the bridge already accepted one, downstream work can be duplicated.',
+            }}
+            onConfirm={performRetry}
+          />
         </div>
       </PanelHeader>
       <PanelBody className="space-y-2">

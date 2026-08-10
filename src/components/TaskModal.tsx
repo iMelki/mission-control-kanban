@@ -12,6 +12,7 @@ import { GitHubWritebackPanel } from './GitHubWritebackPanel';
 import { DispatchTimeline } from './DispatchTimeline';
 import { TaskDependenciesPanel } from './TaskDependenciesPanel';
 import { RuntimeActionsPanel } from './task-modal/RuntimeActionsPanel';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
 import { GitHubIssueDraftPanel } from './task-modal/GitHubIssueDraftPanel';
 import { DispatchContractSection } from './task-modal/DispatchContractSection';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
@@ -300,31 +301,20 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     }
   };
 
-  const deleteInFlight = useRef(false);
+  // Runs inside ActionReviewDialog: a thrown error keeps the dialog open
+  // with the failure message, so no separate submitError plumbing is needed.
   const handleDelete = async () => {
-    if (deleteInFlight.current) return;
-    if (!currentTask || !confirm(`Delete \"${currentTask.title}\"?`)) return;
+    if (!currentTask) return;
 
-    deleteInFlight.current = true;
-    setSubmitError(null);
-
-    try {
-      const res = await fetch(`/api/tasks/${currentTask.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        useMissionControl.setState((state) => ({
-          tasks: state.tasks.filter((t) => t.id !== currentTask.id),
-        }));
-        onClose();
-      } else {
-        const payloadError = await res.json().catch(() => ({}));
-        setSubmitError(payloadError.error || 'Failed to delete task');
-      }
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-      setSubmitError(error instanceof Error ? error.message : 'Failed to delete task');
-    } finally {
-      deleteInFlight.current = false;
+    const res = await fetch(`/api/tasks/${currentTask.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const payloadError = await res.json().catch(() => ({}));
+      throw new Error(payloadError.error || 'Failed to delete task');
     }
+    useMissionControl.setState((state) => ({
+      tasks: state.tasks.filter((t) => t.id !== currentTask.id),
+    }));
+    onClose();
   };
 
   const statuses: TaskStatus[] = ['planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'done'];
@@ -643,16 +633,30 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           <div className="flex flex-col gap-3 p-4 border-t border-mc-border flex-shrink-0 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2">
               {currentTask && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
-                  >
-                    <Trash2 className="size-4" />
-                    Delete
-                  </button>
-                </>
+                <ActionReviewDialog
+                  title={`Delete task "${currentTask.title}"?`}
+                  tone="destructive"
+                  confirmLabel="Delete task"
+                  pendingLabel="Deleting..."
+                  trigger={
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
+                    >
+                      <Trash2 className="size-4" />
+                      Delete
+                    </button>
+                  }
+                  consequences={{
+                    immediateEffect: 'The task disappears from this board and this modal closes.',
+                    confirmedEffect:
+                      'The task record is deleted along with its activity log, deliverable entries, dispatch attempts, events, and tracked sub-agent session records.',
+                    resultLocation: 'The kanban board; connected clients update over the live feed.',
+                    willNotHappen:
+                      'Files on disk and any linked GitHub issue are not deleted; conversations are kept and unlinked.',
+                  }}
+                  onConfirm={handleDelete}
+                />
               )}
             </div>
             <div className="flex gap-2">

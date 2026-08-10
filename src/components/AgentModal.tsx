@@ -8,6 +8,7 @@ import {
   serializeAgentRuntimeConfig,
 } from '@/lib/agent-runtimes';
 import type { Agent, AgentRuntimeType, AgentStatus } from '@/lib/types';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
 import { RuntimeDispatchSection, type AgentFormState } from './agent-modal/RuntimeDispatchSection';
 
 interface AgentModalProps {
@@ -88,22 +89,22 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
     }
   };
 
+  // Runs inside ActionReviewDialog: a thrown error keeps the dialog open
+  // with the failure message instead of failing silently.
   const handleDelete = async () => {
-    if (!agent || !confirm(`Delete ${agent.name}?`)) return;
+    if (!agent) return;
 
-    try {
-      const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        // Remove from store
-        useMissionControl.setState((state) => ({
-          agents: state.agents.filter((a) => a.id !== agent.id),
-          selectedAgent: state.selectedAgent?.id === agent.id ? null : state.selectedAgent,
-        }));
-        onClose();
-      }
-    } catch (error) {
-      console.error('Failed to delete agent:', error);
+    const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const payloadError = await res.json().catch(() => ({}));
+      throw new Error(payloadError.error || 'Failed to delete agent');
     }
+    // Remove from store
+    useMissionControl.setState((state) => ({
+      agents: state.agents.filter((a) => a.id !== agent.id),
+      selectedAgent: state.selectedAgent?.id === agent.id ? null : state.selectedAgent,
+    }));
+    onClose();
   };
 
   return (
@@ -296,14 +297,30 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         <div className="flex items-center justify-between p-4 border-t border-mc-border">
           <div>
             {agent && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
+              <ActionReviewDialog
+                title={`Delete agent ${agent.name}?`}
+                tone="destructive"
+                confirmLabel="Delete agent"
+                pendingLabel="Deleting..."
+                trigger={
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                }
+                consequences={{
+                  immediateEffect: 'The agent is removed from the roster and this modal closes.',
+                  confirmedEffect:
+                    'The agent record is deleted along with its tracked sessions, messages, and conversation memberships.',
+                  resultLocation: 'The agents sidebar and any task that listed this agent.',
+                  willNotHappen:
+                    'Tasks are not deleted - they are unassigned - and no running OpenClaw session is stopped.',
+                }}
+                onConfirm={handleDelete}
+              />
             )}
           </div>
           <div className="flex gap-2">
