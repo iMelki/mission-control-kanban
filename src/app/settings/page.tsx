@@ -16,18 +16,18 @@ export default function SettingsPage() {
   const router = useRouter();
   const [config, setConfig] = useState<MissionControlConfig>(() => getConfig());
   const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
-    setSaveSuccess(false);
+    setSuccessMessage(null);
 
     try {
       updateConfig(config);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setSuccessMessage('Settings saved successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
@@ -39,8 +39,8 @@ export default function SettingsPage() {
   const handleReset = () => {
     resetConfig();
     setConfig(getConfig());
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setSuccessMessage('Settings reset to defaults');
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   const handleChange = (field: keyof MissionControlConfig, value: string) => {
@@ -106,9 +106,9 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Success Message */}
-        {saveSuccess && (
+        {successMessage && (
           <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded text-green-400">
-            ✓ Settings saved successfully
+            ✓ {successMessage}
           </div>
         )}
 

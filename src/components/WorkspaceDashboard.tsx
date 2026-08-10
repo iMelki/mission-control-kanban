@@ -251,6 +251,11 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
                 This workspace has {workspace.taskCounts.total} task(s). Delete them first.
               </span>
             )}
+            {workspace.agentCount > 0 && (
+              <span className="block mt-2 text-mc-accent-red">
+                This workspace has {workspace.agentCount} agent(s). Delete them first.
+              </span>
+            )}
           </p>
 
           {deleteError && (
@@ -337,6 +342,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
                   type="button"
                   onClick={() => setIcon(workspaceIcon)}
                   aria-pressed={icon === workspaceIcon}
+                  aria-label={`Select ${workspaceIcon} workspace icon`}
                   className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-colors ${
                     icon === workspaceIcon
                       ? 'bg-mc-accent/20 border-2 border-mc-accent'

@@ -121,6 +121,10 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
         const res = await fetch(`/api/agents/${agent.id}/openclaw`, { method: 'DELETE' });
         if (res.ok) {
           setAgentOpenClawSession(agent.id, null);
+        } else {
+          const error = await res.json().catch(() => null);
+          console.error('Failed to disconnect from OpenClaw:', error);
+          setConnectError({ agentName: agent.name, message: error?.error || 'Failed to disconnect OpenClaw session' });
         }
       } else {
         const res = await fetch(`/api/agents/${agent.id}/openclaw`, { method: 'POST' });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
@@ -89,6 +89,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
+  const [dispatchDryRunError, setDispatchDryRunError] = useState<Record<string, unknown> | null>(null);
   const [isPreviewingDispatch, setIsPreviewingDispatch] = useState(false);
 
   useEffect(() => {
@@ -177,10 +178,15 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
         body: JSON.stringify({ dry_run: true }),
       });
       if (!response.ok) {
-        setDispatchDryRun(await response.json().catch(() => null));
+        setDispatchDryRun(null);
+        setDispatchDryRunError(await response.json().catch(() => ({ error: `Dispatch preview failed (HTTP ${response.status})` })));
         return;
       }
+      setDispatchDryRunError(null);
       setDispatchDryRun(await response.json());
+    } catch (error) {
+      setDispatchDryRun(null);
+      setDispatchDryRunError({ error: error instanceof Error ? error.message : 'Dispatch preview request failed' });
     } finally {
       setIsPreviewingDispatch(false);
     }
@@ -578,6 +584,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               onDispatchDryRun={handleDispatchDryRun}
               isPreviewingDispatch={isPreviewingDispatch}
               dispatchDryRun={dispatchDryRun}
+              dispatchDryRunError={dispatchDryRunError}
               disabled={!currentTask}
             />
 

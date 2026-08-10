@@ -463,8 +463,10 @@ export default function WorkspacePage() {
                   <AlertTriangle className="size-4 shrink-0" />
                 ) : n8nSyncPresentation?.state === 'warning' ? (
                   <AlertTriangle className="size-4 shrink-0 text-amber-300" />
-                ) : (
+                ) : n8nSyncPresentation ? (
                   <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
+                ) : (
+                  <RefreshCw className="size-4 shrink-0" />
                 )}
                 <span>
                   n8n sync: {n8nSyncPresentation?.label ?? 'waiting for first scheduled run'}

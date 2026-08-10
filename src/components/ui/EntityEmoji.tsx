@@ -25,11 +25,19 @@ const FALLBACK_ICONS: Record<'agent' | 'workspace', LucideIcon> = {
  */
 export function EntityEmoji({ emoji, kind = 'agent', label, hidden = false, className }: EntityEmojiProps) {
   const value = emoji?.trim();
+  // Accessible-name contract: a visible instance is only exposed to assistive
+  // technology when it has a name. Without a label there is nothing to announce,
+  // so the glyph is hidden rather than rendering an unnamed role="img".
+  const exposed = !hidden && Boolean(label);
   if (!value) {
     const Fallback = FALLBACK_ICONS[kind];
-    return <Fallback aria-hidden="true" className={className ? `inline-block size-[1em] ${className}` : 'inline-block size-[1em]'} />;
+    const fallbackClassName = className ? `inline-block size-[1em] ${className}` : 'inline-block size-[1em]';
+    if (!exposed) {
+      return <Fallback aria-hidden="true" className={fallbackClassName} />;
+    }
+    return <Fallback role="img" aria-label={label} className={fallbackClassName} />;
   }
-  if (hidden) {
+  if (!exposed) {
     return <span aria-hidden="true" className={className}>{value}</span>;
   }
   return <span role="img" aria-label={label} className={className}>{value}</span>;
