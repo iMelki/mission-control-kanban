@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle, Github } from 'lucide-react';
+import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
 import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import Link from 'next/link';
 import { LocalControlPanel } from '@/components/LocalControlPanel';

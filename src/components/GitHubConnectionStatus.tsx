@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Github, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
 
 interface GitHubDiagnostics {
   status: 'ok' | 'limited' | 'missing_token' | 'error';
@@ -23,6 +24,9 @@ export function GitHubConnectionStatus() {
     setLoading(true);
     try {
       const response = await fetch('/api/github/diagnostics', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`GitHub diagnostics request failed (${response.status})`);
+      }
       const payload = (await response.json()) as GitHubDiagnostics;
       setDiagnostics(payload);
     } catch (error) {

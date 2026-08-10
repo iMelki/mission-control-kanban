@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Github, Loader2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
 import { useMissionControl } from '@/lib/store';
 
 interface GitHubProjectItemOption {
@@ -80,6 +81,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
   const [isLoadingSource, setIsLoadingSource] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const isCreatingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedProjectItem = useMemo(
@@ -166,10 +168,13 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
   }, [loadPreview, selectedProjectItemId, sourceData]);
 
   const handleCreateTask = async () => {
-    if (!preview?.preview || preview.existing_task) {
+    // Ref guard closes the re-entry window synchronously; React state alone is
+    // stale until the next render, so a fast double-click would slip through.
+    if (isCreatingRef.current || !preview?.preview || preview.existing_task) {
       return;
     }
 
+    isCreatingRef.current = true;
     setIsCreating(true);
     setError(null);
 
@@ -202,6 +207,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'Failed to create local task');
     } finally {
+      isCreatingRef.current = false;
       setIsCreating(false);
     }
   };
@@ -251,6 +257,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
               type="url"
               value={issueUrl}
               onChange={(event) => setIssueUrl(event.target.value)}
+              aria-label="GitHub issue URL"
               placeholder="https://github.com/iMelki/projects-ops/issues/6"
               className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
             />

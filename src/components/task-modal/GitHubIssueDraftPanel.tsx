@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Github, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
 
 interface GitHubIssueDraftResponse {
   dry_run: boolean;

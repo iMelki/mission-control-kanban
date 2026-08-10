@@ -20,7 +20,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, ChevronRight, GripVertical, AlertTriangle, Github } from 'lucide-react';
+import { Plus, ChevronRight, GripVertical, AlertTriangle } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
 import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import { useMissionControl } from '@/lib/store';
 import {
