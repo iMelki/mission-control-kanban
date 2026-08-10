@@ -239,7 +239,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-3 border-b border-mc-border flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -326,7 +326,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex-1 flex gap-3 p-3 overflow-x-auto">
+        <div className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden p-3">
           {COLUMNS.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -370,7 +370,7 @@ function KanbanColumn({ column, tasks, activeTaskId, onCardClick }: KanbanColumn
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-[220px] max-w-[300px] flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 transition-colors ${column.color} ${
+      className={`flex-1 min-h-0 min-w-[220px] max-w-[300px] flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 transition-colors ${column.color} ${
         isOver ? 'ring-2 ring-mc-accent/50' : ''
       }`}
     >
@@ -385,7 +385,7 @@ function KanbanColumn({ column, tasks, activeTaskId, onCardClick }: KanbanColumn
       </div>
 
       {/* Tasks */}
-      <ul className="flex-1 overflow-y-auto p-2 space-y-2 list-none" aria-label={`${column.label} tasks`}>
+      <ul className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 list-none" aria-label={`${column.label} tasks`}>
         <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
             <SortableTaskCard
