@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const RECEIPT_SCHEMA_VERSION = 'mck.runtime-smoke-cleanup.v1';
+const CLEANUP_REQUEST_TIMEOUT_MS = 30_000;
 
 function requestStatus(response) {
   const status = Number(response?.status);
@@ -13,6 +14,7 @@ async function callEntityEndpoint(fetchImpl, baseUrl, entityPath, method) {
     const response = await fetchImpl(`${baseUrl.replace(/\/$/, '')}${entityPath}`, {
       method,
       headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(CLEANUP_REQUEST_TIMEOUT_MS),
     });
     return {
       method,

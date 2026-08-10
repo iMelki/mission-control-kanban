@@ -32,12 +32,16 @@ test('deletes every temporary entity and proves absence with a 404 readback', as
     entities,
     now: () => timestamps.shift(),
     fetchImpl: async (url, init) => {
-      calls.push({ url, method: init.method });
+      calls.push({ url, method: init.method, signal: init.signal });
       return response(init.method === 'DELETE' ? 200 : 404);
     },
   });
 
   assert.equal(receipt.schema_version, RECEIPT_SCHEMA_VERSION);
+  assert.ok(
+    calls.every(({ signal }) => signal instanceof AbortSignal),
+    'every cleanup request must carry a timeout AbortSignal',
+  );
   assert.equal(receipt.ok, true);
   assert.equal(receipt.entity_count, 4);
   assert.equal(receipt.started_at, '2026-08-09T00:00:00.000Z');

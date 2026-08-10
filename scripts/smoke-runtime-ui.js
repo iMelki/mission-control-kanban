@@ -80,6 +80,7 @@ async function main() {
   let cleanupReceipt;
   let cleanupReceiptPath;
   let cleanupReceiptWriteError;
+  let cleanupVerificationError;
   try {
     agent = await requestJson('/api/agents', {
       method: 'POST',
@@ -326,20 +327,26 @@ async function main() {
       agent && { kind: 'agent', role: 'runtime', id: agent.id, path: `/api/agents/${agent.id}` },
     ].filter(Boolean);
 
-    cleanupReceipt = await verifyRuntimeSmokeCleanup({ baseUrl, entities });
     try {
-      cleanupReceiptPath = writeRuntimeSmokeCleanupReceipt({ artifactDir, receipt: cleanupReceipt });
+      cleanupReceipt = await verifyRuntimeSmokeCleanup({ baseUrl, entities });
     } catch (error) {
-      cleanupReceiptWriteError = error;
+      cleanupVerificationError = error;
     }
+    if (cleanupReceipt) {
+      try {
+        cleanupReceiptPath = writeRuntimeSmokeCleanupReceipt({ artifactDir, receipt: cleanupReceipt });
+      } catch (error) {
+        cleanupReceiptWriteError = error;
+      }
 
-    console.log(`RUNTIME_SMOKE_CLEANUP_RECEIPT ${JSON.stringify({
-      ...cleanupReceipt,
-      artifact_path: cleanupReceiptPath || null,
-    })}`);
+      console.log(`RUNTIME_SMOKE_CLEANUP_RECEIPT ${JSON.stringify({
+        ...cleanupReceipt,
+        artifact_path: cleanupReceiptPath || null,
+      })}`);
+    }
   }
 
-  const failures = [primaryError, browserCloseError, cleanupReceiptWriteError].filter(Boolean);
+  const failures = [primaryError, browserCloseError, cleanupVerificationError, cleanupReceiptWriteError].filter(Boolean);
   if (cleanupReceipt && !cleanupReceipt.ok) {
     failures.push(new Error('Runtime smoke cleanup did not prove every temporary entity absent'));
   }
