@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Migrated all six modal overlays onto the owned dialog primitives (2026-08-11, #139)** -
+  `AgentModal`, `TaskModal`, `GitHubImportModal`, and the create-workspace form
+  now render through the vendored shadcn/Radix `Dialog`, and the
+  delete-workspace and live-GitHub-mutation confirms now render through
+  `ActionReviewDialog`. Every modal gains `role="dialog"`, a title-bound
+  accessible name, a focus trap, Escape-to-close, and focus return; the
+  hand-rolled `fixed inset-0` overlays are gone. No new component was written -
+  both primitives already existed in this repository - so five files left the
+  component-sourcing baseline for
+  `docs/preflight/records/2026-08-11-dialog-overlay-migration.md`. Deleting a
+  workspace that still holds tasks or agents now explains the refusal in the
+  dialog instead of greying out the confirm button, and `smoke:runtime-ui`
+  proves the dialog semantics in a real browser.
+
+### Fixed
+
+- **Closed the four PR #137 review follow-ups on the factory bridge (2026-08-11, #136)** -
+  Dispatch v2 refuses out-of-bounds work text before the canonical envelope is
+  built, returning HTTP 400 (or dry-run blockers) that name the offending field
+  instead of the envelope's opaque failure; the bounds live in
+  `FACTORY_V2_WORK_CONTRACT_LIMITS` and are pinned to the canonical validator by
+  test. `validateReceiptForMapping` now rejects `dispatch_version: 1` mappings
+  before any Paperclip call, so a v2 receipt can no longer complete a v1
+  dispatch by comparing `repositoryBaseSha` with itself.
+  `validateWebhookCallbackPayload` accepts a caller-supplied
+  `expectedReceiptIdentity` and no longer builds a self-referential expectation
+  that always passed. The published v2 dispatch schema resolves the factory
+  envelope from a local `$defs` entry with a stable `$id` instead of a mutable
+  `agent-settings@dev` raw URL.
+
 ### Documentation
 
 - **Refresh Paperclip bridge topology truth (2026-08-08, #47/#119/#127)** -

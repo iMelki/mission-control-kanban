@@ -28,24 +28,43 @@ the local operator entrypoint; historical task notes remain in
     Paperclip host and live MCK/Mission Control reconciliation under #47 after
     the separately tracked exact host-SHA gate in #135 is refreshed.
   - CodeRabbit PR #137 follow-ups (recorded 2026-08-10, non-trivial; each links
-    the source review comment):
-    - `integrations/paperclip-bridge/src/contracts.ts`: `validateDispatchMetadata`
-      checks field presence only — mirror the v2 length limits (title 8-240,
-      acceptance/test items, rollback 8-1000) before building the envelope so
-      short text fails fast instead of 500ing in `validateWebhookDispatchPayloadV2`
+    the source review comment). All four are implemented on `dev`
+    (2026-08-11); each carries its own regression coverage:
+    - DONE — dispatch length pre-validation: `FACTORY_V2_WORK_CONTRACT_LIMITS`
+      and `validateFactoryV2WorkContract` in `src/lib/dispatch-contract.ts`
+      mirror the canonical envelope bounds (title 8-240, acceptance 8-1000,
+      test 3-500, rollback 8-1000, 64-entry lists). Both v2 dispatch paths in
+      `src/lib/dispatch-adapters.ts` refuse out-of-bounds text before the
+      envelope is built — live dispatch returns HTTP 400 naming the field, the
+      dry run returns the same blockers. v1 dispatch and the default
+      `validateDispatchMetadata` behaviour are unchanged; the opt-in is
+      `{ factoryDispatchVersion: 2, taskTitle }`. A test pins the mirror to
+      `validateCanonicalFactoryTaskEnvelope` so the two cannot drift
       ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190577)).
-    - `integrations/paperclip-bridge/src/worker.ts` `validateReceiptForMapping`:
-      reject `dispatch_version: 1` mappings before authoritative completion —
-      a v2 receipt against a v1 mapping self-compares `repositoryBaseSha`
+    - DONE — v1-mapping rejection: `validateReceiptForMapping` in
+      `integrations/paperclip-bridge/src/worker.ts` now throws before any host
+      call when `mapping.dispatch_version !== 2` or the persisted envelope is
+      v1, so a v2 receipt can no longer complete a v1 dispatch by
+      self-comparing `repositoryBaseSha`. Covered by the new
+      `integrations/paperclip-bridge/tests/receipt-mapping.spec.ts`, whose
+      context proxy fails the test if Paperclip is touched at all
       ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190580)).
-    - `src/lib/webhook-callback-schema.ts`: the `expected` identity passed to
-      `validateBridgeReceipt` is derived from the receipt itself and verifies
-      nothing — accept the persisted dispatch identity as a parameter of
-      `validateWebhookCallbackPayload` (route-level binding currently compensates)
+    - DONE — self-referential expected identity: `validateWebhookCallbackPayload`
+      accepts `{ expectedReceiptIdentity }` and forwards it to
+      `validateBridgeReceipt`; the self-derived `expected` object is gone, so
+      omitting the identity no longer implies a check that never runs. Five
+      wrong-identity permutations now reject and the bound identity passes.
+      The agent-completion route keeps its own binding in `lifecycleRejection`
+      (it reads the persisted attempt after payload validation), so the new
+      parameter is currently the reusable path for other callers rather than a
+      second enforcement point
       ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190622)).
-    - `src/lib/webhook-dispatch-schema.ts`: the published v2 schema's `envelope`
-      uses a remote `$ref` to a mutable `dev` URL — inline the envelope schema or
-      use a local `$defs` entry with a stable `$id`
+    - DONE — remote `$ref`: the published v2 schema now defines the envelope at
+      `#/$defs/factory_task_envelope` with the stable `$id`
+      `https://mission-control-kanban.local/schemas/factory-task-envelope.v1.json`,
+      carrying the same work-contract bounds. A test asserts every `$ref` in the
+      published document is a local JSON Pointer and that
+      `raw.githubusercontent.com` no longer appears
       ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190626)).
 
 
@@ -305,3 +324,29 @@ the local operator entrypoint; historical task notes remain in
     Awwwards rubric. Full report: `docs/uiux-awwwards-report-2026-08-09.md`.
     Scores are code-inspection estimates pending a Frontend Proof Bundle.
     Fleet rollup: iMelki/agent-settings#586.
+  - DONE 2026-08-11 — dialog semantics: all six hand-rolled `fixed inset-0`
+    overlays moved onto primitives this repo already owned. `AgentModal`,
+    `TaskModal`, `GitHubImportModal`, and `WorkspaceDashboard`'s
+    create-workspace form now use the vendored shadcn/Radix `Dialog`
+    (`DialogTitle` names each one, `DialogClose` owns the header X);
+    `WorkspaceDashboard`'s delete-workspace confirm and
+    `GitHubIssueDraftPanel`'s live-mutation confirm now use
+    `ActionReviewDialog` (destructive tone, and typed confirmation preserving
+    the exact server-issued phrase). `grep "fixed inset-0" src` returns only
+    `src/components/ui/dialog.tsx`; no new component file was created, and the
+    five migrated files left `docs/preflight/component-baseline.json` for the
+    record `docs/preflight/records/2026-08-11-dialog-overlay-migration.md`.
+  - Delete-workspace refusal is now explained rather than silently disabled:
+    a workspace holding tasks or agents states the count and refuses in the
+    dialog instead of greying out the confirm button.
+  - `npm run smoke:runtime-ui` now asserts `role="dialog"` on the primitive's
+    own slot and closes the agent and task modals with Escape. Radix
+    deliberately does not emit `aria-modal`; modality comes from its focus
+    scope plus `aria-hidden` on siblings. Live readback on 127.0.0.1:3021:
+    `role="dialog"`, `aria-labelledby` bound to the title, focus inside the
+    dialog, Escape closes, desktop and mobile screenshots captured, no
+    non-whitelisted console errors.
+  - Still open from the report: semantic tone tokens and the 156 raw
+    emerald/amber/rose usages, the bespoke n8n-sync-history table, next/font
+    loading, the two-accent CTA in `MissionQueue`, and
+    `prefers-reduced-motion` coverage.
