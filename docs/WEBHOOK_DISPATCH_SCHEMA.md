@@ -213,6 +213,37 @@ Bridge authors can fetch the exact schema that MCK uses for outbound dispatch va
 
 The route returns `application/schema+json` and includes `X-Schema-Id` so bridge code can cache or pin the contract version.
 
+Every `$ref` in the published documents is a local JSON Pointer. The v2
+document defines the canonical factory task envelope under
+`#/$defs/factory_task_envelope` with the stable identity
+`https://mission-control-kanban.local/schemas/factory-task-envelope.v1.json`.
+It previously pointed at
+`https://raw.githubusercontent.com/iMelki/agent-settings/dev/...`, so an
+external consumer's validation result could change whenever that branch moved,
+with no MCK release. The authoritative check remains
+`validateCanonicalFactoryTaskEnvelope` in
+`integrations/paperclip-bridge/src/contracts.ts`, which MCK runs on every
+dispatch; the published `$defs` entry exists so external consumers can resolve
+the envelope from the served document alone.
+
+## Factory v2 work-contract text bounds
+
+Dispatch v2 refuses out-of-bounds work text **before** the canonical envelope is
+built, so the operator sees which field is wrong instead of the envelope's
+opaque `work contract is invalid` message. Live dispatch returns HTTP 400 and
+the dry-run preview returns the same blockers in `validation_errors`.
+
+| Field | Source | Bounds |
+| --- | --- | --- |
+| `work.title` | task title | 8-240 characters |
+| `work.acceptanceCriteria[]` | `dispatch_metadata.acceptance_criteria` | 8-1000 characters, at most 64 entries |
+| `work.testRequirements[]` | `dispatch_metadata.test_requirements` | 3-500 characters, at most 64 entries |
+| `work.rollback.strategy` | `dispatch_metadata.rollback_plan` | 8-1000 characters |
+
+Dispatch v1 has no length contract and is unchanged. The bounds live in
+`FACTORY_V2_WORK_CONTRACT_LIMITS` (`src/lib/dispatch-contract.ts`) and are
+pinned to the canonical validator by `npm run test:factory-webhooks`.
+
 ## Required HMAC signatures
 
 Webhook auto-dispatch requires MCK to sign outbound requests without storing raw secrets in `runtime_config`:

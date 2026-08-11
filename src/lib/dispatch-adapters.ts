@@ -9,7 +9,11 @@ import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
 import { getOpenClawClient } from '@/lib/openclaw/client';
-import { parseDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
+import {
+  parseDispatchMetadata,
+  validateDispatchMetadata,
+  validateFactoryV2WorkContract,
+} from '@/lib/dispatch-contract';
 import { normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import { normalizeAgentForResponse, type AgentRow } from '@/lib/agent-api';
 import {
@@ -751,6 +755,30 @@ async function buildDispatchDryRunPreview(
     const webhookUrl = getWebhookUrl(config, process.env);
     const signature = getWebhookSignatureSecret(config, process.env);
     const dispatchVersion = resolveWebhookDispatchVersion(config);
+    // #136 follow-up: refuse out-of-bounds work text before the canonical v2
+    // envelope is built, so the operator sees which field is wrong instead of
+    // the envelope's opaque "work contract is invalid" message.
+    const factoryWorkBlockers = dispatchVersion === 2
+      ? validateFactoryV2WorkContract(task.dispatch_metadata, task.title)
+      : [];
+    if (factoryWorkBlockers.length > 0) {
+      return {
+        success: false,
+        task_id: task.id,
+        agent_id: agent.id,
+        runtime_type: 'webhook',
+        requested_runtime_type: agent.runtime_type,
+        dispatched: false,
+        dry_run: true,
+        would_dispatch: false,
+        webhook_url: webhookUrl ? redactUrlForResponse(webhookUrl) : undefined,
+        validation_errors: factoryWorkBlockers,
+        message: 'Dry-run preview: dispatch v2 work contract text is out of bounds.',
+        handoff_prompt: handoffPrompt,
+        callbacks,
+        reason: factoryWorkBlockers[0],
+      };
+    }
     let factoryRepository: Awaited<ReturnType<typeof resolveFactoryRepositoryBase>> | undefined;
     if (dispatchVersion === 2) {
       try {
@@ -853,6 +881,18 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
   const missionControlUrl = getMissionControlUrl();
   const projectsPath = getProjectsPath();
   const dispatchVersion = resolveWebhookDispatchVersion(config);
+  if (dispatchVersion === 2) {
+    // #136 follow-up: fail fast with a 400 that names the offending field
+    // instead of building an envelope the canonical validator will reject.
+    const factoryWorkBlockers = validateFactoryV2WorkContract(task.dispatch_metadata, task.title);
+    if (factoryWorkBlockers.length > 0) {
+      throw new DispatchAdapterError(
+        `Dispatch v2 work contract is out of bounds: ${factoryWorkBlockers.join('; ')}`,
+        400,
+        { validation_errors: factoryWorkBlockers },
+      );
+    }
+  }
   const factoryRepository = dispatchVersion === 2
     ? await resolveFactoryRepositoryBase(task, projectsPath)
     : undefined;

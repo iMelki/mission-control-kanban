@@ -2,12 +2,21 @@ import type { WebhookDispatchPayload } from './agent-runtimes';
 import type { WebhookDispatchPayloadV2 } from './factory-dispatch';
 import { factoryPathValidationError } from '../../integrations/paperclip-bridge/src/factory-paths';
 import {
+  FACTORY_TASK_ENVELOPE_V1_SCHEMA_VERSION,
   canonicalFactorySha256,
   validateCanonicalFactoryTaskEnvelope,
 } from '../../integrations/paperclip-bridge/src/contracts';
+import { FACTORY_V2_WORK_CONTRACT_LIMITS } from './dispatch-contract';
 
 export const WEBHOOK_DISPATCH_SCHEMA_ID = 'https://mission-control-kanban.local/schemas/webhook-dispatch-payload.v1.json';
 export const WEBHOOK_DISPATCH_V2_SCHEMA_ID = 'https://mission-control-kanban.local/schemas/webhook-dispatch-payload.v2.json';
+/**
+ * Stable local identity for the canonical envelope definition published inside
+ * the v2 dispatch schema. The published schema previously pointed `envelope` at
+ * a raw.githubusercontent.com URL on the mutable agent-settings `dev` branch, so
+ * an external consumer's validation result could change without any MCK release.
+ */
+export const FACTORY_TASK_ENVELOPE_SCHEMA_ID = 'https://mission-control-kanban.local/schemas/factory-task-envelope.v1.json';
 const FACTORY_MCK_BASE_URL = 'http://127.0.0.1:3021';
 const FACTORY_MCK_LIFECYCLE_URL = `${FACTORY_MCK_BASE_URL}/api/webhooks/agent-completion`;
 
@@ -180,10 +189,95 @@ export const webhookDispatchPayloadV2JsonSchema = {
             concurrent_mutating_builders: { const: 1 },
           },
         },
-        envelope: {
-          $ref: 'https://raw.githubusercontent.com/iMelki/agent-settings/dev/shared/schemas/software-factory/factory-task-envelope.v1.schema.json',
-        },
+        envelope: { $ref: '#/$defs/factory_task_envelope' },
         envelope_sha256: { type: 'string', pattern: '^sha256:[a-f0-9]{64}$' },
+      },
+    },
+  },
+  $defs: {
+    factory_task_envelope: {
+      $id: FACTORY_TASK_ENVELOPE_SCHEMA_ID,
+      title: 'Canonical factory task envelope (agent-settings factory-task-envelope.v1)',
+      description: [
+        'Local, version-pinned definition of the canonical envelope. The authoritative',
+        'check is validateCanonicalFactoryTaskEnvelope in',
+        'integrations/paperclip-bridge/src/contracts.ts, which this repository runs on',
+        'every dispatch; this definition exists so published consumers resolve the',
+        'envelope from the served document instead of a mutable upstream branch URL.',
+      ].join(' '),
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'schemaVersion',
+        'envelopeId',
+        'correlationId',
+        'createdAtUtc',
+        'origin',
+        'repository',
+        'work',
+        'execution',
+        'privacy',
+      ],
+      properties: {
+        schemaVersion: { const: FACTORY_TASK_ENVELOPE_V1_SCHEMA_VERSION },
+        envelopeId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$' },
+        correlationId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$' },
+        createdAtUtc: { type: 'string', minLength: 1 },
+        origin: { type: 'object' },
+        repository: { type: 'object' },
+        work: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['title', 'acceptanceCriteria', 'testRequirements', 'risk', 'reviewMode', 'rollback'],
+          properties: {
+            title: {
+              type: 'string',
+              minLength: FACTORY_V2_WORK_CONTRACT_LIMITS.title.min,
+              maxLength: FACTORY_V2_WORK_CONTRACT_LIMITS.title.max,
+            },
+            acceptanceCriteria: {
+              type: 'array',
+              minItems: 1,
+              maxItems: FACTORY_V2_WORK_CONTRACT_LIMITS.list_items.max,
+              items: {
+                type: 'string',
+                minLength: FACTORY_V2_WORK_CONTRACT_LIMITS.acceptance_criteria.min,
+                maxLength: FACTORY_V2_WORK_CONTRACT_LIMITS.acceptance_criteria.max,
+              },
+            },
+            testRequirements: {
+              type: 'array',
+              minItems: 1,
+              maxItems: FACTORY_V2_WORK_CONTRACT_LIMITS.list_items.max,
+              items: {
+                type: 'string',
+                minLength: FACTORY_V2_WORK_CONTRACT_LIMITS.test_requirements.min,
+                maxLength: FACTORY_V2_WORK_CONTRACT_LIMITS.test_requirements.max,
+              },
+            },
+            risk: { enum: ['low', 'medium', 'high', 'critical'] },
+            reviewMode: { enum: ['independent', 'pair-review', 'human-final'] },
+            rollback: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['strategy', 'verification'],
+              properties: {
+                strategy: {
+                  type: 'string',
+                  minLength: FACTORY_V2_WORK_CONTRACT_LIMITS.rollback_plan.min,
+                  maxLength: FACTORY_V2_WORK_CONTRACT_LIMITS.rollback_plan.max,
+                },
+                verification: {
+                  type: 'string',
+                  minLength: FACTORY_V2_WORK_CONTRACT_LIMITS.rollback_plan.min,
+                  maxLength: FACTORY_V2_WORK_CONTRACT_LIMITS.rollback_plan.max,
+                },
+              },
+            },
+          },
+        },
+        execution: { type: 'object' },
+        privacy: { type: 'object' },
       },
     },
   },

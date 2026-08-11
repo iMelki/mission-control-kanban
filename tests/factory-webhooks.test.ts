@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server';
 import {
   canonicalFactoryDigest,
   canonicalFactorySha256,
+  validateCanonicalFactoryTaskEnvelope,
 } from '../integrations/paperclip-bridge/src/contracts';
 
 process.env.MISSION_CONTROL_URL = 'http://127.0.0.1:3021';
@@ -38,7 +39,11 @@ let CallbackBodyReadError: typeof import('../src/lib/webhook-callback-operations
 let signHeaders: typeof import('../src/lib/webhook-signatures').buildSignedWebhookHeaders;
 let signPayload: typeof import('../src/lib/webhook-signatures').signWebhookPayload;
 let validateDispatchV2: typeof import('../src/lib/webhook-dispatch-schema').validateWebhookDispatchPayloadV2;
+let dispatchV2Schema: typeof import('../src/lib/webhook-dispatch-schema').webhookDispatchPayloadV2JsonSchema;
 let validateCallback: typeof import('../src/lib/webhook-callback-schema').validateWebhookCallbackPayload;
+let validateDispatchMetadata: typeof import('../src/lib/dispatch-contract').validateDispatchMetadata;
+let validateFactoryV2WorkContract: typeof import('../src/lib/dispatch-contract').validateFactoryV2WorkContract;
+let factoryWorkLimits: typeof import('../src/lib/dispatch-contract').FACTORY_V2_WORK_CONTRACT_LIMITS;
 
 test.before(async () => {
   const db = await import('../src/lib/db');
@@ -61,7 +66,12 @@ test.before(async () => {
   signHeaders = signatures.buildSignedWebhookHeaders;
   signPayload = signatures.signWebhookPayload;
   validateDispatchV2 = schema.validateWebhookDispatchPayloadV2;
+  dispatchV2Schema = schema.webhookDispatchPayloadV2JsonSchema;
   validateCallback = callbackSchema.validateWebhookCallbackPayload;
+  const dispatchContract = await import('../src/lib/dispatch-contract');
+  validateDispatchMetadata = dispatchContract.validateDispatchMetadata;
+  validateFactoryV2WorkContract = dispatchContract.validateFactoryV2WorkContract;
+  factoryWorkLimits = dispatchContract.FACTORY_V2_WORK_CONTRACT_LIMITS;
 });
 
 function resetDb() {
@@ -1244,6 +1254,35 @@ test('lifecycle v2 advances started, testing, review, and receipt-proven complet
     },
     errors: [],
   };
+  // #136 CodeRabbit follow-up (PR #137 discussion r3744190622): the receipt
+  // validator used to build its `expected` identity out of the receipt under
+  // validation, so every comparison compared a field with itself and always
+  // passed. A caller-supplied identity must bind for real, and a wrong one
+  // must reject; omitting it must not imply a check that never runs.
+  const completionBody = JSON.parse(buildLifecycleBody('completed', revision, { receipt }));
+  const boundIdentity = {
+    envelopeId: 'factory:attempt-factory-1',
+    correlationId: 'mck:default:task-factory-1',
+    taskRevision: revision,
+    repositorySlug: 'iMelki/mission-control-kanban',
+    repositoryBaseSha: FACTORY_BASE_SHA,
+  };
+  assert.equal(validateCallback(completionBody).ok, true);
+  assert.equal(
+    validateCallback(completionBody, { expectedReceiptIdentity: boundIdentity }).ok,
+    true
+  );
+  for (const wrongIdentity of [
+    { ...boundIdentity, envelopeId: 'factory:attempt-someone-else' },
+    { ...boundIdentity, correlationId: 'mck:default:task-someone-else' },
+    { ...boundIdentity, taskRevision: 'e'.repeat(64) },
+    { ...boundIdentity, repositorySlug: 'iMelki/some-other-repo' },
+    { ...boundIdentity, repositoryBaseSha: 'f'.repeat(40) },
+  ]) {
+    const rejected = validateCallback(completionBody, { expectedReceiptIdentity: wrongIdentity });
+    assert.equal(rejected.ok, false, `expected identity ${JSON.stringify(wrongIdentity)} should reject`);
+  }
+
   const legacyReceipt = structuredClone(receipt) as Record<string, unknown>;
   legacyReceipt.schemaVersion = 'agent-settings.factory-run-receipt.v1';
   delete (legacyReceipt.run as Record<string, unknown>).builderAgentId;
@@ -1419,4 +1458,148 @@ test('lifecycle callbacks never regress a manually advanced board status', async
   const response = await sendLifecycle('started', revision, 'lifecycle-late-started');
   assert.equal(response.status, 200);
   assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'done');
+});
+
+type MutableEnvelopeWork = {
+  work: {
+    title: string;
+    acceptanceCriteria: string[];
+    testRequirements: string[];
+    rollback: { strategy: string; verification: string };
+  };
+};
+
+// #136 CodeRabbit follow-up (PR #137 discussion r3744190577): dispatch
+// pre-validation only checked field presence, so short work text reached the
+// canonical envelope and failed there with an opaque message. These cases pin
+// the mirrored bounds to the canonical validator so the two cannot drift.
+test('factory v2 work-contract pre-validation mirrors the canonical envelope validator', () => {
+  const limits = factoryWorkLimits;
+  const baseEnvelope = validFactoryDispatchPayload().factory_contract.envelope;
+  const mutated = (mutate: (envelope: MutableEnvelopeWork) => void) => {
+    const envelope = structuredClone(baseEnvelope) as unknown as MutableEnvelopeWork;
+    mutate(envelope);
+    return envelope;
+  };
+
+  // The unmodified fixture is inside every bound on both sides.
+  assert.doesNotThrow(() => validateCanonicalFactoryTaskEnvelope(baseEnvelope));
+  assert.deepEqual(
+    validateFactoryV2WorkContract(
+      {
+        acceptance_criteria: [...baseEnvelope.work.acceptanceCriteria],
+        test_requirements: [...baseEnvelope.work.testRequirements],
+        rollback_plan: baseEnvelope.work.rollback.strategy,
+      },
+      baseEnvelope.work.title
+    ),
+    []
+  );
+
+  const cases: Array<{
+    label: RegExp;
+    envelope: MutableEnvelopeWork;
+    mirrored: () => string[];
+  }> = [
+    {
+      label: /Task title must be /,
+      envelope: mutated((envelope) => { envelope.work.title = 'x'.repeat(limits.title.min - 1); }),
+      mirrored: () => validateFactoryV2WorkContract(undefined, 'x'.repeat(limits.title.min - 1)),
+    },
+    {
+      label: /Task title must be /,
+      envelope: mutated((envelope) => { envelope.work.title = 'x'.repeat(limits.title.max + 1); }),
+      mirrored: () => validateFactoryV2WorkContract(undefined, 'x'.repeat(limits.title.max + 1)),
+    },
+    {
+      label: /Acceptance criteria entry 1 must be /,
+      envelope: mutated((envelope) => {
+        envelope.work.acceptanceCriteria = ['x'.repeat(limits.acceptance_criteria.min - 1)];
+      }),
+      mirrored: () => validateFactoryV2WorkContract({
+        acceptance_criteria: ['x'.repeat(limits.acceptance_criteria.min - 1)],
+      }),
+    },
+    {
+      label: /Test requirements entry 1 must be /,
+      envelope: mutated((envelope) => {
+        envelope.work.testRequirements = ['x'.repeat(limits.test_requirements.min - 1)];
+      }),
+      mirrored: () => validateFactoryV2WorkContract({
+        test_requirements: ['x'.repeat(limits.test_requirements.min - 1)],
+      }),
+    },
+    {
+      label: /Rollback plan must be /,
+      envelope: mutated((envelope) => {
+        envelope.work.rollback.strategy = 'x'.repeat(limits.rollback_plan.min - 1);
+      }),
+      mirrored: () => validateFactoryV2WorkContract({
+        rollback_plan: 'x'.repeat(limits.rollback_plan.min - 1),
+      }),
+    },
+  ];
+
+  for (const testCase of cases) {
+    assert.throws(
+      () => validateCanonicalFactoryTaskEnvelope(testCase.envelope),
+      /work contract is invalid/,
+      `canonical envelope should reject ${testCase.label}`
+    );
+    const blockers = testCase.mirrored();
+    assert.equal(blockers.length, 1, `mirror should report exactly one blocker for ${testCase.label}`);
+    assert.match(blockers[0], testCase.label);
+  }
+});
+
+test('dispatch metadata validation keeps v1 semantics and opts into the v2 bounds', () => {
+  const metadata = {
+    target_repo: 'iMelki/mission-control-kanban',
+    project_workstream: 'factory',
+    allowed_file_scope: ['src/**'],
+    acceptance_criteria: ['tiny'],
+    test_requirements: ['npm test'],
+    risk_level: 'low' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'pair_review' as const,
+    impact: 'Bridge dispatch',
+    rollback_plan: 'Revert the scoped commit',
+  };
+
+  const v1 = validateDispatchMetadata(metadata);
+  assert.equal(v1.canDispatch, true, 'v1 dispatch has no length contract and must stay unchanged');
+
+  const v2 = validateDispatchMetadata(metadata, { factoryDispatchVersion: 2, taskTitle: 'Short' });
+  assert.equal(v2.canDispatch, false);
+  assert.match(v2.blockers.join('; '), /Task title must be 8-240 characters/);
+  assert.match(v2.blockers.join('; '), /Acceptance criteria entry 1 must be 8-1000 characters/);
+
+  const v2Ready = validateDispatchMetadata(
+    { ...metadata, acceptance_criteria: ['Bridge dispatch reaches the factory'] },
+    { factoryDispatchVersion: 2, taskTitle: 'Make bridge contracts v2-authoritative' }
+  );
+  assert.equal(v2Ready.canDispatch, true);
+});
+
+// #136 CodeRabbit follow-up (PR #137 discussion r3744190626): the published v2
+// schema pointed `envelope` at a mutable agent-settings `dev` branch URL, so an
+// external consumer's validation result could change with no MCK release.
+test('published dispatch v2 schema resolves every $ref locally', () => {
+  const serialized = JSON.stringify(dispatchV2Schema);
+  assert.equal(serialized.includes('raw.githubusercontent.com'), false);
+  assert.equal(
+    dispatchV2Schema.properties.factory_contract.properties.envelope.$ref,
+    '#/$defs/factory_task_envelope'
+  );
+  assert.equal(
+    dispatchV2Schema.$defs.factory_task_envelope.$id,
+    'https://mission-control-kanban.local/schemas/factory-task-envelope.v1.json'
+  );
+  for (const ref of serialized.match(/"\$ref":"[^"]+"/g) ?? []) {
+    assert.match(ref, /^"\$ref":"#\//, 'published schemas must not depend on a remote reference');
+  }
+  const work = dispatchV2Schema.$defs.factory_task_envelope.properties.work.properties;
+  assert.equal(work.title.minLength, factoryWorkLimits.title.min);
+  assert.equal(work.title.maxLength, factoryWorkLimits.title.max);
+  assert.equal(work.rollback.properties.strategy.minLength, factoryWorkLimits.rollback_plan.min);
 });

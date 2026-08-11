@@ -776,10 +776,27 @@ function validateFactoryReceiptV1(value: unknown, errors: string[]): value is Fa
   return errors.length === 0;
 }
 
+/**
+ * Identity a caller already knows from the persisted dispatch it accepted.
+ * Supplying it is what makes receipt validation a real binding check; without
+ * it the validator only proves the receipt is internally well-formed, and the
+ * caller stays responsible for binding it to a dispatch.
+ */
+export interface ExpectedFactoryReceiptIdentity {
+  envelopeId: string;
+  correlationId: string;
+  /** Bare 64-hex task revision, without the `sha256:` prefix. */
+  taskRevision: string;
+  repositorySlug: string;
+  repositoryBaseSha: string;
+  allowedFileScope?: string[];
+}
+
 function validateFactoryReceipt(
   value: unknown,
   errors: string[],
   requireAuthoritativeCompletion: boolean,
+  expectedIdentity?: ExpectedFactoryReceiptIdentity,
 ): { receipt?: FactoryRunReceipt; authority?: FactoryReceiptAuthorityProjection } {
   if (!isObject(value)) {
     errors.push(requireAuthoritativeCompletion
@@ -813,16 +830,18 @@ function validateFactoryReceipt(
     return {};
   }
   try {
-    const receipt = validateBridgeReceipt(value, requireAuthoritativeCompletion
-      ? {
-        envelopeId: String(value.envelopeId ?? ''),
-        correlationId: String(value.correlationId ?? ''),
-        taskRevision: String(value.taskRevisionSha256 ?? '').replace(/^sha256:/, ''),
-        repositorySlug: isObject(value.repository) ? String(value.repository.slug ?? '') : '',
-        repositoryBaseSha: isObject(value.repository) ? String(value.repository.baseSha ?? '') : '',
-        requireAuthoritativeCompletion: true,
-      }
-      : undefined);
+    // Only a caller-supplied identity can bind this receipt to a dispatch. The
+    // previous `expected` object was read back out of `value` itself, so every
+    // comparison compared a field with itself and always passed; passing
+    // undefined states honestly that no identity binding runs here. The v1
+    // rejection that `requireAuthoritativeCompletion` used to carry is already
+    // enforced by the v1 branch above, which this line is only reached past.
+    const receipt = validateBridgeReceipt(
+      value,
+      expectedIdentity
+        ? { ...expectedIdentity, requireAuthoritativeCompletion }
+        : undefined,
+    );
     return {
       receipt: receipt as FactoryRunReceipt,
       authority: projectFactoryReceiptAuthority(receipt),
@@ -833,7 +852,20 @@ function validateFactoryReceipt(
   }
 }
 
-export function validateWebhookCallbackPayload(payload: unknown): WebhookCallbackValidationResult {
+export interface WebhookCallbackValidationOptions {
+  /**
+   * Identity of the dispatch this callback is claimed to answer, read from
+   * persistence by the caller. When supplied, a completed v2 receipt must match
+   * it; when omitted, the caller keeps sole responsibility for that binding
+   * (the agent-completion route does this in `lifecycleRejection`).
+   */
+  expectedReceiptIdentity?: ExpectedFactoryReceiptIdentity;
+}
+
+export function validateWebhookCallbackPayload(
+  payload: unknown,
+  options?: WebhookCallbackValidationOptions,
+): WebhookCallbackValidationResult {
   const errors: string[] = [];
   if (!isObject(payload)) {
     return { ok: false, errors: ['Payload must be a JSON object'] };
@@ -891,6 +923,7 @@ export function validateWebhookCallbackPayload(payload: unknown): WebhookCallbac
         payload.receipt,
         errors,
         payload.status === 'completed',
+        options?.expectedReceiptIdentity,
       );
       if (isObject(payload.receipt)) {
         if (payload.receipt.correlationId !== payload.correlation_id) {
