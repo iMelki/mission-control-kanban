@@ -225,7 +225,13 @@ async function main() {
       throw new Error('Webhook auto-dispatch should be disabled before validation');
     }
     await page.getByText(/^Runtime config JSON$/i).waitFor({ timeout: 10_000 });
-    await page.locator('div.fixed.inset-0 button').first().click();
+    // #139: the agent modal is a real Radix dialog now - assert the semantics
+    // and close it with Escape instead of clicking the first overlay button.
+    // Radix deliberately does not emit aria-modal (screen-reader live-region
+    // bugs); modality comes from its focus scope plus aria-hidden on siblings,
+    // so assert role=dialog on the primitive's own slot instead.
+    await page.locator('[role="dialog"][data-slot="dialog-content"]').first().waitFor({ timeout: 10_000 });
+    await page.keyboard.press('Escape');
     await page.getByLabel(/Runtime type/i).waitFor({ state: 'hidden', timeout: 10_000 });
 
     const taskCard = page.locator('li > [role="button"]').filter({ hasText: task.title });
@@ -241,7 +247,9 @@ async function main() {
     await page.getByText(/Dependency graph/i).waitFor({ timeout: 10_000 });
     await page.getByText(/Smoke dependency edge/i).first().waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: /Retry webhook/i }).waitFor({ timeout: 10_000 });
-    await page.locator('div.fixed.inset-0 button').first().click();
+    await page.locator('[role="dialog"][data-slot="dialog-content"]').first().waitFor({ timeout: 10_000 });
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: /Retry webhook/i }).waitFor({ state: 'hidden', timeout: 10_000 });
     await page.getByRole('button', { name: /All runtimes/i }).click();
 
     const checklistCard = page.locator('li > [role="button"]').filter({ hasText: checklistTask.title });
@@ -255,7 +263,8 @@ async function main() {
     await page.getByText(/Run relevant automated tests/i).waitFor({ timeout: 10_000 });
     await page.getByText(/Preserve unrelated dirty work/i).waitFor({ timeout: 10_000 });
     await page.getByText(/Revert the scoped commit/i).waitFor({ timeout: 10_000 });
-    await page.locator('div.fixed.inset-0 button').first().click();
+    await page.keyboard.press('Escape');
+    await page.getByText(/Revert the scoped commit/i).waitFor({ state: 'hidden', timeout: 10_000 });
 
     const responsiveChecks = [
       { name: 'tablet', width: 900, height: 1100 },
@@ -293,6 +302,7 @@ async function main() {
       ],
       checks: [
         'agent modal runtime selector',
+        'modal dialog semantics (role=dialog, Escape closes)',
         'dispatch-enabled control',
         'runtime config field',
         'task-card runtime badge',

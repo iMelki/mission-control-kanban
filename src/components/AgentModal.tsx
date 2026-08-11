@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import { X, Save, Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useMissionControl } from '@/lib/store';
 import {
   parseAgentRuntimeConfig,
@@ -108,22 +115,24 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent
+        aria-describedby={undefined}
+        showCloseButton={false}
+        className="flex w-[calc(100vw-2rem)] max-w-2xl max-h-[90vh] flex-col gap-0 p-0"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-mc-border">
-          <h2 className="text-lg font-semibold">
+        <DialogHeader className="flex-row items-center justify-between gap-2 p-4 border-b border-mc-border">
+          <DialogTitle>
             {agent ? `Edit ${agent.name}` : 'Create New Agent'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
+          </DialogTitle>
+          <DialogClose
             aria-label="Close agent modal"
-            className="p-1 hover:bg-mc-bg-tertiary rounded"
+            className="p-1 hover:bg-mc-bg-tertiary rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
           >
             <X className="w-5 h-5" />
-          </button>
-        </div>
+          </DialogClose>
+        </DialogHeader>
 
         {/* Tabs */}
         <div className="flex border-b border-mc-border">
@@ -343,7 +352,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

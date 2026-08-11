@@ -13,6 +13,13 @@ import { DispatchTimeline } from './DispatchTimeline';
 import { TaskDependenciesPanel } from './TaskDependenciesPanel';
 import { RuntimeActionsPanel } from './task-modal/RuntimeActionsPanel';
 import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { GitHubIssueDraftPanel } from './task-modal/GitHubIssueDraftPanel';
 import { DispatchContractSection } from './task-modal/DispatchContractSection';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
@@ -338,21 +345,30 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-2 sm:items-center sm:p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-lg sm:rounded-lg w-full max-w-5xl max-h-[96vh] sm:max-h-[90vh] flex flex-col">
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent
+        aria-describedby={undefined}
+        showCloseButton={false}
+        className={[
+          // Bottom sheet on phones, centered dialog from sm up - the same
+          // geometry the hand-rolled overlay had before the Radix migration.
+          'flex flex-col gap-0 p-0',
+          'bottom-0 top-auto w-[calc(100vw-1rem)] max-w-5xl max-h-[96vh] translate-y-0 rounded-b-none',
+          'sm:bottom-auto sm:top-1/2 sm:w-[calc(100vw-2rem)] sm:max-h-[90vh] sm:-translate-y-1/2 sm:rounded-b-lg',
+        ].join(' ')}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
-          <h2 className="text-lg font-semibold">
+        <DialogHeader className="flex-row items-center justify-between gap-2 p-4 border-b border-mc-border flex-shrink-0">
+          <DialogTitle>
             {currentTask ? currentTask.title : 'Create New Task'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 hover:bg-mc-bg-tertiary rounded"
+          </DialogTitle>
+          <DialogClose
+            aria-label="Close task modal"
+            className="p-1 hover:bg-mc-bg-tertiary rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
           >
             <X className="size-5" />
-          </button>
-        </div>
+          </DialogClose>
+        </DialogHeader>
 
         {/* Tabs - only show for existing tasks */}
         {currentTask && (
@@ -686,20 +702,20 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
           </div>
         )}
-      </div>
 
-      {/* Nested Agent Modal for inline agent creation */}
-      {showAgentModal && (
-        <AgentModal
-          workspaceId={workspaceId}
-        onClose={() => setShowAgentModal(false)}
-        onAgentCreated={(agentId) => {
-            // Auto-select the newly created agent
-            updateFormField('assigned_agent_id', agentId);
-            setShowAgentModal(false);
-          }}
-        />
-      )}
-    </div>
+        {/* Nested Agent Modal for inline agent creation */}
+        {showAgentModal && (
+          <AgentModal
+            workspaceId={workspaceId}
+            onClose={() => setShowAgentModal(false)}
+            onAgentCreated={(agentId) => {
+              // Auto-select the newly created agent
+              updateFormField('assigned_agent_id', agentId);
+              setShowAgentModal(false);
+            }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

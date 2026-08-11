@@ -3,6 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, X } from 'lucide-react';
 import { Github } from '@/components/icons/BrandIcons';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useMissionControl } from '@/lib/store';
 
 interface GitHubProjectItemOption {
@@ -231,25 +239,30 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
   } | null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-mc-border">
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex w-[calc(100vw-2rem)] max-w-4xl max-h-[90vh] flex-col gap-0 p-0"
+      >
+        <DialogHeader className="flex-row items-center justify-between gap-3 p-4 border-b border-mc-border">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded bg-mc-accent-cyan/15">
               <Github className="size-5 text-mc-accent-cyan" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Import GitHub Issue</h2>
-              <p className="text-sm text-mc-text-secondary">
+              <DialogTitle>Import GitHub Issue</DialogTitle>
+              <DialogDescription className="mt-1">
                 Paste an issue URL, load its GitHub Project context, inspect the preview, then create the local MCK task.
-              </p>
+              </DialogDescription>
             </div>
           </div>
-          <button
-              type="button" onClick={onClose} className="p-1 hover:bg-mc-bg-tertiary rounded">
+          <DialogClose
+            aria-label="Close GitHub import modal"
+            className="p-1 hover:bg-mc-bg-tertiary rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
+          >
             <X className="size-5" />
-          </button>
-        </div>
+          </DialogClose>
+        </DialogHeader>
 
         <div className="p-4 border-b border-mc-border bg-mc-bg/40">
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -448,7 +461,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
