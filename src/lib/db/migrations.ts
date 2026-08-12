@@ -682,6 +682,47 @@ const migrations: Migration[] = [
       `);
     }
   },
+  {
+    id: '021',
+    name: 'add_frontend_revenue_project_workspace',
+    up: (db) => {
+      console.log('[Migration 021] Adding Frontend Revenue GitHub Project-backed workspace...');
+
+      db.prepare(`
+        INSERT OR IGNORE INTO workspaces (id, name, slug, description, icon)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        'frontend-revenue',
+        'Frontend Revenue',
+        'frontend-revenue',
+        'Frontend Revenue cockpit mapped to GitHub Project #15.',
+        'F'
+      );
+
+      db.prepare(`
+        UPDATE workspaces
+        SET name = ?,
+            description = ?,
+            icon = ?,
+            github_project_owner = ?,
+            github_project_number = ?,
+            github_project_title = ?,
+            github_project_url = ?,
+            github_project_auto_refresh = 0,
+            updated_at = datetime('now')
+        WHERE slug = ?
+      `).run(
+        'Frontend Revenue',
+        'Frontend Revenue cockpit mapped to GitHub Project #15.',
+        'F',
+        'iMelki',
+        15,
+        'Frontend Revenue Program 2026',
+        'https://github.com/users/iMelki/projects/15',
+        'frontend-revenue'
+      );
+    }
+  },
 ];
 
 /**

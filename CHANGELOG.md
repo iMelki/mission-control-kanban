@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Frontend Revenue cockpit workspace bound to GitHub Project #15 (2026-08-12, #140)** -
+  Migration `021` seeds a `frontend-revenue` workspace mapped to
+  `iMelki` project `#15` (Frontend Revenue Program 2026), the largest active
+  project that had no local cockpit. The mapping is declared in
+  `GITHUB_PROJECT_WORKSPACE_MAPPINGS` alongside its siblings and starts with
+  `github_project_auto_refresh = 0`, matching the Asimtop precedent: a manual
+  **Sync now** has to prove the mapping before any scheduled cadence.
+  A new persistence test fails if a declared mapping is ever missing from - or
+  drifts from - its migration seed, which closes the gap that let the code
+  constant and the database disagree; the two partial-database migration tests
+  in `tests/factory-webhooks.test.ts` now isolate themselves from every later
+  migration rather than only from `020`. Verified against the live project: 266
+  items scanned, 231 imported, 35 skipped (4 closed, the rest drafts/PRs), and
+  the board at `/workspace/frontend-revenue` renders 231 real tasks across
+  `content-factory`, `landing-page`, `mission-control-kanban`, `asimtop-landing`
+  and 8 further repositories. No new UI component was written - the existing
+  workspace board, banner, and dashboard cards render the workspace unchanged.
+
 ### Changed
 
 - **Pinned bridge host compatibility to the reviewed Paperclip dev tip

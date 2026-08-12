@@ -30,6 +30,7 @@ let closeDb: typeof import('../src/lib/db').closeDb;
 let queryOne: typeof import('../src/lib/db').queryOne;
 let run: typeof import('../src/lib/db').run;
 let runMigrations: typeof import('../src/lib/db').runMigrations;
+let getMigrationStatus: typeof import('../src/lib/db').getMigrationStatus;
 let dispatchTaskToAssignedAgent: typeof import('../src/lib/dispatch-adapters').dispatchTaskToAssignedAgent;
 let computeTaskRevision: typeof import('../src/lib/dispatch-adapters').computeTaskRevision;
 let getDispatchAttempts: typeof import('../src/lib/dispatch-adapters').getDispatchAttempts;
@@ -57,6 +58,7 @@ test.before(async () => {
   queryOne = db.queryOne;
   run = db.run;
   runMigrations = db.runMigrations;
+  getMigrationStatus = db.getMigrationStatus;
   dispatchTaskToAssignedAgent = dispatch.dispatchTaskToAssignedAgent;
   computeTaskRevision = dispatch.computeTaskRevision;
   getDispatchAttempts = dispatch.getDispatchAttempts;
@@ -79,6 +81,23 @@ function resetDb() {
   for (const suffix of ['', '-wal', '-shm']) {
     const file = `${process.env.DATABASE_PATH}${suffix}`;
     if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+}
+
+/**
+ * These migration tests build a partial database that holds only the table under
+ * test, so any *other* pending migration would fail against the missing tables.
+ * Mark every pending migration except the one under test as already applied, so
+ * adding a migration later never breaks an unrelated isolation test.
+ */
+function isolatePendingMigration(
+  migrationDb: InstanceType<typeof Database>,
+  migrationId: string
+) {
+  const markApplied = migrationDb.prepare('INSERT INTO _migrations (id, name) VALUES (?, ?)');
+  for (const pendingId of getMigrationStatus(migrationDb).pending) {
+    if (pendingId === migrationId) continue;
+    markApplied.run(pendingId, `isolated-other-${pendingId}`);
   }
 }
 
@@ -456,7 +475,7 @@ test('migration 019 preserves callback deliveries while adding the processing st
       const migrationId = String(id).padStart(3, '0');
       markApplied.run(migrationId, `existing-${migrationId}`);
     }
-    markApplied.run('020', 'isolated-later-migration');
+    isolatePendingMigration(migrationDb, '019');
 
     runMigrations(migrationDb);
 
@@ -512,6 +531,7 @@ test('migration 020 preserves dispatch rows while adding canonical envelope and 
       const migrationId = String(id).padStart(3, '0');
       markApplied.run(migrationId, `existing-${migrationId}`);
     }
+    isolatePendingMigration(migrationDb, '020');
 
     runMigrations(migrationDb);
 

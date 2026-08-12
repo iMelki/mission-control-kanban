@@ -12,10 +12,39 @@ workspace is a local cockpit view of a GitHub Project, not a replacement board.
 | `memsys` | `iMelki` project `#12` | Memory-system cockpit. |
 | `content-factory` | `iMelki` project `#14` | Content Factory cockpit. |
 | `asimtop` | `iMelki` project `#8` | Asimtop Trading Automation cockpit; starts with auto-refresh off and requires manual sync proof before scheduled sync. |
+| `frontend-revenue` | `iMelki` project `#15` | Frontend Revenue Program 2026 cockpit; starts with auto-refresh off and requires manual sync proof before scheduled sync. |
 
-The initial mappings are seeded by database migration `008`; Asimtop is added by migration `012`. They are also declared in
+The initial mappings are seeded by database migration `008`; Asimtop is added by
+migration `012` and Frontend Revenue by migration `021`. They are also declared in
 `src/lib/github-project-sync.ts` so tests can protect the expected project
 numbers.
+
+## Adding A Project-Backed Workspace
+
+1. Append a migration to `src/lib/db/migrations.ts` that `INSERT OR IGNORE`s the
+   workspace row and then `UPDATE`s the `github_project_*` columns, following the
+   `012`/`021` shape. New workspaces start with
+   `github_project_auto_refresh = 0` so a manual sync proves the mapping before
+   scheduled n8n sync picks it up.
+2. Append the same values to `GITHUB_PROJECT_WORKSPACE_MAPPINGS` in
+   `src/lib/github-project-sync.ts`. The persistence test
+   `every declared GitHub Project workspace mapping is seeded by the migrations`
+   fails if the declared mapping and the migration seed drift apart.
+3. Add the row to the table above.
+4. Prove it: run a `dry_run` sync, then an applied sync, and confirm the board at
+   `/workspace/<slug>` renders real items.
+
+Two independent sync paths exist, and adding a workspace only wires the first:
+
+- **In-app auto-sync.** `src/app/workspace/[slug]/page.tsx` runs one sync when a
+  project-backed workspace opens, but only when `github_project_auto_refresh`
+  is `1`. A workspace seeded with `0` stays manual-refresh (**Sync now** in the
+  workspace banner) until an operator flips the flag.
+- **Scheduled n8n sync.** The `Projects Ops - MCK Project Workspace Sync`
+  workflow lives in the n8n instance, not in this repo, and carries its own
+  workspace slug list (recorded per run in `n8n_sync_runs.workspaces`). Adding a
+  workspace here does **not** add it to that schedule; the slug has to be added
+  on the n8n side as a separate, operator-approved change.
 
 ## Sync Behavior
 

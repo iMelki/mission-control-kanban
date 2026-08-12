@@ -140,6 +140,26 @@ the local operator entrypoint; historical task notes remain in
 
 ## Recently Completed
 
+- [#140 - Cockpit misses GitHub Project #15 (Frontend Revenue Program)](https://github.com/iMelki/mission-control-kanban/issues/140)
+  - Decision: project #15 belongs in MCK. Migration `021`
+    (`add_frontend_revenue_project_workspace`) seeds the `frontend-revenue`
+    workspace through the sanctioned `008`/`012` path, and the mapping is
+    declared in `GITHUB_PROJECT_WORKSPACE_MAPPINGS`.
+  - Auto-refresh starts off (Asimtop precedent) so the scheduled n8n cadence
+    only picks the workspace up after an operator flips the flag. The n8n
+    workflow keeps its own slug list inside the n8n instance, so adding it
+    there stays a separate operator-approved change.
+  - Proof: dry-run and applied sync both report 266 scanned / 231 imported /
+    35 skipped / 0 errors against `iMelki` project #15;
+    `/workspace/frontend-revenue` renders 231 tasks; `_migrations` records
+    `021` applied.
+  - A new persistence regression test fails when a declared workspace mapping
+    is missing from - or drifts from - its migration seed, and the two
+    partial-database migration tests in `tests/factory-webhooks.test.ts` now
+    isolate themselves from every later migration instead of only `020`.
+  - Empty-legacy-project cleanup (nine 0-item projects) stays out of scope and
+    unswept, as recommended in the issue.
+
 - [#138 - Upgrade GitHub Actions to native Node 24 runtimes](https://github.com/iMelki/mission-control-kanban/issues/138)
   - Replaced every direct Node-20-backed `actions/checkout@v4`,
     `actions/setup-node@v4`, `actions/cache@v4`, and

@@ -74,6 +74,18 @@ export const GITHUB_PROJECT_WORKSPACE_MAPPINGS: GitHubProjectWorkspaceMapping[] 
     github_project_url: 'https://github.com/users/iMelki/projects/8',
     github_project_auto_refresh: false,
   },
+  {
+    id: 'frontend-revenue',
+    name: 'Frontend Revenue',
+    slug: 'frontend-revenue',
+    description: 'Frontend Revenue cockpit mapped to GitHub Project #15.',
+    icon: 'F',
+    github_project_owner: 'iMelki',
+    github_project_number: 15,
+    github_project_title: 'Frontend Revenue Program 2026',
+    github_project_url: 'https://github.com/users/iMelki/projects/15',
+    github_project_auto_refresh: false,
+  },
 ];
 
 interface WorkspaceProjectRow {

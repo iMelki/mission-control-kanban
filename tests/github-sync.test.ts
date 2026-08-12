@@ -111,12 +111,26 @@ test('GitHub Project workspace mappings cover the operator boards without duplic
   assert.equal(mappings.get('asimtop')?.github_project_number, 8);
   assert.equal(mappings.get('asimtop')?.github_project_title, 'Asimtop Trading Automation');
   assert.equal(mappings.get('asimtop')?.github_project_auto_refresh, false);
+  assert.equal(mappings.get('frontend-revenue')?.github_project_number, 15);
+  assert.equal(mappings.get('frontend-revenue')?.github_project_title, 'Frontend Revenue Program 2026');
+  assert.equal(mappings.get('frontend-revenue')?.github_project_auto_refresh, false);
+
+  // Workspaces added after the original seed start with auto-refresh off so a
+  // manual sync has to prove the mapping before scheduled sync touches them.
+  const manualSyncSlugs = new Set(['asimtop', 'frontend-revenue']);
 
   for (const mapping of GITHUB_PROJECT_WORKSPACE_MAPPINGS) {
     assert.equal(mapping.github_project_owner, 'iMelki');
-    assert.equal(mapping.github_project_auto_refresh, mapping.slug === 'asimtop' ? false : true);
+    assert.equal(mapping.github_project_auto_refresh, !manualSyncSlugs.has(mapping.slug));
     assert.match(mapping.description, /mapped to GitHub Project/i);
+    assert.equal(
+      mapping.github_project_url,
+      `https://github.com/users/${mapping.github_project_owner}/projects/${mapping.github_project_number}`
+    );
   }
+
+  const projectNumbers = GITHUB_PROJECT_WORKSPACE_MAPPINGS.map((mapping) => mapping.github_project_number);
+  assert.equal(new Set(projectNumbers).size, projectNumbers.length, 'each mapping owns a distinct GitHub Project');
 });
 
 test('GitHub Project status mapping reconciles upstream Done without inventing a Blocked column', () => {
