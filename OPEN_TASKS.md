@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-02
+Last updated: 2026-08-10
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -8,19 +8,68 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#48 - Adopt ReUI/shadcn kanban+Card+Tabs primitives instead of hand-rolled equivalents](https://github.com/iMelki/mission-control-kanban/issues/48)
-  - Implemented: `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core` +
-    `@dnd-kit/sortable` (`DndContext`/`SortableContext`/keyboard sensor)
-    instead of native HTML5 drag events, giving accessible keyboard
-    reordering; `ui/Panel.tsx` now re-exports shadcn `Card` primitives
-    (`class-variance-authority`); `WorkspaceSectionTabs.tsx` now uses shadcn
-    `Tabs` (Radix) for correct `role="tab"`/`aria-selected` semantics. Added
-    `components.json`, `src/lib/utils.ts`, `src/components/ui/{card,tabs}.tsx`.
-    `ui/DataTable.tsx` intentionally left as-is (low-priority render-layer
-    note, not a violation). `npm run lint`, `npm run build`, and `npm test`
-    (21/21) all pass.
+- [#136 - Make bridge contracts v2-authoritative and byte-safe](https://github.com/iMelki/mission-control-kanban/issues/136)
+  - Bounded byte-safety/redaction slice completed on 2026-08-08: diagnostic
+    strings now recursively scrub embedded URL queries, Bearer/HMAC signatures,
+    and common API-key-shaped values; callback intake rejects leading UTF-8 BOMs
+    and non-canonical/invalid UTF-8 before signature verification.
+  - Focused regression coverage passes in the Paperclip bridge plugin and MCK
+    factory callback tests. Persisted JSONB envelopes are now revalidated by
+    the canonical `parseDispatch` path before correlation reuse or issue lookup;
+    malformed persisted contracts fail closed.
+  - Canonical contract slice completed on 2026-08-09: dispatch v2 validates and
+    persists the complete Agent Settings `factory-task-envelope.v1` plus its
+    canonical digest before network I/O, then revalidates/hash-checks the stored
+    envelope for lifecycle readback. Receipt v1 remains readable but cannot
+    complete; only receipt v2 with exact index, independent session, release
+    steward, remote `dev` SHA/tree, reconciliation, and privacy authority moves
+    a task to Done.
+  - Remaining issue gate: prove the upgraded contract through the installed
+    Paperclip host and live MCK/Mission Control reconciliation under #47 after
+    the separately tracked exact host-SHA gate in #135 is refreshed.
+  - CodeRabbit PR #137 follow-ups (recorded 2026-08-10, non-trivial; each links
+    the source review comment). All four are implemented on `dev`
+    (2026-08-11); each carries its own regression coverage:
+    - DONE — dispatch length pre-validation: `FACTORY_V2_WORK_CONTRACT_LIMITS`
+      and `validateFactoryV2WorkContract` in `src/lib/dispatch-contract.ts`
+      mirror the canonical envelope bounds (title 8-240, acceptance 8-1000,
+      test 3-500, rollback 8-1000, 64-entry lists). Both v2 dispatch paths in
+      `src/lib/dispatch-adapters.ts` refuse out-of-bounds text before the
+      envelope is built — live dispatch returns HTTP 400 naming the field, the
+      dry run returns the same blockers. v1 dispatch and the default
+      `validateDispatchMetadata` behaviour are unchanged; the opt-in is
+      `{ factoryDispatchVersion: 2, taskTitle }`. A test pins the mirror to
+      `validateCanonicalFactoryTaskEnvelope` so the two cannot drift
+      ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190577)).
+    - DONE — v1-mapping rejection: `validateReceiptForMapping` in
+      `integrations/paperclip-bridge/src/worker.ts` now throws before any host
+      call when `mapping.dispatch_version !== 2` or the persisted envelope is
+      v1, so a v2 receipt can no longer complete a v1 dispatch by
+      self-comparing `repositoryBaseSha`. Covered by the new
+      `integrations/paperclip-bridge/tests/receipt-mapping.spec.ts`, whose
+      context proxy fails the test if Paperclip is touched at all
+      ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190580)).
+    - DONE — self-referential expected identity: `validateWebhookCallbackPayload`
+      accepts `{ expectedReceiptIdentity }` and forwards it to
+      `validateBridgeReceipt`; the self-derived `expected` object is gone, so
+      omitting the identity no longer implies a check that never runs. Five
+      wrong-identity permutations now reject and the bound identity passes.
+      The agent-completion route keeps its own binding in `lifecycleRejection`
+      (it reads the persisted attempt after payload validation), so the new
+      parameter is currently the reusable path for other callers rather than a
+      second enforcement point
+      ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190622)).
+    - DONE — remote `$ref`: the published v2 schema now defines the envelope at
+      `#/$defs/factory_task_envelope` with the stable `$id`
+      `https://mission-control-kanban.local/schemas/factory-task-envelope.v1.json`,
+      carrying the same work-contract bounds. A test asserts every `$ref` in the
+      published document is a local JSON Pointer and that
+      `raw.githubusercontent.com` no longer appears
+      ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190626)).
+
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
+  - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`; the canonical checkout is now non-bare, clean, unlocked, and aligned with `origin/dev` at `625cec7e1e92972523e43516bb0a2bea50f0b774`.
   - Local implementation now provides opt-in dispatch v2 with a
     pending-before-send attempt, stable attempt/delivery/correlation/revision
     IDs, raw-body HMAC, replay conflict detection, lifecycle v2 callbacks, and
@@ -40,28 +89,74 @@ the local operator entrypoint; historical task notes remain in
     orchestration, preserves immutable per-channel retry envelopes, replays
     current lifecycle evidence on same-revision redispatch, and bounds callback
     body size plus total/inactivity time.
-  - Remaining closure evidence: install into the owned Paperclip runtime,
-    prove a signed health ping and real dispatch, reconcile the returned
-    receipt across control surfaces, then commit/push and read back `origin/dev`.
+  - Independent review is conditional for source/CI, not release acceptance.
+    MCK #135 tracks partial host-SHA attestation; MCK #136 tracks v2-authority,
+    canonical-envelope validation, recursive redaction, and byte-preserving
+    callback verification. Remaining closure evidence: install into the owned
+    Paperclip runtime, prove a signed health ping and real dispatch, reconcile
+    the returned receipt across control surfaces, and read back the resulting
+    Paperclip/MCK receipts. The #127 owner-map gate is resolved with hash parity;
+    do not replace the canonical checkout unless topology regresses.
+  - Host compatibility is now fail-closed on the exact `testedCommit` even
+    when a partial `testedFiles` attestation is present; the mismatch case is
+    covered by `tests/host-compatibility.spec.ts`. The current host remains
+    intentionally blocked until an owner-approved SHA from a clean, reviewed
+    checkout matches the package metadata.
+
+- [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
+  - Status: active on 2026-07-01.
+  - Scope: component-pool-first runtime UX improvements, artifact-link closeout automation, failure-rate charts, webhook validation/templates, dry-run previews, bulk migration diffs, dependency/readiness surfaces, mobile review, and scheduled runtime-regression summaries.
+  - First slice completed: restored local port 3021, updated Browserslist data, switched the default production build to webpack to remove the Turbopack NFT warning while retaining `npm run build:turbo` for Turbopack inventory, added runtime-regression artifact comment automation, added the home-page Runtime Regression card, and scheduled the daily Hermes runtime-regression summary job (`dea31c50c660`).
+  - Second slice completed: added per-runtime failure-rate trend cards in Runtime operations, created `/runtime-regression` as a local artifact drilldown UI, extended smoke coverage for the drilldown, added a non-blocking `turbopack-inventory` CI artifact job, and documented the research-first roadmap in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`.
+  - Third slice completed: added runtime config templates, webhook endpoint validation gating, dry-run dispatch previews, selected-agent runtime migration diffs, task dependency blocked-by UI/API, ready-for-agent checklist seeding, GitHub issue draft generation, runtime failure-threshold alerts, runtime-regression screenshot thumbnails, PR/requested-issue artifact comments after successful CI, and the reusable workflow doc `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`.
+  - Fourth slice completed: added explicit GitHub issue live create/update behind a plain-English confirmation checkbox, extracted Task modal runtime sections into reusable components, added dependency graph/badges with cycle-detection tests, added runtime migration audit history, runtime-template env diagnostics, local webhook mock receiver, Playwright browser-cache CI tuning, runtime artifact deep links, and expanded browser smoke coverage for dependency/checklist/webhook wizard states.
+  - Fifth slice completed: webhook validation now distinguishes unsigned
+    reachability from signed verification, auto-dispatch and live dispatch fail
+    closed without a resolved signing secret, runtime audit exposes the missing
+    secret without mutating agent records, and loopback route/adapter tests
+    cover signed success, unsigned 2xx, non-2xx, and no-network failure.
+  - PR #137 review follow-up publishes a reachable public Doctor v1 schema
+    mirror, restores TypeScript component-barrel coverage, and renders clean
+    warning/unknown n8n runs as amber `Review needed` states with their message
+    visible instead of presenting them as green success.
+  - Validation: `npm run lint`, `npm test`, `npm run build`, `npm run doctor:react`, `npm run smoke:runtime-ui`, and `npm run comment:runtime-artifacts -- --dry-run`.
+  - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
+
+## Recently Completed
+
+- [#138 - Upgrade GitHub Actions to native Node 24 runtimes](https://github.com/iMelki/mission-control-kanban/issues/138)
+  - Replaced every direct Node-20-backed `actions/checkout@v4`,
+    `actions/setup-node@v4`, `actions/cache@v4`, and
+    `actions/upload-artifact@v4` reference across CI, Runtime Regression, and
+    secret scan with an official native-Node-24 release pinned to its reviewed
+    commit SHA.
+  - Fresh annotation readback then exposed `pre-commit/action@v3.0.1`'s nested
+    `actions/cache@v4`. CI now reproduces that maintenance-only composite's
+    install/cache/run steps explicitly with pinned native-Node-24
+    `setup-python@v6.3.0` and `cache@v5.1.0`, preserving the upstream cache key
+    and `pre-commit --all-files` behavior without the hidden Node 20 action.
+  - Preserved application Node versions, workflow permissions, dependency
+    caching, artifact names/retention, and runtime failure behavior. Official
+    release/tag and commit-signature readback is recorded in #138; closure
+    requires fresh PR and `dev` workflow proof without a forced Node 20
+    annotation.
+  - A focused regression test now rejects mutable external-action refs,
+    pin drift for the reviewed native-Node-24 actions, and reintroduction of
+    the maintenance-only pre-commit composite.
 
 - [#46 - Make Runtime Regression JSON fixture reads deterministic](https://github.com/iMelki/mission-control-kanban/issues/46)
-  - Runtime Regression run `29887043238` attempt 1 failed while rendering
-    `/workspace/default` with `Unexpected end of JSON input`; all temporary
-    smoke entities were cleaned up. Failed-job-only attempt 2 passed unchanged,
-    so preserve both receipts and identify the empty/partial JSON source rather
-    than weakening the smoke gate.
-  - Root cause: the failure log shows Next.js `next dev` compiling the route
-    and reading a truncated internal JSON manifest before returning HTTP 500;
-    no application fixture file or SQLite JSON value was partial. The runner
-    now uses a fresh webpack `next build`, stages `public` and `.next/static`
-    into `.next/standalone`, and launches the same standalone server entrypoint
-    as Docker with explicit host and port settings. It rejects an occupied port
-    and retains `MCK_REGRESSION_SERVER_MODE=dev` only for local diagnosis.
-  - Runtime artifact receipts use one marker-based PR/issue comment that is
-    updated and read back, preventing a new success notification on every run.
-  - Local validation: server-plan contract `2/2`; full runtime smoke and three
-    consecutive remote paths remain required before closure.
+  - Closed on 2026-08-09 after the production standalone runner removed the
+    Next.js development-manifest race and natural scheduled run `31243549448`
+    passed on the exact PR #42 merge SHA.
+  - Commit `546ae8c` added blocking `mck.runtime-smoke-cleanup.v1` receipts.
+    Current-sha PR run `31296740445` and push run `31296738848` independently
+    proved all three temporary tasks and the runtime agent deleted with HTTP
+    `200`, then absent with exact-path GET `404`; each uploaded four screenshots.
+  - Validation: focused cleanup tests `5/5`, complete `npm test`, lint,
+    production build, normal commit/push hooks, deep secret scan, remote SHA
+    readback, and exact closeout-comment/state readback all passed.
 
+<!-- Cured 2026-08-06 via the workspace issue-state audit (projects-ops#101/#73): entries below were active while their issues were closed. -->
 - [#128 - Make Runtime Regression workspace readiness deterministic in CI](https://github.com/iMelki/mission-control-kanban/issues/128)
   - CI run `30759413222` failed only at the Settings-tab visibility wait while
     bridge, gitleaks, pre-commit, and inventory checks passed. A clean clone of
@@ -79,25 +174,21 @@ the local operator entrypoint; historical task notes remain in
     scopes task-card locators to the direct `li > [role="button"]` card root
     and its visible title text so the handle cannot create a strict-mode
     collision.
-  - Closure gate: PR checks and at least three consecutive production smoke
-    runs pass before PR #119 is eligible for merge into `dev`.
-
-- [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
-  - Status: active on 2026-07-01.
-  - Scope: component-pool-first runtime UX improvements, artifact-link closeout automation, failure-rate charts, webhook validation/templates, dry-run previews, bulk migration diffs, dependency/readiness surfaces, mobile review, and scheduled runtime-regression summaries.
-  - First slice completed: restored local port 3021, updated Browserslist data, switched the default production build to webpack to remove the Turbopack NFT warning while retaining `npm run build:turbo` for Turbopack inventory, added runtime-regression artifact comment automation, added the home-page Runtime Regression card, and scheduled the daily Hermes runtime-regression summary job (`dea31c50c660`).
-  - Second slice completed: added per-runtime failure-rate trend cards in Runtime operations, created `/runtime-regression` as a local artifact drilldown UI, extended smoke coverage for the drilldown, added a non-blocking `turbopack-inventory` CI artifact job, and documented the research-first roadmap in `docs/RUNTIME_OPS_RESEARCH_AND_ROADMAP.md`.
-  - Third slice completed: added runtime config templates, webhook endpoint validation gating, dry-run dispatch previews, selected-agent runtime migration diffs, task dependency blocked-by UI/API, ready-for-agent checklist seeding, GitHub issue draft generation, runtime failure-threshold alerts, runtime-regression screenshot thumbnails, PR/requested-issue artifact comments after successful CI, and the reusable workflow doc `docs/workflows/RUNTIME_UX_AND_REGRESSION_WORKFLOW.md`.
-  - Fourth slice completed: added explicit GitHub issue live create/update behind a plain-English confirmation checkbox, extracted Task modal runtime sections into reusable components, added dependency graph/badges with cycle-detection tests, added runtime migration audit history, runtime-template env diagnostics, local webhook mock receiver, Playwright browser-cache CI tuning, runtime artifact deep links, and expanded browser smoke coverage for dependency/checklist/webhook wizard states.
-  - Fifth slice completed: webhook validation now distinguishes unsigned
-    reachability from signed verification, auto-dispatch and live dispatch fail
-    closed without a resolved signing secret, runtime audit exposes the missing
-    secret without mutating agent records, and loopback route/adapter tests
-    cover signed success, unsigned 2xx, non-2xx, and no-network failure.
-  - Validation: `npm run lint`, `npm test`, `npm run build`, `npm run doctor:react`, `npm run smoke:runtime-ui`, and `npm run comment:runtime-artifacts -- --dry-run`.
-  - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
-
-## Recently Completed
+  - Closure gate: PR #119 and its dependent fixes are merged into `dev`; retain
+    the historical checks and now require the installed-host signed ping,
+    bridge receipt reconciliation, and natural runtime evidence before closing
+    the bridge workstream.
+- [#48 - Adopt ReUI/shadcn kanban+Card+Tabs primitives instead of hand-rolled equivalents](https://github.com/iMelki/mission-control-kanban/issues/48)
+  - Implemented: `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core` +
+    `@dnd-kit/sortable` (`DndContext`/`SortableContext`/keyboard sensor)
+    instead of native HTML5 drag events, giving accessible keyboard
+    reordering; `ui/Panel.tsx` now re-exports shadcn `Card` primitives
+    (`class-variance-authority`); `WorkspaceSectionTabs.tsx` now uses shadcn
+    `Tabs` (Radix) for correct `role="tab"`/`aria-selected` semantics. Added
+    `components.json`, `src/lib/utils.ts`, `src/components/ui/{card,tabs}.tsx`.
+    `ui/DataTable.tsx` intentionally left as-is (low-priority render-layer
+    note, not a violation). `npm run lint`, `npm run build`, and `npm test`
+    (21/21) all pass.
 
 - [#43 - Fix Runtime Regression PR artifact-comment permission](https://github.com/iMelki/mission-control-kanban/issues/43)
   - Completed on 2026-07-22 with least-privilege no-checkout comment jobs:
@@ -225,3 +316,37 @@ the local operator entrypoint; historical task notes remain in
 ## Legacy Index
 
 - [docs/OPEN_TASKS.md](docs/OPEN_TASKS.md)
+
+## Active GitHub Issues
+
+- [#139 Expand UI/UX Awwwards report (2026-08-09) into practical tasks](https://github.com/iMelki/mission-control-kanban/issues/139)
+  - Fleet-wide code-only audit scored this app 4.9/10 against the shared
+    Awwwards rubric. Full report: `docs/uiux-awwwards-report-2026-08-09.md`.
+    Scores are code-inspection estimates pending a Frontend Proof Bundle.
+    Fleet rollup: iMelki/agent-settings#586.
+  - DONE 2026-08-11 — dialog semantics: all six hand-rolled `fixed inset-0`
+    overlays moved onto primitives this repo already owned. `AgentModal`,
+    `TaskModal`, `GitHubImportModal`, and `WorkspaceDashboard`'s
+    create-workspace form now use the vendored shadcn/Radix `Dialog`
+    (`DialogTitle` names each one, `DialogClose` owns the header X);
+    `WorkspaceDashboard`'s delete-workspace confirm and
+    `GitHubIssueDraftPanel`'s live-mutation confirm now use
+    `ActionReviewDialog` (destructive tone, and typed confirmation preserving
+    the exact server-issued phrase). `grep "fixed inset-0" src` returns only
+    `src/components/ui/dialog.tsx`; no new component file was created, and the
+    five migrated files left `docs/preflight/component-baseline.json` for the
+    record `docs/preflight/records/2026-08-11-dialog-overlay-migration.md`.
+  - Delete-workspace refusal is now explained rather than silently disabled:
+    a workspace holding tasks or agents states the count and refuses in the
+    dialog instead of greying out the confirm button.
+  - `npm run smoke:runtime-ui` now asserts `role="dialog"` on the primitive's
+    own slot and closes the agent and task modals with Escape. Radix
+    deliberately does not emit `aria-modal`; modality comes from its focus
+    scope plus `aria-hidden` on siblings. Live readback on 127.0.0.1:3021:
+    `role="dialog"`, `aria-labelledby` bound to the title, focus inside the
+    dialog, Escape closes, desktop and mobile screenshots captured, no
+    non-whitelisted console errors.
+  - Still open from the report: semantic tone tokens and the 156 raw
+    emerald/amber/rose usages, the bespoke n8n-sync-history table, next/font
+    loading, the two-accent CTA in `MissionQueue`, and
+    `prefers-reduced-motion` coverage.

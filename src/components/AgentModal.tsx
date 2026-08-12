@@ -2,12 +2,20 @@
 
 import { useState } from 'react';
 import { X, Save, Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useMissionControl } from '@/lib/store';
 import {
   parseAgentRuntimeConfig,
   serializeAgentRuntimeConfig,
 } from '@/lib/agent-runtimes';
 import type { Agent, AgentRuntimeType, AgentStatus } from '@/lib/types';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
 import { RuntimeDispatchSection, type AgentFormState } from './agent-modal/RuntimeDispatchSection';
 
 interface AgentModalProps {
@@ -88,41 +96,43 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
     }
   };
 
+  // Runs inside ActionReviewDialog: a thrown error keeps the dialog open
+  // with the failure message instead of failing silently.
   const handleDelete = async () => {
-    if (!agent || !confirm(`Delete ${agent.name}?`)) return;
+    if (!agent) return;
 
-    try {
-      const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        // Remove from store
-        useMissionControl.setState((state) => ({
-          agents: state.agents.filter((a) => a.id !== agent.id),
-          selectedAgent: state.selectedAgent?.id === agent.id ? null : state.selectedAgent,
-        }));
-        onClose();
-      }
-    } catch (error) {
-      console.error('Failed to delete agent:', error);
+    const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const payloadError = await res.json().catch(() => ({}));
+      throw new Error(payloadError.error || 'Failed to delete agent');
     }
+    // Remove from store
+    useMissionControl.setState((state) => ({
+      agents: state.agents.filter((a) => a.id !== agent.id),
+      selectedAgent: state.selectedAgent?.id === agent.id ? null : state.selectedAgent,
+    }));
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent
+        aria-describedby={undefined}
+        showCloseButton={false}
+        className="flex w-[calc(100vw-2rem)] max-w-2xl max-h-[90vh] flex-col gap-0 p-0"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-mc-border">
-          <h2 className="text-lg font-semibold">
+        <DialogHeader className="flex-row items-center justify-between gap-2 p-4 border-b border-mc-border">
+          <DialogTitle>
             {agent ? `Edit ${agent.name}` : 'Create New Agent'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
+          </DialogTitle>
+          <DialogClose
             aria-label="Close agent modal"
-            className="p-1 hover:bg-mc-bg-tertiary rounded"
+            className="p-1 hover:bg-mc-bg-tertiary rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
           >
             <X className="w-5 h-5" />
-          </button>
-        </div>
+          </DialogClose>
+        </DialogHeader>
 
         {/* Tabs */}
         <div className="flex border-b border-mc-border">
@@ -155,6 +165,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                       key={emoji}
                       type="button"
                       onClick={() => setForm({ ...form, avatar_emoji: emoji })}
+                      aria-pressed={form.avatar_emoji === emoji}
                       aria-label={`Select ${emoji} avatar`}
                       className={`text-2xl p-2 rounded hover:bg-mc-bg-tertiary ${
                         form.avatar_emoji === emoji
@@ -296,14 +307,30 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
         <div className="flex items-center justify-between p-4 border-t border-mc-border">
           <div>
             {agent && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
+              <ActionReviewDialog
+                title={`Delete agent ${agent.name}?`}
+                tone="destructive"
+                confirmLabel="Delete agent"
+                pendingLabel="Deleting..."
+                trigger={
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                }
+                consequences={{
+                  immediateEffect: 'The agent is removed from the roster and this modal closes.',
+                  confirmedEffect:
+                    'The agent record is deleted along with its tracked sessions, messages, and conversation memberships.',
+                  resultLocation: 'The agents sidebar and any task that listed this agent.',
+                  willNotHappen:
+                    'Tasks are not deleted - they are unassigned - and no running OpenClaw session is stopped.',
+                }}
+                onConfirm={handleDelete}
+              />
             )}
           </div>
           <div className="flex gap-2">
@@ -325,7 +352,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

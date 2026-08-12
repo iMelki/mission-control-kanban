@@ -20,7 +20,9 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, ChevronRight, GripVertical, AlertTriangle, Github } from 'lucide-react';
+import { Plus, ChevronRight, GripVertical, AlertTriangle } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import { useMissionControl } from '@/lib/store';
 import {
   READINESS_LABELS,
@@ -54,7 +56,7 @@ const RUNTIME_FILTERS: { id: RuntimeFilter; label: string }[] = [
 ];
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
-  { id: 'planning', label: '📋 PLANNING', color: 'border-t-mc-accent-purple' },
+  { id: 'planning', label: 'PLANNING', color: 'border-t-mc-accent-purple' },
   { id: 'inbox', label: 'INBOX', color: 'border-t-mc-accent-pink' },
   { id: 'assigned', label: 'ASSIGNED', color: 'border-t-mc-accent-yellow' },
   { id: 'in_progress', label: 'IN PROGRESS', color: 'border-t-mc-accent' },
@@ -238,7 +240,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-3 border-b border-mc-border flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -325,7 +327,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex-1 flex gap-3 p-3 overflow-x-auto">
+        <div className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden p-3">
           {COLUMNS.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -369,7 +371,7 @@ function KanbanColumn({ column, tasks, activeTaskId, onCardClick }: KanbanColumn
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-[220px] max-w-[300px] flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 transition-colors ${column.color} ${
+      className={`flex-1 min-h-0 min-w-[220px] max-w-[300px] flex flex-col bg-mc-bg rounded-lg border border-mc-border/50 border-t-2 transition-colors ${column.color} ${
         isOver ? 'ring-2 ring-mc-accent/50' : ''
       }`}
     >
@@ -384,7 +386,7 @@ function KanbanColumn({ column, tasks, activeTaskId, onCardClick }: KanbanColumn
       </div>
 
       {/* Tasks */}
-      <ul className="flex-1 overflow-y-auto p-2 space-y-2 list-none" aria-label={`${column.label} tasks`}>
+      <ul className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 list-none" aria-label={`${column.label} tasks`}>
         <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
             <SortableTaskCard
@@ -481,7 +483,7 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
           onClick();
         }
       }}
-      className={`group w-full bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-all hover:shadow-lg hover:shadow-black/20 ${
+      className={`group w-full bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${isOverlay ? 'shadow-xl shadow-black/40' : ''} ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
@@ -514,7 +516,7 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
         {task.assigned_agent && (
           <div className="mb-3 rounded bg-mc-bg-tertiary/50 px-2 py-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-base">{(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji}</span>
+              <EntityEmoji emoji={(task.assigned_agent as unknown as { avatar_emoji: string }).avatar_emoji} hidden className="text-base" />
               <span className="text-xs text-mc-text-secondary truncate">
                 {(task.assigned_agent as unknown as { name: string }).name}
               </span>

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://raw.githubusercontent.com/iMelki/mission-control-kanban/dev/docs/schemas/doctor-genome.v1.json",
+  "schemaVersion": "doctor-genome.v1",
+  "profile": "observe",
+  "capabilities": [
+    "documentation",
+    "repository-governance",
+    "typescript"
+  ],
+  "sourceSets": [
+    {
+      "id": "authored-app-source",
+      "kind": "authored-runtime",
+      "globContract": "repo-doctor-glob.v1",
+      "includeGlobs": [
+        "src/app/**/*.ts",
+        "src/app/**/*.tsx",
+        "src/components/**/*.ts",
+        "src/components/**/*.tsx",
+        "src/hooks/**/*.ts",
+        "src/lib/**/*.ts"
+      ],
+      "excludeGlobs": [],
+      "reason": "Hand-authored Next.js app source for the Mission Control Kanban cockpit: routes, board components, hooks, and the GitHub/Paperclip sync logic."
+    },
+    {
+      "id": "authored-scripts",
+      "kind": "authored-runtime",
+      "globContract": "repo-doctor-glob.v1",
+      "includeGlobs": [
+        "scripts/*.mjs",
+        "scripts/*.ps1"
+      ],
+      "excludeGlobs": [],
+      "reason": "Workspace preparation and link-check runners invoked by hand and by hooks; small tree, fully in scope."
+    }
+  ],
+  "packs": [
+    {
+      "id": "node.typecheck",
+      "version": "1.0.0",
+      "required": true
+    },
+    {
+      "id": "node.lint",
+      "version": "1.0.0",
+      "required": false
+    },
+    {
+      "id": "architecture.boundaries",
+      "version": "1.0.0",
+      "required": false
+    }
+  ],
+  "gates": [
+    {
+      "id": "on_demand",
+      "scope": "repository",
+      "timeoutSeconds": 300,
+      "maxParallel": 1,
+      "sourceSets": [
+        "authored-app-source",
+        "authored-scripts"
+      ],
+      "packs": [
+        "node.typecheck",
+        "node.lint",
+        "architecture.boundaries"
+      ]
+    }
+  ],
+  "exceptions": []
+}

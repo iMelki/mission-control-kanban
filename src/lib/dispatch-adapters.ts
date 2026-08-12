@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -8,14 +9,17 @@ import { queryAll, queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
 import { getOpenClawClient } from '@/lib/openclaw/client';
-import { parseDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
+import {
+  parseDispatchMetadata,
+  validateDispatchMetadata,
+  validateFactoryV2WorkContract,
+} from '@/lib/dispatch-contract';
 import { normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import { normalizeAgentForResponse, type AgentRow } from '@/lib/agent-api';
 import {
   buildCallbackUrls,
   buildManualHandoffPrompt,
   buildWebhookDispatchPayload,
-  buildWebhookDispatchPayloadV2,
   buildWebhookHeaders,
   getWebhookSignatureSecret,
   getWebhookUrl,
@@ -26,6 +30,10 @@ import {
   resolveWebhookDispatchVersion,
   type FactoryDispatchIdentity,
 } from '@/lib/agent-runtimes';
+import {
+  buildWebhookDispatchPayloadV2,
+  type WebhookDispatchPayloadV2,
+} from '@/lib/factory-dispatch';
 import { validateWebhookDispatchPayload, validateWebhookDispatchPayloadV2 } from '@/lib/webhook-dispatch-schema';
 import { checkDispatchRetryBudget } from '@/lib/runtime-operations';
 import { buildSignedWebhookHeaders } from '@/lib/webhook-signatures';
@@ -71,6 +79,9 @@ interface RecordDispatchAttemptInput {
   correlationId?: string | null;
   taskRevision?: string | null;
   payloadHash?: string | null;
+  envelopeId?: string | null;
+  envelopeSha256?: string | null;
+  envelope?: unknown;
 }
 
 function redactUrlForResponse(rawUrl: string) {
@@ -212,6 +223,13 @@ function ownedOriginMatches(remoteUrl: string, slug: string) {
   ).test(remoteUrl.trim());
 }
 
+function canonicalOwnedOrigin(remoteUrl: string, slug: string) {
+  const trimmed = remoteUrl.trim();
+  return trimmed.toLowerCase().startsWith('ssh://git@github.com/')
+    ? `git@github.com:${slug}.git`
+    : trimmed;
+}
+
 function gitEnvironment() {
   const env: NodeJS.ProcessEnv = { ...process.env, GIT_OPTIONAL_LOCKS: '0' };
   for (const key of [
@@ -284,10 +302,24 @@ export async function resolveFactoryRepositoryBase(
         diagnostics.push(`${candidate}: remote origin/dev is not one lowercase 40-hex commit`);
         continue;
       }
+      const manifestPath = path.join(root, '.agentic-factory.json');
+      const manifestBytes = await readFile(manifestPath);
+      const repositoryManifestSha256 = `sha256:${createHash('sha256').update(manifestBytes).digest('hex')}`;
+      const workspace = queryOne<{ github_project_number: number | null }>(
+        'SELECT github_project_number FROM workspaces WHERE id = ?',
+        [task.workspace_id],
+      );
+      if (!Number.isInteger(workspace?.github_project_number) || Number(workspace?.github_project_number) < 1) {
+        diagnostics.push(`${candidate}: workspace ${task.workspace_id} has no canonical GitHub Project number`);
+        continue;
+      }
       return {
         repositoryPath: root,
         repositorySlug: repository.slug,
+        originRemote: canonicalOwnedOrigin(originUrl, repository.slug),
         baseSha,
+        repositoryManifestSha256,
+        projectNumber: Number(workspace?.github_project_number),
       };
     } catch (error) {
       diagnostics.push(`${candidate}: ${error instanceof Error ? error.message.split(/\r?\n/, 1)[0] : 'unavailable'}`);
@@ -317,14 +349,18 @@ function recordDispatchAttempt({
   correlationId,
   taskRevision,
   payloadHash,
+  envelopeId,
+  envelopeSha256,
+  envelope,
 }: RecordDispatchAttemptInput) {
   const attemptId = id ?? uuidv4();
   run(
     `INSERT INTO task_dispatch_attempts (
       id, task_id, agent_id, runtime_type, adapter_name, status, attempt_number,
       message, http_status, webhook_url, error_message, request_payload, response_body,
-      delivery_id, correlation_id, task_revision, payload_hash, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      delivery_id, correlation_id, task_revision, payload_hash,
+      envelope_id, envelope_sha256, envelope_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       attemptId,
       task.id,
@@ -343,6 +379,9 @@ function recordDispatchAttempt({
       correlationId ?? null,
       taskRevision ?? null,
       payloadHash ?? null,
+      envelopeId ?? null,
+      envelopeSha256 ?? null,
+      envelope === undefined ? null : safeJsonStringify(envelope),
       now,
       now,
     ]
@@ -716,6 +755,30 @@ async function buildDispatchDryRunPreview(
     const webhookUrl = getWebhookUrl(config, process.env);
     const signature = getWebhookSignatureSecret(config, process.env);
     const dispatchVersion = resolveWebhookDispatchVersion(config);
+    // #136 follow-up: refuse out-of-bounds work text before the canonical v2
+    // envelope is built, so the operator sees which field is wrong instead of
+    // the envelope's opaque "work contract is invalid" message.
+    const factoryWorkBlockers = dispatchVersion === 2
+      ? validateFactoryV2WorkContract(task.dispatch_metadata, task.title)
+      : [];
+    if (factoryWorkBlockers.length > 0) {
+      return {
+        success: false,
+        task_id: task.id,
+        agent_id: agent.id,
+        runtime_type: 'webhook',
+        requested_runtime_type: agent.runtime_type,
+        dispatched: false,
+        dry_run: true,
+        would_dispatch: false,
+        webhook_url: webhookUrl ? redactUrlForResponse(webhookUrl) : undefined,
+        validation_errors: factoryWorkBlockers,
+        message: 'Dry-run preview: dispatch v2 work contract text is out of bounds.',
+        handoff_prompt: handoffPrompt,
+        callbacks,
+        reason: factoryWorkBlockers[0],
+      };
+    }
     let factoryRepository: Awaited<ReturnType<typeof resolveFactoryRepositoryBase>> | undefined;
     if (dispatchVersion === 2) {
       try {
@@ -751,8 +814,7 @@ async function buildDispatchDryRunPreview(
         new Date().toISOString(),
         projectsPath,
         identity,
-        factoryRepository!.baseSha,
-        factoryRepository!.repositoryPath,
+        factoryRepository!,
       )
       : buildWebhookDispatchPayload(task, agent, missionControlUrl, new Date().toISOString(), projectsPath);
     const validation = dispatchVersion === 2
@@ -819,6 +881,18 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
   const missionControlUrl = getMissionControlUrl();
   const projectsPath = getProjectsPath();
   const dispatchVersion = resolveWebhookDispatchVersion(config);
+  if (dispatchVersion === 2) {
+    // #136 follow-up: fail fast with a 400 that names the offending field
+    // instead of building an envelope the canonical validator will reject.
+    const factoryWorkBlockers = validateFactoryV2WorkContract(task.dispatch_metadata, task.title);
+    if (factoryWorkBlockers.length > 0) {
+      throw new DispatchAdapterError(
+        `Dispatch v2 work contract is out of bounds: ${factoryWorkBlockers.join('; ')}`,
+        400,
+        { validation_errors: factoryWorkBlockers },
+      );
+    }
+  }
   const factoryRepository = dispatchVersion === 2
     ? await resolveFactoryRepositoryBase(task, projectsPath)
     : undefined;
@@ -833,8 +907,7 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
       now,
       projectsPath,
       identity,
-      factoryRepository!.baseSha,
-      factoryRepository!.repositoryPath,
+      factoryRepository!,
     )
     : buildWebhookDispatchPayload(task, agent, missionControlUrl, now, projectsPath);
   const payloadValidation = dispatchVersion === 2
@@ -842,6 +915,9 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
     : validateWebhookDispatchPayload(payload);
   const payloadBody = JSON.stringify(payload);
   const payloadHash = sha256Text(payloadBody);
+  const factoryContract = dispatchVersion === 2
+    ? (payload as WebhookDispatchPayloadV2).factory_contract
+    : undefined;
   if (!payloadValidation.valid) {
     recordDispatchAttempt({
       id: identity?.attempt_id,
@@ -859,6 +935,9 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
       correlationId: identity?.correlation_id,
       taskRevision: identity?.task_revision,
       payloadHash: dispatchVersion === 2 ? payloadHash : undefined,
+      envelopeId: factoryContract?.envelope_id,
+      envelopeSha256: factoryContract?.envelope_sha256,
+      envelope: factoryContract?.envelope,
     });
     throw new DispatchAdapterError('Webhook dispatch payload failed schema validation', 500, {
       validation_errors: payloadValidation.errors,
@@ -884,6 +963,9 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
       correlationId: identity?.correlation_id,
       taskRevision: identity?.task_revision,
       payloadHash: dispatchVersion === 2 ? payloadHash : undefined,
+      envelopeId: factoryContract?.envelope_id,
+      envelopeSha256: factoryContract?.envelope_sha256,
+      envelope: factoryContract?.envelope,
     });
     throw new DispatchAdapterError(errorMessage, 400, { secret_env: signature.env_name });
   }
@@ -909,6 +991,9 @@ async function dispatchWebhook(task: Task, agent: Agent): Promise<DispatchResult
       correlationId: identity.correlation_id,
       taskRevision: identity.task_revision,
       payloadHash,
+      envelopeId: factoryContract?.envelope_id,
+      envelopeSha256: factoryContract?.envelope_sha256,
+      envelope: factoryContract?.envelope,
     });
   }
   const timeoutMs = getWebhookTimeoutMs(config);

@@ -1,9 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2, AlertTriangle, Github } from 'lucide-react';
+import { Plus, ArrowRight, Folder, Users, CheckSquare, Trash2 } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import Link from 'next/link';
 import { LocalControlPanel } from '@/components/LocalControlPanel';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { WorkspaceStats } from '@/lib/types';
 
 const WORKSPACE_ICON_OPTIONS = ['📁', '💼', '🏢', '🚀', '💡', '🎯', '📊', '🔧', '🌟', '🏠'];
@@ -131,35 +140,40 @@ export function WorkspaceDashboard() {
 
 function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onDelete: (id: string) => void }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/workspaces/${workspace.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        onDelete(workspace.id);
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to delete workspace');
-      }
-    } catch {
-      alert('Failed to delete workspace');
-    } finally {
-      setDeleting(false);
-      setShowDeleteConfirm(false);
+  // Server-side delete refuses non-empty workspaces; state the reason up front
+  // and refuse in place instead of shipping a silently disabled confirm button.
+  const deleteBlockers = [
+    workspace.taskCounts.total > 0
+      ? `This workspace still has ${workspace.taskCounts.total} task(s). Delete or move them first.`
+      : null,
+    workspace.agentCount > 0
+      ? `This workspace still has ${workspace.agentCount} agent(s). Delete or move them first.`
+      : null,
+  ].filter((blocker): blocker is string => blocker !== null);
+
+  // Runs inside ActionReviewDialog: a thrown error keeps the dialog open with
+  // the failure message instead of closing on a delete that never happened.
+  const handleDelete = async () => {
+    if (deleteBlockers.length > 0) {
+      throw new Error(deleteBlockers.join(' '));
     }
+
+    const res = await fetch(`/api/workspaces/${workspace.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to delete workspace');
+    }
+    onDelete(workspace.id);
   };
 
   return (
     <>
     <Link href={`/workspace/${workspace.slug}`}>
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-all hover:shadow-lg cursor-pointer group relative">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-[border-color,box-shadow] hover:shadow-lg cursor-pointer group relative">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <span className="text-3xl">{workspace.icon}</span>
+            <EntityEmoji emoji={workspace.icon} kind="workspace" hidden className="text-3xl" />
             <div>
               <h3 className="font-semibold text-lg group-hover:text-mc-accent transition-colors">
                 {workspace.name}
@@ -215,55 +229,28 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
       </div>
     </Link>
 
-    {/* Delete Confirmation Modal */}
-    {showDeleteConfirm && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <button
-          type="button"
-          aria-label="Close delete workspace confirmation"
-          className="absolute inset-0 cursor-default"
-          onClick={() => setShowDeleteConfirm(false)}
-        />
-        <div className="relative bg-mc-bg-secondary border border-mc-border rounded-xl w-full max-w-md p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-mc-accent-red/20 rounded-full">
-              <AlertTriangle className="w-6 h-6 text-mc-accent-red" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Delete Workspace</h3>
-              <p className="text-sm text-mc-text-secondary">This action cannot be undone</p>
-            </div>
-          </div>
-
-          <p className="text-mc-text-secondary mb-6">
-            Are you sure you want to delete <strong>{workspace.name}</strong>?
-            {workspace.taskCounts.total > 0 && (
-              <span className="block mt-2 text-mc-accent-red">
-                ⚠️ This workspace has {workspace.taskCounts.total} task(s). Delete them first.
-              </span>
-            )}
-          </p>
-
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(false)}
-              className="px-4 py-2 text-mc-text-secondary hover:text-mc-text"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting || workspace.taskCounts.total > 0 || workspace.agentCount > 0}
-              className="px-4 py-2 bg-mc-accent-red text-white rounded-lg font-medium hover:bg-mc-accent-red/90 disabled:opacity-50"
-            >
-              {deleting ? 'Deleting...' : 'Delete Workspace'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+    <ActionReviewDialog
+      open={showDeleteConfirm}
+      onOpenChange={setShowDeleteConfirm}
+      title={`Delete workspace ${workspace.name}?`}
+      tone="destructive"
+      confirmLabel="Delete workspace"
+      pendingLabel="Deleting..."
+      description={
+        deleteBlockers.length > 0
+          ? `Blocked: ${deleteBlockers.join(' ')}`
+          : 'This workspace is empty, so deleting it removes only the workspace record itself.'
+      }
+      consequences={{
+        immediateEffect: 'The workspace card disappears from this dashboard.',
+        confirmedEffect:
+          'MCK deletes the workspace record and its local runtime/sync settings from the local database.',
+        resultLocation: `This dashboard; the /workspace/${workspace.slug} route stops resolving.`,
+        willNotHappen:
+          'No GitHub repository, GitHub Project, or file on disk is touched, and other workspaces are unaffected.',
+      }}
+      onConfirm={handleDelete}
+    />
     </>
   );
 }
@@ -302,11 +289,14 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl w-full max-w-md">
-        <div className="p-6 border-b border-mc-border">
-          <h2 className="text-lg font-semibold">Create New Workspace</h2>
-        </div>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="w-[calc(100vw-2rem)] max-w-md gap-0 rounded-xl p-0"
+      >
+        <DialogHeader className="p-6 border-b border-mc-border">
+          <DialogTitle>Create New Workspace</DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Icon selector */}
@@ -318,6 +308,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
                   key={workspaceIcon}
                   type="button"
                   onClick={() => setIcon(workspaceIcon)}
+                  aria-pressed={icon === workspaceIcon}
                   aria-label={`Select ${workspaceIcon} workspace icon`}
                   className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-colors ${
                     icon === workspaceIcon
@@ -339,7 +330,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Acme Corp"
+              placeholder="e.g., Assistants"
               className="w-full bg-mc-bg border border-mc-border rounded-lg px-4 py-2 focus:outline-none focus:border-mc-accent"
             />
           </div>
@@ -365,7 +356,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

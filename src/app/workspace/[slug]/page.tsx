@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw, SearchX } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { MissionQueue } from '@/components/MissionQueue';
@@ -16,6 +16,7 @@ import { WorkspaceSectionTabs, type WorkspaceSection } from '@/components/worksp
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
+import { presentMckN8nSyncRun } from '@/lib/n8n-sync-presentation';
 import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
 
 const SYNC_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -35,12 +36,23 @@ function formatSyncTimestamp(value?: string): string {
     return 'unknown time';
   }
 
+  // react-doctor-disable-next-line -- Client-only operator page; sync timestamps render in the operator's locale on purpose.
   return SYNC_TIMESTAMP_FORMATTER.format(parsed);
 }
 
 function formatSyncCount(value: unknown): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatReconciliationSuffix(summary: Record<string, unknown>): string {
+  const statusReconciled = formatSyncCount(summary.status_reconciled);
+  const driftWarnings = formatSyncCount(summary.upstream_drift_warnings);
+  if (statusReconciled === 0 && driftWarnings === 0) {
+    return '';
+  }
+
+  return `, ${statusReconciled} status reconciled, ${driftWarnings} upstream drift warning${driftWarnings === 1 ? '' : 's'}`;
 }
 
 function extractGitHubSyncStatusNotes(payload: Record<string, unknown>): string[] {
@@ -154,12 +166,12 @@ export default function WorkspacePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: false }),
       });
-      const payload = await res.json();
       if (!res.ok) {
-        throw new Error(payload.error || 'GitHub Project refresh failed');
+        const errorPayload = await res.json().catch(() => null);
+        throw new Error(errorPayload?.error || 'GitHub Project refresh failed');
       }
 
-      const syncPayload = payload as Record<string, unknown>;
+      const syncPayload = await res.json() as Record<string, unknown>;
       const imported = formatSyncCount(syncPayload.imported);
       const updated = formatSyncCount(syncPayload.updated);
       const moved = formatSyncCount(syncPayload.moved);
@@ -226,6 +238,7 @@ export default function WorkspacePage() {
   }, [slug, setIsLoading, setNotFound, setWorkspace]);
 
   // Load workspace-specific data
+  // react-doctor-disable-next-line -- Every polling interval created here is cleared in the returned cleanup; the OpenClaw abort timeout is bounded and cleared inline.
   useEffect(() => {
     if (!loadedWorkspace) return;
 
@@ -355,7 +368,7 @@ export default function WorkspacePage() {
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔍</div>
+          <SearchX aria-hidden="true" className="w-14 h-14 mx-auto mb-4 text-mc-text-secondary" />
           <h1 className="text-2xl font-bold mb-2">Workspace Not Found</h1>
           <p className="text-mc-text-secondary mb-6">
             The workspace &ldquo;{slug}&rdquo; doesn&apos;t exist.
@@ -392,16 +405,14 @@ export default function WorkspacePage() {
 
   const latestN8nSync = n8nSyncStatus?.latest ?? null;
   const n8nSummary = (latestN8nSync?.summary ?? {}) as Record<string, unknown>;
-  const n8nSyncHasAlert = Boolean(
-    latestN8nSync && (!latestN8nSync.ok || latestN8nSync.alert_level === 'error')
-  );
+  const n8nSyncPresentation = latestN8nSync ? presentMckN8nSyncRun(latestN8nSync) : null;
   const n8nSyncCounts = latestN8nSync
-    ? `${formatSyncCount(n8nSummary.scanned_items)} scanned, ${formatSyncCount(n8nSummary.updated)} updated, ${formatSyncCount(n8nSummary.errors)} errors`
+    ? `${formatSyncCount(n8nSummary.scanned_items)} scanned, ${formatSyncCount(n8nSummary.updated)} updated, ${formatSyncCount(n8nSummary.errors)} errors${formatReconciliationSuffix(n8nSummary)}`
     : 'no recorded runs yet';
 
   return (
     <div
-      className="h-screen flex flex-col bg-mc-bg overflow-hidden"
+      className="min-h-[100dvh] max-h-[100dvh] flex flex-col bg-mc-bg overflow-hidden"
       data-workspace-ready={loadedWorkspace ? 'true' : 'false'}
     >
       <Header workspace={workspace} />
@@ -443,14 +454,22 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               )}
-              <div className={n8nSyncHasAlert ? 'flex flex-wrap items-center gap-2 text-rose-200' : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
-                {n8nSyncHasAlert ? (
+              <div className={n8nSyncPresentation?.state === 'error'
+                ? 'flex flex-wrap items-center gap-2 text-rose-200'
+                : n8nSyncPresentation?.state === 'warning'
+                  ? 'flex flex-wrap items-center gap-2 text-amber-200'
+                  : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
+                {n8nSyncPresentation?.state === 'error' ? (
                   <AlertTriangle className="size-4 shrink-0" />
-                ) : (
+                ) : n8nSyncPresentation?.state === 'warning' ? (
+                  <AlertTriangle className="size-4 shrink-0 text-amber-300" />
+                ) : n8nSyncPresentation ? (
                   <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
+                ) : (
+                  <RefreshCw className="size-4 shrink-0" />
                 )}
                 <span>
-                  n8n sync: {latestN8nSync ? (n8nSyncHasAlert ? 'attention needed' : 'ok') : 'waiting for first scheduled run'}
+                  n8n sync: {n8nSyncPresentation?.label ?? 'waiting for first scheduled run'}
                 </span>
                 <span>
                   Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - {formatSyncCadence(latestN8nSync)}
@@ -458,7 +477,7 @@ export default function WorkspacePage() {
                 <Link href="/n8n-sync-history" className="text-mc-accent-cyan hover:text-mc-accent">
                   View history
                 </Link>
-                {latestN8nSync?.alert_message && n8nSyncHasAlert && (
+                {latestN8nSync?.alert_message && n8nSyncPresentation?.showMessage && (
                   <span>{latestN8nSync.alert_message}</span>
                 )}
               </div>
@@ -478,9 +497,9 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
         {section === 'board' && (
-          <div className="flex h-full overflow-hidden">
+          <div className="flex flex-1 min-h-0 overflow-hidden">
             <AgentsSidebar workspaceId={workspace.id} />
             <MissionQueue workspaceId={workspace.id} />
             <LiveFeed />

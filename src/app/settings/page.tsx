@@ -9,24 +9,25 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Settings, Save, RotateCcw, FolderOpen, Link as LinkIcon } from 'lucide-react';
 import { getConfig, updateConfig, resetConfig, type MissionControlConfig } from '@/lib/config';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
 import { RuntimeOpsSettings } from '@/components/RuntimeOpsSettings';
 
 export default function SettingsPage() {
   const router = useRouter();
   const [config, setConfig] = useState<MissionControlConfig>(() => getConfig());
   const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
-    setSaveSuccess(false);
+    setSuccessMessage(null);
 
     try {
       updateConfig(config);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setSuccessMessage('Settings saved successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
@@ -34,13 +35,12 @@ export default function SettingsPage() {
     }
   };
 
+  // Runs inside ActionReviewDialog, which owns the review step.
   const handleReset = () => {
-    if (confirm('Reset all settings to defaults? This cannot be undone.')) {
-      resetConfig();
-      setConfig(getConfig());
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    }
+    resetConfig();
+    setConfig(getConfig());
+    setSuccessMessage('Settings reset to defaults');
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   const handleChange = (field: keyof MissionControlConfig, value: string) => {
@@ -66,14 +66,30 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-4 py-2 border border-mc-border rounded hover:bg-mc-bg-tertiary text-mc-text-secondary flex items-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset to Defaults
-            </button>
+            <ActionReviewDialog
+              title="Reset all settings to defaults?"
+              tone="destructive"
+              confirmLabel="Reset settings"
+              pendingLabel="Resetting..."
+              trigger={
+                <button
+                  type="button"
+                  className="px-4 py-2 border border-mc-border rounded hover:bg-mc-bg-tertiary text-mc-text-secondary flex items-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset to Defaults
+                </button>
+              }
+              consequences={{
+                immediateEffect: 'Every field on this page reverts to its default value.',
+                confirmedEffect:
+                  'The saved Mission Control settings are cleared from this browser (localStorage); there is no undo.',
+                resultLocation: 'This settings page, and everywhere the app reads these settings.',
+                willNotHappen:
+                  'Environment variables in .env.local and server-side data are untouched; other browsers and devices keep their own settings.',
+              }}
+              onConfirm={handleReset}
+            />
             <button
               type="button"
               onClick={handleSave}
@@ -90,9 +106,9 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Success Message */}
-        {saveSuccess && (
+        {successMessage && (
           <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded text-green-400">
-            ✓ Settings saved successfully
+            ✓ {successMessage}
           </div>
         )}
 
@@ -202,7 +218,7 @@ export default function SettingsPage() {
         {/* Environment Variables Note */}
         <section className="p-6 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <h3 className="text-lg font-semibold text-blue-400 mb-2">
-            📝 Environment Variables
+            Environment Variables
           </h3>
           <p className="text-sm text-blue-300 mb-3">
             Some settings are also configurable via environment variables in <code className="px-2 py-1 bg-mc-bg rounded">.env.local</code>:

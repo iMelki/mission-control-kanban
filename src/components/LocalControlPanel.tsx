@@ -8,7 +8,6 @@ import {
   Bot,
   CheckCircle2,
   Database,
-  Github,
   Info,
   Loader2,
   Monitor,
@@ -17,6 +16,7 @@ import {
   Server,
   Workflow,
 } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
 import {
   LOCAL_CONTROL_GROUP_LABELS,
   LOCAL_CONTROL_SURFACES,
@@ -77,12 +77,12 @@ function SurfaceIcon({ surface }: { surface: LocalControlSurface }) {
 
 async function fetchJson(path: string, signal: AbortSignal): Promise<unknown> {
   const response = await fetch(path, { cache: 'no-store', signal });
-  const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
     throw new Error(typeof payload.error === 'string' ? payload.error : `HTTP ${response.status}`);
   }
 
-  return payload;
+  return response.json().catch(() => ({}));
 }
 
 export function LocalControlPanel() {
@@ -102,39 +102,43 @@ export function LocalControlPanel() {
 
     async function refreshHealth() {
       setRefreshing(true);
-      const checks = LOCAL_CONTROL_SURFACES.filter((surface) => (
-        surface.healthSource === 'github' ||
-        surface.healthSource === 'openclaw' ||
-        surface.healthSource === 'n8n-sync' ||
-        surface.healthSource === 'runtime-regression'
-      ));
+      try {
+        const checks = LOCAL_CONTROL_SURFACES.filter((surface) => (
+          surface.healthSource === 'github' ||
+          surface.healthSource === 'openclaw' ||
+          surface.healthSource === 'n8n-sync' ||
+          surface.healthSource === 'runtime-regression'
+        ));
 
-      const updates = await Promise.all(checks.map(async (surface) => {
-        try {
-          const payload = await fetchJson(surface.detailHref ?? surface.href, controller.signal);
-          return [surface.id, mapHealthPayload(surface.healthSource, payload)] as const;
-        } catch (error) {
-          if (controller.signal.aborted) {
-            return null;
+        const updates = await Promise.all(checks.map(async (surface) => {
+          try {
+            const payload = await fetchJson(surface.detailHref ?? surface.href, controller.signal);
+            return [surface.id, mapHealthPayload(surface.healthSource, payload)] as const;
+          } catch (error) {
+            if (controller.signal.aborted) {
+              return null;
+            }
+
+            return [surface.id, {
+              state: 'attention',
+              label: 'Check failed',
+              detail: error instanceof Error ? error.message : 'Local diagnostic endpoint failed.',
+            } satisfies LocalControlHealth] as const;
           }
+        }));
 
-          return [surface.id, {
-            state: 'attention',
-            label: 'Check failed',
-            detail: error instanceof Error ? error.message : 'Local diagnostic endpoint failed.',
-          } satisfies LocalControlHealth] as const;
+        if (!active || controller.signal.aborted) {
+          return;
         }
-      }));
 
-      if (!active || controller.signal.aborted) {
-        return;
+        setHealth((current) => ({
+          ...current,
+          ...Object.fromEntries(updates.filter((update): update is NonNullable<typeof update> => Boolean(update))),
+        }));
+      } finally {
+        // Safe after unmount: React treats setState on an unmounted component as a no-op.
+        setRefreshing(false);
       }
-
-      setHealth((current) => ({
-        ...current,
-        ...Object.fromEntries(updates.filter((update): update is NonNullable<typeof update> => Boolean(update))),
-      }));
-      setRefreshing(false);
     }
 
     void refreshHealth();

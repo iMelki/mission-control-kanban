@@ -9,7 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Migrated all six modal overlays onto the owned dialog primitives (2026-08-11, #139)** -
+  `AgentModal`, `TaskModal`, `GitHubImportModal`, and the create-workspace form
+  now render through the vendored shadcn/Radix `Dialog`, and the
+  delete-workspace and live-GitHub-mutation confirms now render through
+  `ActionReviewDialog`. Every modal gains `role="dialog"`, a title-bound
+  accessible name, a focus trap, Escape-to-close, and focus return; the
+  hand-rolled `fixed inset-0` overlays are gone. No new component was written -
+  both primitives already existed in this repository - so five files left the
+  component-sourcing baseline for
+  `docs/preflight/records/2026-08-11-dialog-overlay-migration.md`. Deleting a
+  workspace that still holds tasks or agents now explains the refusal in the
+  dialog instead of greying out the confirm button, and `smoke:runtime-ui`
+  proves the dialog semantics in a real browser.
+
+### Fixed
+
+- **Closed the four PR #137 review follow-ups on the factory bridge (2026-08-11, #136)** -
+  Dispatch v2 refuses out-of-bounds work text before the canonical envelope is
+  built, returning HTTP 400 (or dry-run blockers) that name the offending field
+  instead of the envelope's opaque failure; the bounds live in
+  `FACTORY_V2_WORK_CONTRACT_LIMITS` and are pinned to the canonical validator by
+  test. `validateReceiptForMapping` now rejects `dispatch_version: 1` mappings
+  before any Paperclip call, so a v2 receipt can no longer complete a v1
+  dispatch by comparing `repositoryBaseSha` with itself.
+  `validateWebhookCallbackPayload` accepts a caller-supplied
+  `expectedReceiptIdentity` and no longer builds a self-referential expectation
+  that always passed. The published v2 dispatch schema resolves the factory
+  envelope from a local `$defs` entry with a stable `$id` instead of a mutable
+  `agent-settings@dev` raw URL.
+
+### Documentation
+
+- **Refresh Paperclip bridge topology truth (2026-08-08, #47/#119/#127)** -
+  Records that bridge PR #119 merged into `dev`, the canonical checkout is
+  non-bare and aligned with `origin/dev`, and the remaining gate is installed
+  runtime signed-ping/dispatch plus cross-surface receipt reconciliation.
+
 ### Added
+
+- **Made factory envelopes canonical and receipt v2 authoritative (2026-08-09, #136)** -
+  Dispatch v2 now embeds, validates, hashes, and persists the complete Agent
+  Settings `factory-task-envelope.v1` before network I/O, while retaining
+  exact-match snake_case aliases for installed-plugin compatibility. Lifecycle
+  readback revalidates the stored envelope and digest. Historical receipt v1
+  remains readable, but only receipt v2 with exact index, independent reviewer
+  session, release-steward identity, remote `refs/heads/dev` SHA/tree readback,
+  reconciliation, and privacy evidence can authorize Done. Receipt authority
+  and canonical digest are stored on the dispatch attempt and activity/event
+  records. The v2 builder now lives in a server-only module, while the webpack
+  resolver maps NodeNext `.js` specifiers to their TypeScript sources so the
+  shared plugin contract compiles in both the plugin and production app builds.
 
 - **Adopt dnd-kit/shadcn for kanban, Card, and Tabs (2026-08-02, #48)** -
   `MissionQueue.tsx`'s kanban board now uses `@dnd-kit/core`/`@dnd-kit/sortable`
@@ -21,6 +73,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Moved GitHub Actions to native Node 24 releases (2026-08-09, #138)** -
+  Upgrades checkout to v5.1.0, setup-node to v6.5.0, cache to v5.1.0, and
+  upload-artifact to v6.0.0 across CI, Runtime Regression, and secret scan.
+  Every external action reference is pinned to the reviewed release commit;
+  existing Node inputs, permissions, cache keys, artifacts, retention, and
+  failure semantics are unchanged. Replaces the maintenance-only
+  `pre-commit/action@v3.0.1` composite after live annotation readback exposed
+  its nested `actions/cache@v4`; explicit setup-python, cache, install, and run
+  steps preserve its behavior using native Node 24 action releases. A focused
+  workflow test now rejects mutable action refs, reviewed-pin drift, and
+  reintroduction of that hidden Node 20 dependency.
+
+- **Made Doctor schema discovery public and warning-level sync state visible (2026-08-09, PR #137)** -
+  Publishes a versioned public distribution mirror of the canonical private
+  `doctor-genome.v1` contract, points the repository genome at that reachable
+  URI, and covers TypeScript component barrels such as
+  `src/components/index.ts`. The workspace and n8n history views now render
+  warning or unknown clean runs in amber as `Review needed`, preserve their
+  message, and keep failed/error runs distinct in red.
+
+- **Made Runtime Regression cleanup receipt-gated (2026-08-09, #46)** -
+  The UI smoke now tracks partially created fixtures, deletes every temporary
+  task and agent in unconditional teardown, and requires an exact-path `404`
+  readback before reporting success. It emits the structured
+  `mck.runtime-smoke-cleanup.v1` receipt into the uploaded artifact directory,
+  fails on deletion/readback/receipt-write/browser-close errors, and preserves
+  simultaneous UI and cleanup failures with an aggregate error. Added focused
+  success, residual-agent, transport-failure, and deterministic-writer tests.
+  Current-sha PR run `31296740445` and push run `31296738848` each uploaded a
+  four-entity receipt proving DELETE `200` plus GET `404` for three tasks and
+  one agent; issue #46 closed after exact artifact, comment, and state readback.
+
+- **Made Paperclip host compatibility exact-SHA fail-closed (2026-08-08, #135)** -
+  Host migration validation now requires the declared `testedCommit` to match
+  the actual host even when partial file attestations are supplied. Added
+  regression coverage for mismatched, missing, and malformed host metadata;
+  file attestations remain additive evidence rather than a compatibility
+  bypass.
+
+- **Revalidated persisted bridge envelopes before reuse (2026-08-08, #136)** -
+  JSONB/string envelopes loaded by correlation and issue mappings now pass
+  through the canonical `parseDispatch` validator before orchestration. Malformed
+  or owner-conflicting persisted contracts fail closed, with regression coverage.
+
+- **Hardened bridge diagnostics and callback byte boundaries (2026-08-08, #136)** -
+  Recursive diagnostic redaction now removes embedded URL queries, Bearer/HMAC
+  signatures, and common API-key-shaped values from arbitrary failure strings.
+  Callback intake rejects leading UTF-8 BOMs and non-canonical/invalid UTF-8
+  before HMAC verification, preserving exact signed-byte semantics. Added
+  focused Paperclip bridge and callback regression fixtures.
 - Added a deterministic Paperclip workspace provisioner for the factory path:
   clean workspaces install the root and plugin lockfiles with lifecycle scripts
   disabled, rebuild only `better-sqlite3`, and expose the same exact argv as the

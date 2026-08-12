@@ -245,6 +245,22 @@ function identity(dispatch: MckDispatch, deliveryId: string, rawBody: string) {
   };
 }
 
+function parsePersistedEnvelope(value: BridgeMapping["envelope"]): MckDispatch {
+  let candidate: unknown = value;
+  if (typeof value === "string") {
+    try {
+      candidate = JSON.parse(value) as unknown;
+    } catch {
+      throw new Error("Persisted MCK task envelope is not valid JSON");
+    }
+  }
+  try {
+    return parseDispatch(candidate);
+  } catch {
+    throw new Error("Persisted MCK task envelope failed canonical validation");
+  }
+}
+
 async function getMapping(ctx: PluginContext, companyId: string, correlationId: string) {
   const rows = await ctx.db.query<BridgeMapping>(
     `SELECT * FROM ${table(ctx, "bridge_mappings")}
@@ -252,8 +268,8 @@ async function getMapping(ctx: PluginContext, companyId: string, correlationId: 
     [companyId, correlationId],
   );
   const mapping = rows[0];
-  if (mapping && typeof mapping.envelope === "string") {
-    mapping.envelope = JSON.parse(mapping.envelope) as MckDispatch;
+  if (mapping) {
+    mapping.envelope = parsePersistedEnvelope(mapping.envelope);
   }
   return mapping ?? null;
 }
@@ -270,8 +286,8 @@ async function mappingForIssue(ctx: PluginContext, companyId: string, issueId: s
     [companyId, issueId],
   );
   const mapping = rows[0];
-  if (mapping && typeof mapping.envelope === "string") {
-    mapping.envelope = JSON.parse(mapping.envelope) as MckDispatch;
+  if (mapping) {
+    mapping.envelope = parsePersistedEnvelope(mapping.envelope);
   }
   return mapping ?? null;
 }
@@ -441,7 +457,7 @@ export async function createExecutionGraph(
     status: "backlog",
     issuePriority: priority(dispatch.task.priority),
   });
-  const envelopeDocument = await ctx.issues.documents.upsert({
+  const { envelopeDocument, envelopeReadback } = await ctx.issues.documents.upsert({
     issueId: root.id,
     companyId: config.companyId,
     key: "mck-task-envelope",
@@ -449,12 +465,15 @@ export async function createExecutionGraph(
     format: "markdown",
     body: rawDispatchBody,
     changeSummary: "Recorded signed MCK dispatch envelope",
-  });
-  const envelopeReadback = await ctx.issues.documents.get(
-    root.id,
-    "mck-task-envelope",
-    config.companyId,
-  );
+  }).then(async (envelopeDocument) => ({
+    envelopeDocument,
+    // Readback intentionally starts only after the upsert is acknowledged.
+    envelopeReadback: await ctx.issues.documents.get(
+      root.id,
+      "mck-task-envelope",
+      config.companyId,
+    ),
+  }));
   if (
     envelopeDocument.format !== "markdown"
     || envelopeReadback?.format !== "markdown"
@@ -1811,7 +1830,7 @@ async function latestEvidenceRevision(
   };
 }
 
-async function validateReceiptForMapping(
+export async function validateReceiptForMapping(
   ctx: PluginContext,
   config: BridgeConfig,
   mapping: BridgeMapping,
@@ -1821,24 +1840,23 @@ async function validateReceiptForMapping(
     throw new Error("Factory receipt mapping does not belong to the authorized company");
   }
   const envelope = mapping.envelope as MckDispatch;
-  const repositorySlug = envelope.version === 2
-    ? envelope.factory_contract.repository.slug
-    : `${envelope.task.github_source.repo_owner}/${envelope.task.github_source.repo_name}`;
+  // A v1 mapping stores no repository base SHA, so the only value available to
+  // compare against is the one the receipt itself carries - a self-comparison
+  // that always passes and would let a v2 receipt complete a v1 dispatch while
+  // its v1 lifecycle callback is skipped. Reject the mapping instead.
+  if (mapping.dispatch_version !== 2 || envelope.version !== 2) {
+    throw new Error(
+      "Factory receipt completion requires a dispatch v2 mapping; the v1 envelope has no stored repository base SHA to bind",
+    );
+  }
   const expectedReceipt = {
-    envelopeId: envelope.version === 2
-      ? envelope.factory_contract.envelope_id
-      : `factory:${mapping.attempt_id}`,
+    envelopeId: envelope.factory_contract.envelope_id,
     correlationId: mapping.correlation_id,
     taskRevision: mapping.task_revision,
-    repositorySlug,
-    repositoryBaseSha: envelope.version === 2
-      ? envelope.factory_contract.repository.base_sha
-      : receiptInput && typeof receiptInput === "object" && "repository" in receiptInput
-        ? String((receiptInput as { repository?: { baseSha?: unknown } }).repository?.baseSha ?? "")
-        : "",
-    allowedFileScope: envelope.version === 2
-      ? envelope.factory_contract.repository.allowed_file_scope
-      : undefined,
+    repositorySlug: envelope.factory_contract.repository.slug,
+    repositoryBaseSha: envelope.factory_contract.repository.base_sha,
+    allowedFileScope: envelope.factory_contract.repository.allowed_file_scope,
+    requireAuthoritativeCompletion: true,
   };
   if (
     !mapping.parent_issue_id
@@ -1855,6 +1873,9 @@ async function validateReceiptForMapping(
     receiptDocument,
     validationDocument,
     releaseDocument,
+    receiptRevision,
+    validationRevision,
+    releaseRevision,
   ] = await Promise.all([
     ctx.issues.summaries.getOrchestration({
       issueId: mapping.parent_issue_id,
@@ -1881,8 +1902,6 @@ async function validateReceiptForMapping(
       "factory-release-evidence",
       config.companyId,
     ),
-  ]);
-  const [receiptRevision, validationRevision, releaseRevision] = await Promise.all([
     latestEvidenceRevision(ctx, config.companyId, mapping.release_issue_id, "factory-run-receipt"),
     latestEvidenceRevision(ctx, config.companyId, mapping.validate_issue_id, "factory-validation-evidence"),
     latestEvidenceRevision(ctx, config.companyId, mapping.review_issue_id, "factory-release-evidence"),
@@ -2049,7 +2068,7 @@ async function publishFromIssueEvent(ctx: PluginContext, event: PluginEvent) {
         config,
         mapping,
         "needs_human",
-        "Release finished without factory-run-receipt.v1",
+        "Release finished without authoritative factory-run-receipt.v2",
         undefined,
         { occurrenceIdentity },
       );

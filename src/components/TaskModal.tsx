@@ -12,6 +12,14 @@ import { GitHubWritebackPanel } from './GitHubWritebackPanel';
 import { DispatchTimeline } from './DispatchTimeline';
 import { TaskDependenciesPanel } from './TaskDependenciesPanel';
 import { RuntimeActionsPanel } from './task-modal/RuntimeActionsPanel';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { GitHubIssueDraftPanel } from './task-modal/GitHubIssueDraftPanel';
 import { DispatchContractSection } from './task-modal/DispatchContractSection';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
@@ -88,6 +96,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
+  const [dispatchDryRunError, setDispatchDryRunError] = useState<Record<string, unknown> | null>(null);
   const [isPreviewingDispatch, setIsPreviewingDispatch] = useState(false);
 
   useEffect(() => {
@@ -175,7 +184,16 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: true }),
       });
+      if (!response.ok) {
+        setDispatchDryRun(null);
+        setDispatchDryRunError(await response.json().catch(() => ({ error: `Dispatch preview failed (HTTP ${response.status})` })));
+        return;
+      }
+      setDispatchDryRunError(null);
       setDispatchDryRun(await response.json());
+    } catch (error) {
+      setDispatchDryRun(null);
+      setDispatchDryRunError({ error: error instanceof Error ? error.message : 'Dispatch preview request failed' });
     } finally {
       setIsPreviewingDispatch(false);
     }
@@ -274,7 +292,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               id: crypto.randomUUID(),
               type: 'task_status_changed',
               task_id: savedTask.id,
-              message: `📋 Planning started for: ${savedTask.title}`,
+              message: `Planning started for: ${savedTask.title}`,
               created_at: new Date().toISOString(),
             });
           }
@@ -296,26 +314,20 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     }
   };
 
+  // Runs inside ActionReviewDialog: a thrown error keeps the dialog open
+  // with the failure message, so no separate submitError plumbing is needed.
   const handleDelete = async () => {
-    if (!currentTask || !confirm(`Delete \"${currentTask.title}\"?`)) return;
+    if (!currentTask) return;
 
-    setSubmitError(null);
-
-    try {
-      const res = await fetch(`/api/tasks/${currentTask.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        useMissionControl.setState((state) => ({
-          tasks: state.tasks.filter((t) => t.id !== currentTask.id),
-        }));
-        onClose();
-      } else {
-        const payloadError = await res.json().catch(() => ({}));
-        setSubmitError(payloadError.error || 'Failed to delete task');
-      }
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-      setSubmitError(error instanceof Error ? error.message : 'Failed to delete task');
+    const res = await fetch(`/api/tasks/${currentTask.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const payloadError = await res.json().catch(() => ({}));
+      throw new Error(payloadError.error || 'Failed to delete task');
     }
+    useMissionControl.setState((state) => ({
+      tasks: state.tasks.filter((t) => t.id !== currentTask.id),
+    }));
+    onClose();
   };
 
   const statuses: TaskStatus[] = ['planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'done'];
@@ -333,21 +345,30 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-2 sm:items-center sm:p-4">
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-t-lg sm:rounded-lg w-full max-w-5xl max-h-[96vh] sm:max-h-[90vh] flex flex-col">
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent
+        aria-describedby={undefined}
+        showCloseButton={false}
+        className={[
+          // Bottom sheet on phones, centered dialog from sm up - the same
+          // geometry the hand-rolled overlay had before the Radix migration.
+          'flex flex-col gap-0 p-0',
+          'bottom-0 top-auto w-[calc(100vw-1rem)] max-w-5xl max-h-[96vh] translate-y-0 rounded-b-none',
+          'sm:bottom-auto sm:top-1/2 sm:w-[calc(100vw-2rem)] sm:max-h-[90vh] sm:-translate-y-1/2 sm:rounded-b-lg',
+        ].join(' ')}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-mc-border flex-shrink-0">
-          <h2 className="text-lg font-semibold">
+        <DialogHeader className="flex-row items-center justify-between gap-2 p-4 border-b border-mc-border flex-shrink-0">
+          <DialogTitle>
             {currentTask ? currentTask.title : 'Create New Task'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 hover:bg-mc-bg-tertiary rounded"
+          </DialogTitle>
+          <DialogClose
+            aria-label="Close task modal"
+            className="p-1 hover:bg-mc-bg-tertiary rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
           >
             <X className="size-5" />
-          </button>
-        </div>
+          </DialogClose>
+        </DialogHeader>
 
         {/* Tabs - only show for existing tasks */}
         {currentTask && (
@@ -519,11 +540,11 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               <option value="">Unassigned</option>
               {agents.map((agent) => (
                 <option key={agent.id} value={agent.id}>
-                  {agent.avatar_emoji} {agent.name} - {agent.role}
+                  {agent.name} - {agent.role}
                 </option>
               ))}
               <option value="__add_new__" className="text-mc-accent">
-                ➕ Add new agent…
+                + Add new agent…
               </option>
             </select>
             {assignedAgent && (
@@ -579,6 +600,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
               onDispatchDryRun={handleDispatchDryRun}
               isPreviewingDispatch={isPreviewingDispatch}
               dispatchDryRun={dispatchDryRun}
+              dispatchDryRunError={dispatchDryRunError}
               disabled={!currentTask}
             />
 
@@ -634,16 +656,30 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           <div className="flex flex-col gap-3 p-4 border-t border-mc-border flex-shrink-0 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2">
               {currentTask && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
-                  >
-                    <Trash2 className="size-4" />
-                    Delete
-                  </button>
-                </>
+                <ActionReviewDialog
+                  title={`Delete task "${currentTask.title}"?`}
+                  tone="destructive"
+                  confirmLabel="Delete task"
+                  pendingLabel="Deleting..."
+                  trigger={
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
+                    >
+                      <Trash2 className="size-4" />
+                      Delete
+                    </button>
+                  }
+                  consequences={{
+                    immediateEffect: 'The task disappears from this board and this modal closes.',
+                    confirmedEffect:
+                      'The task record is deleted along with its activity log, deliverable entries, dispatch attempts, events, and tracked sub-agent session records.',
+                    resultLocation: 'The kanban board; connected clients update over the live feed.',
+                    willNotHappen:
+                      'Files on disk and any linked GitHub issue are not deleted; conversations are kept and unlinked.',
+                  }}
+                  onConfirm={handleDelete}
+                />
               )}
             </div>
             <div className="flex gap-2">
@@ -666,20 +702,20 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
             </div>
           </div>
         )}
-      </div>
 
-      {/* Nested Agent Modal for inline agent creation */}
-      {showAgentModal && (
-        <AgentModal
-          workspaceId={workspaceId}
-        onClose={() => setShowAgentModal(false)}
-        onAgentCreated={(agentId) => {
-            // Auto-select the newly created agent
-            updateFormField('assigned_agent_id', agentId);
-            setShowAgentModal(false);
-          }}
-        />
-      )}
-    </div>
+        {/* Nested Agent Modal for inline agent creation */}
+        {showAgentModal && (
+          <AgentModal
+            workspaceId={workspaceId}
+            onClose={() => setShowAgentModal(false)}
+            onAgentCreated={(agentId) => {
+              // Auto-select the newly created agent
+              updateFormField('assigned_agent_id', agentId);
+              setShowAgentModal(false);
+            }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

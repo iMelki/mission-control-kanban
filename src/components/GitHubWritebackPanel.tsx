@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ExternalLink, Github, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
 import { buildTaskRefreshUpdateFromGitHubPreview, type GitHubImportPreviewTask } from '@/lib/github-task-import';
 import type { GitHubWritebackLog, Task } from '@/lib/types';
 

@@ -24,6 +24,33 @@ export interface DispatchValidationResult {
   warnings: string[];
 }
 
+export interface DispatchValidationOptions {
+  /**
+   * Set to 2 to also enforce the canonical factory v2 envelope work-contract
+   * bounds. Version 1 dispatch has no length contract, so the default is
+   * unchanged for every existing caller.
+   */
+  factoryDispatchVersion?: 1 | 2;
+  /** Task title; the v2 envelope carries it verbatim as `work.title`. */
+  taskTitle?: string;
+}
+
+/**
+ * Text bounds the canonical factory task envelope enforces
+ * (`validateCanonicalFactoryTaskEnvelope` in
+ * `integrations/paperclip-bridge/src/contracts.ts`). Mirrored here — not
+ * imported — because that module pulls in `node:crypto` and this one is bundled
+ * into client components. `tests/factory-webhooks.test.ts` pins the mirror to
+ * the canonical validator so the two cannot drift apart silently.
+ */
+export const FACTORY_V2_WORK_CONTRACT_LIMITS = {
+  title: { min: 8, max: 240 },
+  acceptance_criteria: { min: 8, max: 1_000 },
+  test_requirements: { min: 3, max: 500 },
+  rollback_plan: { min: 8, max: 1_000 },
+  list_items: { max: 64 },
+} as const;
+
 export interface DispatchUiSummary {
   state: 'ready' | 'blocked' | 'needs_grooming' | 'human_only';
   headline: string;
@@ -155,7 +182,67 @@ export function parseDispatchMetadata(raw: unknown): DispatchMetadata | undefine
   return normalizeDispatchMetadata(raw);
 }
 
-export function validateDispatchMetadata(metadata: DispatchMetadata | undefined): DispatchValidationResult {
+/**
+ * Pre-validates the fields that become the canonical v2 envelope `work` block.
+ * Returns operator-readable blockers so short or oversized text is refused
+ * before the envelope is built, instead of surfacing later as the opaque
+ * "Canonical factory task envelope work contract is invalid" error.
+ */
+export function validateFactoryV2WorkContract(
+  metadata: DispatchMetadata | undefined,
+  taskTitle?: string,
+): string[] {
+  const normalized = normalizeDispatchMetadata(metadata);
+  const limits = FACTORY_V2_WORK_CONTRACT_LIMITS;
+  const blockers: string[] = [];
+
+  // The envelope carries the raw task title, so measure it untrimmed.
+  if (typeof taskTitle === 'string') {
+    const length = taskTitle.length;
+    if (length < limits.title.min || length > limits.title.max) {
+      blockers.push(
+        `Task title must be ${limits.title.min}-${limits.title.max} characters for factory dispatch v2 (currently ${length})`
+      );
+    }
+  }
+
+  const checkList = (
+    values: string[] | undefined,
+    label: string,
+    bound: { min: number; max: number },
+  ) => {
+    if (!values || values.length === 0) {
+      return;
+    }
+    if (values.length > limits.list_items.max) {
+      blockers.push(`${label} must hold at most ${limits.list_items.max} entries for factory dispatch v2 (currently ${values.length})`);
+    }
+    values.forEach((value, index) => {
+      if (value.length < bound.min || value.length > bound.max) {
+        blockers.push(
+          `${label} entry ${index + 1} must be ${bound.min}-${bound.max} characters for factory dispatch v2 (currently ${value.length})`
+        );
+      }
+    });
+  };
+
+  checkList(normalized?.acceptance_criteria, 'Acceptance criteria', limits.acceptance_criteria);
+  checkList(normalized?.test_requirements, 'Test requirements', limits.test_requirements);
+
+  const rollback = normalized?.rollback_plan;
+  if (rollback && (rollback.length < limits.rollback_plan.min || rollback.length > limits.rollback_plan.max)) {
+    blockers.push(
+      `Rollback plan must be ${limits.rollback_plan.min}-${limits.rollback_plan.max} characters for factory dispatch v2 (currently ${rollback.length})`
+    );
+  }
+
+  return blockers;
+}
+
+export function validateDispatchMetadata(
+  metadata: DispatchMetadata | undefined,
+  options?: DispatchValidationOptions,
+): DispatchValidationResult {
   const normalized = normalizeDispatchMetadata(metadata);
   const missingFields = REQUIRED_FIELD_LABELS.flatMap(([field, label]) => {
     const value = normalized?.[field];
@@ -180,6 +267,10 @@ export function validateDispatchMetadata(metadata: DispatchMetadata | undefined)
 
   if (normalized?.review_mode === 'auto_checks_only' && normalized?.risk_level && ['high', 'critical'].includes(normalized.risk_level)) {
     blockers.push('High-risk work cannot use Auto Checks Only review mode');
+  }
+
+  if (options?.factoryDispatchVersion === 2) {
+    blockers.push(...validateFactoryV2WorkContract(normalized, options.taskTitle));
   }
 
   return {

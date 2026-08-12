@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Zap, ZapOff, Loader2 } from 'lucide-react';
+import { Plus, Bot, ChevronLeft, ChevronRight, Zap, ZapOff, Loader2, X } from 'lucide-react';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentRuntimeType, AgentStatus, OpenClawSession } from '@/lib/types';
 import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes';
@@ -49,6 +50,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [connectingAgentId, setConnectingAgentId] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<{ agentName: string; message: string } | null>(null);
   const [activeSubAgents, setActiveSubAgents] = useState(0);
   const isCollapsed = useSyncExternalStore(
     subscribeCollapsedPreference,
@@ -110,6 +112,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
   const handleConnectToOpenClaw = async (agent: Agent, e: React.MouseEvent) => {
     e.stopPropagation();
     setConnectingAgentId(agent.id);
+    setConnectError(null);
 
     try {
       const existingSession = agentOpenClawSessions[agent.id];
@@ -118,6 +121,10 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
         const res = await fetch(`/api/agents/${agent.id}/openclaw`, { method: 'DELETE' });
         if (res.ok) {
           setAgentOpenClawSession(agent.id, null);
+        } else {
+          const error = await res.json().catch(() => null);
+          console.error('Failed to disconnect from OpenClaw:', error);
+          setConnectError({ agentName: agent.name, message: error?.error || 'Failed to disconnect OpenClaw session' });
         }
       } else {
         const res = await fetch(`/api/agents/${agent.id}/openclaw`, { method: 'POST' });
@@ -127,11 +134,12 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
         } else {
           const error = await res.json();
           console.error('Failed to connect to OpenClaw:', error);
-          alert(`Failed to connect: ${error.error || 'Unknown error'}`);
+          setConnectError({ agentName: agent.name, message: error.error || 'Unknown error' });
         }
       }
     } catch (error) {
       console.error('OpenClaw connection error:', error);
+      setConnectError({ agentName: agent.name, message: 'Connection request failed' });
     } finally {
       setConnectingAgentId(null);
     }
@@ -145,7 +153,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
   return (
     <>
       <aside
-        className={`shrink-0 bg-mc-bg-secondary border-r border-mc-border flex flex-col transition-[width] duration-200 ease-in-out overflow-hidden ${
+        className={`shrink-0 bg-mc-bg-secondary border-r border-mc-border flex flex-col overflow-hidden ${
           isCollapsed ? 'w-12' : 'w-64'
         }`}
         aria-label="Agents sidebar"
@@ -158,24 +166,44 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
             onAddAgent={() => setShowCreateModal(true)}
           />
         ) : (
-          <AgentsExpandedPanel
-            agents={filteredAgents}
-            allAgents={agents}
-            allAgentCount={agents.length}
-            activeSubAgents={activeSubAgents}
-            filter={filter}
-            selectedAgent={selectedAgent}
-            connectingAgentId={connectingAgentId}
-            agentOpenClawSessions={agentOpenClawSessions}
-            onFilterChange={setFilter}
-            onCollapse={() => setIsCollapsed(true)}
-            onAddAgent={() => setShowCreateModal(true)}
-            onSelectAgent={(agent) => {
-              setSelectedAgent(agent);
-              setEditingAgent(agent);
-            }}
-            onConnectToOpenClaw={handleConnectToOpenClaw}
-          />
+          <>
+            {connectError && (
+              <div
+                role="alert"
+                className="m-2 flex items-start gap-2 rounded border border-mc-accent-red/40 bg-mc-accent-red/10 p-2 text-xs text-mc-text"
+              >
+                <p className="m-0 flex-1">
+                  Failed to connect {connectError.agentName} to OpenClaw: {connectError.message}
+                </p>
+                <button
+                  type="button"
+                  aria-label="Dismiss connection error"
+                  onClick={() => setConnectError(null)}
+                  className="rounded p-0.5 text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            <AgentsExpandedPanel
+              agents={filteredAgents}
+              allAgents={agents}
+              allAgentCount={agents.length}
+              activeSubAgents={activeSubAgents}
+              filter={filter}
+              selectedAgent={selectedAgent}
+              connectingAgentId={connectingAgentId}
+              agentOpenClawSessions={agentOpenClawSessions}
+              onFilterChange={setFilter}
+              onCollapse={() => setIsCollapsed(true)}
+              onAddAgent={() => setShowCreateModal(true)}
+              onSelectAgent={(agent) => {
+                setSelectedAgent(agent);
+                setEditingAgent(agent);
+              }}
+              onConnectToOpenClaw={handleConnectToOpenClaw}
+            />
+          </>
         )}
       </aside>
 
@@ -215,7 +243,7 @@ function AgentsCollapsedRail({
       >
         <ChevronRight className="w-4 h-4" />
       </button>
-      <div className="text-2xl" aria-hidden="true">🤖</div>
+      <Bot aria-hidden="true" className="w-5 h-5 text-mc-text-secondary" />
       <span className="rounded bg-mc-bg-tertiary px-2 py-0.5 text-xs text-mc-text-secondary">
         {agentCount}
       </span>
@@ -447,7 +475,7 @@ function AgentRow({
     >
       <button type="button" onClick={onSelect} className="w-full flex items-center gap-3 p-2 text-left">
         <div className="text-2xl relative">
-          {agent.avatar_emoji}
+          <EntityEmoji emoji={agent.avatar_emoji} hidden />
           {openclawSession && (
             <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />
           )}

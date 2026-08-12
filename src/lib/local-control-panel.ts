@@ -254,6 +254,8 @@ export function mapN8nSyncStatusToHealth(payload: unknown): LocalControlHealth {
   const summary = asRecord(latest.summary);
   const updated = asNumber(summary.updated);
   const errors = asNumber(summary.errors);
+  const driftWarnings = asNumber(summary.upstream_drift_warnings);
+  const statusReconciled = asNumber(summary.status_reconciled);
 
   if (!ok || alertLevel === 'error') {
     return {
@@ -263,11 +265,15 @@ export function mapN8nSyncStatusToHealth(payload: unknown): LocalControlHealth {
     };
   }
 
-  if (alertLevel === 'warning') {
+  // Read drift from the summary too so runs recorded before drift downgraded
+  // alert_level (historical rows with alert_level 'ok') still degrade the panel.
+  if (alertLevel === 'warning' || driftWarnings > 0) {
     return {
       state: 'limited',
       label: 'Warning',
-      detail: `${updated} updated; review latest sync warning.`,
+      detail: driftWarnings > 0 || statusReconciled > 0
+        ? `${updated} updated, ${statusReconciled} status reconciled, ${driftWarnings} upstream drift warning${driftWarnings === 1 ? '' : 's'}.`
+        : `${updated} updated; review latest sync warning.`,
     };
   }
 

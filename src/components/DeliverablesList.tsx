@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FileText, Link as LinkIcon, Package, ExternalLink, Eye } from 'lucide-react';
+import { FileText, Link as LinkIcon, Package, ExternalLink, Eye, X } from 'lucide-react';
 import { debug } from '@/lib/debug';
 import type { TaskDeliverable } from '@/lib/types';
 
@@ -14,84 +14,16 @@ interface DeliverablesListProps {
   taskId: string;
 }
 
-function getDeliverableIcon(type: string) {
-  switch (type) {
-    case 'file':
-      return <FileText className="w-5 h-5" />;
-    case 'url':
-      return <LinkIcon className="w-5 h-5" />;
-    case 'artifact':
-      return <Package className="w-5 h-5" />;
-    default:
-      return <FileText className="w-5 h-5" />;
-  }
-}
-
-async function handleOpen(deliverable: TaskDeliverable) {
-  // URLs open directly in new tab
-  if (deliverable.deliverable_type === 'url' && deliverable.path) {
-    window.open(deliverable.path, '_blank');
-    return;
-  }
-
-  // Files - try to open in Finder
-  if (deliverable.path) {
-    try {
-      debug.file('Opening file in Finder', { path: deliverable.path });
-      const res = await fetch('/api/files/reveal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: deliverable.path }),
-      });
-
-      if (res.ok) {
-        debug.file('Opened in Finder successfully');
-        return;
-      }
-
-      const error = await res.json();
-      debug.file('Failed to open', error);
-
-      if (res.status === 404) {
-        alert(`File not found:\n${deliverable.path}\n\nThe file may have been moved or deleted.`);
-      } else if (res.status === 403) {
-        alert(`Cannot open this location:\n${deliverable.path}\n\nPath is outside allowed directories.`);
-      } else {
-        throw new Error(error.error || 'Unknown error');
-      }
-    } catch (error) {
-      console.error('Failed to open file:', error);
-      // Fallback: copy path to clipboard
-      try {
-        await navigator.clipboard.writeText(deliverable.path);
-        alert(`Could not open Finder. Path copied to clipboard:\n${deliverable.path}`);
-      } catch {
-        alert(`File path:\n${deliverable.path}`);
-      }
-    }
-  }
-}
-
-function handlePreview(deliverable: TaskDeliverable) {
-  if (deliverable.path) {
-    debug.file('Opening preview', { path: deliverable.path });
-    window.open(`/api/files/preview?path=${encodeURIComponent(deliverable.path)}`, '_blank');
-  }
-}
-
-function formatTimestamp(timestamp: string) {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+interface OpenNotice {
+  tone: 'error' | 'info';
+  message: string;
+  path?: string;
 }
 
 export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const [deliverables, setDeliverables] = useState<TaskDeliverable[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openNotice, setOpenNotice] = useState<OpenNotice | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,12 +69,13 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const handleOpen = async (deliverable: TaskDeliverable) => {
     // URLs open directly in new tab
     if (deliverable.deliverable_type === 'url' && deliverable.path) {
-      window.open(deliverable.path, '_blank');
+      window.open(deliverable.path, '_blank', 'noopener');
       return;
     }
 
     // Files - try to open in Finder
     if (deliverable.path) {
+      setOpenNotice(null);
       try {
         debug.file('Opening file in Finder', { path: deliverable.path });
         const res = await fetch('/api/files/reveal', {
@@ -151,29 +84,45 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           body: JSON.stringify({ filePath: deliverable.path }),
         });
 
-        if (res.ok) {
-          debug.file('Opened in Finder successfully');
+        if (!res.ok) {
+          const error = await res.json();
+          debug.file('Failed to open', error);
+
+          if (res.status === 404) {
+            setOpenNotice({
+              tone: 'error',
+              message: 'File not found - it may have been moved or deleted.',
+              path: deliverable.path,
+            });
+          } else if (res.status === 403) {
+            setOpenNotice({
+              tone: 'error',
+              message: 'Cannot open this location - the path is outside the allowed directories.',
+              path: deliverable.path,
+            });
+          } else {
+            throw new Error(error.error || 'Unknown error');
+          }
           return;
         }
 
-        const error = await res.json();
-        debug.file('Failed to open', error);
-
-        if (res.status === 404) {
-          alert(`File not found:\n${deliverable.path}\n\nThe file may have been moved or deleted.`);
-        } else if (res.status === 403) {
-          alert(`Cannot open this location:\n${deliverable.path}\n\nPath is outside allowed directories.`);
-        } else {
-          throw new Error(error.error || 'Unknown error');
-        }
+        debug.file('Opened in Finder successfully');
       } catch (error) {
         console.error('Failed to open file:', error);
         // Fallback: copy path to clipboard
         try {
           await navigator.clipboard.writeText(deliverable.path);
-          alert(`Could not open Finder. Path copied to clipboard:\n${deliverable.path}`);
+          setOpenNotice({
+            tone: 'info',
+            message: 'Could not open the file manager. Path copied to clipboard:',
+            path: deliverable.path,
+          });
         } catch {
-          alert(`File path:\n${deliverable.path}`);
+          setOpenNotice({
+            tone: 'error',
+            message: 'Could not open the file manager. Copy the path manually:',
+            path: deliverable.path,
+          });
         }
       }
     }
@@ -207,7 +156,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   if (deliverables.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-4xl mb-2">📦</div>
+        <Package aria-hidden="true" className="w-10 h-10 mb-2" />
         <p>No deliverables yet</p>
       </div>
     );
@@ -215,6 +164,31 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
 
   return (
     <div className="space-y-3">
+      {openNotice && (
+        <div
+          role={openNotice.tone === 'error' ? 'alert' : 'status'}
+          className={`flex items-start gap-2 rounded-lg border p-3 text-sm text-mc-text ${
+            openNotice.tone === 'error'
+              ? 'border-mc-accent-red/40 bg-mc-accent-red/10'
+              : 'border-mc-border bg-mc-bg-tertiary'
+          }`}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="m-0">{openNotice.message}</p>
+            {openNotice.path && (
+              <p className="m-0 mt-1 break-all font-mono text-xs text-mc-text-secondary">{openNotice.path}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            aria-label="Dismiss notice"
+            onClick={() => setOpenNotice(null)}
+            className="rounded p-1 text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {deliverables.map((deliverable) => (
         <div
           key={deliverable.id}

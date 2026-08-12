@@ -76,45 +76,6 @@ export interface FactoryDispatchIdentity {
   task_revision: string;
 }
 
-export interface WebhookDispatchPayloadV2 {
-  event: 'mck.task.dispatch';
-  version: 2;
-  dispatch: FactoryDispatchIdentity;
-  task: WebhookDispatchPayload['task'];
-  agent: WebhookDispatchPayload['agent'];
-  callbacks: LifecycleCallbackUrls;
-  callback_urls: LifecycleCallbackUrls;
-  mission_control_url: string;
-  output_directory: string;
-  prompt_markdown: string;
-  issued_at: string;
-  factory_contract: {
-    schema_version: 'factory-task-envelope.v1';
-    envelope_id: string;
-    repository: {
-      slug: string;
-      owner: string;
-      name: string;
-      active_branch: 'dev';
-      base_sha: string;
-      allowed_file_scope: string[];
-    };
-    acceptance_criteria: string[];
-    test_requirements: string[];
-    risk_level: string;
-    review_mode: string;
-    impact: string;
-    rollback_plan: string;
-    safety_rules: string[];
-    limits: {
-      max_repair_attempts: 2;
-      concurrent_mutating_builders: 1;
-    };
-  };
-}
-
-export type AnyWebhookDispatchPayload = WebhookDispatchPayload | WebhookDispatchPayloadV2;
-
 export interface RuntimeAdapterDescriptor {
   type: AgentRuntimeType;
   label: string;
@@ -373,82 +334,6 @@ export function buildWebhookDispatchPayload(
       mode: 'auto',
     }),
     issued_at: issuedAt,
-  };
-}
-
-function parseRepositorySlug(task: Task) {
-  const targetRepo = task.dispatch_metadata?.target_repo?.trim();
-  const source = task.github_source;
-  const slug = targetRepo || (source ? `${source.repo_owner}/${source.repo_name}` : '');
-  const [owner = '', name = ''] = slug.split('/', 2);
-  return { slug, owner, name };
-}
-
-export function buildWebhookDispatchPayloadV2(
-  task: Task,
-  agent: Agent,
-  missionControlUrl: string,
-  issuedAt: string,
-  projectsPath: string,
-  dispatch: FactoryDispatchIdentity,
-  repositoryBaseSha: string,
-  repositoryPath?: string,
-): WebhookDispatchPayloadV2 {
-  const callbacks = buildLifecycleCallbackUrls(task.id, missionControlUrl);
-  const metadata = task.dispatch_metadata;
-  const repository = parseRepositorySlug(task);
-  return {
-    event: 'mck.task.dispatch',
-    version: 2,
-    dispatch,
-    task: {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      priority: task.priority,
-      due_date: task.due_date ?? null,
-      github_source: task.github_source,
-      dispatch_metadata: metadata,
-    },
-    agent: {
-      id: agent.id,
-      name: agent.name,
-      role: agent.role,
-      runtime_type: normalizeAgentRuntimeType(agent.runtime_type),
-    },
-    callbacks,
-    callback_urls: callbacks,
-    mission_control_url: missionControlUrl,
-    output_directory: repositoryPath ?? buildOutputDirectory(task, projectsPath),
-    prompt_markdown: buildManualHandoffPrompt({
-      task,
-      agent,
-      missionControlUrl,
-      projectsPath,
-      mode: 'auto',
-    }),
-    issued_at: issuedAt,
-    factory_contract: {
-      schema_version: 'factory-task-envelope.v1',
-      envelope_id: `factory:${dispatch.attempt_id}`,
-      repository: {
-        ...repository,
-        active_branch: 'dev',
-        base_sha: repositoryBaseSha,
-        allowed_file_scope: metadata?.allowed_file_scope ?? [],
-      },
-      acceptance_criteria: metadata?.acceptance_criteria ?? [],
-      test_requirements: metadata?.test_requirements ?? [],
-      risk_level: metadata?.risk_level ?? 'medium',
-      review_mode: metadata?.review_mode ?? 'human_required',
-      impact: metadata?.impact ?? '',
-      rollback_plan: metadata?.rollback_plan ?? '',
-      safety_rules: metadata?.safety_rules ?? [],
-      limits: {
-        max_repair_attempts: 2,
-        concurrent_mutating_builders: 1,
-      },
-    },
   };
 }
 

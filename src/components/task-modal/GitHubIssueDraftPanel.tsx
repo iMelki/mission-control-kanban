@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Github, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Github } from '@/components/icons/BrandIcons';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
 
 interface GitHubIssueDraftResponse {
   dry_run: boolean;
@@ -33,9 +35,7 @@ export function GitHubIssueDraftPanel({ taskId, fallbackTitle }: { taskId?: stri
   const [draftPayload, setDraftPayload] = useState<GitHubIssueDraftResponse | null>(null);
   const [applyResult, setApplyResult] = useState<GitHubIssueApplyResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [confirmationText, setConfirmationText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const loadDraft = async () => {
@@ -61,33 +61,27 @@ export function GitHubIssueDraftPanel({ taskId, fallbackTitle }: { taskId?: stri
     await navigator.clipboard.writeText(`# ${draft.title || fallbackTitle}\n\n${draft.body || ''}`);
   };
 
+  // Runs inside ActionReviewDialog: it only unlocks confirm once the operator
+  // has typed the server-issued phrase exactly, so the same phrase is what the
+  // route re-checks. A thrown error keeps the dialog open with the failure.
   const applyLiveIssue = async () => {
     if (!taskId) return;
-    setIsApplying(true);
     setError(null);
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/github-issue-draft`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dry_run: false, confirmation_text: confirmationText }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'GitHub issue create/update failed');
-      setApplyResult(payload);
-      setShowConfirm(false);
-      setConfirmationText('');
-      setDraftPayload(payload);
-    } catch (applyError) {
-      setError(applyError instanceof Error ? applyError.message : 'GitHub issue create/update failed');
-    } finally {
-      setIsApplying(false);
-    }
+    const response = await fetch(`/api/tasks/${taskId}/github-issue-draft`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dry_run: false, confirmation_text: draftPayload?.expected_confirmation ?? '' }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'GitHub issue create/update failed');
+    setApplyResult(payload);
+    setDraftPayload(payload);
   };
 
   const draft = draftPayload?.draft;
   const expected = draftPayload?.expected_confirmation || '';
-  const readyToApply = Boolean(draft && expected && confirmationText === expected);
-  const actionLabel = draftPayload?.action === 'update' ? 'Update GitHub issue' : 'Create GitHub issue';
+  const isUpdate = draftPayload?.action === 'update';
+  const actionLabel = isUpdate ? 'Update GitHub issue' : 'Create GitHub issue';
 
   return (
     <section className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm" aria-label="GitHub issue draft panel">
@@ -129,27 +123,29 @@ export function GitHubIssueDraftPanel({ taskId, fallbackTitle }: { taskId?: stri
         </div>
       )}
 
-      {showConfirm && draft && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg rounded-lg border border-mc-border bg-mc-bg-secondary p-4 shadow-xl">
-            <h4 className="text-base font-semibold">Confirm live GitHub mutation</h4>
-            <div className="mt-3 space-y-2 rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-50">
-              <p><strong>Plain English:</strong> This will {draftPayload.action === 'update' ? 'update an existing GitHub issue' : 'create a new GitHub issue'} in <strong>{draft.owner}/{draft.repo}</strong>.</p>
-              <p><strong>Risk:</strong> Medium — this mutates GitHub-visible issue state. It does not push code or change Project fields.</p>
-              <p><strong>Rollback:</strong> edit/close the created issue or revert the issue body in GitHub.</p>
-              <p><strong>Required phrase:</strong></p>
-              <code className="block break-words rounded bg-mc-bg px-2 py-1 text-xs text-mc-text">{expected}</code>
-            </div>
-            <label className="mt-3 block text-xs font-medium text-mc-text-secondary" htmlFor="github-issue-confirmation">Type confirmation phrase</label>
-            <input id="github-issue-confirmation" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value)} className="mt-1 w-full rounded border border-mc-border bg-mc-bg px-3 py-2 text-sm" />
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setShowConfirm(false)} className="rounded px-3 py-2 text-sm text-mc-text-secondary hover:text-mc-text">Cancel</button>
-              <button type="button" onClick={() => void applyLiveIssue()} disabled={!readyToApply || isApplying} className="inline-flex items-center gap-2 rounded bg-amber-400 px-3 py-2 text-sm font-medium text-mc-bg disabled:opacity-50">
-                {isApplying && <Loader2 className="size-4 animate-spin" />} {actionLabel}
-              </button>
-            </div>
-          </div>
-        </div>
+      {draft && (
+        <ActionReviewDialog
+          open={showConfirm}
+          onOpenChange={setShowConfirm}
+          title="Confirm live GitHub mutation"
+          confirmLabel={actionLabel}
+          pendingLabel={isUpdate ? 'Updating...' : 'Creating...'}
+          description={`Risk: medium - this mutates GitHub-visible issue state in ${draft.owner}/${draft.repo}. Rollback: edit or close the issue, or revert the issue body in GitHub.`}
+          typedConfirmation={{
+            expectedValue: expected,
+            inputLabel: 'Type the confirmation phrase',
+            hint: expected ? `Required phrase: ${expected}` : 'The draft did not return a confirmation phrase; reload the draft first.',
+          }}
+          consequences={{
+            immediateEffect: 'This review closes and the panel shows the resulting GitHub issue link.',
+            confirmedEffect: isUpdate
+              ? `MCK updates issue ${draft.owner}/${draft.repo}#${draft.issue_number} with the title, body, and labels shown in the draft above.`
+              : `MCK creates a new issue in ${draft.owner}/${draft.repo} with the title, body, and labels shown in the draft above.`,
+            resultLocation: `GitHub (${draft.owner}/${draft.repo}) and the "Applied to GitHub" line in this panel.`,
+            willNotHappen: 'No code is pushed, no GitHub Project field is changed, and no other issue is created or closed.',
+          }}
+          onConfirm={applyLiveIssue}
+        />
       )}
     </section>
   );

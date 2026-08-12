@@ -5,12 +5,14 @@ export function RuntimeActionsPanel({
   onDispatchDryRun,
   isPreviewingDispatch,
   dispatchDryRun,
+  dispatchDryRunError,
   disabled,
 }: {
   onApplyReadyChecklist: () => void;
   onDispatchDryRun: () => void | Promise<void>;
   isPreviewingDispatch: boolean;
   dispatchDryRun: Record<string, unknown> | null;
+  dispatchDryRunError?: Record<string, unknown> | null;
   disabled?: boolean;
 }) {
   return (
@@ -23,6 +25,12 @@ export function RuntimeActionsPanel({
           Preview manual/OpenClaw/webhook payloads without side effects.
         </ActionButton>
       </div>
+      {dispatchDryRunError && (
+        <div role="alert" className="rounded border border-mc-accent-red/40 bg-mc-accent-red/10 p-3 text-xs">
+          <span className="block font-semibold text-mc-text">Dispatch dry-run failed</span>
+          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-mc-bg p-3">{JSON.stringify(dispatchDryRunError, null, 2)}</pre>
+        </div>
+      )}
       {dispatchDryRun && (
         <details open className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-xs">
           <summary className="cursor-pointer font-semibold text-mc-text">Dispatch dry-run preview</summary>

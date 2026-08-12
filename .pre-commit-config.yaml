@@ -34,3 +34,10 @@ repos:
         pass_filenames: true
         require_serial: true
         files: ^(src|app|components|lib|hooks)/.*\.(ts|tsx|js|jsx|mjs|cjs)$
+
+      - id: component-sourcing-preflight
+        name: Component sourcing preflight
+        entry: node scripts/verify-component-sourcing-preflight.mjs
+        language: system
+        pass_filenames: false
+        files: ^(src/components/.*\.(tsx|jsx)|docs/preflight/(component-baseline\.json|records/.*\.md)|scripts/verify-component-sourcing-preflight\.mjs)$

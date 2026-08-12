@@ -7,6 +7,8 @@
 
 import { useEffect, useState } from 'react';
 import { Bot, CheckCircle, Circle, XCircle, Trash2, Check } from 'lucide-react';
+import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
+import { EntityEmoji } from '@/components/ui/EntityEmoji';
 
 interface SessionWithAgent {
   id: string;
@@ -122,21 +124,20 @@ export function SessionsList({ taskId }: SessionsListProps) {
     }
   };
 
+  // Runs inside ActionReviewDialog: a thrown error keeps the dialog open
+  // with the failure message instead of failing silently.
   const handleDelete = async (sessionId: string) => {
-    if (!confirm('Delete this sub-agent session?')) return;
-    try {
-      const res = await fetch(`/api/openclaw/sessions/${sessionId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        const refreshed = await fetch(`/api/tasks/${taskId}/subagent`);
-        if (refreshed.ok) {
-          const data = await refreshed.json();
-          setSessions(data);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to delete session:', error);
+    const res = await fetch(`/api/openclaw/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const payloadError = await res.json().catch(() => ({}));
+      throw new Error(payloadError.error || 'Failed to delete session');
+    }
+    const refreshed = await fetch(`/api/tasks/${taskId}/subagent`);
+    if (refreshed.ok) {
+      const data = await refreshed.json();
+      setSessions(data);
     }
   };
 
@@ -151,7 +152,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
   if (sessions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-mc-text-secondary">
-        <div className="text-4xl mb-2">🤖</div>
+        <Bot aria-hidden="true" className="w-10 h-10 mb-2" />
         <p>No sub-agent sessions yet</p>
       </div>
     );
@@ -166,11 +167,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
         >
           {/* Agent Avatar */}
           <div className="flex-shrink-0">
-            {session.agent_avatar_emoji ? (
-              <span className="text-2xl">{session.agent_avatar_emoji}</span>
-            ) : (
-              <Bot className="w-8 h-8 text-mc-accent" />
-            )}
+            <EntityEmoji emoji={session.agent_avatar_emoji} hidden className="text-2xl" />
           </div>
 
           {/* Content */}
@@ -220,14 +217,30 @@ export function SessionsList({ taskId }: SessionsListProps) {
                 <Check className="w-4 h-4" />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => handleDelete(session.openclaw_session_id)}
-              className="p-1.5 hover:bg-mc-bg-tertiary rounded text-red-500"
-              title="Delete session"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <ActionReviewDialog
+              title={`Delete ${session.agent_name || 'sub-agent'} session?`}
+              tone="destructive"
+              confirmLabel="Delete session"
+              pendingLabel="Deleting..."
+              trigger={
+                <button
+                  type="button"
+                  className="p-1.5 hover:bg-mc-bg-tertiary rounded text-red-500"
+                  title="Delete session"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              }
+              consequences={{
+                immediateEffect: 'The session entry is removed from this list.',
+                confirmedEffect:
+                  'The tracked session record is deleted; an auto-created Sub-Agent roster entry goes with it, while a regular agent is set back to idle.',
+                resultLocation: 'This Sessions tab and the agents sidebar.',
+                willNotHappen:
+                  'The task itself is not changed, and no running OpenClaw session is stopped by this delete.',
+              }}
+              onConfirm={() => handleDelete(session.openclaw_session_id)}
+            />
           </div>
         </div>
       ))}

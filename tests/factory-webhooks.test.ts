@@ -7,6 +7,11 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { NextRequest } from 'next/server';
+import {
+  canonicalFactoryDigest,
+  canonicalFactorySha256,
+  validateCanonicalFactoryTaskEnvelope,
+} from '../integrations/paperclip-bridge/src/contracts';
 
 process.env.MISSION_CONTROL_URL = 'http://127.0.0.1:3021';
 process.env.PROJECTS_PATH = 'S:/source/CCAI/Assistants';
@@ -34,6 +39,11 @@ let CallbackBodyReadError: typeof import('../src/lib/webhook-callback-operations
 let signHeaders: typeof import('../src/lib/webhook-signatures').buildSignedWebhookHeaders;
 let signPayload: typeof import('../src/lib/webhook-signatures').signWebhookPayload;
 let validateDispatchV2: typeof import('../src/lib/webhook-dispatch-schema').validateWebhookDispatchPayloadV2;
+let dispatchV2Schema: typeof import('../src/lib/webhook-dispatch-schema').webhookDispatchPayloadV2JsonSchema;
+let validateCallback: typeof import('../src/lib/webhook-callback-schema').validateWebhookCallbackPayload;
+let validateDispatchMetadata: typeof import('../src/lib/dispatch-contract').validateDispatchMetadata;
+let validateFactoryV2WorkContract: typeof import('../src/lib/dispatch-contract').validateFactoryV2WorkContract;
+let factoryWorkLimits: typeof import('../src/lib/dispatch-contract').FACTORY_V2_WORK_CONTRACT_LIMITS;
 
 test.before(async () => {
   const db = await import('../src/lib/db');
@@ -42,6 +52,7 @@ test.before(async () => {
   const callbackOperations = await import('../src/lib/webhook-callback-operations');
   const signatures = await import('../src/lib/webhook-signatures');
   const schema = await import('../src/lib/webhook-dispatch-schema');
+  const callbackSchema = await import('../src/lib/webhook-callback-schema');
   closeDb = db.closeDb;
   queryOne = db.queryOne;
   run = db.run;
@@ -55,6 +66,12 @@ test.before(async () => {
   signHeaders = signatures.buildSignedWebhookHeaders;
   signPayload = signatures.signWebhookPayload;
   validateDispatchV2 = schema.validateWebhookDispatchPayloadV2;
+  dispatchV2Schema = schema.webhookDispatchPayloadV2JsonSchema;
+  validateCallback = callbackSchema.validateWebhookCallbackPayload;
+  const dispatchContract = await import('../src/lib/dispatch-contract');
+  validateDispatchMetadata = dispatchContract.validateDispatchMetadata;
+  validateFactoryV2WorkContract = dispatchContract.validateFactoryV2WorkContract;
+  factoryWorkLimits = dispatchContract.FACTORY_V2_WORK_CONTRACT_LIMITS;
 });
 
 function resetDb() {
@@ -67,6 +84,7 @@ function resetDb() {
 
 function seedFactoryTask(webhookUrl?: string) {
   const now = new Date().toISOString();
+  run('UPDATE workspaces SET github_project_number = ? WHERE id = ?', [13, 'default']);
   run(
     `INSERT INTO agents (
       id, name, role, description, avatar_emoji, status, runtime_type, runtime_config,
@@ -148,11 +166,32 @@ function seedAcceptedAttempt() {
   assert.ok(agent);
   const revision = computeTaskRevision(task, agent, FACTORY_BASE_SHA);
   const now = new Date().toISOString();
+  const baseEnvelope = validFactoryDispatchPayload().factory_contract.envelope;
+  const envelope = {
+    ...baseEnvelope,
+    envelopeId: 'factory:attempt-factory-1',
+    correlationId: `mck:${task.workspace_id}:${task.id}`,
+    createdAtUtc: now,
+    origin: {
+      ...baseEnvelope.origin,
+      taskId: task.id,
+      attemptId: 'attempt-factory-1',
+      deliveryId: 'dispatch-attempt-factory-1',
+      taskRevisionSha256: `sha256:${revision}`,
+    },
+    repository: {
+      ...baseEnvelope.repository,
+      baseSha: FACTORY_BASE_SHA,
+      allowedPaths: ['src/**', 'tests/**', 'integrations/paperclip-bridge/**'],
+    },
+  };
+  const envelopeSha256 = canonicalFactorySha256(envelope);
   run(
     `INSERT INTO task_dispatch_attempts (
       id, task_id, agent_id, runtime_type, adapter_name, status, attempt_number, message,
-      delivery_id, correlation_id, task_revision, payload_hash, request_payload, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      delivery_id, correlation_id, task_revision, payload_hash, request_payload,
+      envelope_id, envelope_sha256, envelope_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'attempt-factory-1',
       task.id,
@@ -170,6 +209,8 @@ function seedAcceptedAttempt() {
         version: 2,
         factory_contract: {
           envelope_id: 'factory:attempt-factory-1',
+          envelope_sha256: envelopeSha256,
+          envelope,
           repository: {
             slug: 'iMelki/mission-control-kanban',
             base_sha: FACTORY_BASE_SHA,
@@ -177,6 +218,9 @@ function seedAcceptedAttempt() {
           },
         },
       }),
+      envelope.envelopeId,
+      envelopeSha256,
+      JSON.stringify(envelope),
       now,
       now,
     ]
@@ -185,22 +229,86 @@ function seedAcceptedAttempt() {
 }
 
 function validFactoryDispatchPayload() {
+  const issuedAt = new Date().toISOString();
+  const envelope = {
+    schemaVersion: 'agent-settings.factory-task-envelope.v1' as const,
+    envelopeId: 'factory:attempt-1',
+    correlationId: 'mck:default:task-0001',
+    createdAtUtc: issuedAt,
+    origin: {
+      source: 'github-project' as const,
+      taskId: 'task-0001',
+      attemptId: 'attempt-1',
+      deliveryId: 'delivery-1',
+      taskRevisionSha256: `sha256:${'a'.repeat(64)}`,
+      github: {
+        owner: 'iMelki' as const,
+        repository: 'mission-control-kanban',
+        issueNumber: 47,
+        projectNumber: 13,
+        projectItemId: 'PVTI_factory',
+      },
+    },
+    repository: {
+      path: 'S:/source/CCAI/Assistants/tools/mission-control-kanban',
+      slug: 'iMelki/mission-control-kanban',
+      originRemote: 'git@github.com:iMelki/mission-control-kanban.git',
+      branch: 'dev' as const,
+      baseSha: '9'.repeat(40),
+      allowedPaths: ['src/**'],
+    },
+    work: {
+      title: 'Factory task',
+      acceptanceCriteria: ['Ship the bridge'],
+      testRequirements: ['npm test'],
+      risk: 'high' as const,
+      reviewMode: 'pair-review' as const,
+      rollback: {
+        strategy: 'Revert the bridge',
+        verification: 'Verify the prior bridge remains healthy.',
+      },
+    },
+    execution: {
+      capabilityProfile: 'factory-builder',
+      maxRepairAttempts: 2,
+      timeoutSeconds: 3_600,
+      concurrentMutatingBuilders: 1 as const,
+      repositoryManifest: {
+        path: '.agentic-factory.json' as const,
+        sha256: `sha256:${'b'.repeat(64)}`,
+      },
+      callbacks: [{
+        kind: 'mck-lifecycle' as const,
+        url: 'http://127.0.0.1:3021/api/webhooks/agent-completion',
+        localOnly: true as const,
+        authenticationRef: 'secret:mck-webhook-callback-signature',
+      }],
+    },
+    privacy: {
+      containsSecrets: false as const,
+      containsDirectPersonalIdentifiers: false as const,
+      rawPrivateLogsIncluded: false as const,
+    },
+  };
   return {
     event: 'mck.task.dispatch',
     version: 2,
     dispatch: {
       attempt_id: 'attempt-1',
       delivery_id: 'delivery-1',
-      correlation_id: 'mck:default:task-1',
+      correlation_id: 'mck:default:task-0001',
       task_revision: 'a'.repeat(64),
     },
     task: {
-      id: 'task-1',
+      id: 'task-0001',
       title: 'Factory task',
       priority: 'high',
       github_source: {
         repo_owner: 'iMelki',
         repo_name: 'mission-control-kanban',
+        issue_number: 47,
+        issue_url: 'https://github.com/iMelki/mission-control-kanban/issues/47',
+        project_item_id: 'PVTI_factory',
       },
     },
     agent: {
@@ -226,7 +334,7 @@ function validFactoryDispatchPayload() {
     mission_control_url: 'http://127.0.0.1:3021',
     output_directory: 'S:/source/CCAI/Assistants/tools/mission-control-kanban',
     prompt_markdown: '# Work',
-    issued_at: new Date().toISOString(),
+    issued_at: issuedAt,
     factory_contract: {
       schema_version: 'factory-task-envelope.v1',
       envelope_id: 'factory:attempt-1',
@@ -249,6 +357,8 @@ function validFactoryDispatchPayload() {
         max_repair_attempts: 2,
         concurrent_mutating_builders: 1,
       },
+      envelope,
+      envelope_sha256: canonicalFactorySha256(envelope),
     },
   };
 }
@@ -346,6 +456,7 @@ test('migration 019 preserves callback deliveries while adding the processing st
       const migrationId = String(id).padStart(3, '0');
       markApplied.run(migrationId, `existing-${migrationId}`);
     }
+    markApplied.run('020', 'isolated-later-migration');
 
     runMigrations(migrationDb);
 
@@ -375,6 +486,62 @@ test('migration 019 preserves callback deliveries while adding the processing st
   }
 });
 
+test('migration 020 preserves dispatch rows while adding canonical envelope and receipt authority readback', () => {
+  const migrationPath = path.join(tmpDir, 'migration-020.db');
+  const migrationDb = new Database(migrationPath);
+  try {
+    migrationDb.exec(`
+      CREATE TABLE _migrations (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE TABLE task_dispatch_attempts (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        updated_at TEXT
+      );
+      INSERT INTO task_dispatch_attempts (id, task_id, status, updated_at)
+      VALUES ('attempt-existing-1', 'task-existing-1', 'success', '2026-08-08T00:00:00.000Z');
+    `);
+    const markApplied = migrationDb.prepare(
+      'INSERT INTO _migrations (id, name) VALUES (?, ?)'
+    );
+    for (let id = 1; id <= 19; id += 1) {
+      const migrationId = String(id).padStart(3, '0');
+      markApplied.run(migrationId, `existing-${migrationId}`);
+    }
+
+    runMigrations(migrationDb);
+
+    const columns = migrationDb.prepare('PRAGMA table_info(task_dispatch_attempts)').all() as Array<{ name: string }>;
+    for (const name of [
+      'envelope_id',
+      'envelope_sha256',
+      'envelope_json',
+      'receipt_schema_version',
+      'receipt_authority',
+      'receipt_sha256',
+    ]) {
+      assert.ok(columns.some((column) => column.name === name), `missing ${name}`);
+    }
+    assert.deepEqual(
+      migrationDb.prepare(
+        'SELECT id, task_id, status, updated_at FROM task_dispatch_attempts WHERE id = ?'
+      ).get('attempt-existing-1'),
+      {
+        id: 'attempt-existing-1',
+        task_id: 'task-existing-1',
+        status: 'success',
+        updated_at: '2026-08-08T00:00:00.000Z',
+      }
+    );
+  } finally {
+    migrationDb.close();
+  }
+});
+
 test('dispatch v2 persists its stable pending identity before network I/O and updates the same row', async () => {
   resetDb();
   let observedPayload: Record<string, unknown> | undefined;
@@ -384,12 +551,27 @@ test('dispatch v2 persists its stable pending identity before network I/O and up
     request.on('end', () => {
       observedPayload = JSON.parse(rawBody) as Record<string, unknown>;
       const dispatch = observedPayload.dispatch as Record<string, string>;
-      const pending = queryOne<{ id: string; status: string; delivery_id: string; payload_hash: string }>(
-        'SELECT id, status, delivery_id, payload_hash FROM task_dispatch_attempts WHERE id = ?',
+      const pending = queryOne<{
+        id: string;
+        status: string;
+        delivery_id: string;
+        payload_hash: string;
+        envelope_id: string;
+        envelope_sha256: string;
+        envelope_json: string;
+      }>(
+        `SELECT id, status, delivery_id, payload_hash,
+                envelope_id, envelope_sha256, envelope_json
+         FROM task_dispatch_attempts WHERE id = ?`,
         [dispatch.attempt_id]
       );
       assert.equal(pending?.status, 'retrying');
       assert.equal(pending?.delivery_id, dispatch.delivery_id);
+      const contract = observedPayload.factory_contract as Record<string, unknown>;
+      assert.equal(pending?.envelope_id, (contract.envelope as Record<string, unknown>).envelopeId);
+      assert.equal(pending?.envelope_sha256, contract.envelope_sha256);
+      assert.deepEqual(JSON.parse(pending?.envelope_json || '{}'), contract.envelope);
+      assert.equal(canonicalFactorySha256(JSON.parse(pending?.envelope_json || '{}')), pending?.envelope_sha256);
       assert.equal(request.headers['x-mck-delivery-id'], dispatch.delivery_id);
       assert.match(String(request.headers['x-mck-signature']), /^sha256=[a-f0-9]{64}$/);
       response.writeHead(202, { 'Content-Type': 'application/json' });
@@ -566,6 +748,14 @@ test('dispatch v2 validator binds both aliases to exact loopback URLs and canoni
     /callbacks\.lifecycle and callback_urls\.lifecycle must be identical/
   );
 
+  const hashDrift = structuredClone(valid);
+  hashDrift.factory_contract.envelope_sha256 = `sha256:${'0'.repeat(64)}`;
+  assert.match(validateDispatchV2(hashDrift).errors.join('; '), /canonical envelope hash/);
+
+  const workAliasDrift = structuredClone(valid);
+  workAliasDrift.factory_contract.acceptance_criteria = ['Ship an incompatible result'];
+  assert.match(validateDispatchV2(workAliasDrift).errors.join('; '), /compatibility aliases/);
+
   for (const lifecycle of [
     'http://localhost:3021/api/webhooks/agent-completion',
     'http://user@127.0.0.1:3021/api/webhooks/agent-completion',
@@ -716,6 +906,50 @@ test('callback body reader rejects oversized declared and chunked bodies before 
   assert.equal(chunked.status, 413);
 });
 
+test('callback body reader rejects a leading UTF-8 BOM before authentication', async () => {
+  const body = new Uint8Array(new ArrayBuffer(5));
+  body.set([0xef, 0xbb, 0xbf, 0x7b, 0x7d]);
+  await assert.rejects(
+    readBoundedCallbackBody({
+      headers: new Headers({ 'content-length': String(body.byteLength) }),
+      body: new ReadableStream<Uint8Array<ArrayBuffer>>({
+        start(controller) {
+          controller.enqueue(body);
+          controller.close();
+        },
+      }),
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof CallbackBodyReadError);
+      assert.equal(error.status, 400);
+      assert.match(error.message, /UTF-8 BOM/);
+      return true;
+    },
+  );
+});
+
+test('callback body reader rejects non-canonical UTF-8 before authentication', async () => {
+  const body = new Uint8Array(new ArrayBuffer(2)); // overlong encoding of '/'
+  body.set([0xc0, 0xaf]);
+  await assert.rejects(
+    readBoundedCallbackBody({
+      headers: new Headers({ 'content-length': String(body.byteLength) }),
+      body: new ReadableStream<Uint8Array<ArrayBuffer>>({
+        start(controller) {
+          controller.enqueue(body);
+          controller.close();
+        },
+      }),
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof CallbackBodyReadError);
+      assert.equal(error.status, 400);
+      assert.match(error.message, /valid UTF-8/);
+      return true;
+    },
+  );
+});
+
 test('callback body reader accepts signed chunked lifecycle bytes without changing HMAC input', async () => {
   resetDb();
   seedFactoryTask();
@@ -862,6 +1096,17 @@ test('lifecycle v2 binds callbacks to the dispatched agent and runtime configura
   const reconfigured = await sendLifecycle('started', accepted.revision, 'lifecycle-reconfigured');
   assert.equal(reconfigured.status, 409);
   assert.equal((await reconfigured.json()).reason, 'task_revision_stale');
+
+  resetDb();
+  seedFactoryTask();
+  accepted = seedAcceptedAttempt();
+  run(
+    'UPDATE task_dispatch_attempts SET envelope_sha256 = ? WHERE id = ?',
+    [`sha256:${'0'.repeat(64)}`, 'attempt-factory-1']
+  );
+  const tamperedEnvelope = await sendLifecycle('started', accepted.revision, 'lifecycle-envelope-tamper');
+  assert.equal(tamperedEnvelope.status, 409);
+  assert.equal((await tamperedEnvelope.json()).reason, 'dispatch_envelope_invalid');
 });
 
 test('lifecycle v2 advances started, testing, review, and receipt-proven completion', async () => {
@@ -881,13 +1126,14 @@ test('lifecycle v2 advances started, testing, review, and receipt-proven complet
   assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'review');
 
   const receipt = {
-    schemaVersion: 'agent-settings.factory-run-receipt.v1',
+    schemaVersion: 'agent-settings.factory-run-receipt.v2',
     receiptId: 'receipt-factory-1',
     envelopeId: 'factory:attempt-factory-1',
     correlationId: 'mck:default:task-factory-1',
     taskRevisionSha256: `sha256:${revision}`,
     status: 'succeeded',
     run: {
+      builderAgentId: 'builder-agent-1',
       paperclipIssueId: 'paperclip-issue-1',
       paperclipRunId: 'paperclip-run-1',
       workspaceId: 'paperclip-workspace-1',
@@ -906,6 +1152,14 @@ test('lifecycle v2 advances started, testing, review, and receipt-proven complet
       baseSha: FACTORY_BASE_SHA,
       headBeforeReleaseSha: '8'.repeat(40),
       candidateSnapshotSha256: `sha256:${'c'.repeat(64)}`,
+      expectedIndexTreeSha: 'b'.repeat(40),
+      expectedIndexEntries: [{
+        path: 'src/lib/dispatch-adapters.ts',
+        state: 'present',
+        mode: '100644',
+        blobOid: 'd'.repeat(40),
+      }],
+      modeEvidence: [],
       finalSha: 'a'.repeat(40),
       changedPaths: ['src/lib/dispatch-adapters.ts'],
     },
@@ -956,6 +1210,12 @@ test('lifecycle v2 advances started, testing, review, and receipt-proven complet
     },
     review: {
       reviewerId: 'reviewer-agent',
+      reviewerRunId: 'reviewer-run-1',
+      roleProfile: 'factory-independent-reviewer',
+      profileManifestSha256: `sha256:${'1'.repeat(64)}`,
+      effectiveConfigSha256: `sha256:${'2'.repeat(64)}`,
+      toolInventorySha256: `sha256:${'3'.repeat(64)}`,
+      sessionProvenanceSha256: `sha256:${'9'.repeat(64)}`,
       decision: 'accept',
       freshSession: true,
       builderSessionReused: false,
@@ -969,8 +1229,14 @@ test('lifecycle v2 advances started, testing, review, and receipt-proven complet
       remoteRef: 'refs/heads/dev',
       commitSha: 'a'.repeat(40),
       remoteReadbackSha: 'a'.repeat(40),
+      remoteReadbackTreeSha: 'b'.repeat(40),
       startedAtUtc: '2026-07-29T12:00:45.000Z',
       finishedAtUtc: '2026-07-29T12:01:00.000Z',
+      paperclipAgentId: 'integrator-agent-1',
+      paperclipRunId: 'integrator-run-1',
+      roleProfile: 'factory-integrator-release-steward',
+      effectiveConfigSha256: `sha256:${'2'.repeat(64)}`,
+      toolInventorySha256: `sha256:${'3'.repeat(64)}`,
     },
     publications: [],
     reconciliation: {
@@ -988,8 +1254,73 @@ test('lifecycle v2 advances started, testing, review, and receipt-proven complet
     },
     errors: [],
   };
+  // #136 CodeRabbit follow-up (PR #137 discussion r3744190622): the receipt
+  // validator used to build its `expected` identity out of the receipt under
+  // validation, so every comparison compared a field with itself and always
+  // passed. A caller-supplied identity must bind for real, and a wrong one
+  // must reject; omitting it must not imply a check that never runs.
+  const completionBody = JSON.parse(buildLifecycleBody('completed', revision, { receipt }));
+  const boundIdentity = {
+    envelopeId: 'factory:attempt-factory-1',
+    correlationId: 'mck:default:task-factory-1',
+    taskRevision: revision,
+    repositorySlug: 'iMelki/mission-control-kanban',
+    repositoryBaseSha: FACTORY_BASE_SHA,
+  };
+  assert.equal(validateCallback(completionBody).ok, true);
+  assert.equal(
+    validateCallback(completionBody, { expectedReceiptIdentity: boundIdentity }).ok,
+    true
+  );
+  for (const wrongIdentity of [
+    { ...boundIdentity, envelopeId: 'factory:attempt-someone-else' },
+    { ...boundIdentity, correlationId: 'mck:default:task-someone-else' },
+    { ...boundIdentity, taskRevision: 'e'.repeat(64) },
+    { ...boundIdentity, repositorySlug: 'iMelki/some-other-repo' },
+    { ...boundIdentity, repositoryBaseSha: 'f'.repeat(40) },
+  ]) {
+    const rejected = validateCallback(completionBody, { expectedReceiptIdentity: wrongIdentity });
+    assert.equal(rejected.ok, false, `expected identity ${JSON.stringify(wrongIdentity)} should reject`);
+  }
+
+  const legacyReceipt = structuredClone(receipt) as Record<string, unknown>;
+  legacyReceipt.schemaVersion = 'agent-settings.factory-run-receipt.v1';
+  delete (legacyReceipt.run as Record<string, unknown>).builderAgentId;
+  for (const key of ['expectedIndexTreeSha', 'expectedIndexEntries', 'modeEvidence']) {
+    delete (legacyReceipt.repository as Record<string, unknown>)[key];
+  }
+  for (const key of [
+    'reviewerRunId',
+    'roleProfile',
+    'profileManifestSha256',
+    'effectiveConfigSha256',
+    'toolInventorySha256',
+    'sessionProvenanceSha256',
+  ]) {
+    delete (legacyReceipt.review as Record<string, unknown>)[key];
+  }
+  for (const key of [
+    'remoteReadbackTreeSha',
+    'paperclipAgentId',
+    'paperclipRunId',
+    'roleProfile',
+    'effectiveConfigSha256',
+    'toolInventorySha256',
+  ]) {
+    delete (legacyReceipt.release as Record<string, unknown>)[key];
+  }
+  const legacyRead = validateCallback(JSON.parse(buildLifecycleBody('review', revision, {
+    receipt: legacyReceipt,
+  })));
+  assert.equal(legacyRead.ok, true);
+  assert.equal(legacyRead.normalized?.receipt_authority?.authority, 'v1-legacy-compatibility');
+  const legacyCompletion = validateCallback(JSON.parse(buildLifecycleBody('completed', revision, {
+    receipt: legacyReceipt,
+  })));
+  assert.equal(legacyCompletion.ok, false);
+  assert.match(legacyCompletion.errors.join('; '), /compatibility-read-only/);
   const missingRelease = await sendLifecycle('completed', revision, 'lifecycle-missing-release', {
-    receipt: { ...receipt, commands: receipt.commands.filter((command) => command.stage === 'validation') },
+    receipt: { ...receipt, release: { ...receipt.release, pushed: false } },
   });
   assert.equal(missingRelease.status, 400);
   const wrongBase = await sendLifecycle('completed', revision, 'lifecycle-wrong-base', {
@@ -1053,12 +1384,24 @@ test('lifecycle v2 advances started, testing, review, and receipt-proven complet
   const completed = await sendLifecycle('completed', revision, 'lifecycle-completed', { receipt });
   assert.equal(completed.status, 200);
   assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'done');
-  const attempt = queryOne<{ lifecycle_status: string; receipt_id: string; receipt_json: string }>(
-    'SELECT lifecycle_status, receipt_id, receipt_json FROM task_dispatch_attempts WHERE id = ?',
+  const attempt = queryOne<{
+    lifecycle_status: string;
+    receipt_id: string;
+    receipt_schema_version: string;
+    receipt_authority: string;
+    receipt_sha256: string;
+    receipt_json: string;
+  }>(
+    `SELECT lifecycle_status, receipt_id, receipt_schema_version,
+            receipt_authority, receipt_sha256, receipt_json
+     FROM task_dispatch_attempts WHERE id = ?`,
     ['attempt-factory-1']
   );
   assert.equal(attempt?.lifecycle_status, 'completed');
   assert.equal(attempt?.receipt_id, receipt.receiptId);
+  assert.equal(attempt?.receipt_schema_version, 'agent-settings.factory-run-receipt.v2');
+  assert.equal(attempt?.receipt_authority, 'v2-release-authority');
+  assert.equal(attempt?.receipt_sha256, canonicalFactoryDigest(receipt));
   assert.equal(JSON.parse(attempt?.receipt_json || '{}').repository.candidateSnapshotSha256, receipt.repository.candidateSnapshotSha256);
 
   const regression = await sendLifecycle('blocked', revision, 'lifecycle-after-completed');
@@ -1115,4 +1458,148 @@ test('lifecycle callbacks never regress a manually advanced board status', async
   const response = await sendLifecycle('started', revision, 'lifecycle-late-started');
   assert.equal(response.status, 200);
   assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'done');
+});
+
+type MutableEnvelopeWork = {
+  work: {
+    title: string;
+    acceptanceCriteria: string[];
+    testRequirements: string[];
+    rollback: { strategy: string; verification: string };
+  };
+};
+
+// #136 CodeRabbit follow-up (PR #137 discussion r3744190577): dispatch
+// pre-validation only checked field presence, so short work text reached the
+// canonical envelope and failed there with an opaque message. These cases pin
+// the mirrored bounds to the canonical validator so the two cannot drift.
+test('factory v2 work-contract pre-validation mirrors the canonical envelope validator', () => {
+  const limits = factoryWorkLimits;
+  const baseEnvelope = validFactoryDispatchPayload().factory_contract.envelope;
+  const mutated = (mutate: (envelope: MutableEnvelopeWork) => void) => {
+    const envelope = structuredClone(baseEnvelope) as unknown as MutableEnvelopeWork;
+    mutate(envelope);
+    return envelope;
+  };
+
+  // The unmodified fixture is inside every bound on both sides.
+  assert.doesNotThrow(() => validateCanonicalFactoryTaskEnvelope(baseEnvelope));
+  assert.deepEqual(
+    validateFactoryV2WorkContract(
+      {
+        acceptance_criteria: [...baseEnvelope.work.acceptanceCriteria],
+        test_requirements: [...baseEnvelope.work.testRequirements],
+        rollback_plan: baseEnvelope.work.rollback.strategy,
+      },
+      baseEnvelope.work.title
+    ),
+    []
+  );
+
+  const cases: Array<{
+    label: RegExp;
+    envelope: MutableEnvelopeWork;
+    mirrored: () => string[];
+  }> = [
+    {
+      label: /Task title must be /,
+      envelope: mutated((envelope) => { envelope.work.title = 'x'.repeat(limits.title.min - 1); }),
+      mirrored: () => validateFactoryV2WorkContract(undefined, 'x'.repeat(limits.title.min - 1)),
+    },
+    {
+      label: /Task title must be /,
+      envelope: mutated((envelope) => { envelope.work.title = 'x'.repeat(limits.title.max + 1); }),
+      mirrored: () => validateFactoryV2WorkContract(undefined, 'x'.repeat(limits.title.max + 1)),
+    },
+    {
+      label: /Acceptance criteria entry 1 must be /,
+      envelope: mutated((envelope) => {
+        envelope.work.acceptanceCriteria = ['x'.repeat(limits.acceptance_criteria.min - 1)];
+      }),
+      mirrored: () => validateFactoryV2WorkContract({
+        acceptance_criteria: ['x'.repeat(limits.acceptance_criteria.min - 1)],
+      }),
+    },
+    {
+      label: /Test requirements entry 1 must be /,
+      envelope: mutated((envelope) => {
+        envelope.work.testRequirements = ['x'.repeat(limits.test_requirements.min - 1)];
+      }),
+      mirrored: () => validateFactoryV2WorkContract({
+        test_requirements: ['x'.repeat(limits.test_requirements.min - 1)],
+      }),
+    },
+    {
+      label: /Rollback plan must be /,
+      envelope: mutated((envelope) => {
+        envelope.work.rollback.strategy = 'x'.repeat(limits.rollback_plan.min - 1);
+      }),
+      mirrored: () => validateFactoryV2WorkContract({
+        rollback_plan: 'x'.repeat(limits.rollback_plan.min - 1),
+      }),
+    },
+  ];
+
+  for (const testCase of cases) {
+    assert.throws(
+      () => validateCanonicalFactoryTaskEnvelope(testCase.envelope),
+      /work contract is invalid/,
+      `canonical envelope should reject ${testCase.label}`
+    );
+    const blockers = testCase.mirrored();
+    assert.equal(blockers.length, 1, `mirror should report exactly one blocker for ${testCase.label}`);
+    assert.match(blockers[0], testCase.label);
+  }
+});
+
+test('dispatch metadata validation keeps v1 semantics and opts into the v2 bounds', () => {
+  const metadata = {
+    target_repo: 'iMelki/mission-control-kanban',
+    project_workstream: 'factory',
+    allowed_file_scope: ['src/**'],
+    acceptance_criteria: ['tiny'],
+    test_requirements: ['npm test'],
+    risk_level: 'low' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'pair_review' as const,
+    impact: 'Bridge dispatch',
+    rollback_plan: 'Revert the scoped commit',
+  };
+
+  const v1 = validateDispatchMetadata(metadata);
+  assert.equal(v1.canDispatch, true, 'v1 dispatch has no length contract and must stay unchanged');
+
+  const v2 = validateDispatchMetadata(metadata, { factoryDispatchVersion: 2, taskTitle: 'Short' });
+  assert.equal(v2.canDispatch, false);
+  assert.match(v2.blockers.join('; '), /Task title must be 8-240 characters/);
+  assert.match(v2.blockers.join('; '), /Acceptance criteria entry 1 must be 8-1000 characters/);
+
+  const v2Ready = validateDispatchMetadata(
+    { ...metadata, acceptance_criteria: ['Bridge dispatch reaches the factory'] },
+    { factoryDispatchVersion: 2, taskTitle: 'Make bridge contracts v2-authoritative' }
+  );
+  assert.equal(v2Ready.canDispatch, true);
+});
+
+// #136 CodeRabbit follow-up (PR #137 discussion r3744190626): the published v2
+// schema pointed `envelope` at a mutable agent-settings `dev` branch URL, so an
+// external consumer's validation result could change with no MCK release.
+test('published dispatch v2 schema resolves every $ref locally', () => {
+  const serialized = JSON.stringify(dispatchV2Schema);
+  assert.equal(serialized.includes('raw.githubusercontent.com'), false);
+  assert.equal(
+    dispatchV2Schema.properties.factory_contract.properties.envelope.$ref,
+    '#/$defs/factory_task_envelope'
+  );
+  assert.equal(
+    dispatchV2Schema.$defs.factory_task_envelope.$id,
+    'https://mission-control-kanban.local/schemas/factory-task-envelope.v1.json'
+  );
+  for (const ref of serialized.match(/"\$ref":"[^"]+"/g) ?? []) {
+    assert.match(ref, /^"\$ref":"#\//, 'published schemas must not depend on a remote reference');
+  }
+  const work = dispatchV2Schema.$defs.factory_task_envelope.properties.work.properties;
+  assert.equal(work.title.minLength, factoryWorkLimits.title.min);
+  assert.equal(work.title.maxLength, factoryWorkLimits.title.max);
+  assert.equal(work.rollback.properties.strategy.minLength, factoryWorkLimits.rollback_plan.min);
 });

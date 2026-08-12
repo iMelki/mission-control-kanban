@@ -40,7 +40,7 @@ export function buildStageDefinitions(taskTitle: string): StageDefinition[] {
     {
       key: "release",
       title: `Release: ${taskTitle}`,
-      description: "Verify exact-path staging, commit and push dev, then publish factory-run-receipt.v1.",
+      description: "Verify exact-path staging, commit and push dev, then publish authoritative factory-run-receipt.v2.",
       assigneeConfigKey: "integratorAgentId",
       blockedBy: "review",
     },

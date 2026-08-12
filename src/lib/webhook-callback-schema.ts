@@ -1,4 +1,12 @@
 import { factoryPathValidationError } from '../../integrations/paperclip-bridge/src/factory-paths';
+import {
+  FACTORY_RUN_RECEIPT_V1_SCHEMA_VERSION,
+  FACTORY_RUN_RECEIPT_V2_SCHEMA_VERSION,
+  canonicalFactoryDigest,
+  projectFactoryReceiptAuthority,
+  validateReceipt as validateBridgeReceipt,
+  type FactoryReceiptAuthorityProjection,
+} from '../../integrations/paperclip-bridge/src/contracts';
 
 export type WebhookCallbackMode = 'direct' | 'session' | 'canonical';
 export type WebhookLifecycleStatus =
@@ -12,13 +20,16 @@ export type WebhookLifecycleStatus =
   | 'cancelled';
 
 export interface FactoryRunReceipt {
-  schemaVersion: 'agent-settings.factory-run-receipt.v1';
+  schemaVersion:
+    | 'agent-settings.factory-run-receipt.v1'
+    | 'agent-settings.factory-run-receipt.v2';
   receiptId: string;
   envelopeId: string;
   correlationId: string;
   taskRevisionSha256: string;
   status: 'succeeded';
   run: {
+    builderAgentId?: string;
     paperclipIssueId: string;
     paperclipRunId: string;
     workspaceId: string;
@@ -37,6 +48,9 @@ export interface FactoryRunReceipt {
     baseSha: string;
     headBeforeReleaseSha: string;
     candidateSnapshotSha256: string;
+    expectedIndexTreeSha?: string | null;
+    expectedIndexEntries?: Array<Record<string, unknown>>;
+    modeEvidence?: unknown[];
     finalSha: string;
     changedPaths: string[];
   };
@@ -72,6 +86,12 @@ export interface FactoryRunReceipt {
   };
   review: {
     reviewerId: string;
+    reviewerRunId?: string;
+    roleProfile?: string;
+    profileManifestSha256?: string;
+    effectiveConfigSha256?: string;
+    toolInventorySha256?: string;
+    sessionProvenanceSha256?: string;
     decision: 'accept';
     freshSession: true;
     builderSessionReused: false;
@@ -85,8 +105,14 @@ export interface FactoryRunReceipt {
     remoteRef: 'refs/heads/dev';
     commitSha: string;
     remoteReadbackSha: string;
+    remoteReadbackTreeSha?: string;
     startedAtUtc: string;
     finishedAtUtc: string;
+    paperclipAgentId?: string;
+    paperclipRunId?: string;
+    roleProfile?: string;
+    effectiveConfigSha256?: string;
+    toolInventorySha256?: string;
   };
   publications: Array<Record<string, unknown>>;
   reconciliation: {
@@ -114,6 +140,7 @@ export interface NormalizedWebhookCallback {
   correlation_id?: string;
   task_revision?: string;
   receipt?: FactoryRunReceipt;
+  receipt_authority?: FactoryReceiptAuthorityProjection;
   summary: string;
   status: WebhookLifecycleStatus;
   completed_at?: string;
@@ -235,7 +262,6 @@ export const webhookLifecycleCallbackPayloadJsonSchema = {
       },
     },
     receipt: {
-      $ref: 'https://raw.githubusercontent.com/iMelki/agent-settings/dev/shared/schemas/software-factory/factory-run-receipt.v1.schema.json',
       type: 'object',
       additionalProperties: false,
       required: [
@@ -260,7 +286,12 @@ export const webhookLifecycleCallbackPayloadJsonSchema = {
         'errors',
       ],
       properties: {
-        schemaVersion: { const: 'agent-settings.factory-run-receipt.v1' },
+        schemaVersion: {
+          enum: [
+            'agent-settings.factory-run-receipt.v1',
+            'agent-settings.factory-run-receipt.v2',
+          ],
+        },
         receiptId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$' },
         envelopeId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$' },
         correlationId: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$' },
@@ -300,20 +331,13 @@ export const webhookLifecycleCallbackPayloadJsonSchema = {
         },
         commands: {
           type: 'array',
-          minItems: 2,
+          minItems: 1,
           allOf: [
             {
               contains: {
                 type: 'object',
                 required: ['stage'],
                 properties: { stage: { const: 'validation' } },
-              },
-            },
-            {
-              contains: {
-                type: 'object',
-                required: ['stage'],
-                properties: { stage: { const: 'release' } },
               },
             },
           ],
@@ -416,12 +440,21 @@ export const webhookLifecycleCallbackPayloadJsonSchema = {
   allOf: [
     {
       if: { properties: { status: { const: 'completed' } } },
-      then: { required: ['receipt'] },
+      then: {
+        required: ['receipt'],
+        properties: {
+          receipt: {
+            properties: {
+              schemaVersion: { const: 'agent-settings.factory-run-receipt.v2' },
+            },
+          },
+        },
+      },
     },
   ],
 } as const;
 
-function validateFactoryReceipt(value: unknown, errors: string[]): value is FactoryRunReceipt {
+function validateFactoryReceiptV1(value: unknown, errors: string[]): value is FactoryRunReceipt {
   const idPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$/;
   const digestPattern = /^sha256:[a-f0-9]{64}$/;
   const gitShaPattern = /^[a-f0-9]{40}$/;
@@ -537,7 +570,6 @@ function validateFactoryReceipt(value: unknown, errors: string[]): value is Fact
     !Array.isArray(value.commands)
     || value.commands.length === 0
     || !value.commands.some((command) => isObject(command) && command.stage === 'validation')
-    || !value.commands.some((command) => isObject(command) && command.stage === 'release')
     || value.commands.length > 256
     || value.commands.some((command) => (
       !isObject(command)
@@ -744,7 +776,96 @@ function validateFactoryReceipt(value: unknown, errors: string[]): value is Fact
   return errors.length === 0;
 }
 
-export function validateWebhookCallbackPayload(payload: unknown): WebhookCallbackValidationResult {
+/**
+ * Identity a caller already knows from the persisted dispatch it accepted.
+ * Supplying it is what makes receipt validation a real binding check; without
+ * it the validator only proves the receipt is internally well-formed, and the
+ * caller stays responsible for binding it to a dispatch.
+ */
+export interface ExpectedFactoryReceiptIdentity {
+  envelopeId: string;
+  correlationId: string;
+  /** Bare 64-hex task revision, without the `sha256:` prefix. */
+  taskRevision: string;
+  repositorySlug: string;
+  repositoryBaseSha: string;
+  allowedFileScope?: string[];
+}
+
+function validateFactoryReceipt(
+  value: unknown,
+  errors: string[],
+  requireAuthoritativeCompletion: boolean,
+  expectedIdentity?: ExpectedFactoryReceiptIdentity,
+): { receipt?: FactoryRunReceipt; authority?: FactoryReceiptAuthorityProjection } {
+  if (!isObject(value)) {
+    errors.push(requireAuthoritativeCompletion
+      ? 'completed lifecycle callbacks require receipt proof'
+      : 'receipt must be an object when provided');
+    return {};
+  }
+  if (value.schemaVersion === FACTORY_RUN_RECEIPT_V1_SCHEMA_VERSION) {
+    const valid = validateFactoryReceiptV1(value, errors);
+    if (valid && requireAuthoritativeCompletion) {
+      errors.push('factory-run-receipt v1 is compatibility-read-only; completed requires v2 release authority');
+    }
+    if (!valid) return {};
+    return {
+      receipt: value as unknown as FactoryRunReceipt,
+      authority: {
+        schemaVersion: FACTORY_RUN_RECEIPT_V1_SCHEMA_VERSION,
+        authority: 'v1-legacy-compatibility',
+        receiptId: String(value.receiptId),
+        status: String(value.status),
+        canonicalSha256: canonicalFactoryDigest(value),
+        validationSucceeded: false,
+        independentReviewAccepted: false,
+        remoteCommitReadbackVerified: false,
+        privacyVerified: false,
+      },
+    };
+  }
+  if (value.schemaVersion !== FACTORY_RUN_RECEIPT_V2_SCHEMA_VERSION) {
+    errors.push('receipt.schemaVersion must be a supported factory-run-receipt version');
+    return {};
+  }
+  try {
+    // Only a caller-supplied identity can bind this receipt to a dispatch. The
+    // previous `expected` object was read back out of `value` itself, so every
+    // comparison compared a field with itself and always passed; passing
+    // undefined states honestly that no identity binding runs here. The v1
+    // rejection that `requireAuthoritativeCompletion` used to carry is already
+    // enforced by the v1 branch above, which this line is only reached past.
+    const receipt = validateBridgeReceipt(
+      value,
+      expectedIdentity
+        ? { ...expectedIdentity, requireAuthoritativeCompletion }
+        : undefined,
+    );
+    return {
+      receipt: receipt as FactoryRunReceipt,
+      authority: projectFactoryReceiptAuthority(receipt),
+    };
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : 'receipt v2 release authority is invalid');
+    return {};
+  }
+}
+
+export interface WebhookCallbackValidationOptions {
+  /**
+   * Identity of the dispatch this callback is claimed to answer, read from
+   * persistence by the caller. When supplied, a completed v2 receipt must match
+   * it; when omitted, the caller keeps sole responsibility for that binding
+   * (the agent-completion route does this in `lifecycleRejection`).
+   */
+  expectedReceiptIdentity?: ExpectedFactoryReceiptIdentity;
+}
+
+export function validateWebhookCallbackPayload(
+  payload: unknown,
+  options?: WebhookCallbackValidationOptions,
+): WebhookCallbackValidationResult {
   const errors: string[] = [];
   if (!isObject(payload)) {
     return { ok: false, errors: ['Payload must be a JSON object'] };
@@ -796,8 +917,14 @@ export function validateWebhookCallbackPayload(payload: unknown): WebhookCallbac
         errors.push('error must include bounded code and message fields');
       }
     }
-    if (payload.status === 'completed') {
-      validateFactoryReceipt(payload.receipt, errors);
+    let receiptValidation: ReturnType<typeof validateFactoryReceipt> = {};
+    if (payload.receipt !== undefined || payload.status === 'completed') {
+      receiptValidation = validateFactoryReceipt(
+        payload.receipt,
+        errors,
+        payload.status === 'completed',
+        options?.expectedReceiptIdentity,
+      );
       if (isObject(payload.receipt)) {
         if (payload.receipt.correlationId !== payload.correlation_id) {
           errors.push('receipt.correlationId must match callback correlation_id');
@@ -822,7 +949,8 @@ export function validateWebhookCallbackPayload(payload: unknown): WebhookCallbac
         summary: String(payload.summary),
         status: payload.status as WebhookLifecycleStatus,
         completed_at: String(payload.occurred_at),
-        receipt: payload.receipt as FactoryRunReceipt | undefined,
+        receipt: receiptValidation.receipt,
+        receipt_authority: receiptValidation.authority,
         raw: payload,
       },
     };

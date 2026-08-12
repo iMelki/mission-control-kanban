@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lucide-react';
 import { Header } from '@/components/Header';
+import { presentMckN8nSyncRun } from '@/lib/n8n-sync-presentation';
 import type { MckN8nSyncRun, MckN8nSyncStatusResponse } from '@/lib/types';
 
 const SYNC_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -23,12 +24,23 @@ function formatDate(value?: string): string {
     return 'unknown time';
   }
 
+  // react-doctor-disable-next-line -- Client-only operator page; run timestamps render in the operator's locale on purpose.
   return SYNC_DATE_FORMATTER.format(parsed);
 }
 
 function formatCount(value: unknown): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatReconciliationSuffix(summary: Record<string, unknown>): string {
+  const statusReconciled = formatCount(summary.status_reconciled);
+  const driftWarnings = formatCount(summary.upstream_drift_warnings);
+  if (statusReconciled === 0 && driftWarnings === 0) {
+    return '';
+  }
+
+  return `, ${statusReconciled} status reconciled, ${driftWarnings} upstream drift warning${driftWarnings === 1 ? '' : 's'}`;
 }
 
 function formatWorkspaces(run: MckN8nSyncRun): string {
@@ -61,12 +73,12 @@ export default function N8nSyncHistoryPage() {
 
     try {
       const response = await fetch('/api/n8n/mck-sync-status?limit=25');
-      const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load n8n sync history');
+        const errorPayload = await response.json().catch(() => null);
+        throw new Error(errorPayload?.error || 'Failed to load n8n sync history');
       }
 
-      setStatus(payload);
+      setStatus(await response.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load n8n sync history');
     } finally {
@@ -80,7 +92,7 @@ export default function N8nSyncHistoryPage() {
 
   const latest = status?.latest ?? null;
   const latestSummary = (latest?.summary ?? {}) as Record<string, unknown>;
-  const latestHasAlert = Boolean(latest && (!latest.ok || latest.alert_level === 'error'));
+  const latestPresentation = latest ? presentMckN8nSyncRun(latest) : null;
 
   return (
     <div className="min-h-screen bg-mc-bg">
@@ -125,12 +137,14 @@ export default function N8nSyncHistoryPage() {
             <div>
               <div className="text-xs uppercase text-mc-text-secondary">Latest result</div>
               <div className="mt-1 flex items-center gap-2 font-medium">
-                {latestHasAlert ? (
+                {latestPresentation?.state === 'error' ? (
                   <AlertTriangle className="size-4 text-rose-300" />
+                ) : latestPresentation?.state === 'warning' ? (
+                  <AlertTriangle className="size-4 text-amber-300" />
                 ) : (
                   <CheckCircle2 className="size-4 text-emerald-300" />
                 )}
-                {latest ? (latestHasAlert ? 'Attention needed' : 'OK') : 'No runs'}
+                {latestPresentation?.label ?? 'No runs'}
               </div>
             </div>
             <div>
@@ -144,7 +158,7 @@ export default function N8nSyncHistoryPage() {
             <div>
               <div className="text-xs uppercase text-mc-text-secondary">Latest counts</div>
               <div className="mt-1 font-medium">
-                {formatCount(latestSummary.scanned_items)} scanned, {formatCount(latestSummary.updated)} updated, {formatCount(latestSummary.errors)} errors
+                {formatCount(latestSummary.scanned_items)} scanned, {formatCount(latestSummary.updated)} updated, {formatCount(latestSummary.errors)} errors{formatReconciliationSuffix(latestSummary)}
               </div>
             </div>
           </div>
@@ -171,7 +185,12 @@ export default function N8nSyncHistoryPage() {
               ) : status?.history.length ? (
                 status.history.map((run) => {
                   const summary = (run.summary ?? {}) as Record<string, unknown>;
-                  const hasAlert = !run.ok || run.alert_level === 'error';
+                  const presentation = presentMckN8nSyncRun(run);
+                  const alertClassName = presentation.state === 'error'
+                    ? 'px-4 py-3 align-top text-rose-200'
+                    : presentation.state === 'warning'
+                      ? 'px-4 py-3 align-top text-amber-200'
+                      : 'px-4 py-3 align-top text-emerald-200';
                   return (
                     <tr key={run.id} className="bg-mc-bg hover:bg-mc-bg-secondary/70">
                       <td className="px-4 py-3 align-top">
@@ -184,12 +203,12 @@ export default function N8nSyncHistoryPage() {
                       </td>
                       <td className="px-4 py-3 align-top">{formatWorkspaces(run)}</td>
                       <td className="px-4 py-3 align-top">
-                        {formatCount(summary.scanned_items)} scanned, {formatCount(summary.imported)} imported, {formatCount(summary.updated)} updated, {formatCount(summary.errors)} errors
+                        {formatCount(summary.scanned_items)} scanned, {formatCount(summary.imported)} imported, {formatCount(summary.updated)} updated, {formatCount(summary.errors)} errors{formatReconciliationSuffix(summary)}
                       </td>
-                      <td className={hasAlert ? 'px-4 py-3 align-top text-rose-200' : 'px-4 py-3 align-top text-emerald-200'}>
+                      <td className={alertClassName}>
                         <div className="flex items-center gap-2">
-                          {hasAlert ? <AlertTriangle className="size-4" /> : <CheckCircle2 className="size-4" />}
-                          {run.alert_level}
+                          {presentation.state === 'ok' ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
+                          {presentation.label}
                         </div>
                         {run.alert_message && (
                           <div className="mt-1 max-w-xl text-xs text-mc-text-secondary">{run.alert_message}</div>
