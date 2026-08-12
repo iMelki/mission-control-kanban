@@ -8,6 +8,17 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
+- [#141 - Scheduled n8n sync carries a hardcoded workspace list](https://github.com/iMelki/mission-control-kanban/issues/141)
+  - Follow-up from #140. Every recorded run in `n8n_sync_runs.workspaces` is
+    `["assistants","memsys","content-factory","asimtop"]`, and it includes
+    `asimtop` despite `github_project_auto_refresh = 0`, so the list is
+    n8n-side and is not derived from the `workspaces` table.
+  - `frontend-revenue` therefore refreshes only through the manual **Sync now**
+    control until the workflow is changed inside the n8n instance.
+  - Recommended: have the workflow read project-backed workspaces from
+    `GET /api/workspaces` and gate inclusion on `github_project_auto_refresh`,
+    so a new workspace joins the cadence by existing rather than by hand-edit.
+
 - [#136 - Make bridge contracts v2-authoritative and byte-safe](https://github.com/iMelki/mission-control-kanban/issues/136)
   - Bounded byte-safety/redaction slice completed on 2026-08-08: diagnostic
     strings now recursively scrub embedded URL queries, Bearer/HMAC signatures,
