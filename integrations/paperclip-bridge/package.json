@@ -16,7 +16,7 @@
     "ui": "./dist/ui/"
   },
   "paperclipHostCompatibility": {
-    "testedCommit": "c5a4ba43368439f5e05c1c7f5cdf74758a2f8a53",
+    "testedCommit": "aeff5ddaf25e861f2bbff5d5840be417866cae3a",
     "testedFiles": [
       {
         "path": "server/src/services/plugin-database.ts",

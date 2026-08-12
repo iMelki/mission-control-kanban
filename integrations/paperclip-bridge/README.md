@@ -12,10 +12,12 @@ graph, and returns signed lifecycle evidence to MCK and Mission Control.
   `021ab2f08e07463b038c3d1472f227d2d5f68ca4`. `package-lock.json` pins both
   file dependencies and their npm integrity values; adjacent provenance
   records pin their SHA-256 digests and source paths.
-- Host API validated against that exact owned commit and plugin SDK/API
-  version `1.0.0`; validation fails closed on any host SHA mismatch even when
-  partial file attestations are present. Do not replace the tarballs with a moving canary or a
-  registry package without a fresh compatibility review and Worker RPC test.
+- Host migrations and policy were revalidated against clean owned Paperclip
+  `dev` commit `aeff5ddaf25e861f2bbff5d5840be417866cae3a` while retaining the
+  vendored SDK/API version `1.0.0`. Validation fails closed on any host SHA
+  mismatch even when partial file attestations are present. Do not replace the
+  tarballs with a moving canary or a registry package without a fresh
+  compatibility review and Worker RPC test.
 - `npm audit` reports
   [GHSA-3pw3-v88x-xj24](https://github.com/advisories/GHSA-3pw3-v88x-xj24)
   because the owned `@paperclipai/shared` package still carries the historical

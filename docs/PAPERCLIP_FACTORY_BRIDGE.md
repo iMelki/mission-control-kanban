@@ -132,6 +132,13 @@ that exact source. This avoids both a moving canary and a stale registry
 `@paperclipai/shared` artifact. Replacing either tarball requires a fresh
 compatibility review and Worker RPC test.
 
+The host compatibility gate is separately pinned to the clean, owned
+Paperclip `dev` commit
+`aeff5ddaf25e861f2bbff5d5840be417866cae3a`. Exact-SHA migration and policy
+validation passed against that checkout; the retained file attestation is
+additive evidence and cannot bypass a host-SHA mismatch. This is source
+compatibility evidence only, not installed-runtime or release acceptance.
+
 The retained upstream package version causes `npm audit` to classify both the
 SDK and shared runtime under
 [GHSA-3pw3-v88x-xj24](https://github.com/advisories/GHSA-3pw3-v88x-xj24).

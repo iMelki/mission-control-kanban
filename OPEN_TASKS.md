@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-10
+Last updated: 2026-08-12
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -69,7 +69,11 @@ the local operator entrypoint; historical task notes remain in
 
 
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
-  - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`; the canonical checkout is now non-bare, clean, unlocked, and aligned with `origin/dev` at `625cec7e1e92972523e43516bb0a2bea50f0b774`.
+  - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge
+    commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`. PR #137 follow-ups are
+    present on remote `dev` at `893918e95e98dc61147c8cea1483d2757a8d9255`;
+    issue #46 is closed with natural Runtime Regression and cleanup receipts,
+    so it is no longer a scheduler gate for this bridge.
   - Local implementation now provides opt-in dispatch v2 with a
     pending-before-send attempt, stable attempt/delivery/correlation/revision
     IDs, raw-body HMAC, replay conflict detection, lifecycle v2 callbacks, and
@@ -99,9 +103,21 @@ the local operator entrypoint; historical task notes remain in
     do not replace the canonical checkout unless topology regresses.
   - Host compatibility is now fail-closed on the exact `testedCommit` even
     when a partial `testedFiles` attestation is present; the mismatch case is
-    covered by `tests/host-compatibility.spec.ts`. The current host remains
-    intentionally blocked until an owner-approved SHA from a clean, reviewed
-    checkout matches the package metadata.
+    covered by `tests/host-compatibility.spec.ts`. The package metadata and
+    focused migration proof now match clean, owned Paperclip `dev` commit
+    `aeff5ddaf25e861f2bbff5d5840be417866cae3a`. This clears the source
+    compatibility gate only. Live acceptance remains blocked by Paperclip's
+    unmerged reproducible-lock review, unintegrated Job Object custody for both
+    local launch paths, absent governed signing-secret bindings and configured
+    webhook agents, stopped local services, plugin installation, signed health
+    ping, one real dispatch, and the reconciled end-to-end receipt.
+  - Post-runtime UI acceptance: add a `Factory custody & signed-bridge
+    readiness` section only after the runtime gates clear. Reuse MCK's existing
+    Radix/TanStack/Card composition and `ActionReviewDialog` with zero new
+    packages; show secret-safe booleans and freshness, link to
+    `/runtime-regression`, and route consequential actions through the review
+    dialog. Require desktop/mobile, keyboard, axe, RTL, and reduced-motion
+    proof before acceptance.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.

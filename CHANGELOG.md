@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Pinned bridge host compatibility to the reviewed Paperclip dev tip
+  (2026-08-12, #47/#135)** - The installable bridge now requires clean owned
+  Paperclip commit `aeff5ddaf25e861f2bbff5d5840be417866cae3a` and keeps the
+  exact-SHA gate fail-closed when additive file attestations are present.
+  Focused migration validation covers that exact host; installed signed
+  ping/dispatch/receipt acceptance remains separately gated.
+
 - **Migrated all six modal overlays onto the owned dialog primitives (2026-08-11, #139)** -
   `AgentModal`, `TaskModal`, `GitHubImportModal`, and the create-workspace form
   now render through the vendored shadcn/Radix `Dialog`, and the

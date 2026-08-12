@@ -401,7 +401,7 @@ describe("MCK Paperclip bridge", () => {
       "file:vendor/paperclipai-plugin-sdk-1.0.0-021ab2f08e07463b038c3d1472f227d2d5f68ca4.tgz",
     );
     expect(packageJson.paperclipHostCompatibility).toMatchObject({
-      testedCommit: "c5a4ba43368439f5e05c1c7f5cdf74758a2f8a53",
+      testedCommit: "aeff5ddaf25e861f2bbff5d5840be417866cae3a",
       pluginSdkApi: "1.0.0",
       vendoredSdkSha256: tarballSha256,
       vendoredSharedSha256: sharedTarballSha256,
