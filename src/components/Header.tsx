@@ -116,19 +116,28 @@ export function Header({ workspace }: HeaderProps) {
         >
           {format(currentTime, 'HH:mm:ss')}
         </span>
+        {/*
+          Below sm the badge collapses to its dot so the workspace title keeps the
+          width instead of being truncated to a few characters (#142). The state
+          stays announced through the accessible name, so nothing is lost.
+        */}
         <div
-          className={`flex items-center gap-2 px-3 py-1 rounded border text-sm font-medium ${
+          role="status"
+          aria-label={isOnline ? 'Connection online' : 'Connection offline'}
+          title={isOnline ? 'ONLINE' : 'OFFLINE'}
+          className={`flex items-center gap-2 px-2 sm:px-3 py-1 rounded border text-sm font-medium ${
             isOnline
               ? 'bg-mc-accent-green/20 border-mc-accent-green text-mc-accent-green'
               : 'bg-mc-accent-red/20 border-mc-accent-red text-mc-accent-red'
           }`}
         >
           <span
+            aria-hidden="true"
             className={`w-2 h-2 rounded-full ${
               isOnline ? 'bg-mc-accent-green animate-pulse' : 'bg-mc-accent-red'
             }`}
           />
-          {isOnline ? 'ONLINE' : 'OFFLINE'}
+          <span className="hidden sm:inline">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
         </div>
         <button
               type="button"
