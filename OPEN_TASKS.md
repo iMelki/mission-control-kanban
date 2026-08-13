@@ -34,10 +34,18 @@ the local operator entrypoint; historical task notes remain in
     plus `surfaces:check`, reached by `.git/hooks/pre-push` via git-toolkit
     `pre-push-quality.ps1`. No CI job was added. Reachability confirmed with
     `git rev-parse --git-path hooks/pre-push` (`core.hooksPath` unset).
-  - Open follow-up: a `capturedAt` record can go stale silently. The gate checks
-    that a capture happened, not that it happened recently or at a commit that
-    still touches the surface. A staleness ratchet (re-capture required when a
-    surface's own source changes after `capturedAt.commit`) is the next step.
+  - Landed in `a9a274c` on `origin/dev`; closed. Duplicate report #146 was
+    self-closed by its author.
+  - Open follow-up, tracked as #147: a `capturedAt` record can go stale
+    silently. The gate checks that a capture happened, not that it happened at a
+    commit that still reflects the surface. A staleness ratchet (re-capture
+    required when a surface's own source changes after `capturedAt.commit`) is
+    the next step, and belongs in the same free pre-push layer.
+
+- [#147 - Captured-surface gate accepts a stale capture](https://github.com/iMelki/mission-control-kanban/issues/147)
+  - Follow-up to #144 and the known remaining hole in it. `capturedAt` is never
+    invalidated, so a surface can drift back to unmeasured while the gate stays
+    green - the original #142 failure shape, one level up.
 
 - [#145 - /settings clips 17 elements at 1440px](https://github.com/iMelki/mission-control-kanban/issues/145)
   - Live shipped defect, found by the first ever capture of `/settings`. Rooted
