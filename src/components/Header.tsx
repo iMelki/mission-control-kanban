@@ -51,30 +51,35 @@ export function Header({ workspace }: HeaderProps) {
   const tasksInQueue = tasks.filter((t) => t.status !== 'done' && t.status !== 'review').length;
 
   return (
-    <header className="h-14 bg-mc-bg-secondary border-b border-mc-border flex items-center justify-between px-4">
+    <header className="h-14 bg-mc-bg-secondary border-b border-mc-border flex items-center justify-between gap-2 px-4">
       {/* Left: Logo & Title */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+        <div className="flex items-center gap-2 shrink-0">
           <Zap className="w-5 h-5 text-mc-accent-cyan" />
-          <span className="font-semibold text-mc-text uppercase tracking-wider text-sm">
+          {/* The wordmark is redundant with the workspace title at phone widths (#142). */}
+          <span className="hidden sm:inline font-semibold text-mc-text uppercase tracking-wider text-sm">
             Mission Control
           </span>
         </div>
 
         {/* Workspace indicator or back to dashboard */}
         {workspace ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Link
               href="/"
-              className="flex items-center gap-1 text-mc-text-secondary hover:text-mc-accent transition-colors"
+              className="flex items-center gap-1 shrink-0 text-mc-text-secondary hover:text-mc-accent transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               <LayoutGrid className="w-4 h-4" />
             </Link>
-            <span className="text-mc-text-secondary">/</span>
-            <div className="flex items-center gap-2 px-3 py-1 bg-mc-bg-tertiary rounded">
+            <span className="text-mc-text-secondary shrink-0">/</span>
+            <div className="flex items-center gap-2 min-w-0 px-3 py-1 bg-mc-bg-tertiary rounded">
               <EntityEmoji emoji={workspace.icon} kind="workspace" hidden className="text-lg" />
-              <span className="font-medium">{workspace.name}</span>
+              {/*
+                The cockpit had no h1 at all before #142; the workspace name is the
+                page title, so it carries the heading role for this route.
+              */}
+              <h1 className="text-heading text-base truncate">{workspace.name}</h1>
             </div>
           </div>
         ) : (
@@ -104,8 +109,11 @@ export function Header({ workspace }: HeaderProps) {
       )}
 
       {/* Right: Time & Status */}
-      <div className="flex items-center gap-4">
-        <span className="text-mc-text-secondary text-sm font-mono" suppressHydrationWarning>
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+        <span
+          className="hidden sm:inline text-mc-text-secondary text-sm font-mono"
+          suppressHydrationWarning
+        >
           {format(currentTime, 'HH:mm:ss')}
         </span>
         <div

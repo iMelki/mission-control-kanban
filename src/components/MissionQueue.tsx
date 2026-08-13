@@ -240,14 +240,16 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+    // min-w-0 lets the board shrink inside the lg row instead of being crushed to a
+    // 0px content box; the mobile min-height keeps the stacked board usable (#142).
+    <div className="flex-1 min-w-0 min-h-[60vh] lg:min-h-0 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="p-3 border-b border-mc-border flex items-center justify-between">
+      <div className="p-3 border-b border-mc-border flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <ChevronRight className="size-4 text-mc-text-secondary" />
           <span className="text-sm font-medium uppercase tracking-wider">Mission Queue</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <GitHubConnectionStatus />
           <button
             type="button"

@@ -1,12 +1,29 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-12
+Last updated: 2026-08-13
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
+
+- [#142 - Frontend Revenue cockpit reflow and heading role](https://github.com/iMelki/mission-control-kanban/issues/142)
+  - Reflow and heading-role fixes are landed and browser-proven; the derivable
+    captured-surface gate (`docs/captured-surfaces.json`,
+    `scripts/derive-captured-surfaces.ts`, `npm run test:captured-surfaces`) is
+    wired into `npm test`.
+  - **Open, operator decision:** the issue's acceptance criterion asks for a
+    computed `font-family` on `h1` that differs from body. The app has chosen
+    exactly one typeface (JetBrains Mono, loaded as a variable font by
+    `next/font/google`). Satisfying that criterion literally means adopting a
+    second family, which is a typeface decision rather than an engineering fix.
+    Shipped instead: a weight and tracking heading role on the existing family,
+    per the issue's own stated alternative. Adopting a display family remains
+    available if the operator wants it.
+  - Follow-up worth considering: `/workspace/memsys` was also never in the
+    surface list. It is listed now, but it has still never been captured, so its
+    state is unmeasured rather than known-good.
 
 - [#141 - Scheduled n8n sync carries a hardcoded workspace list](https://github.com/iMelki/mission-control-kanban/issues/141)
   - Follow-up from #140. Every recorded run in `n8n_sync_runs.workspaces` is

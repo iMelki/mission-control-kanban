@@ -80,9 +80,11 @@ export function LiveFeed() {
   });
 
   return (
+    // Below lg this rail is a full-width stacked section with a bounded height;
+    // from lg up it returns to the fixed-width side rail (#142).
     <aside
-      className={`shrink-0 bg-mc-bg-secondary border-l border-mc-border flex flex-col overflow-hidden ${
-        isCollapsed ? 'w-12' : 'w-80'
+      className={`shrink-0 bg-mc-bg-secondary border-t lg:border-t-0 lg:border-l border-mc-border flex flex-col overflow-hidden w-full max-h-[45vh] lg:max-h-none ${
+        isCollapsed ? 'lg:w-12' : 'lg:w-80'
       }`}
       aria-label="Live feed sidebar"
     >

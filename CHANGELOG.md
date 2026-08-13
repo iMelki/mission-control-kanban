@@ -11,6 +11,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Captured-surface list derived from the app's real routes (2026-08-13, #142)** -
+  `docs/captured-surfaces.json` now records a capture decision for every route the
+  app serves, and `scripts/derive-captured-surfaces.ts` derives that list from the
+  App Router tree (`src/app/**/page.tsx`) plus the existing workspace registry
+  (`GITHUB_PROJECT_WORKSPACE_MAPPINGS`) and fails when the two disagree. Wired into
+  `npm test` as `test:captured-surfaces`. The surface list used by the UI/UX scoring
+  programme had been a hand-maintained claim: `/workspace/frontend-revenue` shipped
+  in `690a5fb` and never entered it, so the cockpit was scored without ever being
+  looked at. On its first run the new gate found a second never-listed cockpit,
+  `/workspace/memsys`. A newly added route now fails the check until someone records
+  `capture: "required"`, or `"excluded"` with a reason.
+
+### Fixed
+
+- **Workspace cockpits reflow at phone widths (2026-08-13, #142)** -
+  Below `lg` the board row stacked its two fixed-width rails (`w-64` + `w-80` =
+  576px) beside the board inside a 390px viewport, which crushed `MissionQueue` to a
+  0px content box: 1636px of board sat inside a 24px flex child, and the board was
+  unreachable on a phone. The rails are now full-width bounded-height sections that
+  return to side rails from `lg` up, the board carries `min-w-0`, and the header and
+  queue toolbar shrink and wrap instead of clipping mid-word. The `agents` and
+  `activity` sections got the same treatment. This is a WCAG 1.4.10 (Reflow) fix and
+  it applies to every `/workspace/[slug]` cockpit, not only Frontend Revenue.
+- **Cockpit headings have a role of their own (2026-08-13, #142)** -
+  The cockpit rendered no `h1` at all outside its not-found state, so there was no
+  top-level heading to carry hierarchy. The workspace name is now the route's `h1`,
+  and `h1`-`h6` pick up an explicit weight and tracking role in `globals.css`. The
+  role is expressed on the axes the already-chosen typeface provides - JetBrains Mono
+  is loaded by `next/font/google` as a variable font across the 100-800 weight axis -
+  rather than by introducing a second family, which would be a new typeface decision
+  for the operator to make rather than an engineering fix.
+
 - **Frontend Revenue cockpit workspace bound to GitHub Project #15 (2026-08-12, #140)** -
   Migration `021` seeds a `frontend-revenue` workspace mapped to
   `iMelki` project `#15` (Frontend Revenue Program 2026), the largest active

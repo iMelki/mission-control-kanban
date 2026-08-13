@@ -499,16 +499,19 @@ export default function WorkspacePage() {
 
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
         {section === 'board' && (
-          <div className="flex flex-1 min-h-0 overflow-hidden">
+          // Below lg the two fixed-width rails (w-64 + w-80 = 576px) exceed a 390px
+          // viewport and squeeze MissionQueue to a 0px content box, so the cockpit
+          // stacks into a single scrolling column instead (#142, WCAG 1.4.10).
+          <div className="flex flex-col lg:flex-row flex-1 min-w-0 min-h-0 overflow-y-auto lg:overflow-hidden">
             <AgentsSidebar workspaceId={workspace.id} />
             <MissionQueue workspaceId={workspace.id} />
             <LiveFeed />
           </div>
         )}
         {section === 'agents' && (
-          <div className="flex h-full overflow-hidden">
+          <div className="flex flex-col lg:flex-row h-full min-w-0 overflow-y-auto lg:overflow-hidden">
             <AgentsSidebar workspaceId={workspace.id} />
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 min-w-0 overflow-auto p-4">
               <RuntimeAuditPanel />
             </div>
           </div>
@@ -520,8 +523,8 @@ export default function WorkspacePage() {
           </div>
         )}
         {section === 'activity' && (
-          <div className="flex h-full overflow-hidden">
-            <div className="flex-1 overflow-auto p-4">
+          <div className="flex flex-col lg:flex-row h-full min-w-0 overflow-y-auto lg:overflow-hidden">
+            <div className="flex-1 min-w-0 overflow-auto p-4">
               <DispatchFailureQueue workspaceId={workspace.id} />
             </div>
             <LiveFeed />

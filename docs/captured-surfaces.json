@@ -1,0 +1,54 @@
+{
+  "description": "Surfaces that the UI/UX scoring programme must capture. Derived from the App Router tree (src/app/**/page.tsx) and the workspace registry (GITHUB_PROJECT_WORKSPACE_MAPPINGS in src/lib/github-project-sync.ts). Verified by scripts/derive-captured-surfaces.ts, which fails when the app serves a route this file does not list. See mission-control-kanban#142.",
+  "viewports": [
+    { "label": "mobile", "width": 390, "height": 844 },
+    { "label": "desktop", "width": 1440, "height": 900 }
+  ],
+  "surfaces": [
+    {
+      "route": "/",
+      "capture": "required",
+      "note": "Workspace dashboard and app entry point."
+    },
+    {
+      "route": "/n8n-sync-history",
+      "capture": "required",
+      "note": "n8n MCK sync history table."
+    },
+    {
+      "route": "/runtime-regression",
+      "capture": "required",
+      "note": "Runtime regression evidence page."
+    },
+    {
+      "route": "/settings",
+      "capture": "required",
+      "note": "Global settings."
+    },
+    {
+      "route": "/workspace/assistants",
+      "capture": "required",
+      "note": "Assistants cockpit (GitHub Project #13)."
+    },
+    {
+      "route": "/workspace/memsys",
+      "capture": "required",
+      "note": "MemSys cockpit (GitHub Project #12). Found by the derivation gate on its first run: this cockpit had never been in the surface list either."
+    },
+    {
+      "route": "/workspace/content-factory",
+      "capture": "required",
+      "note": "Content Factory cockpit (GitHub Project #14)."
+    },
+    {
+      "route": "/workspace/asimtop",
+      "capture": "required",
+      "note": "Asimtop cockpit (GitHub Project #8)."
+    },
+    {
+      "route": "/workspace/frontend-revenue",
+      "capture": "required",
+      "note": "Frontend Revenue cockpit (GitHub Project #15). Added to this list by #142 after shipping in 690a5fb without ever being captured."
+    }
+  ]
+}

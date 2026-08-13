@@ -36,6 +36,41 @@ body {
   color: var(--mc-text);
 }
 
+/*
+ * Heading role (#142).
+ *
+ * The app has already chosen exactly one typeface: JetBrains Mono, loaded as a
+ * variable font by `next/font/google` in src/app/layout.tsx with the full
+ * 100-800 weight axis available. Introducing a second family would be a new
+ * typeface decision, so the heading role is expressed on the axes the chosen
+ * font already provides: a heavier real weight cut plus tighter tracking.
+ * Body text stays 400/normal, so headings no longer rest on size alone.
+ *
+ * These are element selectors on purpose (specificity 0,0,1): any component
+ * that needs a different weight can still override with a Tailwind utility.
+ */
+:root {
+  --mc-heading-weight: 700;
+  --mc-heading-tracking: -0.02em;
+  --mc-body-weight: 400;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--mc-heading-weight);
+  letter-spacing: var(--mc-heading-tracking);
+}
+
+/* Explicit opt-in for headings that also carry sizing utilities. */
+.text-heading {
+  font-weight: var(--mc-heading-weight);
+  letter-spacing: var(--mc-heading-tracking);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
