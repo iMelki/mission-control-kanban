@@ -27,6 +27,26 @@ const config: Config = {
       fontFamily: {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
+      // fleet-motion-primitive v1.0.0 (agent-settings shared/assets/motion-primitive).
+      // The tokens themselves live on :root in globals.css; these keys are the
+      // Tailwind v3 consumption path, so `duration-fast` / `ease-standard` are real
+      // utilities instead of tokens nothing can reference. The v4 `@theme` variant in
+      // the primitive's README does not apply here - this app is Tailwind 3.4.
+      // Durations resolve through var(), so the reduced-motion block collapses these
+      // utilities too rather than only the hand-written CSS.
+      transitionDuration: {
+        instant: 'var(--duration-instant)',
+        fast: 'var(--duration-fast)',
+        slow: 'var(--duration-slow)',
+        slower: 'var(--duration-slower)',
+      },
+      transitionTimingFunction: {
+        // Only `standard` is added. The primitive's --ease-out / --ease-in are
+        // verbatim Tailwind defaults, so `ease-out` / `ease-in` already carry the
+        // canonical curves and remapping them would add a var() failure mode for no
+        // change in value.
+        standard: 'var(--ease-standard)',
+      },
     },
   },
   plugins: [],

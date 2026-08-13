@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Adopted the canonical fleet motion primitive (2026-08-13, #142)** -
+  `globals.css` now carries `fleet-motion-primitive` v1.0.0 verbatim from
+  `agent-settings shared/assets/motion-primitive/motion.css`: four duration tokens,
+  three easing tokens, and the two-layer `prefers-reduced-motion` contract. Nothing
+  was re-derived; the app previously had **no motion tokens at all** and exactly one
+  `motion-reduce:` utility in all of `src/`, against 50 animated and 481 transitioned
+  elements on a single measured route. The tokens live on `:root` rather than in an
+  `@theme` block because this app is Tailwind 3.4 - `@theme` is the v4 variant of the
+  primitive and would be inert here - and `tailwind.config.ts` maps them to named
+  `duration-fast` / `ease-standard` utilities so they are consumable rather than
+  declared-and-unreferenced. Layer B of the contract is what makes the adoption a
+  paste instead of a rewrite: it reaches the 481 call sites still using Tailwind's
+  hardcoded `transition`, so those can migrate to tokens incrementally. Durations
+  collapse to `0.01ms`, never `0`, because CSS Transitions Level 1 requires a
+  non-zero combined duration before a transition is created at all - at `0s`
+  `transitionend` never fires. Proven with the primitive's own recipe
+  (`Test-ReducedMotionCollapse.ps1`), which reported `fail`/`tokens-missing` before
+  this change and `pass` after.
+
 - **Captured-surface list derived from the app's real routes (2026-08-13, #142)** -
   `docs/captured-surfaces.json` now records a capture decision for every route the
   app serves, and `scripts/derive-captured-surfaces.ts` derives that list from the
@@ -25,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Settings header reflows at phone widths (2026-08-13, #142)** -
+  Found by measuring every derived route at 390px rather than only the route the
+  issue named. The `/settings` header put its title group and its action group in one
+  non-wrapping `justify-between` row: 504px of content in a 342px content box, 114px
+  clipped with no scroller and no ellipsis. The row now wraps, so the actions drop to
+  their own line. Same class of defect as the cockpit reflow below, on a route that
+  fix did not touch - and the only route in the app still clipping at 390px.
 - **Workspace cockpits reflow at phone widths (2026-08-13, #142)** -
   Below `lg` the board row stacked its two fixed-width rails (`w-64` + `w-80` =
   576px) beside the board inside a 390px viewport, which crushed `MissionQueue` to a

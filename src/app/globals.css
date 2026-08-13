@@ -18,6 +18,34 @@
   --mc-accent-cyan: #39d353;
 }
 
+/*
+ * fleet-motion-primitive v1.0.0 - BLOCK 1 (tokens).
+ *
+ * Canonical source: agent-settings shared/assets/motion-primitive/motion.css,
+ * standard id `fleet-motion-primitive` in shared/catalog/promoted-standards-register.json.
+ * Adopted verbatim - not re-derived. Every value is an exact reuse (80ms and 360ms
+ * from paperclip, 140ms and 240ms plus --ease-standard from the memsys web-console,
+ * --ease-out / --ease-in are Tailwind's own defaults).
+ *
+ * This app is Tailwind 3.4, so the tokens go on :root, not in an `@theme` block -
+ * `@theme` is the v4 variant of the primitive and would be inert here. The Tailwind
+ * consumption path is tailwind.config.ts (`duration-fast`, `ease-standard`).
+ *
+ * Semantics pick the step, not size:
+ *   instant - a state flips with no travel      fast - hover / focus / press
+ *   slow    - something moves or resizes        slower - a large surface
+ */
+:root {
+  --duration-instant: 80ms;
+  --duration-fast: 140ms;
+  --duration-slow: 240ms;
+  --duration-slower: 360ms;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -147,6 +175,12 @@ h6 {
   50% { opacity: 0.7; }
 }
 
+/*
+ * Deliberately NOT tokenised. 2s is an ambient breathing loop, not one of the four
+ * interaction steps, and forcing it onto --duration-slower (360ms) would change the
+ * design rather than adopt a token. Block 2 still reaches it: the blanket sweep sets
+ * animation-iteration-count to 1, which is what actually stops an infinite loop.
+ */
 .animate-pulse-soft {
   animation: pulse-soft 2s ease-in-out infinite;
 }
@@ -162,11 +196,58 @@ h6 {
   }
 }
 
+/* Something moves and resizes into place, so this is the `slow` step (0.2s -> 240ms). */
 .animate-slide-in {
-  animation: slide-in 0.2s ease-out;
+  animation: slide-in var(--duration-slow) var(--ease-out);
 }
 
 /* Glow effect for online status */
 .online-glow {
   box-shadow: 0 0 10px var(--mc-accent-green), 0 0 20px var(--mc-accent-green);
+}
+
+/*
+ * fleet-motion-primitive v1.0.0 - BLOCK 2 (the reduced-motion contract).
+ *
+ * MUST stay the last motion rule in this file so it wins on source order at equal
+ * specificity, and must sit after `@tailwind utilities` so it also outranks the
+ * generated duration/transition utilities.
+ *
+ * Layer A collapses the tokens themselves - it reaches every rule and every
+ * `duration-fast` utility that resolves through var(), and it is what JS sees from
+ * getComputedStyle().getPropertyValue().
+ *
+ * Layer B is the blanket sweep for what Layer A structurally cannot reach: the 481
+ * elements in this app still carrying Tailwind's hardcoded `transition` (150ms) and
+ * `animate-spin` / `animate-pulse`, none of which reference a token yet. Without
+ * Layer B, adopting this would have meant rewriting every one of those call sites
+ * first; with it, the migration to named tokens can proceed incrementally.
+ *
+ * 0.01ms, NOT 0. CSS Transitions Level 1 requires the combined duration to be
+ * greater than 0s for a transition to be created at all; at 0s `transitionend` never
+ * fires and any JS awaiting it hangs. paperclip already paid for that bug.
+ *
+ * `data-motion-essential` is the WCAG 2.3.3 escape hatch for motion that carries
+ * information (progress that would otherwise read as frozen) - never for decoration.
+ */
+@media (prefers-reduced-motion: reduce) {
+  /* Layer A - collapse the tokens. */
+  :root {
+    --duration-instant: 0.01ms;
+    --duration-fast: 0.01ms;
+    --duration-slow: 0.01ms;
+    --duration-slower: 0.01ms;
+  }
+
+  /* Layer B - sweep everything the tokens cannot reach. */
+  *:where(:not([data-motion-essential], [data-motion-essential] *)),
+  *:where(:not([data-motion-essential], [data-motion-essential] *))::before,
+  *:where(:not([data-motion-essential], [data-motion-essential] *))::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

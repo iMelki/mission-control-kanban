@@ -51,8 +51,14 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-mc-bg">
       {/* Header */}
       <div className="border-b border-mc-border bg-mc-bg-secondary">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        {/*
+          The title group and the action group together measure 504px, so at 390px they
+          overflowed the 342px content box by 114px with no scroller and no ellipsis -
+          the same class of defect as #142, on a route that fix did not touch. Wrapping
+          lets the action group drop to its own line instead of being clipped.
+        */}
+        <div className="max-w-4xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={() => router.push('/')}
