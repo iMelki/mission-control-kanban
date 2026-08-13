@@ -6,6 +6,11 @@ GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues
 
 ## Active Issues
 
+- [#143 - Migrate hardcoded durations onto the adopted motion tokens](https://github.com/iMelki/mission-control-kanban/issues/143)
+  - Goal: retire the app's dependence on Layer B of the reduced-motion contract. `362e448` adopted
+    `fleet-motion-primitive` v1.0.0 and the tokens are proven, but 481 transitions still use
+    Tailwind's hardcoded `transition` and the named `duration-*` utilities have zero call sites.
+    Incremental; the proof recipe must stay `pass` after each batch.
 - [#6 - Surface readiness, review mode, risk, and dispatch blockers in the Kanban UI](https://github.com/iMelki/mission-control-kanban/issues/6)
   - Goal: surface the repo and task dispatch signals operators need before they take write actions from the Kanban UI.
 - [#7 - Use relevant skills for market research, competitor analysis, and monetization planning](https://github.com/iMelki/mission-control-kanban/issues/7)
