@@ -21,9 +21,31 @@ the local operator entrypoint; historical task notes remain in
     Shipped instead: a weight and tracking heading role on the existing family,
     per the issue's own stated alternative. Adopting a display family remains
     available if the operator wants it.
-  - Follow-up worth considering: `/workspace/memsys` was also never in the
-    surface list. It is listed now, but it has still never been captured, so its
-    state is unmeasured rather than known-good.
+  - Resolved by #144: `/workspace/memsys` and the other five never-captured
+    required surfaces are now measured and carry `capturedAt` records.
+
+- [#144 - Captured-surface gate is fail-open](https://github.com/iMelki/mission-control-kanban/issues/144)
+  - Landed: runtime validation of the parsed manifest closes all four holes
+    (missing `capture`, misspelled value, blanket `excluded` with a placeholder
+    reason, and `required` + never-captured). Each has a negative fixture
+    asserting its specific problem `code`, and each was re-run against the real
+    repo to confirm it exits 1.
+  - Wired on the free local layer only: `npm test` -> `test:captured-surfaces`
+    plus `surfaces:check`, reached by `.git/hooks/pre-push` via git-toolkit
+    `pre-push-quality.ps1`. No CI job was added. Reachability confirmed with
+    `git rev-parse --git-path hooks/pre-push` (`core.hooksPath` unset).
+  - Open follow-up: a `capturedAt` record can go stale silently. The gate checks
+    that a capture happened, not that it happened recently or at a commit that
+    still touches the surface. A staleness ratchet (re-capture required when a
+    surface's own source changes after `capturedAt.commit`) is the next step.
+
+- [#145 - /settings clips 17 elements at 1440px](https://github.com/iMelki/mission-control-kanban/issues/145)
+  - Live shipped defect, found by the first ever capture of `/settings`. Rooted
+    in `RuntimeConfigTemplateGallery.tsx:61`: an env-diagnostic badge is a single
+    unbreakable token wider than its grid column, with no `min-w-0`, no
+    `break-all`, and no ellipsis. Desktop-only; 390px measures clean.
+  - Not fixed. Invisible to page-level probes because `globals.css` clamps
+    `html, body` with `max-width: 100vw; overflow-x: hidden`.
 
 - [#141 - Scheduled n8n sync carries a hardcoded workspace list](https://github.com/iMelki/mission-control-kanban/issues/141)
   - Follow-up from #140. Every recorded run in `n8n_sync_runs.workspaces` is

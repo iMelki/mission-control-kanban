@@ -9,7 +9,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Closed four fail-open holes in the captured-surface gate (2026-08-13, #144)** -
+  `scripts/derive-captured-surfaces.ts` validated that a manifest *entry* existed, not
+  that a capture *decision* was valid. `CaptureDecision` is a compile-time union;
+  `JSON.parse` returns `any`, so the `as CapturedSurfaceManifest` cast asserted a shape
+  nothing checked. Four mutations of `docs/captured-surfaces.json` each exited **0**
+  against the real repo with the unit suite green: (a) deleting an entry's `capture`
+  field, (b) `capture: "excludedd"` - which also dodged the missing-reason check,
+  because that check string-matched the exact literal `'excluded'` - (c) flipping every
+  cockpit to `excluded` with `reason: "x"`, and (d) `capture: "required"` on a surface
+  nobody had ever captured. A positive control (removing an entry outright) exited 1
+  first, so the holes are not a dead probe. Every check now validates the parsed value
+  at runtime and reports a stable problem `code`, so tests assert the specific reason
+  rather than "something failed". Exclusions need a substantive `reason` (placeholders
+  such as `"x"`/`"TBD"` rejected) plus an `excludedBy` tracking reference; `required`
+  needs a `capturedAt` record naming a full 40-hex commit, an ISO date, the viewport
+  labels covered, and the method used, or an explicit `captureDeferred` carrying a
+  reason and an issue. A manifest that requires nothing now fails as `programme_empty`.
+  The header comment claimed the gate "fails until someone records a capture DECISION"
+  when it failed only until someone recorded an ENTRY; corrected. Re-run against the
+  hardened gate, all four mutations exit 1 with their specific code, the unmutated
+  manifest exits 0, and the resolved pre-push hook
+  (`git rev-parse --git-path hooks/pre-push` -> `.git/hooks/pre-push`, `core.hooksPath`
+  unset) blocks the push with `Push blocked (Node tests failed)`. 13 unit tests pass.
+
+- **`/settings` clips 17 elements at 1440px (2026-08-13, #145)** - found by the first
+  ever capture of a required-but-never-captured surface. Filed, not yet fixed.
+
 ### Added
+
+- **Measured the six required surfaces nobody had ever captured (2026-08-13, #144)** -
+  all 9 entries in `docs/captured-surfaces.json` were marked `capture: "required"` but
+  only 3 had ever been captured, and the gate scored `required` + never-captured as
+  passing. `npm run surfaces:probe` (`scripts/probe-surface-clipping.mjs`) now drives
+  its route list from the manifest, so the probe cannot drift from the gate, and all 9
+  surfaces carry a `capturedAt` record at both declared viewports. The probe measures
+  **element-level** clipping and never document scroll: `globals.css` clamps
+  `html, body` with `max-width: 100vw; overflow-x: hidden`, so an overflowing page
+  reports zero document scroll and any probe reading `documentElement`/`body`
+  `scrollWidth` is defeated by construction. Proven rather than assumed - injecting a
+  1200px element into a 390px viewport moved `clippedElements` 0 -> 1 while
+  `docOverflow` stayed 0px - and the probe exits 2 instead of reporting zeroes if the
+  injection fails to move the count. Result at `e50e256`: 17 of 18 measurements clean;
+  `/settings` clean at 390px but **17 clipped elements at 1440px**, rooted in the
+  `RuntimeConfigTemplateGallery` env-diagnostic badges (#145). A prior report calling
+  `/settings` a *mobile* defect ("body scrollWidth 504 vs 390, 4 clipped at 390px") did
+  **not** reproduce: it measures 0 clipped and `body.scrollWidth` 390 == `clientWidth`
+  390 at HEAD.
 
 - **Adopted the canonical fleet motion primitive (2026-08-13, #142)** -
   `globals.css` now carries `fleet-motion-primitive` v1.0.0 verbatim from

@@ -1,5 +1,10 @@
 {
-  "description": "Surfaces that the UI/UX scoring programme must capture. Derived from the App Router tree (src/app/**/page.tsx) and the workspace registry (GITHUB_PROJECT_WORKSPACE_MAPPINGS in src/lib/github-project-sync.ts). Verified by scripts/derive-captured-surfaces.ts, which fails when the app serves a route this file does not list. See mission-control-kanban#142.",
+  "description": "Surfaces that the UI/UX scoring programme must capture. Derived from the App Router tree (src/app/**/page.tsx) and the workspace registry (GITHUB_PROJECT_WORKSPACE_MAPPINGS in src/lib/github-project-sync.ts). Verified by scripts/derive-captured-surfaces.ts, which fails when the app serves a route this file does not list, when a capture decision is missing or unrecognised, when an exclusion is unjustified or unattributed, and when a 'required' surface has never actually been captured. See mission-control-kanban#142 and #144.",
+  "captureContract": {
+    "required": "The surface is in the scoring programme. It must carry a 'capturedAt' record naming the 40-hex commit measured, the ISO date, the viewport labels covered, and the method used -- or an explicit 'captureDeferred' with a substantive reason and a tracking issue. 'required' with neither is a NON-passing state: the surface is unmeasured, not known-good.",
+    "excluded": "The surface is deliberately outside the programme. It must carry a substantive 'reason' (>= 20 chars, no placeholders) and an 'excludedBy' tracking reference (#issue, URL, or 40-hex commit) so the downgrade is attributable and reviewable.",
+    "capture": "npm run surfaces:probe -- measures element-level clipping. Document scroll is NOT a valid measurement here: src/app/globals.css clamps html/body with max-width:100vw and overflow-x:hidden, so an overflowing page reports zero document scroll."
+  },
   "viewports": [
     { "label": "mobile", "width": 390, "height": 844 },
     { "label": "desktop", "width": 1440, "height": 900 }
@@ -8,47 +13,101 @@
     {
       "route": "/",
       "capture": "required",
-      "note": "Workspace dashboard and app entry point."
+      "note": "Workspace dashboard and app entry point. Doubles as the probe's control route.",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+      }
     },
     {
       "route": "/n8n-sync-history",
       "capture": "required",
-      "note": "n8n MCK sync history table."
+      "note": "n8n MCK sync history table. First ever capture: 2026-08-13, clean at both viewports.",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+      }
     },
     {
       "route": "/runtime-regression",
       "capture": "required",
-      "note": "Runtime regression evidence page."
+      "note": "Runtime regression evidence page. First ever capture: 2026-08-13, clean at both viewports.",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+      }
     },
     {
       "route": "/settings",
       "capture": "required",
-      "note": "Global settings."
+      "note": "Global settings. First ever capture: 2026-08-13. Clean at 390px; 17 clipped elements at 1440px in the RuntimeConfigTemplateGallery env-diagnostic badges. Tracked as #145.",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; mobile 0 clipped, desktop 17 clipped)"
+      }
     },
     {
       "route": "/workspace/assistants",
       "capture": "required",
-      "note": "Assistants cockpit (GitHub Project #13)."
+      "note": "Assistants cockpit (GitHub Project #13).",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+      }
     },
     {
       "route": "/workspace/memsys",
       "capture": "required",
-      "note": "MemSys cockpit (GitHub Project #12). Found by the derivation gate on its first run: this cockpit had never been in the surface list either."
+      "note": "MemSys cockpit (GitHub Project #12). Found by the derivation gate on its first run: this cockpit had never been in the surface list either. First ever capture: 2026-08-13, clean at both viewports.",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+      }
     },
     {
       "route": "/workspace/content-factory",
       "capture": "required",
-      "note": "Content Factory cockpit (GitHub Project #14)."
+      "note": "Content Factory cockpit (GitHub Project #14). First ever capture: 2026-08-13, clean at both viewports.",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+      }
     },
     {
       "route": "/workspace/asimtop",
       "capture": "required",
-      "note": "Asimtop cockpit (GitHub Project #8)."
+      "note": "Asimtop cockpit (GitHub Project #8). First ever capture: 2026-08-13, clean at both viewports.",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+      }
     },
     {
       "route": "/workspace/frontend-revenue",
       "capture": "required",
-      "note": "Frontend Revenue cockpit (GitHub Project #15). Added to this list by #142 after shipping in 690a5fb without ever being captured."
+      "note": "Frontend Revenue cockpit (GitHub Project #15). Added to this list by #142 after shipping in 690a5fb without ever being captured.",
+      "capturedAt": {
+        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+        "date": "2026-08-13",
+        "viewports": ["mobile", "desktop"],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+      }
     }
   ]
 }
