@@ -230,24 +230,93 @@ h6 {
  * `data-motion-essential` is the WCAG 2.3.3 escape hatch for motion that carries
  * information (progress that would otherwise read as frozen) - never for decoration.
  */
+/*
+ * fleet-motion-primitive v1.1.0 - BLOCK 1b (essential-motion tokens).
+ *
+ * MUST stay on :root and MUST NOT move into @theme. Tailwind v4 tree-shakes
+ * @theme variables it does not see used in a class name, and these are read by
+ * the plain rules below rather than by a utility - so in @theme they would be
+ * dropped, the busy indicator would fall back to 0s, and it would never animate
+ * at all. This app has already been bitten by that hole once: --duration-instant
+ * and --duration-slower were declared and silently absent from :root at runtime.
+ */
+:root {
+  --duration-essential-loop: 1000ms;
+  --ease-essential-loop: linear;
+}
+
+@keyframes fleet-busy-spin { to { transform: rotate(360deg); } }
+@keyframes fleet-busy-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.fleet-busy-indicator {
+  animation: fleet-busy-spin var(--duration-essential-loop, 1000ms)
+             var(--ease-essential-loop, linear) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  /* Layer A - collapse the tokens. */
+  /* Layer A - collapse the DECORATIVE tokens. --duration-essential-loop is
+     deliberately absent from this list: collapsing it on :root is exactly the
+     v1.0.0 bug, because :root is an ancestor of the elements Layer B skips, so
+     the escape hatch leaked and "exempt" spinners froze anyway. */
   :root {
     --duration-instant: 0.01ms;
     --duration-fast: 0.01ms;
     --duration-slow: 0.01ms;
     --duration-slower: 0.01ms;
+
+    /* Essential motion is SLOWED, not stopped. */
+    --duration-essential-loop: 1600ms;
   }
 
-  /* Layer B - sweep everything the tokens cannot reach. */
-  *:where(:not([data-motion-essential], [data-motion-essential] *)),
-  *:where(:not([data-motion-essential], [data-motion-essential] *))::before,
-  *:where(:not([data-motion-essential], [data-motion-essential] *))::after {
+  /* Layer B - sweep everything the tokens cannot reach. [role="progressbar"] is
+     exempt alongside the explicit attribute: ARIA already defines that role as
+     "displays the progress status for tasks that take a long time", so an app
+     that marked progress semantically should not need a second annotation.
+     aria-busy is deliberately NOT exempt - it is routinely set on whole-region
+     wrappers and would gut this sweep. */
+  *:where(:not(
+    [data-motion-essential], [data-motion-essential] *,
+    [role="progressbar"], [role="progressbar"] *
+  )),
+  *:where(:not(
+    [data-motion-essential], [data-motion-essential] *,
+    [role="progressbar"], [role="progressbar"] *
+  ))::before,
+  *:where(:not(
+    [data-motion-essential], [data-motion-essential] *,
+    [role="progressbar"], [role="progressbar"] *
+  ))::after {
     animation-duration: 0.01ms !important;
     animation-delay: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     transition-delay: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Layer C - essential motion keeps running, with the vestibular trigger
+     removed: rotation out, opacity pulse in, at a slower cycle.
+     WCAG 2.3.3 exempts motion "essential to the ... information being conveyed",
+     and W3C's definition of essential also requires that the information cannot
+     be conveyed another way that conforms. It can be - a pulse conveys "still
+     working" without rotating - so the exemption buys the right to keep
+     signalling, not the right to keep spinning.
+
+     Bound to `.animate-spin` as well as the primitive class. Audited 2026-08-16:
+     all 19 `animate-spin` source lines in this app are request/busy indicators
+     (Loader2 and RefreshCw/RefreshCcw gated on a loading flag); there is no
+     decorative rotation. Re-audit before adding one, or mark it
+     data-motion-decorative and add that to this selector's :not().
+
+     !important at class specificity is load-bearing: Layer B above is
+     specificity 0, and among !important declarations the cascade is settled by
+     specificity, so (0,1,0) wins. */
+  .animate-spin,
+  .fleet-busy-indicator {
+    animation-name: fleet-busy-pulse !important;
+    animation-duration: var(--duration-essential-loop, 1600ms) !important;
+    animation-timing-function: var(--ease-standard, ease-in-out) !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0s !important;
   }
 }
