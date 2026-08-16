@@ -60,7 +60,12 @@ export function RuntimeConfigTemplateGallery({
               {templateDiagnostics.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5" aria-label={`${template.label} env diagnostics`}>
                   {templateDiagnostics.map((diagnostic) => (
-                    <span key={`${diagnostic.env_name}-${diagnostic.kind}`} className={`rounded border px-1.5 py-0.5 text-[10px] ${diagnosticTone(diagnostic.severity)}`} title={diagnostic.message}>
+                    // min-w-0 lets the badge shrink below the env name's min-content width (flex
+                    // items default to min-width:auto); break-all then wraps the name instead of
+                    // overflowing the card. Not truncated: sibling badges differ only in their
+                    // suffix (..._URL vs ..._TOKEN), so an ellipsis would erase what tells them
+                    // apart. See #145.
+                    <span key={`${diagnostic.env_name}-${diagnostic.kind}`} className={`min-w-0 break-all rounded border px-1.5 py-0.5 text-[10px] ${diagnosticTone(diagnostic.severity)}`} title={diagnostic.message}>
                       {diagnostic.env_name}: {diagnostic.severity}
                     </span>
                   ))}
