@@ -46,12 +46,12 @@
     {
       "route": "/settings",
       "capture": "required",
-      "note": "Global settings. First ever capture: 2026-08-13. Clean at 390px; 17 clipped elements at 1440px in the RuntimeConfigTemplateGallery env-diagnostic badges. Tracked as #145.",
+      "note": "Global settings. First ever capture 2026-08-13 at e50e256 found 17 clipped elements at 1440px (0 at 390px) in the RuntimeConfigTemplateGallery env-diagnostic badges; #145. Fixed in d677d1cd2221369e0ba4b52047b7e7315a8a221a (min-w-0 + break-all on the badge); re-measured 0 clipped at both viewports. The capture below cites 5b846ce rather than the fix commit because 5b846ce is the sha whose tree was actually served when the measurement ran. This surface's badge content is env-dependent (it renders whatever MCK_* vars resolve on the measuring host), so the fix was additionally checked against synthetic env names of 27/60/120/240 chars: 0px badge-row overflow at every length with the fix, and 46/244/604/1324px with the two classes removed.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
+        "commit": "5b846ce1412644847e4e84799826c9edc5b4c61a",
+        "date": "2026-08-16",
         "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; mobile 0 clipped, desktop 17 clipped)"
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
       }
     },
     {
