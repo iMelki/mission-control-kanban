@@ -73,7 +73,7 @@ the local operator entrypoint; historical task notes remain in
     `test:captured-surfaces` plus `surfaces:check`, reached by
     `.git/hooks/pre-push`. No CI job added.
 
-- [Root package has no `typecheck` script, so root type errors are ungated](https://github.com/iMelki/mission-control-kanban/issues/147)
+- [#148 - Root type errors are ungated: no `typecheck` script, and `tsc --noEmit` is already failing](https://github.com/iMelki/mission-control-kanban/issues/148)
   - Found while working #147, pre-existing and NOT introduced by it:
     `npx tsc --noEmit` at the repo root reports
     `scripts/derive-captured-surfaces.ts ... TS18046: 'record.viewports' is of
