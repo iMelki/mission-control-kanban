@@ -11,6 +11,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The captured-surface gate accepted a stale capture (2026-08-16, #147)** -
+  `docs/captured-surfaces.json` records a `capturedAt.commit` per surface, and nothing
+  ever compared it to the code. `scripts/derive-captured-surfaces.ts` validated that the
+  sha was 40 hex characters and stopped, so a surface could be rewritten after its capture
+  and the gate stayed green: the capture drifted back to unmeasured while still reading as
+  evidence. Confirmed by control first - with a clean tree `npm run surfaces:check` exited
+  **0**, and it exited **0** again after appending a comment to
+  `src/app/settings/page.tsx`, still citing the pre-change capture. **This was already
+  live:** `5b846ce` changed `src/app/globals.css`, which the root layout imports and every
+  surface renders through, yet 8 of the 9 surfaces still cited the pre-change `e50e256`.
+  A capture now carries `sourceDigest`, a 16-hex content fingerprint over the transitive
+  static local-import closure that renders that surface - its page, every `layout`/
+  `template` wrapping it, everything they import through `@/` or a relative path, and
+  `tailwind.config.ts`/`postcss.config.mjs`. The gate recomputes it and fails, naming the
+  surface and the files that moved. It is **content, not ancestry**: a rebase or re-land
+  producing identical files keeps a capture valid, and a rewrite keeping the same sha does
+  not. Line endings are normalised to LF first, because the repo has `core.autocrlf=true`
+  and no `.gitattributes`, so a raw-byte digest would fail on whichever platform did not
+  take the capture. Depth is the design decision, so it is asserted rather than described:
+  a `page.tsx`-only rule would have missed `RuntimeConfigTemplateGallery.tsx`, where the
+  #145 clipping bug actually lived, and a whole-repo hash would invalidate everything on
+  every commit and be routed around within a week. Measured on this repo's own history:
+  the dependency union is 61 of 133 `src/` files, 35% of the last 60 commits touch it, and
+  7% touch a global file that invalidates all nine. Six proofs, both directions: mutating
+  `src/app/settings/page.tsx` fails naming `/settings` alone; mutating the shared
+  `RuntimeConfigTemplateGallery.tsx` fails naming 6 of 9 while `/`, `/n8n-sync-history`
+  and `/runtime-regression` still pass; mutating `globals.css` fails all 9; mutating
+  `scripts/check-runtime-regressions.js` passes; an unreachable capture commit still fails
+  and names the surface, degrading only the file list; and reverting each mutation returns
+  the gate to green. A capture with no `sourceDigest` is rejected outright - it could never
+  be shown to be stale - and the freshness lookup is a required argument, so "nobody
+  checked" cannot be mistaken for "nothing was stale". `npm run surfaces:fingerprint`
+  prints the current digests and deliberately never writes them, so a stale capture cannot
+  be re-greened without editing the same block that holds the date and the method. All
+  nine surfaces were re-probed at `8f72854` on 2026-08-16: 18 measurements, 0 clipped,
+  probe self-proof alive. What this deliberately does **not** cover - npm dependency bumps,
+  runtime/env-dependent content, `src/app/api/**` handlers reached by string URL,
+  `next.config.mjs`, `public/` assets - is documented at the top of
+  `scripts/surface-dependencies.ts`.
+
 - **Closed four fail-open holes in the captured-surface gate (2026-08-13, #144)** -
   `scripts/derive-captured-surfaces.ts` validated that a manifest *entry* existed, not
   that a capture *decision* was valid. `CaptureDecision` is a compile-time union;

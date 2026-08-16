@@ -46,6 +46,43 @@ the local operator entrypoint; historical task notes remain in
   - Follow-up to #144 and the known remaining hole in it. `capturedAt` is never
     invalidated, so a surface can drift back to unmeasured while the gate stays
     green - the original #142 failure shape, one level up.
+  - Confirmed by control before fixing: with the tree clean `surfaces:check`
+    exited 0; appending a comment to `src/app/settings/page.tsx` and re-running
+    it exited 0 again, still citing the pre-change `capturedAt`. The same held
+    for `src/components/RuntimeOpsSettings.tsx`.
+  - It was already live, not hypothetical. `5b846ce` changed
+    `src/app/globals.css`, which the root layout imports and every surface
+    renders through, yet 8 of the 9 surfaces still cited the pre-change
+    `e50e256` and the gate stayed green.
+  - Landed: `capturedAt.sourceDigest`, a 16-hex content fingerprint over the
+    transitive static local-import closure that renders each surface, resolved
+    by `scripts/surface-dependencies.ts` and recomputed by the gate. Content,
+    not ancestry, so a rebase or re-land producing identical files keeps a
+    capture valid. Deliberately NOT a whole-repo hash: 35% of the last 60
+    commits touch the dependency union (61 of 133 `src/` files), 7% touch a
+    global file that invalidates all nine.
+  - Known blind spots, documented at the top of
+    `scripts/surface-dependencies.ts`: npm dependency bumps
+    (`package-lock.json` is excluded on purpose), runtime/env-dependent content,
+    `src/app/api/**` handlers reached by string URL, `next.config.mjs`, and
+    `public/` assets.
+  - All nine surfaces re-probed at `8f72854` on 2026-08-16 against the running
+    dev server: 18 measurements, 0 clipped, probe self-proof alive (injection
+    moved clipped 0 -> 1 while document overflow stayed 0).
+  - Wired on the same free local layer as #144: `npm test` ->
+    `test:captured-surfaces` plus `surfaces:check`, reached by
+    `.git/hooks/pre-push`. No CI job added.
+
+- [Root package has no `typecheck` script, so root type errors are ungated](https://github.com/iMelki/mission-control-kanban/issues/147)
+  - Found while working #147, pre-existing and NOT introduced by it:
+    `npx tsc --noEmit` at the repo root reports
+    `scripts/derive-captured-surfaces.ts ... TS18046: 'record.viewports' is of
+    type 'unknown'`. Proven pre-existing by restoring the HEAD version of that
+    file and re-running `tsc` - the same error appears at its old line number.
+  - Nothing runs it: `package.json` has no `typecheck` script, and the only
+    `npm run typecheck` in `.github/workflows/ci.yml` is inside the
+    `paperclip-bridge` job with `working-directory: integrations/paperclip-bridge`.
+    Filed separately rather than fixed inline, to keep #147 to one concern.
 
 - [#145 - /settings clips 17 elements at 1440px](https://github.com/iMelki/mission-control-kanban/issues/145)
   - Live shipped defect, found by the first ever capture of `/settings`. Rooted

@@ -18,6 +18,7 @@
     "test:captured-surfaces": "node --import tsx --test tests/captured-surfaces.test.ts",
     "surfaces:list": "tsx scripts/derive-captured-surfaces.ts --list",
     "surfaces:check": "tsx scripts/derive-captured-surfaces.ts",
+    "surfaces:fingerprint": "tsx scripts/derive-captured-surfaces.ts --fingerprint",
     "surfaces:probe": "node scripts/probe-surface-clipping.mjs",
     "test:github-actions-node24": "node --test tests/github-actions-node24.test.mjs",
     "test:runtime-artifact-comment": "node --test tests/runtime-artifact-comment.test.mjs",

@@ -1,112 +1,166 @@
 {
-  "description": "Surfaces that the UI/UX scoring programme must capture. Derived from the App Router tree (src/app/**/page.tsx) and the workspace registry (GITHUB_PROJECT_WORKSPACE_MAPPINGS in src/lib/github-project-sync.ts). Verified by scripts/derive-captured-surfaces.ts, which fails when the app serves a route this file does not list, when a capture decision is missing or unrecognised, when an exclusion is unjustified or unattributed, and when a 'required' surface has never actually been captured. See mission-control-kanban#142 and #144.",
+  "description": "Surfaces that the UI/UX scoring programme must capture. Derived from the App Router tree (src/app/**/page.tsx) and the workspace registry (GITHUB_PROJECT_WORKSPACE_MAPPINGS in src/lib/github-project-sync.ts). Verified by scripts/derive-captured-surfaces.ts, which fails when the app serves a route this file does not list, when a capture decision is missing or unrecognised, when an exclusion is unjustified or unattributed, when a 'required' surface has never actually been captured, and -- since #147 -- when a capture has gone STALE because the files that render that surface changed after it was measured. See mission-control-kanban#142, #144 and #147.",
   "captureContract": {
-    "required": "The surface is in the scoring programme. It must carry a 'capturedAt' record naming the 40-hex commit measured, the ISO date, the viewport labels covered, and the method used -- or an explicit 'captureDeferred' with a substantive reason and a tracking issue. 'required' with neither is a NON-passing state: the surface is unmeasured, not known-good.",
+    "required": "The surface is in the scoring programme. It must carry a 'capturedAt' record naming the 40-hex commit measured, the ISO date, the viewport labels covered, the method used, and the 'sourceDigest' of the files that render it -- or an explicit 'captureDeferred' with a substantive reason and a tracking issue. 'required' with neither is a NON-passing state: the surface is unmeasured, not known-good.",
     "excluded": "The surface is deliberately outside the programme. It must carry a substantive 'reason' (>= 20 chars, no placeholders) and an 'excludedBy' tracking reference (#issue, URL, or 40-hex commit) so the downgrade is attributable and reviewable.",
-    "capture": "npm run surfaces:probe -- measures element-level clipping. Document scroll is NOT a valid measurement here: src/app/globals.css clamps html/body with max-width:100vw and overflow-x:hidden, so an overflowing page reports zero document scroll."
+    "capture": "npm run surfaces:probe -- measures element-level clipping. Document scroll is NOT a valid measurement here: src/app/globals.css clamps html/body with max-width:100vw and overflow-x:hidden, so an overflowing page reports zero document scroll. Recording a capture is deliberately a manual edit: 'npm run surfaces:fingerprint' only prints, so nobody can re-green a stale capture without touching the same block that holds the date and the method.",
+    "sourceDigest": "A 16-hex content fingerprint over the transitive static local-import closure of the files that render this surface: the route's page, every layout/template that wraps it, everything they import through '@/' or a relative path, and the styling config (tailwind.config.ts, postcss.config.mjs). Print the current value with 'npm run surfaces:fingerprint'. The gate recomputes it and fails when it moved, so a capture cannot keep reading as evidence after the surface has been rewritten. It is CONTENT, not ancestry: a rebase or a re-land that reproduces identical files keeps the capture valid, and a rewrite that keeps the same sha does not. Line endings are normalised to LF first, because this repo has core.autocrlf=true and no .gitattributes. Resolution rules and the list of what this deliberately does NOT cover -- npm dependency bumps, runtime/env-dependent content, API route handlers, next.config.mjs, public assets -- are documented at the top of scripts/surface-dependencies.ts. Bumping DEPENDENCY_CONTRACT_VERSION there invalidates every capture on purpose."
   },
   "viewports": [
-    { "label": "mobile", "width": 390, "height": 844 },
-    { "label": "desktop", "width": 1440, "height": 900 }
+    {
+      "label": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "label": "desktop",
+      "width": 1440,
+      "height": 900
+    }
   ],
   "surfaces": [
     {
       "route": "/",
       "capture": "required",
-      "note": "Workspace dashboard and app entry point. Doubles as the probe's control route.",
+      "note": "Workspace dashboard and app entry point. Doubles as the probe's control route. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
+        "date": "2026-08-16",
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "3c7593d409c3ead0",
+        "sourceFileCount": 16
       }
     },
     {
       "route": "/n8n-sync-history",
       "capture": "required",
-      "note": "n8n MCK sync history table. First ever capture: 2026-08-13, clean at both viewports.",
+      "note": "n8n MCK sync history table. First ever capture: 2026-08-13. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
+        "date": "2026-08-16",
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "e000a46715385550",
+        "sourceFileCount": 13
       }
     },
     {
       "route": "/runtime-regression",
       "capture": "required",
-      "note": "Runtime regression evidence page. First ever capture: 2026-08-13, clean at both viewports.",
+      "note": "Runtime regression evidence page. First ever capture: 2026-08-13. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
+        "date": "2026-08-16",
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "26b6b4bfbdef157d",
+        "sourceFileCount": 5
       }
     },
     {
       "route": "/settings",
       "capture": "required",
-      "note": "Global settings. First ever capture 2026-08-13 at e50e256 found 17 clipped elements at 1440px (0 at 390px) in the RuntimeConfigTemplateGallery env-diagnostic badges; #145. Fixed in d677d1cd2221369e0ba4b52047b7e7315a8a221a (min-w-0 + break-all on the badge); re-measured 0 clipped at both viewports. The capture below cites 5b846ce rather than the fix commit because 5b846ce is the sha whose tree was actually served when the measurement ran. This surface's badge content is env-dependent (it renders whatever MCK_* vars resolve on the measuring host), so the fix was additionally checked against synthetic env names of 27/60/120/240 chars: 0px badge-row overflow at every length with the fix, and 46/244/604/1324px with the two classes removed.",
+      "note": "Global settings. The first ever capture (2026-08-13, e50e256) found 17 clipped elements at 1440px (0 at 390px) in the RuntimeConfigTemplateGallery env-diagnostic badges; #145. Fixed in d677d1cd2221369e0ba4b52047b7e7315a8a221a (min-w-0 + break-all on the badge). This surface's badge content is env-dependent (it renders whatever MCK_* vars resolve on the measuring host), so the fix was additionally checked against synthetic env names of 27/60/120/240 chars: 0px badge-row overflow at every length with the fix, and 46/244/604/1324px with the two classes removed. That env-dependence is a known blind spot of sourceDigest, which covers source only. The 2026-08-13 capture of this surface was superseded by the #145 fix; re-probed at 8f72854 on 2026-08-16 alongside the other eight: 0 clipped elements at both viewports.",
       "capturedAt": {
-        "commit": "5b846ce1412644847e4e84799826c9edc5b4c61a",
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
         "date": "2026-08-16",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "a3cc4c75aab580f5",
+        "sourceFileCount": 16
       }
     },
     {
       "route": "/workspace/assistants",
       "capture": "required",
-      "note": "Assistants cockpit (GitHub Project #13).",
+      "note": "Assistants cockpit (GitHub Project #13). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. All five cockpits share sourceDigest eb3af727177054dd because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
+        "date": "2026-08-16",
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "eb3af727177054dd",
+        "sourceFileCount": 53
       }
     },
     {
       "route": "/workspace/memsys",
       "capture": "required",
-      "note": "MemSys cockpit (GitHub Project #12). Found by the derivation gate on its first run: this cockpit had never been in the surface list either. First ever capture: 2026-08-13, clean at both viewports.",
+      "note": "MemSys cockpit (GitHub Project #12). Found by the derivation gate on its first run: this cockpit had never been in the surface list either. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. All five cockpits share sourceDigest eb3af727177054dd because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
+        "date": "2026-08-16",
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "eb3af727177054dd",
+        "sourceFileCount": 53
       }
     },
     {
       "route": "/workspace/content-factory",
       "capture": "required",
-      "note": "Content Factory cockpit (GitHub Project #14). First ever capture: 2026-08-13, clean at both viewports.",
+      "note": "Content Factory cockpit (GitHub Project #14). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. All five cockpits share sourceDigest eb3af727177054dd because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
+        "date": "2026-08-16",
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "eb3af727177054dd",
+        "sourceFileCount": 53
       }
     },
     {
       "route": "/workspace/asimtop",
       "capture": "required",
-      "note": "Asimtop cockpit (GitHub Project #8). First ever capture: 2026-08-13, clean at both viewports.",
+      "note": "Asimtop cockpit (GitHub Project #8). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. All five cockpits share sourceDigest eb3af727177054dd because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
+        "date": "2026-08-16",
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "eb3af727177054dd",
+        "sourceFileCount": 53
       }
     },
     {
       "route": "/workspace/frontend-revenue",
       "capture": "required",
-      "note": "Frontend Revenue cockpit (GitHub Project #15). Added to this list by #142 after shipping in 690a5fb without ever being captured.",
+      "note": "Frontend Revenue cockpit (GitHub Project #15). Added to this list by #142 after shipping in 690a5fb without ever being captured. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. All five cockpits share sourceDigest eb3af727177054dd because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover.",
       "capturedAt": {
-        "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
-        "date": "2026-08-13",
-        "viewports": ["mobile", "desktop"],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports)"
+        "commit": "8f72854660030863d61f6955a94fd4300496048d",
+        "date": "2026-08-16",
+        "viewports": [
+          "mobile",
+          "desktop"
+        ],
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
+        "sourceDigest": "eb3af727177054dd",
+        "sourceFileCount": 53
       }
     }
   ]

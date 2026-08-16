@@ -32,15 +32,39 @@
  *   2. GITHUB_PROJECT_WORKSPACE_MAPPINGS, the registry that defines every
  *      /workspace/[slug] cockpit (src/lib/github-project-sync.ts).
  *
+ * What this gate STILL did not guarantee (#147). A capture was validated for shape and
+ * never for freshness. `capturedAt.commit` had to be 40 hex characters; nothing ever
+ * compared it to the code. So a surface could be re-edited after its capture and the gate
+ * stayed green — the capture drifted back to unmeasured while still reading as evidence.
+ *
+ *   (e) `capture: "required"` + a `capturedAt` naming a commit older than the files that
+ *       render the surface passed. This was live, not hypothetical: `5b846ce` changed
+ *       `src/app/globals.css`, which the root layout imports and every surface renders
+ *       through, and eight of the nine surfaces still cited the pre-change `e50e256`.
+ *
+ * A capture record therefore now also carries `sourceDigest`: a content fingerprint of
+ * the files that render that surface (see scripts/surface-dependencies.ts for the
+ * dependency-resolution rules and, importantly, for what they miss). The gate recomputes
+ * it from the working tree and fails when it moved. Content, not ancestry — a re-land or
+ * a rebase that reproduces identical files keeps the capture valid, and a rewrite that
+ * keeps the same sha does not.
+ *
  * Usage:
- *   npx tsx scripts/derive-captured-surfaces.ts          # check, exit 1 on drift
- *   npx tsx scripts/derive-captured-surfaces.ts --list    # print derived routes
+ *   npx tsx scripts/derive-captured-surfaces.ts             # check, exit 1 on drift
+ *   npx tsx scripts/derive-captured-surfaces.ts --list       # print derived routes
+ *   npx tsx scripts/derive-captured-surfaces.ts --fingerprint # print each surface's digest
  */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { GITHUB_PROJECT_WORKSPACE_MAPPINGS } from '../src/lib/github-project-sync';
+import {
+  DEPENDENCY_CONTRACT_VERSION,
+  fingerprintSurface,
+  type SurfaceFingerprint,
+} from './surface-dependencies';
 
 export const MANIFEST_RELATIVE_PATH = 'docs/captured-surfaces.json';
 const APP_DIR_RELATIVE_PATH = 'src/app';
@@ -59,6 +83,8 @@ const PLACEHOLDER_REASON = /^(x+|n\/?a|tbd|todo|none|-+|\.+|\?+)$/i;
 const TRACKING_REFERENCE = /^(#\d+|https?:\/\/\S+|[0-9a-f]{40})$/;
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** `sourceDigest`: the 16-hex fingerprint fingerprintSurface() produces. */
+const SOURCE_DIGEST = /^[0-9a-f]{16}$/;
 
 /** Proof that a surface was actually looked at. Required for `capture: "required"`. */
 export interface CaptureRecord {
@@ -70,6 +96,14 @@ export interface CaptureRecord {
   viewports: string[];
   /** How it was measured. A capture with no named method cannot be reproduced or trusted. */
   method: string;
+  /**
+   * Content fingerprint (16 hex) of the files that render this surface, at capture time.
+   * Recomputed by the gate; a mismatch means the surface changed since it was measured,
+   * so the capture is no longer evidence about the current code (#147).
+   */
+  sourceDigest: string;
+  /** How many files that fingerprint covered. Recorded so a shrinking set is visible. */
+  sourceFileCount?: number;
 }
 
 /** An explicitly-reasoned downgrade: a required surface knowingly left uncaptured. */
@@ -121,9 +155,21 @@ export interface SurfaceDiff {
   exclusionsWithoutReason: string[];
   /** Required entries with no capture record and no explicit deferral. */
   requiredNeverCaptured: string[];
+  /** Captured entries whose rendering source changed after the capture was taken (#147). */
+  staleCaptures: string[];
   /** Every complaint, including the shape violations the old cast hid. */
   problems: SurfaceProblem[];
 }
+
+/**
+ * Supplies the current content fingerprint for a route, or null when nothing renders it.
+ *
+ * This is a REQUIRED argument to `diffSurfaces` rather than an optional one. An optional
+ * freshness source would make "nobody passed it" indistinguishable from "nothing was
+ * stale", which is the fail-open shape this whole file exists to close: the caller must
+ * say what it is checking against.
+ */
+export type SurfaceFingerprintLookup = (route: string) => SurfaceFingerprint | null;
 
 /**
  * Turns App Router `page` file paths into route patterns.
@@ -350,6 +396,18 @@ export function validateManifestShape(parsed: unknown): SurfaceProblem[] {
         detail: `"capturedAt.method" must name how the surface was measured, so the capture is reproducible`,
       });
     }
+    // Hole (e): without a content fingerprint a capture can never be shown to be stale,
+    // so it would read as evidence forever. A missing digest is not a fresh capture.
+    if (!isNonEmptyString(record.sourceDigest) || !SOURCE_DIGEST.test(record.sourceDigest.trim())) {
+      problems.push({
+        route,
+        code: 'capture_digest_missing',
+        detail:
+          `"capturedAt.sourceDigest" must be the 16-hex fingerprint of the files that render this ` +
+          `surface; got ${JSON.stringify(record.sourceDigest)}. Without it the capture can never be ` +
+          `shown to be stale. Print it with: npm run surfaces:fingerprint`,
+      });
+    }
     if (!Array.isArray(record.viewports) || record.viewports.length === 0) {
       problems.push({
         route,
@@ -388,7 +446,77 @@ export function validateManifestShape(parsed: unknown): SurfaceProblem[] {
   return problems;
 }
 
-export function diffSurfaces(derived: string[], manifest: unknown): SurfaceDiff {
+/**
+ * Compares each capture's recorded fingerprint against the surface's CURRENT source.
+ *
+ * Only routes the app actually serves are checked: a route no longer served is already
+ * reported as stale-in-manifest, and fingerprinting a route with no page would report a
+ * second, less useful problem for the same fact.
+ */
+export function checkCaptureFreshness(
+  manifest: unknown,
+  derived: string[],
+  fingerprintFor: SurfaceFingerprintLookup
+): SurfaceProblem[] {
+  if (typeof fingerprintFor !== 'function') {
+    throw new TypeError('checkCaptureFreshness needs a fingerprint lookup; freshness is never skipped by omission');
+  }
+  const problems: SurfaceProblem[] = [];
+  if (!isPlainObject(manifest) || !Array.isArray(manifest.surfaces)) return problems;
+  const servedRoutes = new Set(derived);
+
+  for (const raw of manifest.surfaces) {
+    if (!isPlainObject(raw) || !isNonEmptyString(raw.route)) continue;
+    const route = raw.route;
+    if (!servedRoutes.has(route)) continue;
+    if (raw.capture !== 'required') continue;
+    if (!isPlainObject(raw.capturedAt)) continue;
+
+    const recorded = raw.capturedAt.sourceDigest;
+    if (!isNonEmptyString(recorded) || !SOURCE_DIGEST.test(recorded.trim())) continue; // already reported
+
+    const current = fingerprintFor(route);
+    if (!current) {
+      problems.push({
+        route,
+        code: 'surface_dependencies_unresolvable',
+        detail: `no App Router page renders ${route}, so its capture cannot be checked for staleness`,
+      });
+      continue;
+    }
+    if (current.unresolved.length > 0) {
+      // An import the walker could not follow means the dependency set is incomplete, so
+      // the digest is a lie by omission: a change behind that import would not invalidate.
+      problems.push({
+        route,
+        code: 'surface_dependencies_unresolved',
+        detail:
+          `${current.unresolved.length} local import(s) in this surface's dependency set could not be ` +
+          `resolved, so the fingerprint does not cover everything that renders it: ` +
+          `${current.unresolved.slice(0, 3).join('; ')}`,
+      });
+    }
+    if (current.digest !== recorded.trim()) {
+      problems.push({
+        route,
+        code: 'capture_stale',
+        detail:
+          `${route} changed since it was captured: recorded sourceDigest ${recorded.trim()}, ` +
+          `current ${current.digest} over ${current.fileCount} rendering file(s). ` +
+          `The capture at ${String(raw.capturedAt.commit).slice(0, 12)} (${String(raw.capturedAt.date)}) ` +
+          `describes source this app no longer serves, so it is not evidence about the code as it stands. ` +
+          `Re-run npm run surfaces:probe for this surface and record the new capture.`,
+      });
+    }
+  }
+  return problems;
+}
+
+export function diffSurfaces(
+  derived: string[],
+  manifest: unknown,
+  fingerprintFor: SurfaceFingerprintLookup
+): SurfaceDiff {
   const problems = validateManifestShape(manifest);
   const surfaces: CapturedSurfaceEntry[] =
     isPlainObject(manifest) && Array.isArray(manifest.surfaces)
@@ -411,12 +539,16 @@ export function diffSurfaces(derived: string[], manifest: unknown): SurfaceDiff 
   for (const route of staleInManifest) {
     problems.push({ route, code: 'route_stale_in_manifest', detail: `${route} is listed but the app no longer serves it` });
   }
+  problems.push(...checkCaptureFreshness(manifest, derived, fingerprintFor));
 
   return {
     derived,
     declared,
     missingFromManifest,
     staleInManifest,
+    staleCaptures: problems
+      .filter((problem) => problem.code === 'capture_stale' && problem.route)
+      .map((problem) => problem.route as string),
     exclusionsWithoutReason: problems
       .filter((problem) => problem.code.startsWith('exclusion_reason_missing') && problem.route)
       .map((problem) => problem.route as string),
@@ -448,7 +580,40 @@ export function formatDiff(diff: SurfaceDiff): string {
       `  Fix: add each unlisted route with capture "required" plus a "capturedAt" record, or "excluded" plus a reason and "excludedBy".`
     );
   }
+  if (diff.staleCaptures.length > 0) {
+    lines.push(`  Stale captures (${diff.staleCaptures.length}): ${diff.staleCaptures.join(', ')}`);
+  }
   return lines.join('\n');
+}
+
+/**
+ * Names which rendering files moved since a capture's commit, purely as an explanation.
+ *
+ * The FAILURE is decided by the content digest above; this only makes it actionable. It
+ * is therefore allowed to come back empty (git missing, unreachable commit, a repo
+ * exported without history) without changing the verdict — the gate has already failed
+ * and already named the surface.
+ */
+export function explainStaleCapture(
+  repoRoot: string,
+  commit: string,
+  dependencyFiles: string[]
+): string[] | null {
+  if (!FULL_SHA.test(commit)) return null;
+  try {
+    execFileSync('git', ['cat-file', '-e', `${commit}^{commit}`], { cwd: repoRoot, stdio: 'ignore' });
+    // Diff the whole tree and intersect in-process: passing 60+ pathspecs risks the
+    // Windows argv limit, and one call cannot be truncated halfway.
+    const changed = new Set(
+      execFileSync('git', ['diff', '--name-only', commit], { cwd: repoRoot, encoding: 'utf8' })
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    );
+    return dependencyFiles.filter((file) => changed.has(file));
+  } catch {
+    return null;
+  }
 }
 
 const isDirectRun = (() => {
@@ -464,9 +629,51 @@ if (isDirectRun) {
     for (const route of derived) console.log(route);
     process.exit(0);
   }
-  const diff = diffSurfaces(derived, readManifest(repoRoot));
+
+  /** Memoised so nine surfaces sharing one component tree read each file once. */
+  const fingerprintCache = new Map<string, SurfaceFingerprint | null>();
+  const fingerprintFor: SurfaceFingerprintLookup = (route) => {
+    if (!fingerprintCache.has(route)) fingerprintCache.set(route, fingerprintSurface(repoRoot, route));
+    return fingerprintCache.get(route) ?? null;
+  };
+
+  if (process.argv.includes('--fingerprint')) {
+    // Deliberately PRINTS and never writes. An auto-writer would let anyone re-green a
+    // stale capture without re-measuring anything, which is the hole this closes.
+    console.log(`surface dependency contract v${DEPENDENCY_CONTRACT_VERSION}\n`);
+    for (const route of derived) {
+      const fingerprint = fingerprintFor(route);
+      if (!fingerprint) {
+        console.log(`${route.padEnd(30)} (no page renders this route)`);
+        continue;
+      }
+      console.log(
+        `${route.padEnd(30)} sourceDigest ${fingerprint.digest}  over ${fingerprint.fileCount} file(s)` +
+          (fingerprint.unresolved.length > 0 ? `  UNRESOLVED: ${fingerprint.unresolved.join('; ')}` : '')
+      );
+    }
+    console.log(`\nRecord these in ${MANIFEST_RELATIVE_PATH} only alongside a capture you actually took.`);
+    process.exit(0);
+  }
+
+  const manifest = readManifest(repoRoot);
+  const diff = diffSurfaces(derived, manifest, fingerprintFor);
   if (diff.problems.length > 0) {
     console.error(formatDiff(diff));
+    for (const route of diff.staleCaptures) {
+      const entry = (manifest as CapturedSurfaceManifest).surfaces.find((surface) => surface.route === route);
+      const fingerprint = fingerprintFor(route);
+      const changed = entry?.capturedAt && fingerprint
+        ? explainStaleCapture(repoRoot, entry.capturedAt.commit, fingerprint.files)
+        : null;
+      if (changed === null) {
+        console.error(`\n  ${route}: capture commit unreachable from here, so the changed files cannot be listed.`);
+      } else {
+        console.error(`\n  ${route}: ${changed.length} rendering file(s) changed since the capture commit:`);
+        for (const file of changed.slice(0, 12)) console.error(`      ${file}`);
+        if (changed.length > 12) console.error(`      ... and ${changed.length - 12} more`);
+      }
+    }
     console.error(
       `\ncaptured-surface drift: ${diff.problems.length} problem(s) across ${derived.length} derived route(s).`
     );
@@ -474,6 +681,7 @@ if (isDirectRun) {
   }
   console.log(
     `captured-surface list matches the app: ${derived.length} route(s) derived, ${diff.declared.length} declared, ` +
-      `every "required" surface carries a capture record or a tracked deferral.`
+      `every "required" surface carries a capture record or a tracked deferral, and every capture's ` +
+      `sourceDigest still matches the files that render it (contract v${DEPENDENCY_CONTRACT_VERSION}).`
   );
 }
