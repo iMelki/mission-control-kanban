@@ -41,3 +41,19 @@ repos:
         language: system
         pass_filenames: false
         files: ^(src/components/.*\.(tsx|jsx)|docs/preflight/(component-baseline\.json|records/.*\.md)|scripts/verify-component-sourcing-preflight\.mjs)$
+
+      - id: captured-surfaces-canonical
+        name: Captured-surface manifest (canonical Gap-2 gate)
+        entry: node scripts/captured-surfaces/derive-captured-surfaces.mjs --repo .
+        language: system
+        pass_filenames: false
+        require_serial: true
+        files: ^(src/app/.*|docs/captured-surfaces(\.config)?\.json|scripts/captured-surfaces/.*)$
+
+      - id: captured-surfaces-canonical-selftest
+        name: Captured-surface gate negative proof (31 fixtures, each asserting its own code)
+        entry: node scripts/captured-surfaces/derive-captured-surfaces.mjs --self-test
+        language: system
+        pass_filenames: false
+        require_serial: true
+        files: ^scripts/captured-surfaces/.*$

@@ -1,0 +1,29 @@
+{
+  "route": "/settings",
+  "expect_summary": "CONTROL for (b): spelled correctly, the reason and attribution are still demanded",
+  "expect_codes": [
+    "exclusion_reason_missing",
+    "exclusion_untracked"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "excluded"
+      }
+    ]
+  }
+}

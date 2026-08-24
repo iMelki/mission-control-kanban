@@ -1,0 +1,15 @@
+{
+  "$comment": "Provenance for the vendored canonical Gap-2 gate. This repo COPY-OWNS the runner and SHARES the contract vectors, per shared/catalog/fleet-duplication-share-vs-copy-ruling-2026-08-13.md section 2 Q2: fleet CI runs GitHub Actions on ubuntu-latest after a single-repo checkout, so agent-settings/shared/ does not exist at enforcement time and a cross-repo path dependency would be unreachable in CI. The register row for this standard says 'an adopting repo invokes the shared file rather than copying it', which contradicts that ruling; the contradiction is tracked, and this repo follows the ruling because the ruling is the one that survives a single-repo checkout.",
+  "standard": "captured-surface-manifest",
+  "canonicalRepo": "iMelki/agent-settings",
+  "canonicalPath": "shared/assets/captured-surface-manifest/derive-captured-surfaces.mjs",
+  "canonicalCommit": "1048bea5028aeb0aecef6236c6e3cfee91c43b5f",
+  "vendoredAt": "2026-08-23",
+  "digests": {
+    "derive-captured-surfaces.mjs": "sha256:3afe8a91acfd40b00d9fe7b44e5ac69fea09c56fea0188b4e531b3dfe439ea14",
+    "fixtures/manifests (sha256 of `sha256sum *.json`)": "sha256:0040fdbe9b094b9f96ca731ca0d749a9ec467dbfaaeac46930af7196e7d20f0f",
+    "fixtureCount": 31
+  },
+  "driftCheck": "sha256sum scripts/captured-surfaces/derive-captured-surfaces.mjs -- compare against canonicalPath at canonicalCommit. A divergence means this copy has drifted from the fleet gate and must be re-vendored or the divergence justified here.",
+  "relationshipToTheRepoOwnGate": "scripts/derive-captured-surfaces.ts is NOT superseded. It carries mission-control-kanban#147's sourceDigest staleness check, which the canonical gate does not have, so replacing it would be a regression. Both run in `npm test`: the repo gate owns staleness, the canonical gate owns router fidelity (private folders, intercepting routes, @slot, %5F) and the liveness contract."
+}

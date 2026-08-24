@@ -10,10 +10,10 @@
     "build:turbo": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "npm run test:doctor-genome && npm run test:captured-surfaces && npm run surfaces:check && npm run test:github-actions-node24 && npm run test:react-doctor-hook && npm run test:component-sourcing-preflight && npm run test:runtime-artifact-comment && npm run test:runtime-regression-server && npm run test:runtime-smoke-cleanup && npm run test:action-review && npm run test:agent-runtimes && npm run test:dispatch-adapters && npm run test:factory-webhooks && npm run test:webhook-health && npm run test:runtime-operations && npm run test:task-dependencies && npm run test:github-sync",
+    "test": "npm run test:doctor-genome && npm run test:captured-surfaces && npm run surfaces:check && npm run test:captured-surfaces-canonical && npm run surfaces:canonical && npm run test:github-actions-node24 && npm run test:react-doctor-hook && npm run test:component-sourcing-preflight && npm run test:runtime-artifact-comment && npm run test:runtime-regression-server && npm run test:runtime-smoke-cleanup && npm run test:action-review && npm run test:agent-runtimes && npm run test:dispatch-adapters && npm run test:factory-webhooks && npm run test:webhook-health && npm run test:runtime-operations && npm run test:task-dependencies && npm run test:github-sync",
     "doctor:react": "node scripts/run-react-doctor.js",
     "test:react-doctor-hook": "node --test tests/react-doctor-precommit.test.mjs",
- "test:component-sourcing-preflight": "node --test tests/component-sourcing-preflight.test.mjs",
+    "test:component-sourcing-preflight": "node --test tests/component-sourcing-preflight.test.mjs",
     "test:doctor-genome": "node --test tests/doctor-genome.test.mjs",
     "test:captured-surfaces": "node --import tsx --test tests/captured-surfaces.test.ts",
     "surfaces:list": "tsx scripts/derive-captured-surfaces.ts --list",
@@ -41,7 +41,10 @@
     "db:seed": "tsx src/lib/db/seed.ts",
     "db:backup": "sqlite3 mission-control.db 'PRAGMA wal_checkpoint(TRUNCATE);' && cp mission-control.db mission-control.db.backup && echo 'Backed up to mission-control.db.backup'",
     "db:restore": "cp mission-control.db.backup mission-control.db && echo 'Restored from backup'",
-    "db:reset": "rm -f mission-control.db mission-control.db-* && npm run db:seed"
+    "db:reset": "rm -f mission-control.db mission-control.db-* && npm run db:seed",
+    "surfaces:canonical": "node scripts/captured-surfaces/derive-captured-surfaces.mjs --repo .",
+    "surfaces:canonical:list": "node scripts/captured-surfaces/derive-captured-surfaces.mjs --repo . --list",
+    "test:captured-surfaces-canonical": "node scripts/captured-surfaces/derive-captured-surfaces.mjs --self-test"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

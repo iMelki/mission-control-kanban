@@ -1,0 +1,28 @@
+{
+  "route": "/settings",
+  "expect_summary": "HOLE (a): an entry with no capture field is not a capture decision",
+  "expect_codes": [
+    "capture_missing"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "note": "no decision here"
+      }
+    ]
+  }
+}
