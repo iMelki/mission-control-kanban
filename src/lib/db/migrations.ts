@@ -743,13 +743,24 @@ export function runMigrations(db: SqliteDatabase): void {
     (db.prepare('SELECT id FROM _migrations').all() as { id: string }[]).map(m => m.id)
   );
 
+  // Under the Node test runner every test file builds a fresh database, so
+  // per-migration chatter multiplies by the number of suites. It pushed
+  // `npm test` past git-toolkit's 131072-character evidence cap, which fails
+  // closed and blocked the push even though every test passed. One summary
+  // line carries the same information. Set MC_DB_VERBOSE=1 to restore the
+  // per-migration log.
+  const quiet = Boolean(process.env.NODE_TEST_CONTEXT) && process.env.MC_DB_VERBOSE !== '1';
+  const appliedNow: string[] = [];
+
   // Run pending migrations in order
   for (const migration of migrations) {
     if (applied.has(migration.id)) {
       continue;
     }
 
-    console.log(`[DB] Running migration ${migration.id}: ${migration.name}`);
+    if (!quiet) {
+      console.log(`[DB] Running migration ${migration.id}: ${migration.name}`);
+    }
 
     try {
       // Run migration in a transaction
@@ -758,11 +769,18 @@ export function runMigrations(db: SqliteDatabase): void {
         db.prepare('INSERT INTO _migrations (id, name) VALUES (?, ?)').run(migration.id, migration.name);
       })();
 
-      console.log(`[DB] Migration ${migration.id} completed`);
+      appliedNow.push(migration.id);
+      if (!quiet) {
+        console.log(`[DB] Migration ${migration.id} completed`);
+      }
     } catch (error) {
       console.error(`[DB] Migration ${migration.id} failed:`, error);
       throw error;
     }
+  }
+
+  if (quiet && appliedNow.length > 0) {
+    console.log(`[DB] Applied ${appliedNow.length} migration(s): ${appliedNow[0]}..${appliedNow[appliedNow.length - 1]}`);
   }
 }
 
