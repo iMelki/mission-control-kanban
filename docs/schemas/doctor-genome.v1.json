@@ -1,10 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/iMelki/mission-control-kanban/dev/docs/schemas/doctor-genome.v1.json",
-  "$comment": "Public distribution mirror. Canonical source: iMelki/projects-ops docs/schemas/doctor-genome.v1.json.",
-  "x-canonical-source-sha256": "afe8676e1c3c78c8d3c2a52915bea4246a09da2f82770fbe115ee2722323d272",
+  "$id": "https://raw.githubusercontent.com/iMelki/projects-ops/main/docs/schemas/doctor-genome.v1.json",
   "title": "DoctorGenome",
-  "description": "Public distribution mirror of the canonical Projects Ops doctor-genome.v1 contract. Repository capabilities, pinned quality packs, bounded gates, and expiring exceptions are validated without embedding pack commands.",
+  "description": "Repository capabilities, pinned quality packs, bounded gates, and expiring exceptions. Pack commands are resolved by a trusted runner catalog and are never embedded in the genome.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +16,7 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "pattern": "^https://raw\\.githubusercontent\\.com/iMelki/mission-control-kanban/(main|dev)/docs/schemas/doctor-genome\\.v1\\.json$"
+      "pattern": "^https://raw\\.githubusercontent\\.com/iMelki/projects-ops/(main|dev)/docs/schemas/doctor-genome\\.v1\\.json$"
     },
     "schemaVersion": {
       "type": "string",

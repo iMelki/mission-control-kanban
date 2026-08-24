@@ -1,17 +1,39 @@
-# Public schema distributions
+# Local schema copies
 
-`doctor-genome.v1.json` is the public distribution mirror of the canonical
-Doctor contract in the private `iMelki/projects-ops` repository. The local
-genome uses this public URL so editors and other unauthenticated JSON tooling
-can load the schema instead of receiving GitHub's private-repository `404`.
+`doctor-genome.v1.json` is a **byte-faithful mirror** of the canonical Doctor
+contract in the private `iMelki/projects-ops` repository. Its SHA-256 is
+`afe8676e1c3c78c8d3c2a52915bea4246a09da2f82770fbe115ee2722323d272`, and
+`tests/doctor-genome.test.mjs` hashes the file on every run, so the mirror
+cannot silently diverge from the document it claims to mirror.
 
-The mirror records the canonical source SHA-256 in
-`x-canonical-source-sha256`. Compatible v1 changes must update the private
-canonical schema first, refresh this mirror and digest, and pass both the local
-schema validation and Doctor coverage tests. Breaking changes require a new
-versioned filename instead of silently changing the v1 contract.
+## The mirror is not a `$schema` target
 
-Validation:
+`doctor.genome.json` must declare
+
+```
+https://raw.githubusercontent.com/iMelki/projects-ops/main/docs/schemas/doctor-genome.v1.json
+```
+
+That is not a preference. The authority is git-toolkit's own vendored copy at
+`doctor/schemas/doctor-genome.v1.json`, which
+`hooks/Compare-RepoDoctorPolicy.ps1` validates every genome against at
+pre-commit, and whose `$schema` pattern accepts only the `projects-ops`
+`main` or `dev` URI.
+
+An earlier revision pointed the genome at this repository's own copy of the
+schema and rewrote that copy's pattern to allow it. No consumer reads the local
+copy, so the relaxation was inert while the genome it was written to authorise
+was rejected. Because the classifier validates the **baseline** — the genome at
+`HEAD`, not the staged one — the one-line repair could not pass the gate that
+demanded it. Classification `invalid`, exit 2, and `invalid` has no approval
+path: the repository accepted no commit at all for three scoring rounds. See
+issue #149.
+
+## Editors and offline tooling
+
+The canonical URI returns HTTP `404` to unauthenticated clients because
+`iMelki/projects-ops` is private. This is expected and must not be "fixed" by
+changing `$schema`. Validate locally against the mirror instead:
 
 ```powershell
 npm run test:doctor-genome
@@ -20,12 +42,19 @@ Test-Json -Path .\doctor.genome.json `
   -ErrorAction Stop
 ```
 
-After pushing the active branch, also verify that the exact `$schema` URI
-returns HTTP `200` and that the downloaded body matches the committed mirror.
-VS Code documents `$schema` as a supported JSON-file association and warns
-when remote schema downloads fail. JSON Schema itself distinguishes a schema
-identifier from guaranteed network retrieval, so this public mirror is a
-tooling distribution surface rather than a replacement authority.
+Editors that want inline validation should associate the file by path rather
+than by `$schema` — VS Code's `json.schemas` setting accepts a workspace-relative
+`url` such as `./docs/schemas/doctor-genome.v1.json`. That association is not
+configured in this repository today, and VS Code does not document how it ranks
+against an in-document `$schema`, so it is offered as a local preference, not as
+a supported guarantee.
+
+## Changing the contract
+
+Compatible v1 changes must land in the private canonical schema first, then
+refresh this mirror and the digest recorded in the test in the same commit.
+Breaking changes require a new versioned filename; the v1 contract is never
+silently changed.
 
 References:
 
