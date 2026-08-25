@@ -134,7 +134,9 @@
  * Env knobs:
  *   MCK_A11Y_SELFPROOF_ROUTE   pin the self-proof to a named surface
  *   MCK_A11Y_MAX_FOCUS         focus-check cap (0 = unbounded, the default)
- *   MCK_A11Y_FOCUS_BUDGET_MS   wall-clock budget per surface (default 240000)
+ *   MCK_A11Y_FOCUS_BUDGET_MS   wall-clock budget per surface (default 120000, 0 = none)
+ *   MCK_A11Y_ROUTES            comma-separated route filter; the report and the
+ *                              banner both record that the run was filtered
  *   MCK_A11Y_FOCUS_ROUNDS      re-enumeration rounds after a destroyed sample
  *   MCK_A11Y_MAX_TABS          tab-walk step cap (default 60)
  */
@@ -155,12 +157,30 @@ const manifest = JSON.parse(
 );
 const viewports = manifest.viewports.map((v) => ({ w: v.width, h: v.height, label: v.label }));
 // Drive the route list from the manifest so this can never drift from the gate.
-const routes = manifest.surfaces
+const allRoutes = manifest.surfaces
   .filter((s) => s.capture === 'required')
   .map((s) => ({
     url: s.route,
     name: s.route === '/' ? 'home' : s.route.replace(/^\//, '').replace(/\//g, '-'),
   }));
+// A full sweep is ~35 minutes, which makes iterating on one surface expensive
+// enough that people stop doing it. MCK_A11Y_ROUTES narrows the run -- and the
+// filter is RECORDED in the report and printed in the banner, because a
+// one-route run that cannot be told apart from a sweep is a fail-open waiting
+// to be quoted as a baseline.
+const ROUTE_FILTER = (process.env.MCK_A11Y_ROUTES || '')
+  .split(',')
+  .map((x) => x.trim())
+  .filter(Boolean);
+const routes = ROUTE_FILTER.length
+  ? allRoutes.filter((r) => ROUTE_FILTER.includes(r.url))
+  : allRoutes;
+if (ROUTE_FILTER.length && routes.length === 0) {
+  console.error(
+    'MCK_A11Y_ROUTES matched none of the required surfaces: ' + allRoutes.map((r) => r.url).join(' ')
+  );
+  process.exit(2);
+}
 // DEFECT: the self-proof used to be pinned to '/', the one required surface
 // whose focusable population is small and static -- so the legs that guard the
 // coverage reporter ran on the single route where the failure mode cannot
@@ -168,12 +188,14 @@ const routes = manifest.surfaces
 // live) and prove the choice: the last leg fails if the chosen route turns out
 // to be structurally incapable of collapsing.
 const SELF_PROOF_ROUTE_ENV = process.env.MCK_A11Y_SELFPROOF_ROUTE;
-const nestedRoutes = routes.filter((r) => r.url !== '/' && r.url.split('/').length > 2);
+// Chosen from ALL required surfaces, never from the filtered set: a route
+// filter must not silently move the subject the probe proves itself on.
+const nestedRoutes = allRoutes.filter((r) => r.url !== '/' && r.url.split('/').length > 2);
 const control =
-  (SELF_PROOF_ROUTE_ENV && routes.find((r) => r.url === SELF_PROOF_ROUTE_ENV)) ||
+  (SELF_PROOF_ROUTE_ENV && allRoutes.find((r) => r.url === SELF_PROOF_ROUTE_ENV)) ||
   nestedRoutes[0] ||
-  routes.find((r) => r.url === '/') ||
-  routes[0];
+  allRoutes.find((r) => r.url === '/') ||
+  allRoutes[0];
 const SELF_PROOF_ROUTE_REASON = SELF_PROOF_ROUTE_ENV
   ? 'MCK_A11Y_SELFPROOF_ROUTE=' + SELF_PROOF_ROUTE_ENV
   : nestedRoutes[0]
@@ -601,10 +623,54 @@ const FOCUS_EVIDENCE = (element) => {
           shadow !== 'none' && shadow !== '' && !/rgba\([^)]*,\s*0\s*\)/.test(shadow);
         const focusVisible = element.matches(':focus-visible');
         const rect = element.getBoundingClientRect();
-        const cx = Math.min(window.innerWidth - 1, Math.max(0, rect.left + rect.width / 2));
-        const cy = Math.min(window.innerHeight - 1, Math.max(0, rect.top + rect.height / 2));
-        const top = document.elementFromPoint(cx, cy);
-        const inViewport = rect.bottom > 0 && rect.top < window.innerHeight;
+        // OCCLUSION (#155). The first version hit-tested the centre of the
+        // element's FULL border box and clamped that point to the viewport
+        // edge. A control taller than the scroll window that CLIPS it -- a
+        // 312px card inside a 16px-tall flex column on this app at 390x844 --
+        // has its geometric centre outside that window, so elementFromPoint
+        // returned a node from outside the control's subtree and the control
+        // was reported "obscured or outside the viewport" while being fully
+        // legible to a user. That is what produced 960 mobile failures and 0
+        // desktop failures from the same controls.
+        //
+        // WCAG 2.4.11 asks whether the focused control is hidden, so hit-test
+        // the centre of the part that is actually PAINTED: the border box
+        // intersected with the viewport and with every clipping ancestor.
+        // `visibleFraction` is recorded so a control reduced to a sliver is
+        // still visible IN THE EVIDENCE rather than laundered into a pass.
+        let vx0 = Math.max(0, rect.left);
+        let vy0 = Math.max(0, rect.top);
+        let vx1 = Math.min(window.innerWidth, rect.right);
+        let vy1 = Math.min(window.innerHeight, rect.bottom);
+        let clippedBy = null;
+        for (let n = element.parentElement, d = 0; n && d < 24; n = n.parentElement, d += 1) {
+          const cs = window.getComputedStyle(n);
+          if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+          const cr = n.getBoundingClientRect();
+          const bx0 = cs.overflowX === 'visible' ? vx0 : Math.max(vx0, cr.left);
+          const bx1 = cs.overflowX === 'visible' ? vx1 : Math.min(vx1, cr.right);
+          const by0 = cs.overflowY === 'visible' ? vy0 : Math.max(vy0, cr.top);
+          const by1 = cs.overflowY === 'visible' ? vy1 : Math.min(vy1, cr.bottom);
+          if (!clippedBy && (bx0 !== vx0 || bx1 !== vx1 || by0 !== vy0 || by1 !== vy1)) {
+            clippedBy =
+              n.tagName.toLowerCase() +
+              (n.id ? '#' + n.id : '') +
+              ' [' + cs.overflowX + '/' + cs.overflowY + ']';
+          }
+          vx0 = bx0;
+          vx1 = bx1;
+          vy0 = by0;
+          vy1 = by1;
+          if (vx1 <= vx0 || vy1 <= vy0) break;
+        }
+        const visW = Math.max(0, vx1 - vx0);
+        const visH = Math.max(0, vy1 - vy0);
+        const boxArea = Math.max(1, rect.width * rect.height);
+        const visibleFraction = Math.round(((visW * visH) / boxArea) * 1000) / 1000;
+        const inViewport = visW > 0 && visH > 0;
+        const hx = Math.min(window.innerWidth - 1, Math.max(0, vx0 + visW / 2));
+        const hy = Math.min(window.innerHeight - 1, Math.max(0, vy0 + visH / 2));
+        const top = inViewport ? document.elementFromPoint(hx, hy) : null;
         const unobscured =
           inViewport &&
           Boolean(top) &&
@@ -656,6 +722,16 @@ const FOCUS_EVIDENCE = (element) => {
           focusVisible,
           inViewport,
           unobscured,
+          visibleFraction,
+          clippedBy,
+          obscuredBy:
+            !unobscured && inViewport && top
+              ? top.tagName.toLowerCase() +
+                (top.id ? '#' + top.id : '') +
+                (typeof top.className === 'string' && top.className
+                  ? '.' + top.className.trim().split(/\s+/).slice(0, 3).join('.')
+                  : '')
+              : null,
           visible,
           transparentOutlineOnly,
           styles,
@@ -789,6 +865,13 @@ async function verifyFocusIndicators(page, limit, options = {}) {
         // :focus-visible to the final programmatic focus used for measurement.
         await page.keyboard.press('Tab');
         await h.focus();
+        // NOT re-scrolled before measuring. An extra scrollIntoView here was
+        // tried and dropped: on a 25-control timing control at 390x844 it
+        // changed nothing that mattered (unobscured 25/25 with and without,
+        // 111 vs 111 ms per control) while adding a second scroll of every
+        // overflow:hidden ancestor per control. The occlusion result is made
+        // correct by measuring the VISIBLE rect, not by re-positioning the
+        // page -- see FOCUS_EVIDENCE.
         result = await h.evaluate(FOCUS_EVIDENCE);
       } catch (e) {
         outcome.threw += 1;
@@ -874,7 +957,17 @@ async function verifyFocusIndicators(page, limit, options = {}) {
         );
       }
       if (!result.unobscured) {
-        failures.push(result.label + ' was obscured or outside the viewport when focused.');
+        failures.push(
+          result.label +
+            (result.inViewport
+              ? ' was OBSCURED when focused: the centre of its visible area hit ' +
+                JSON.stringify(result.obscuredBy) +
+                (result.clippedBy ? ' (clipped by ' + result.clippedBy + ')' : '') +
+                '.'
+              : ' was OUTSIDE THE VIEWPORT when focused (no painted area' +
+                (result.clippedBy ? '; clipped by ' + result.clippedBy : '') +
+                ').')
+        );
       }
     }
 
@@ -958,10 +1051,306 @@ async function verifyFocusIndicators(page, limit, options = {}) {
       visible: scored.filter((e) => e.visible).length,
       transparentOutlineOnly: scored.filter((e) => e.transparentOutlineOnly).length,
       unobscured: scored.filter((e) => e.unobscured).length,
+      // Split so a genuinely off-screen control can never hide inside an
+      // "obscured" count, and so a control reduced to a sliver by a clipping
+      // ancestor is visible in the report even though WCAG 2.4.11 (AA) is
+      // satisfied by any painted part. Reported, not scored.
+      outsideViewport: scored.filter((e) => !e.inViewport).length,
+      coveredByOtherContent: scored.filter((e) => e.inViewport && !e.unobscured).length,
+      lessThanQuarterVisible: scored.filter(
+        (e) => e.inViewport && typeof e.visibleFraction === 'number' && e.visibleFraction < 0.25
+      ).length,
       retainedFocus: scored.filter((e) => e.active).length,
       coverage,
     },
     coverage,
+    failures,
+    evidence,
+  };
+}
+
+/* -------------------------------------------------- roving arrow-key pass --- */
+/**
+ * #154. A roving-tabindex widget parks `tabindex="-1"` on every child except
+ * the active one. Those children are NOT Tab-reachable, so verifyFocusIndicators
+ * deliberately never focuses them -- doing so on an automatic-activation tablist
+ * selects the tab, unmounts the panel holding the rest of the sample, and is
+ * exactly what collapsed the focus sample to 4.9%. The consequence was that 40
+ * controls were enumerated and never focus-audited, and their focus rings went
+ * unmeasured.
+ *
+ * They ARE reachable -- by ArrowRight/ArrowDown inside the widget -- and the
+ * focus-indicator requirement applies to them there. This pass walks them that
+ * way, and it runs LAST on each surface: the panel switch it provokes is
+ * expected here and fatal to the Tab pass, so the two must not be interleaved.
+ *
+ * It holds NO element handle across a key press. Every measurement reads
+ * `document.activeElement` fresh and re-resolves containers by a stamped id, so
+ * an unmount between two stops cannot silently drop a control the way a stale
+ * handle did -- an unmounted handle reports a 0x0 rect rather than throwing,
+ * which is the original defect in a different costume.
+ *
+ * DENOMINATOR. `population` is the UNION of the roving children stamped before
+ * the walk and those stamped after it (panel switches mint new ones), so a
+ * widget that only appears mid-pass still counts against the denominator and
+ * cannot be excluded to flatter coverage. `measured` counts distinct stamped
+ * ids actually focused and scored. Children a widget will not move DOM focus to
+ * -- an aria-activedescendant listbox, say -- are NAMED in `notReached` with the
+ * reason, never absorbed.
+ */
+const ROVING_ROLES =
+  '[role="tablist"],[role="toolbar"],[role="radiogroup"],[role="menu"],[role="menubar"],' +
+  '[role="listbox"],[role="tree"],[role="treegrid"],[role="grid"],[role="tabs"]';
+const ANY_FOCUSABLE =
+  'a[href],button,input,select,textarea,summary,[tabindex],[contenteditable="true"]';
+
+/** Stamps ids on roving children and groups them under their container. */
+const ROVING_INVENTORY = (args) => {
+  const root = args.scope ? document.querySelector(args.scope) : document.body;
+  if (!root) return { containers: [], childIds: [] };
+  const stamp = (el) => {
+    if (!el.__a11yId) {
+      window.__a11ySeq = (window.__a11ySeq || 0) + 1;
+      el.__a11yId = window.__a11ySeq;
+    }
+    return el.__a11yId;
+  };
+  const usable = (el) => {
+    if (!el.isConnected || !window.__isAppEl(el)) return false;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    if (el.hasAttribute('disabled')) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const roving = Array.from(root.querySelectorAll(args.anyFocusable)).filter(
+    (el) => el.tabIndex < 0 && usable(el)
+  );
+  const byContainer = new Map();
+  const childIds = [];
+  for (const el of roving) {
+    let container = el.closest(args.rovingRoles);
+    if (!container) {
+      // No ARIA role to go on: the container is the nearest ancestor that also
+      // holds a Tab-reachable focusable, i.e. the widget's entry point.
+      for (let n = el.parentElement, d = 0; n && d < 6; n = n.parentElement, d += 1) {
+        const entry = Array.from(n.querySelectorAll(args.anyFocusable)).filter(
+          (c) => c.tabIndex >= 0 && usable(c)
+        );
+        if (entry.length >= 1) {
+          container = n;
+          break;
+        }
+      }
+    }
+    if (!container) continue;
+    const cid = stamp(container);
+    if (!byContainer.has(cid)) {
+      byContainer.set(cid, {
+        containerId: cid,
+        role: container.getAttribute('role'),
+        tag: container.tagName.toLowerCase(),
+        // aria-label first, then the widget's own visible text: a bare
+        // "DIV" in a failure line sends the reader nowhere.
+        label: (
+          container.getAttribute('aria-label') ||
+          container.textContent ||
+          container.tagName
+        )
+          .trim()
+          .replace(/\s+/g, ' ')
+          .slice(0, 40),
+        childIds: [],
+        entryIds: [],
+      });
+    }
+    byContainer.get(cid).childIds.push(stamp(el));
+    childIds.push(el.__a11yId);
+  }
+  for (const c of byContainer.values()) {
+    const node = window.__a11yById(c.containerId);
+    if (!node) continue;
+    c.entryIds = Array.from(node.querySelectorAll(args.anyFocusable))
+      .filter((el) => el.tabIndex >= 0 && usable(el))
+      .map(stamp);
+  }
+  return { containers: Array.from(byContainer.values()), childIds };
+};
+
+/** Resolves a stamped id back to its live node; returns null once unmounted. */
+async function defineStampLookup(page) {
+  await page.evaluate(() => {
+    window.__a11yById = (id) => {
+      for (const n of document.querySelectorAll('*')) if (n.__a11yId === id) return n;
+      return null;
+    };
+  });
+}
+
+async function auditRovingChildren(page, options = {}) {
+  const scope = options.scope || null;
+  const maxStepsPerContainer = options.maxSteps ?? 32;
+  await defineStampLookup(page);
+  const args = { scope, rovingRoles: ROVING_ROLES, anyFocusable: ANY_FOCUSABLE };
+  const before = await page.evaluate(ROVING_INVENTORY, args);
+
+  // A roving widget moves tabindex="0" ONTO the child it focuses (that is the
+  // pattern), so a stop's LIVE tabIndex says nothing about whether Tab could
+  // have reached it. Identity is decided once, from the enumeration: anything
+  // that was a Tab-reachable entry point belongs to the Tab pass; every other
+  // stop is arrow-only and belongs here. Filtering on the live tabIndex instead
+  // would have measured zero children on every correctly-built widget.
+  const entryIdSet = new Set(before.containers.flatMap((c) => c.entryIds));
+  const populationIds = new Set(before.childIds.filter((id) => !entryIdSet.has(id)));
+  const measuredIds = new Set();
+  const evidence = [];
+  const failures = [];
+  const notReached = [];
+  let containersWalked = 0;
+  let containersWithoutEntry = 0;
+  let containersArrowInert = 0;
+
+  for (const container of before.containers) {
+    if (container.entryIds.length === 0) {
+      containersWithoutEntry += 1;
+      notReached.push({
+        container: container.label,
+        reason:
+          'no Tab-reachable entry point: a keyboard user cannot enter this widget at all, so its ' +
+          container.childIds.length +
+          ' roving children are unreachable',
+        children: container.childIds.length,
+      });
+      continue;
+    }
+    const entered = await page.evaluate((id) => {
+      const el = window.__a11yById(id);
+      if (!el) return false;
+      el.focus();
+      return document.activeElement === el;
+    }, container.entryIds[0]);
+    if (!entered) {
+      notReached.push({
+        container: container.label,
+        reason: 'entry control would not take focus',
+        children: container.childIds.length,
+      });
+      continue;
+    }
+    containersWalked += 1;
+
+    // Find a key this widget actually responds to before spending the budget.
+    let key = null;
+    for (const candidate of ['ArrowRight', 'ArrowDown']) {
+      const idBefore = await page.evaluate(() =>
+        document.activeElement ? document.activeElement.__a11yId || null : null
+      );
+      await page.keyboard.press(candidate);
+      await delay(60);
+      const idAfter = await page.evaluate(() =>
+        document.activeElement ? document.activeElement.__a11yId || null : null
+      );
+      if (idAfter !== idBefore) {
+        key = candidate;
+        break;
+      }
+    }
+    if (!key) {
+      containersArrowInert += 1;
+      notReached.push({
+        container: container.label,
+        reason:
+          'neither ArrowRight nor ArrowDown moves DOM focus (aria-activedescendant widget, or no ' +
+          'roving handler) -- its children never become document.activeElement',
+        children: container.childIds.length,
+      });
+      continue;
+    }
+
+    const seenThisContainer = new Set();
+    for (let step = 0; step < maxStepsPerContainer; step += 1) {
+      const stamped = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return null;
+        if (!window.__isAppEl(el)) return { outsideApp: true };
+        if (!el.__a11yId) {
+          window.__a11ySeq = (window.__a11ySeq || 0) + 1;
+          el.__a11yId = window.__a11ySeq;
+        }
+        return { id: el.__a11yId, tabIndex: el.tabIndex };
+      });
+      if (!stamped || stamped.outsideApp) break;
+      if (seenThisContainer.has(stamped.id)) break; // wrapped around
+      seenThisContainer.add(stamped.id);
+      if (!entryIdSet.has(stamped.id)) populationIds.add(stamped.id);
+
+      if (!entryIdSet.has(stamped.id) && !measuredIds.has(stamped.id)) {
+        // The IDENTICAL collector the Tab pass uses, applied to whatever is
+        // focused right now. No handle is held across the key press.
+        const result = await page.evaluate(
+          '(' + FOCUS_EVIDENCE.toString() + ')(document.activeElement)'
+        );
+        result.a11yId = stamped.id;
+        result.reachedBy = key;
+        result.container = container.label;
+        measuredIds.add(stamped.id);
+        evidence.push(result);
+        if (!result.visible) {
+          failures.push(
+            'ROVING ' +
+              JSON.stringify(result.label) +
+              ' in ' +
+              JSON.stringify(container.label) +
+              ' has ' +
+              (result.transparentOutlineOnly
+                ? 'only a TRANSPARENT outline'
+                : 'no visible keyboard focus indicator') +
+              ' when reached by ' +
+              key +
+              '.'
+          );
+        }
+        if (!result.unobscured) {
+          failures.push(
+            'ROVING ' +
+              JSON.stringify(result.label) +
+              ' was ' +
+              (result.inViewport ? 'OBSCURED' : 'OUTSIDE THE VIEWPORT') +
+              ' when reached by ' +
+              key +
+              '.'
+          );
+        }
+      }
+      await page.keyboard.press(key);
+      await delay(60);
+    }
+  }
+
+  // Panel switches mint new roving children. Re-enumerate and UNION, so a widget
+  // that only exists after an activation still counts against the denominator.
+  const after = await page.evaluate(ROVING_INVENTORY, args);
+  // The walk leaves tabindex="0" on the last child it visited and "-1" on the
+  // original entry, so `after` reports the entry as a roving child. It is not
+  // one for this pass's purposes -- the Tab pass measured it -- and counting it
+  // here would invent a shortfall that no control could ever close.
+  for (const id of after.childIds) if (!entryIdSet.has(id)) populationIds.add(id);
+
+  const population = populationIds.size;
+  const measured = measuredIds.size;
+  return {
+    containers: before.containers.length,
+    containersWalked,
+    containersWithoutEntry,
+    containersArrowInert,
+    population,
+    measured,
+    coveragePct: population === 0 ? 100 : Math.round((measured / population) * 1000) / 10,
+    notAudited: Math.max(0, population - measured),
+    visible: evidence.filter((e) => e.visible).length,
+    transparentOutlineOnly: evidence.filter((e) => e.transparentOutlineOnly).length,
+    unobscured: evidence.filter((e) => e.unobscured).length,
+    notReached,
     failures,
     evidence,
   };
@@ -991,6 +1380,10 @@ async function measure(browser, route, vp) {
   // silently mis-state coverage in either direction.
   const inventoryAtFocusPass = await focusableInventory(page);
   const focus = await verifyFocusIndicators(page, MAX_FOCUS_CHECKS);
+  // #154. LAST, deliberately: arriving on an automatic-activation tab switches
+  // panels, which is expected for an arrow-key audit and fatal to the Tab pass
+  // above. Interleaving the two is what produced 4.9% coverage.
+  const roving = await auditRovingChildren(page);
 
   await page.close();
   return {
@@ -1013,6 +1406,23 @@ async function measure(browser, route, vp) {
     focus: focus.metrics,
     focusCoverage: focus.coverage,
     focusFailures: focus.failures,
+    // Kept in its own bucket so Tab coverage and arrow-key coverage stay
+    // separately readable and neither can be quietly folded into the other.
+    roving: {
+      containers: roving.containers,
+      containersWalked: roving.containersWalked,
+      containersWithoutEntry: roving.containersWithoutEntry,
+      containersArrowInert: roving.containersArrowInert,
+      population: roving.population,
+      measured: roving.measured,
+      coveragePct: roving.coveragePct,
+      notAudited: roving.notAudited,
+      visible: roving.visible,
+      transparentOutlineOnly: roving.transparentOutlineOnly,
+      unobscured: roving.unobscured,
+      notReached: roving.notReached,
+    },
+    rovingFailures: roving.failures,
     pageErrors,
   };
 }
@@ -1081,6 +1491,163 @@ async function injectFocusSample(page, spec) {
       tabReachable: Array.from(wrap.querySelectorAll('button')).filter((b) => b.tabIndex >= 0)
         .length,
     };
+  }, spec);
+}
+
+/**
+ * Authored control content for the OCCLUSION detector (#155).
+ *
+ * Before this existed the occlusion test had NEVER been shown capable of
+ * reporting a covered control: the harness had twelve legs and not one of them
+ * touched `unobscured`. It reported `208/208 unobscured`, then `3234/4194`, and
+ * neither number had a proof behind it. A detector that has never fired is not
+ * evidence of anything.
+ *
+ * Three controls, all identical except for what sits on top of them:
+ *   clear      - nothing over it                       -> must read unobscured
+ *   covered    - an opaque fixed overlay directly over -> must read OBSCURED
+ *   clipped    - taller than the 20px overflow:hidden window that holds it, so
+ *                its geometric CENTRE is outside that window while a large part
+ *                of it is plainly painted -> must read unobscured. This is the
+ *                exact shape that produced 960 false mobile failures.
+ */
+async function injectOcclusionSample(page, spec) {
+  return await page.evaluate((s) => {
+    const wrap = document.createElement('div');
+    wrap.id = s.id;
+    wrap.setAttribute(
+      'style',
+      'position:relative;z-index:2147483000;background:#ffffff;padding:8px'
+    );
+    const ring = 'outline:2px solid #0000ff';
+    const mk = (bid, text, extra) => {
+      const b = document.createElement('button');
+      b.id = bid;
+      b.textContent = text;
+      b.setAttribute(
+        'style',
+        'display:block;width:160px;height:24px;background:#ffffff;color:#000000;' +
+          'border:1px solid #000000;' + ring + ';' + (extra || '')
+      );
+      return b;
+    };
+    wrap.appendChild(mk(s.id + '_clear', 'occlusion clear'));
+
+    const clipBox = document.createElement('div');
+    clipBox.id = s.id + '_clipbox';
+    clipBox.setAttribute('style', 'height:20px;overflow:hidden;width:180px');
+    clipBox.appendChild(mk(s.id + '_clipped', 'occlusion clipped', 'height:200px'));
+    wrap.appendChild(clipBox);
+
+    const coveredHolder = document.createElement('div');
+    coveredHolder.setAttribute('style', 'position:relative');
+    coveredHolder.appendChild(mk(s.id + '_covered', 'occlusion covered'));
+    wrap.appendChild(coveredHolder);
+    document.body.prepend(wrap);
+
+    if (s.cover) {
+      const target = document.getElementById(s.id + '_covered').getBoundingClientRect();
+      const veil = document.createElement('div');
+      veil.id = s.id + '_veil';
+      veil.setAttribute(
+        'style',
+        'position:fixed;z-index:2147483600;background:#123456;' +
+          'left:' + Math.round(target.left - 4) + 'px;top:' + Math.round(target.top - 4) + 'px;' +
+          'width:' + Math.round(target.width + 8) + 'px;height:' + Math.round(target.height + 8) + 'px'
+      );
+      document.body.appendChild(veil);
+    }
+    return { injected: 3 };
+  }, spec);
+}
+
+/**
+ * Authored control content for the ROVING arrow-key pass (#154).
+ *
+ * A real roving widget: one Tab-reachable entry, two `tabindex="-1"` children,
+ * ArrowRight/ArrowLeft move focus AND move the tabindex="0" onto the newly
+ * focused child, exactly as Radix RovingFocusGroup does. `suppressed` strips the
+ * focus ring from the first child, so the pass must NAME it. `destructive`
+ * unmounts the panel on arrival, so the pass must survive the unmount and still
+ * measure both children -- the failure mode that made #154 a trade-off in the
+ * first place.
+ */
+async function injectRovingWidget(page, spec) {
+  return await page.evaluate((s) => {
+    const wrap = document.createElement('div');
+    wrap.id = s.id;
+    wrap.setAttribute(
+      'style',
+      'position:relative;z-index:2147483000;background:#ffffff;padding:8px'
+    );
+    const ring = 'outline:2px solid #0000ff';
+    const mk = (bid, text, tabindex, style) => {
+      const b = document.createElement('button');
+      b.id = bid;
+      b.textContent = text;
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', tabindex === 0 ? 'true' : 'false');
+      b.tabIndex = tabindex;
+      b.setAttribute(
+        'style',
+        'display:inline-block;width:150px;height:24px;background:#ffffff;color:#000000;' +
+          'border:1px solid #000000;' + style
+      );
+      return b;
+    };
+    const list = document.createElement('div');
+    list.id = s.id + '_list';
+    list.setAttribute('role', 'tablist');
+    list.setAttribute('aria-label', s.id + ' roving tablist');
+    list.appendChild(mk(s.id + '_entry', s.id + ' roving entry', 0, ring));
+    list.appendChild(
+      mk(
+        s.id + '_child1',
+        s.id + ' roving child one',
+        -1,
+        s.suppressed ? 'outline:none !important;box-shadow:none !important' : ring
+      )
+    );
+    list.appendChild(mk(s.id + '_child2', s.id + ' roving child two', -1, ring));
+    wrap.appendChild(list);
+
+    const panel = document.createElement('div');
+    panel.id = s.id + '_panel';
+    for (let i = 0; i < (s.panelControls || 0); i += 1) {
+      const v = document.createElement('button');
+      v.id = s.id + '_p' + i;
+      v.textContent = 'panel control ' + i;
+      v.setAttribute('style', 'display:inline-block;width:110px;height:20px;' + ring);
+      panel.appendChild(v);
+    }
+    wrap.appendChild(panel);
+    document.body.prepend(wrap);
+
+    list.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const items = Array.from(list.querySelectorAll('[role="tab"]'));
+      const i = items.indexOf(document.activeElement);
+      if (i < 0) return;
+      const next = items[(i + (e.key === 'ArrowRight' ? 1 : items.length - 1)) % items.length];
+      // The roving pattern: the focused item BECOMES the single tab stop.
+      items.forEach((it) => {
+        it.tabIndex = -1;
+        it.setAttribute('aria-selected', 'false');
+      });
+      next.tabIndex = 0;
+      next.setAttribute('aria-selected', 'true');
+      next.focus();
+      e.preventDefault();
+    });
+    if (s.destructive) {
+      list.addEventListener('focusin', () => {
+        const el = document.activeElement;
+        if (!el || el.id !== s.id + '_child1') return;
+        const p = document.getElementById(s.id + '_panel');
+        if (p) p.remove();
+      });
+    }
+    return { rovingChildren: 2, panelControls: s.panelControls || 0 };
   }, spec);
 }
 
@@ -1206,6 +1773,55 @@ async function selfProof(browser) {
     rounds: 2,
   });
   await removeById(page, '__a11y_roving');
+
+  /* --- authored control content for the OCCLUSION detector (#155) --- */
+  // C4: three identical controls -- one clear, one under an opaque fixed veil,
+  //     one clipped so its geometric centre is outside the window that paints
+  //     it. The detector must separate "covered" from "merely clipped".
+  await injectOcclusionSample(page, { id: '__a11y_occ', cover: true });
+  await delay(150);
+  const occPass = await verifyFocusIndicators(page, 0, {
+    selector: '#__a11y_occ button',
+    rounds: 1,
+  });
+  const occClear = occPass.evidence.find((e) => /occlusion clear/.test(e.label));
+  const occCovered = occPass.evidence.find((e) => /occlusion covered/.test(e.label));
+  const occClipped = occPass.evidence.find((e) => /occlusion clipped/.test(e.label));
+  await removeById(page, '__a11y_occ_veil');
+  await delay(150);
+  const occAfterUnveil = await verifyFocusIndicators(page, 0, {
+    selector: '#__a11y_occ button',
+    rounds: 1,
+  });
+  const occCoveredAfter = occAfterUnveil.evidence.find((e) => /occlusion covered/.test(e.label));
+  await removeById(page, '__a11y_occ');
+
+  /* --- authored control content for the ROVING arrow-key pass (#154) --- */
+  // C5: a roving tablist whose first arrow-reachable child has its focus ring
+  //     suppressed and which unmounts its panel on arrival. The pass must reach
+  //     BOTH children through the unmount and must name the suppressed one.
+  await injectRovingWidget(page, {
+    id: '__a11y_rovingbad',
+    suppressed: true,
+    destructive: true,
+    panelControls: 6,
+  });
+  await delay(150);
+  const rovingBad = await auditRovingChildren(page, { scope: '#__a11y_rovingbad' });
+  await removeById(page, '__a11y_rovingbad');
+
+  // C6: the SAME widget with every ring intact and nothing destructive. If this
+  //     does not come back clean then a roving failure count carries no
+  //     information -- a leg that cannot pass is as dead as one that cannot fail.
+  await injectRovingWidget(page, {
+    id: '__a11y_rovinggood',
+    suppressed: false,
+    destructive: false,
+    panelControls: 6,
+  });
+  await delay(150);
+  const rovingGood = await auditRovingChildren(page, { scope: '#__a11y_rovinggood' });
+  await removeById(page, '__a11y_rovinggood');
 
   await page.close();
 
@@ -1394,6 +2010,81 @@ async function selfProof(browser) {
           ? ''
           : ' -- STATIC surface: this self-proof cannot observe the defect it guards.'),
     },
+    {
+      // #155. The occlusion test shipped two published numbers (208/208, then
+      // 3234/4194) without ever having been shown able to report a covered
+      // control. Twelve legs, none of them touching `unobscured`. This is that
+      // proof, in both directions and by name.
+      leg: 'OCCLUSION: a control under an opaque overlay is reported OBSCURED, a clear one is not',
+      detected:
+        Boolean(occClear && occCovered) &&
+        occClear.unobscured === true &&
+        occCovered.unobscured === false &&
+        occCovered.inViewport === true &&
+        Boolean(occCovered.obscuredBy) &&
+        occPass.failures.some((f) => /occlusion covered/.test(f) && /OBSCURED/.test(f)),
+      detail:
+        'clear unobscured=' + (occClear ? occClear.unobscured : 'MISSING') +
+        '; covered unobscured=' + (occCovered ? occCovered.unobscured : 'MISSING') +
+        ' obscuredBy=' + JSON.stringify(occCovered ? occCovered.obscuredBy : null) +
+        '; named in failures=' + occPass.failures.some((f) => /occlusion covered/.test(f)),
+    },
+    {
+      leg: 'OCCLUSION: the same control reads unobscured once the overlay is removed',
+      detected: Boolean(occCoveredAfter) && occCoveredAfter.unobscured === true,
+      detail:
+        'covered-after-unveil unobscured=' +
+        (occCoveredAfter ? occCoveredAfter.unobscured : 'MISSING') +
+        ' (a detector that cannot return to clean is a stuck alarm, not a detector)',
+    },
+    {
+      // The FALSE-POSITIVE direction, which is what #155 actually was: a
+      // control taller than the window that clips it is visible, and must not
+      // be scored obscured merely because its geometric midpoint is unpainted.
+      leg: 'OCCLUSION: a clipped control is scored on its VISIBLE area, not its midpoint',
+      detected:
+        Boolean(occClipped) &&
+        occClipped.unobscured === true &&
+        occClipped.inViewport === true &&
+        typeof occClipped.visibleFraction === 'number' &&
+        occClipped.visibleFraction < 0.25 &&
+        Boolean(occClipped.clippedBy),
+      detail:
+        'clipped unobscured=' + (occClipped ? occClipped.unobscured : 'MISSING') +
+        ' visibleFraction=' + (occClipped ? occClipped.visibleFraction : 'n/a') +
+        ' clippedBy=' + JSON.stringify(occClipped ? occClipped.clippedBy : null),
+    },
+    {
+      // #154. Arrow-key coverage, proven on authored content that unmounts a
+      // panel mid-walk -- the exact event that made the Tab pass skip these.
+      leg: 'ROVING: both arrow-only children measured THROUGH a panel unmount, suppressed ring named',
+      detected:
+        rovingBad.population === 2 &&
+        rovingBad.measured === 2 &&
+        rovingBad.notAudited === 0 &&
+        rovingBad.containersWalked === 1 &&
+        rovingBad.failures.some((f) => /roving child one/.test(f)) &&
+        rovingBad.failures.every((f) => !/roving child two/.test(f)),
+      detail:
+        'measured=' + rovingBad.measured + '/' + rovingBad.population +
+        ' notAudited=' + rovingBad.notAudited +
+        ' visible=' + rovingBad.visible +
+        ' failures=' + rovingBad.failures.length +
+        ' namesChildOne=' + rovingBad.failures.some((f) => /roving child one/.test(f)) +
+        ' namesChildTwo=' + rovingBad.failures.some((f) => /roving child two/.test(f)),
+    },
+    {
+      leg: 'ROVING: an identical widget with intact rings reports 2/2 measured and ZERO failures',
+      detected:
+        rovingGood.population === 2 &&
+        rovingGood.measured === 2 &&
+        rovingGood.visible === 2 &&
+        rovingGood.failures.length === 0,
+      detail:
+        'measured=' + rovingGood.measured + '/' + rovingGood.population +
+        ' visible=' + rovingGood.visible +
+        ' failures=' + rovingGood.failures.length,
+    },
   ];
   return {
     route: control.url,
@@ -1411,6 +2102,30 @@ async function selfProof(browser) {
       selfDestroying: collapsePass.coverage,
       stable: stablePass.coverage,
       rovingTabindex: rovingPass.coverage,
+      occlusion: {
+        clear: occClear || null,
+        covered: occCovered || null,
+        clipped: occClipped || null,
+        coveredAfterUnveil: occCoveredAfter || null,
+        failures: occPass.failures,
+      },
+      rovingArrowAudit: {
+        suppressedAndDestructive: {
+          population: rovingBad.population,
+          measured: rovingBad.measured,
+          notAudited: rovingBad.notAudited,
+          visible: rovingBad.visible,
+          failures: rovingBad.failures,
+          notReached: rovingBad.notReached,
+        },
+        intact: {
+          population: rovingGood.population,
+          measured: rovingGood.measured,
+          visible: rovingGood.visible,
+          failures: rovingGood.failures,
+          notReached: rovingGood.notReached,
+        },
+      },
     },
     legs,
     alive: legs.every((l) => l.detected),
@@ -1465,7 +2180,9 @@ async function main() {
               ? ' SAMPLE-DESTROYED-BY=' + JSON.stringify(r.focusCoverage.destroyedBy)
               : '') +
             ' tabstops=' + r.keyboard.tabStops +
-            ' trap=' + (r.keyboard.keyboardTrap ? 'YES' : 'no')
+            ' trap=' + (r.keyboard.keyboardTrap ? 'YES' : 'no') +
+            ' roving=' + r.roving.measured + '/' + r.roving.population +
+            '(' + r.roving.visible + 'vis)'
         );
       }
     }
@@ -1485,7 +2202,22 @@ async function main() {
         focusPopulation: a.focusPopulation + r.focusCoverage.population,
         focusMeasured: a.focusMeasured + r.focusCoverage.measuredFromPopulation,
         focusableBeforeSettle: a.focusableBeforeSettle + r.keyboard.focusableCountBeforeSettle,
-        rovingNotAudited: a.rovingNotAudited + r.focusCoverage.skipped.notTabReachable,
+        // The Tab pass's own count of controls it declined to focus. Kept as a
+        // cross-check against the arrow-key pass, which enumerates at a
+        // different moment and can legitimately differ.
+        rovingSkippedByTabPass: a.rovingSkippedByTabPass + r.focusCoverage.skipped.notTabReachable,
+        rovingPopulation: a.rovingPopulation + r.roving.population,
+        rovingMeasured: a.rovingMeasured + r.roving.measured,
+        rovingNotAudited: a.rovingNotAudited + r.roving.notAudited,
+        rovingVisible: a.rovingVisible + r.roving.visible,
+        rovingUnobscured: a.rovingUnobscured + r.roving.unobscured,
+        rovingContainersArrowInert: a.rovingContainersArrowInert + r.roving.containersArrowInert,
+        rovingContainersWithoutEntry:
+          a.rovingContainersWithoutEntry + r.roving.containersWithoutEntry,
+        focusOutsideViewport: a.focusOutsideViewport + r.focus.outsideViewport,
+        focusCoveredByOtherContent: a.focusCoveredByOtherContent + r.focus.coveredByOtherContent,
+        focusLessThanQuarterVisible:
+          a.focusLessThanQuarterVisible + r.focus.lessThanQuarterVisible,
       }),
       {
         axeViolations: 0,
@@ -1500,7 +2232,17 @@ async function main() {
         focusPopulation: 0,
         focusMeasured: 0,
         focusableBeforeSettle: 0,
+        rovingSkippedByTabPass: 0,
+        rovingPopulation: 0,
+        rovingMeasured: 0,
         rovingNotAudited: 0,
+        rovingVisible: 0,
+        rovingUnobscured: 0,
+        rovingContainersArrowInert: 0,
+        rovingContainersWithoutEntry: 0,
+        focusOutsideViewport: 0,
+        focusCoveredByOtherContent: 0,
+        focusLessThanQuarterVisible: 0,
       }
     );
     const mins = results.map((r) => r.contrast.minimumRatio).filter((n) => typeof n === 'number');
@@ -1522,12 +2264,21 @@ async function main() {
       surfacesTotal: results.length,
       surfacesPartial: partial.length,
       surfacesWithDestroyedSample: destroyed.length,
-      // Roving-tabindex children (tabindex="-1") are enumerated but deliberately
-      // NOT focused: a Tab user cannot reach them, and focusing one is what
-      // destroyed the sample. They are reachable by arrow key inside their
-      // widget, so their focus rings are genuinely unaudited here. Stated, not
-      // hidden -- see the follow-up issue referenced in the baseline doc.
+      // Roving-tabindex children (tabindex="-1") are not Tab-reachable, so the
+      // Tab pass above declines to focus them (#154 root cause). They are
+      // audited by the SEPARATE arrow-key pass, whose own denominator is
+      // reported here. `rovingEnumeratedNotAudited` is now what the arrow-key
+      // pass could not reach, not the whole roving population.
+      rovingPopulation: totals.rovingPopulation,
+      rovingMeasured: totals.rovingMeasured,
+      rovingCoveragePct:
+        totals.rovingPopulation === 0
+          ? 100
+          : Math.round((totals.rovingMeasured / totals.rovingPopulation) * 1000) / 10,
       rovingEnumeratedNotAudited: totals.rovingNotAudited,
+      rovingSkippedByTabPass: totals.rovingSkippedByTabPass,
+      rovingContainersArrowInert: totals.rovingContainersArrowInert,
+      rovingContainersWithoutEntry: totals.rovingContainersWithoutEntry,
       partialSurfaces: partial.map((r) => ({
         route: r.route,
         viewport: r.viewport,
@@ -1544,6 +2295,13 @@ async function main() {
       // First keys in the file on purpose: a reader cannot reach a focus number
       // without passing the coverage that number was measured at.
       status,
+      // Which surfaces this file actually covers. A filtered run says so here
+      // and in its banner; only `scope: "all-required-surfaces"` may be quoted
+      // as the app-wide baseline.
+      scope: ROUTE_FILTER.length
+        ? 'FILTERED to ' + routes.map((r) => r.url).join(',') + ' of ' + allRoutes.length +
+          ' required surfaces -- NOT an app-wide baseline'
+        : 'all-required-surfaces',
       coverage,
       started,
       finished: new Date().toISOString(),
@@ -1560,6 +2318,10 @@ async function main() {
     const rule = '='.repeat(78);
     const banner =
       '\n' + rule + '\n' +
+      (ROUTE_FILTER.length
+        ? 'FILTERED RUN: ' + routes.length + ' of ' + allRoutes.length +
+          ' required surfaces (MCK_A11Y_ROUTES) -- not an app-wide baseline\n'
+        : '') +
       'FOCUS/KEYBOARD COVERAGE: ' + totals.focusMeasured + ' of ' + totals.focusPopulation +
       ' Tab-reachable controls measured (' + totals.focusCoveragePct + '%)' + '\n' +
       'status=' + status + '   partial surfaces: ' + partial.length + '/' + results.length +

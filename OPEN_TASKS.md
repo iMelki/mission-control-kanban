@@ -8,21 +8,50 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#150 - No visible keyboard focus indicator on 58 of 208 controls](https://github.com/iMelki/mission-control-kanban/issues/150)
+- [#150 - focus:outline-none without a focus-visible ring: 18 of 4192 Tab-reachable controls, plus 40 of 40 arrow-key ones](https://github.com/iMelki/mission-control-kanban/issues/150)
   - First ever keyboard/focus/contrast/axe measurement landed:
     `scripts/probe-surface-a11y.mjs` plus `docs/a11y-baseline-2026-08-24.md`.
-    695 tab stops, 0 traps, 208/208 focus unobscured, 150/208 focus visible,
-    554/572 contrast pairs pass (min 2.87:1), 45 axe violations.
-  - All 58 focus failures are one defect: `focus:outline-none` with no
+  - **The "58 of 208" figures were measured over 4.9% of the app** and were
+    restated on 2026-08-25 (#156). At 99.9% coverage it is **18 of 4192**, and
+    those 18 are only TWO distinct call sites: the four `/settings` inputs that
+    share one className (8 of the 18, one edit) and the cockpit `Board` control
+    (10). The old `208/208 focus unobscured` is **withdrawn** entirely - it
+    measured the probe's own scroll state, not the app (#155).
+  - Plus **40 of 40** roving `tabindex="-1"` cockpit tab controls
+    (Agents/Dispatch/Settings/Activity, five cockpits, both viewports), which no
+    earlier run could reach at all (#154).
+  - All of them are one defect: `focus:outline-none` with no
     `focus-visible:ring-*`. The repo already uses the correct pattern in 9 of
     its 40 `focus:outline-none` sites, so the fix extends an existing
-    convention rather than inventing one.
+    convention rather than inventing one. The sites in modals and dialogs are
+    **unmeasured, not clean** - the probe does not open them.
   - **Blocked on a coordinated change, not on a decision:** any `src/` edit
     moves `sourceDigest` and invalidates existing clipping captures. Proven
     with a control (one `aria-label` in `Header.tsx` produced
     `captured-surface drift: 6 problem(s) across 9 derived route(s)`, then
     reverted). Landing the fix also means re-probing and re-recording
     `capturedAt` for the affected surfaces.
+
+- a11y probe follow-ups, opened 2026-08-24 and worked 2026-08-25:
+  - [#154](https://github.com/iMelki/mission-control-kanban/issues/154) roving
+    `tabindex="-1"` children never focus-audited - **implemented**: a separate
+    arrow-key pass reaches all 40 (`rovingEnumeratedNotAudited: 0`) and every
+    one of them fails.
+  - [#155](https://github.com/iMelki/mission-control-kanban/issues/155) 960
+    controls off-viewport at mobile - **not a UI defect**: a probe artifact,
+    refuted with three controls over 157 failures. Occlusion is now measured on
+    the control's visible rect and the detector has self-proof legs for the
+    first time.
+  - [#156](https://github.com/iMelki/mission-control-kanban/issues/156) restate
+    #150 - **done**, above.
+  - [#157](https://github.com/iMelki/mission-control-kanban/issues/157) two
+    self-proof legs compare whole-page axe node counts and fail closed about
+    half the time; a full sweep needed 4 attempts. **Open.**
+  - [#159](https://github.com/iMelki/mission-control-kanban/issues/159) the
+    coverage reporter scores a surface that rendered ZERO controls as `full` at
+    100%, and ignores its own `unaccounted` invariant (observed at `-1`). The
+    "99.9% coverage" headline is not reproducible: 99.9% / 92.7% / 88.7% on the
+    same surface, same unmodified code, one session. **Open.**
 
 - [#151 - Three colour pairs below WCAG AA, worst 2.87:1](https://github.com/iMelki/mission-control-kanban/issues/151)
   - 10px timestamps using `text-mc-text-secondary/60` (2.87:1), the n8n status
