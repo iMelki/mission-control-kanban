@@ -1,18 +1,27 @@
 # mission-control-kanban Open Tasks
 
-Last updated: 2026-06-11
+Last updated: 2026-08-25
 
 GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues as the canonical task records and keep this file as the local index.
 
+This index had drifted badly: it was stamped 2026-06-11 and named four "active"
+issues while GitHub carried **57 open**. Treat the counts below as a pointer,
+not an inventory — `gh issue list --repo iMelki/mission-control-kanban` is
+authoritative.
+
 ## Active Issues
+
+Open on GitHub: **57** (verified 2026-08-25). The a11y cluster (#150-#153,
+#157-#159) and the ungated-typecheck item (#148) are the newest work; the
+`[MC-0xx]` series (#56-#118) is the commercialization/hardening backlog.
 
 - [#143 - Migrate hardcoded durations onto the adopted motion tokens](https://github.com/iMelki/mission-control-kanban/issues/143)
   - Goal: retire the app's dependence on Layer B of the reduced-motion contract. `362e448` adopted
     `fleet-motion-primitive` v1.0.0 and the tokens are proven, but 481 transitions still use
     Tailwind's hardcoded `transition` and the named `duration-*` utilities have zero call sites.
     Incremental; the proof recipe must stay `pass` after each batch.
-- [#6 - Surface readiness, review mode, risk, and dispatch blockers in the Kanban UI](https://github.com/iMelki/mission-control-kanban/issues/6)
-  - Goal: surface the repo and task dispatch signals operators need before they take write actions from the Kanban UI.
+- [#148 - Root type errors are ungated](https://github.com/iMelki/mission-control-kanban/issues/148)
+  - Goal: add a `typecheck` script and stop `tsc --noEmit` failing unobserved.
 - [#7 - Use relevant skills for market research, competitor analysis, and monetization planning](https://github.com/iMelki/mission-control-kanban/issues/7)
   - Goal: map competitors, ICPs, monetization options, and positioning for mission-control-kanban.
 - [#8 - Design and build a landing page](https://github.com/iMelki/mission-control-kanban/issues/8)
@@ -20,10 +29,18 @@ GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues
 
 ## Latest Progress
 
+- 2026-08-25: verified the #149 commit-lock unlock end to end. The genome
+  `$schema` pin, the byte-faithful local schema mirror, and the captured-surface
+  adoption are all on `origin/dev`; `npm run test:doctor-genome` passes 4/4 and
+  the canonical gate self-test passes **38/38** negative fixtures. Note the
+  pinned `$schema` URI resolves only with credentials — `iMelki/projects-ops` is
+  a private repo, so an anonymous GET of the raw URL returns 404 by design. That
+  is a JSON Schema *identifier*, not a fetch target; do not "fix" the 404.
 - 2026-05-31: continued the GitHub-native operator flow by adding a Mission
   Queue diagnostics pill and `/api/github/diagnostics`. The UI now shows
   whether MCK can see a GitHub token, authenticate the current viewer, and read
   GitHub Projects before an operator starts the import/write-back loop.
+
 ## Recently Completed
 
 - [#18 - Choose and activate MCK n8n alert notification destination](https://github.com/iMelki/mission-control-kanban/issues/18)
