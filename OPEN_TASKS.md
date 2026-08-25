@@ -1,12 +1,50 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-13
+Last updated: 2026-08-24
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
+
+- [#150 - No visible keyboard focus indicator on 58 of 208 controls](https://github.com/iMelki/mission-control-kanban/issues/150)
+  - First ever keyboard/focus/contrast/axe measurement landed:
+    `scripts/probe-surface-a11y.mjs` plus `docs/a11y-baseline-2026-08-24.md`.
+    695 tab stops, 0 traps, 208/208 focus unobscured, 150/208 focus visible,
+    554/572 contrast pairs pass (min 2.87:1), 45 axe violations.
+  - All 58 focus failures are one defect: `focus:outline-none` with no
+    `focus-visible:ring-*`. The repo already uses the correct pattern in 9 of
+    its 40 `focus:outline-none` sites, so the fix extends an existing
+    convention rather than inventing one.
+  - **Blocked on a coordinated change, not on a decision:** any `src/` edit
+    moves `sourceDigest` and invalidates existing clipping captures. Proven
+    with a control (one `aria-label` in `Header.tsx` produced
+    `captured-surface drift: 6 problem(s) across 9 derived route(s)`, then
+    reverted). Landing the fix also means re-probing and re-recording
+    `capturedAt` for the affected surfaces.
+
+- [#151 - Three colour pairs below WCAG AA, worst 2.87:1](https://github.com/iMelki/mission-control-kanban/issues/151)
+  - 10px timestamps using `text-mc-text-secondary/60` (2.87:1), the n8n status
+    line (3.43:1), and the `OFFLINE` badge (4.04:1). Contrast is computed from
+    computed style, not from hand-authored annotations.
+
+- [#152 - 45 axe WCAG violations including one critical](https://github.com/iMelki/mission-control-kanban/issues/152)
+  - `nested-interactive` (692 nodes, workspace task cards), `color-contrast`,
+    `scrollable-region-focusable` (tables with no keyboard scroll access),
+    `link-name` (icon-only header link), and critical `aria-valid-attr-value`
+    (Radix Tabs `aria-controls` pointing at an unmounted panel).
+  - Smallest first: `link-name` and `scrollable-region-focusable` are one
+    attribute each.
+
+- [#153 - Bind a11y evidence to the captured-surfaces staleness gate](https://github.com/iMelki/mission-control-kanban/issues/153)
+  - Deliberate decision: a11y evidence rides the **existing**
+    `capturedAt.sourceDigest` rather than a second mechanism. Not yet wired,
+    so today's baseline is point-in-time, not enforced.
+  - Also carries the `a11y:probe` / `a11y:selfproof` npm scripts, deferred
+    because `package.json` had another in-flight change in the working tree.
+  - Should land after the `scripts/captured-surfaces/` canonical migration
+    settles, so the check is not written twice.
 
 - [#142 - Frontend Revenue cockpit reflow and heading role](https://github.com/iMelki/mission-control-kanban/issues/142)
   - Reflow and heading-role fixes are landed and browser-proven; the derivable
