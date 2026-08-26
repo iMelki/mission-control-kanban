@@ -69,9 +69,12 @@ ledger has zero exclusions and one entry for every discovered gate. The a11y,
 Markdown-link, and component-sourcing callers have direct broken/restored
 proof. The three workflow entries and the runtime wrapper record bounded local
 caller-command evidence and state the boundary explicitly: GitHub-hosted
-canaries and a restored production-mode runtime caller are still tracked in
-#161, because the production build currently stops at the pre-existing #148
-TypeScript error. No local diagnostic is described as a hosted Actions run.
+negative canaries remain tracked in #161. The local production-mode runtime
+caller now passes after the #148 correction, but its negative fixture was run
+in development mode on Windows rather than the hosted Ubuntu workflow. No
+local diagnostic is described as a hosted Actions run. Numeric broken and
+restored exit-code fields in `.gate-evidence.json` are the durable sidecar to
+the raw logs, which did not all include a top-level exit sentinel.
 
 Legacy proof added during recovery:
 
@@ -174,10 +177,32 @@ zero-decision helper would hide rather than reduce the baseline/injected/restore
 contract. Refactoring capture, pure leg evaluation, and cleanup before the next
 feature growth is tracked in #160 with a 2026-09-15 target.
 
-`npm run build` compiled the application but exited `1` at the already-tracked
-#148 type error in `scripts/derive-captured-surfaces.ts:426`
-(`record.viewports` is `unknown`). This recovery does not conceal or widen into
-that separate defect.
+The first local production build and PR #162's first hosted Runtime Regression
+run both compiled successfully, then exited `1` at the already-tracked #148
+type error in `scripts/derive-captured-surfaces.ts:426` (`record.viewports` is
+`unknown`) before browser smoke. The bounded correction binds the parsed
+property once to `capturedViewports`, narrows that stable local with
+`Array.isArray`, and reuses it for the unknown-label and uncovered-label checks.
+Root `tsc --noEmit --incremental false`, the 25-case focused suite, and the full
+Next 16.2.9 production build now exit `0`. The full local production-mode
+Runtime Regression caller on port 5393 also exits `0`: the build completes, all
+16 browser checks pass, four screenshots are captured, cleanup proves all four
+temporary entities absent, and the owned server is stopped with the port
+released. The existing Runtime Regression workflow remains the hosted caller;
+no new gate was added.
+
+That correction grows `scripts/derive-captured-surfaces.ts` from 687 to 688
+physical lines and 641 to 642 nonblank lines. Its cohesive
+`validateManifestShape` function moves from 177 to 178 physical lines and 167
+to 168 nonblank lines; its decision proxy stays at 33 and maximum decision
+nesting stays at 3. The file's maximum line length (136) and four pre-existing
+lines over 120 characters are unchanged; the function's maximum is 123 with one
+pre-existing line over 120. Changed lines are at most 110 characters. The new
+line is the narrowing boundary the whole validation block consumes; extracting
+it would add indirection without reducing the oversized validator. Independent
+review approved this narrow cohesion exception; broader validator decomposition
+is required before substantive future growth and is tracked separately in #163
+with a 2026-09-30 target.
 
 No new UI control or component decision was made here. The checkpoint's visual
 change remains the existing Radix/shadcn `TabsTrigger` primitive with Tailwind

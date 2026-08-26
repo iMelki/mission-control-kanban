@@ -111,9 +111,10 @@ the local operator entrypoint; historical task notes remain in
     changed a11y caller and both direct verification scripts have exact
     broken/restored proof. The six legacy paths now also have bounded local
     caller-command evidence with zero exclusions; the workflow entries state
-    their limits explicitly. Hosted production runtime proof remains blocked by
-    #148, and neither the hosted Gitleaks action nor the full CI job matrix has a
-    deliberate current red/green canary yet.
+    their limits explicitly. The #148 correction now restores the local
+    production-mode runtime caller. The hosted Ubuntu production-mode negative
+    canary, hosted Gitleaks action, and full CI job matrix still lack deliberate
+    current red/green canaries.
 
 - [#151 - Three colour pairs below WCAG AA, worst 2.87:1](https://github.com/iMelki/mission-control-kanban/issues/151)
   - 10px timestamps using `text-mc-text-secondary/60` (2.87:1), the n8n status
@@ -214,10 +215,21 @@ the local operator entrypoint; historical task notes remain in
     `scripts/derive-captured-surfaces.ts ... TS18046: 'record.viewports' is of
     type 'unknown'`. Proven pre-existing by restoring the HEAD version of that
     file and re-running `tsc` - the same error appears at its old line number.
-  - Nothing runs it: `package.json` has no `typecheck` script, and the only
-    `npm run typecheck` in `.github/workflows/ci.yml` is inside the
-    `paperclip-bridge` job with `working-directory: integrations/paperclip-bridge`.
-    Filed separately rather than fixed inline, to keep #147 to one concern.
+  - **Fix proven on PR #162:** bind the unknown property once to
+    `capturedViewports`, then narrow that stable local with `Array.isArray`
+    before both the unknown-label and uncovered-label checks. Runtime behavior
+    is unchanged; the existing viewport contract still passes 25/25.
+  - Root `tsc --noEmit --incremental false` and `npm run build` now exit 0. No
+    new metered job was added: the existing Runtime Regression workflow already
+    calls the production build, and its first PR #162 run reproduced the exact
+    line-426 failure before this correction. Keep open until the replacement
+    hosted run reaches the browser smoke and the PR lands.
+
+- [#163 - Decompose captured-manifest validator before substantive future growth](https://github.com/iMelki/mission-control-kanban/issues/163)
+  - `validateManifestShape` is now 178 physical / 168 nonblank lines with a
+    decision proxy of 33 and maximum decision nesting of 3. Independent review
+    approved #148's one-line stable-narrowing boundary, but requires cohesive
+    pure checks by 2026-09-30 and before substantive validator growth.
 
 - [#145 - /settings clips 17 elements at 1440px](https://github.com/iMelki/mission-control-kanban/issues/145)
   - Live shipped defect, found by the first ever capture of `/settings`. Rooted

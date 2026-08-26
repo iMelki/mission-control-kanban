@@ -149,6 +149,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the green evidence-harness result. Full recovery details and local artifact
   paths are in `docs/a11y-capture-recovery-2026-08-26.md`.
 
+- **Restored the root production build by preserving parsed-viewport narrowing
+  (2026-08-26, #148)** - `record.viewports` is intentionally `unknown` until the
+  manifest validator checks it. TypeScript discarded the property narrowing
+  after an intervening `problems.push(...)`, so the production build compiled
+  and then failed type checking before Runtime Regression could start its
+  browser smoke. The validator now binds the property once to the stable local
+  `capturedViewports` and narrows that value with `Array.isArray`; validation
+  codes and runtime behavior are unchanged. Root `tsc --noEmit`, the 25-case
+  captured-surface suite, and the full Next 16.2.9 production build now pass.
+  The existing hosted Runtime Regression build remains the authority, so no new
+  CI job or typecheck gate was added.
+
 - **The captured-surface gate accepted a stale capture (2026-08-16, #147)** -
   `docs/captured-surfaces.json` records a `capturedAt.commit` per surface, and nothing
   ever compared it to the code. `scripts/derive-captured-surfaces.ts` validated that the
