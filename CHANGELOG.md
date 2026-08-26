@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **First production-build capture (2026-08-26, #164, #165)** -
+  `docs/production-capture-2026-08-26.md`. Every UI/UX round before this one
+  measured this app on `next dev`, and `next dev` does not survive being
+  measured: it died compiling the 4th consecutive on-demand route, and its
+  watchdog then failed recovery twice at a 300-second ceiling while first-hit
+  compiles were measured at 15-54 s per route. Built from a detached worktree at
+  `c3bfc6f` and served with `next start` on a separate port, the same sequential
+  warm answers 200 on 11 of 11 routes in 18-161 ms and the server stays up -
+  `/runtime-regression` improves from 53,880 ms to 17.9 ms. `.next/BUILD_ID` is
+  `LhwzqpkXyePprPbNMSBmo`, verified present before any number was recorded.
+  Measured on that build: WCAG **2.5.8 (AA, 24x24) passes with 0 failures of
+  4,394 controls** (positive control caught on 18 of 18 units), 2.5.5 (AAA,
+  44x44) fails 53.4%, contrast coverage is **100%** (13,488 of 13,488 elements,
+  cross-checked against a 1x1 canvas readback with 0 disagreements) with a worst
+  ratio of 2.87:1, and focus coverage is **67.3%** - so 1,438 Tab-reachable
+  controls remain unmeasured rather than clean. Composite 5.8 -> 5.9, and the
+  report states plainly that this is a measurement gain rather than a product
+  improvement, and which way it will move if the unmeasured remainder is
+  reached. Nothing in `src/` changed, the manifest was not re-recorded, and
+  `livenessContract` stays at `none`: 5 of 18 route x viewport units still
+  refuse under `liveness_unstable_across_runs`, which was traced to the settle
+  detector accepting a pre-data quiet window - the per-surface content assertion
+  agent-settings#691 asks for is still the missing half.
+
 ### Fixed
 
 - **The captured-surface gate accepted a stale capture (2026-08-16, #147)** -

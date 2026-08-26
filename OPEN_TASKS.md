@@ -8,6 +8,26 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
+- [#164 - the capture harness cannot survive its own subject: the dev server dies under on-demand compile](https://github.com/iMelki/mission-control-kanban/issues/164)
+  - `next dev` first-hit compiles measured at 15-54 s per route; the process
+    exited while compiling the 4th consecutive one. The LocalNext watchdog then
+    failed recovery twice at a **300-second ceiling**, and one post-boot attempt
+    failed with "root was not found" because the repo volume was not mounted yet.
+  - Removed at the source, not worked around: `next build` + `next start` from a
+    detached worktree answers 200 on 11 of 11 routes in 18-161 ms and stays up.
+    Evidence and the reproduce steps: `docs/production-capture-2026-08-26.md`.
+  - Blocked on #148: `next build` does not currently succeed on `dev`.
+
+- [#165 - two served workspace routes are invisible to both captured-surface gates](https://github.com/iMelki/mission-control-kanban/issues/165)
+  - `/workspace/default` and `/workspace/mck-sync-test-assistants` both answer
+    200, both are linked from the dashboard, and neither is in the manifest.
+    Both gates derive from committed source; **neither reads the workspaces
+    table**, so nothing raises. `mck-sync-test-assistants` ships from migration
+    011, so this is not test residue.
+  - The config `$comment` also names the wrong gate; proven with controls.
+  - **Do not "fix" this by adding the slugs to the config** - that greens the
+    gate and deletes the only signal.
+
 - [#150 - focus:outline-none without a focus-visible ring: 18 of 4192 Tab-reachable controls, plus 40 of 40 arrow-key ones](https://github.com/iMelki/mission-control-kanban/issues/150)
   - First ever keyboard/focus/contrast/axe measurement landed:
     `scripts/probe-surface-a11y.mjs` plus `docs/a11y-baseline-2026-08-24.md`.
