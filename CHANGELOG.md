@@ -132,15 +132,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   weaken the proof contract. Extraction of the collector and fixtures is
   tracked before any further growth.
 
-  **Local proof status:** the preserved port 5391 server's compiled workspace
-  assets contain the full-accent class and not `/60`, but its authored cockpit
-  route returns HTTP 500 after a Next/Jest worker retry-limit failure. The
-  application-level AFTER sweep and canonical clipping capture are therefore
-  deferred, not reported green. `npm run surfaces:check` exits 1 for exactly the
-  five cockpit routes (`eb3af727177054dd -> 57c47aa411d855f3`, 53 files,
-  `tabs.tsx` the only changed rendering file). This local checkpoint must not be
-  pushed as complete until those receipts exist or the owning maintainer
-  accepts the explicit deferral.
+  **Recovered proof status (2026-08-26):** the stale port 5391 process tree was
+  stopped and a fresh isolated server returned HTTP 200 for all five cockpits.
+  Issue #157's two flaky axe legs now count only the authored selectors instead
+  of the live page's moving totals. Three deliberate broken inputs each make the
+  caller exit 2 for the intended named reason, and the final restored
+  self-proof passes 18/18. The no-budget exhaustive caller exits 0 with 18/18
+  route/viewport rows complete, no partial surfaces or destroyed samples,
+  4,372/4,376 Tab-reachable controls measured (99.9%), and 40/40 roving
+  controls visible and unobscured. The five stale cockpit records were
+  re-captured at both viewports: 18 caller-required measurements, zero clipping,
+  digest `57c47aa411d855f3`. `surfaces:check` passes 9/9,
+  `test:captured-surfaces` passes 25/25, and the canonical gate/self-test pass
+  9/9 and 38/38. The remaining four `/settings` inputs at two viewports plus
+  the axe/contrast findings stay tracked in #150-#152; they are not hidden by
+  the green evidence-harness result. Full recovery details and local artifact
+  paths are in `docs/a11y-capture-recovery-2026-08-26.md`.
 
 - **The captured-surface gate accepted a stale capture (2026-08-16, #147)** -
   `docs/captured-surfaces.json` records a `capturedAt.commit` per surface, and nothing

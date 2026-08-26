@@ -87,21 +87,33 @@ the local operator entrypoint; historical task notes remain in
     additional missing indicators.
   - [#157](https://github.com/iMelki/mission-control-kanban/issues/157) two
     self-proof legs compare whole-page axe node counts and fail closed about
-    half the time; a full sweep needed 4 attempts. **Open.**
+    half the time; a full sweep needed 4 attempts. **Fix proven on the
+    2026-08-26 recovery branch:** authored targets now prove `0 -> 1 -> 0`,
+    three deliberate mutations exit 2 for their named reasons, and the restored
+    exhaustive caller exits 0 with 18/18 rows complete. Open until the feature
+    PR lands.
   - [#159](https://github.com/iMelki/mission-control-kanban/issues/159) the
     coverage reporter scores a surface that rendered ZERO controls as `full` at
     100%, and ignores its own `unaccounted` invariant (observed at `-1`). The
     "99.9% coverage" headline is not reproducible: 99.9% / 92.7% / 88.7% on the
     same surface, same unmodified code, one session. **Open.**
-  - **Local follow-up pending a GitHub issue:** extract the serialized focus
+    The no-budget recovery completed without an empty or partial row, but that
+    successful sample does not repair the zero-population acceptance bug.
+  - [#160](https://github.com/iMelki/mission-control-kanban/issues/160) extract the serialized focus
     collector and its authored self-proof fixture contract before the probe
-    grows again. This correction takes `scripts/probe-surface-a11y.mjs` from
-    2,358 to 2,424 human-authored lines; `FOCUS_EVIDENCE` grows 144 to 170 lines,
-    `injectRovingWidget` grows 78 to 89 and crosses the independent-review
-    threshold, and `selfProof` grows 474 to 496. The narrow exception is
-    independently reviewed: collector code must remain self-contained for page
-    serialization, and the widgets must prove that exact collector. It is not
-    permission for more growth without extraction.
+    grows again. The 2026-08-26 independent review approved the seven-line
+    #157 recovery exception (`selfProof` 483 -> 490 nonblank lines; decision
+    proxy 77 -> 81; nesting unchanged at 6) and requires capture, pure leg
+    evaluation, and cleanup to be decomposed by 2026-09-15 and before the next
+    feature growth.
+  - [#161](https://github.com/iMelki/mission-control-kanban/issues/161) complete
+    authoritative hosted-canary coverage for the three workflow gates. The
+    changed a11y caller and both direct verification scripts have exact
+    broken/restored proof. The six legacy paths now also have bounded local
+    caller-command evidence with zero exclusions; the workflow entries state
+    their limits explicitly. Hosted production runtime proof remains blocked by
+    #148, and neither the hosted Gitleaks action nor the full CI job matrix has a
+    deliberate current red/green canary yet.
 
 - [#151 - Three colour pairs below WCAG AA, worst 2.87:1](https://github.com/iMelki/mission-control-kanban/issues/151)
   - 10px timestamps using `text-mc-text-secondary/60` (2.87:1), the n8n status

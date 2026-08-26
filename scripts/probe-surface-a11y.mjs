@@ -1885,9 +1885,9 @@ async function selfProof(browser) {
   const spContrast = injectedContrast.pairs.find((p) => /selfproof low contrast/.test(p.text));
   const targetsFor = (scan, rule) =>
     scan.violations.filter((v) => v.id === rule).flatMap((v) => v.targets);
-  const nodesFor = (scan, rule) =>
-    scan.violations.filter((v) => v.id === rule).reduce((n, v) => n + v.nodeCount, 0);
   const names = (scan, rule, sel) => targetsFor(scan, rule).some((t) => String(t).includes(sel));
+  const scopedNodesFor = (scan, rule, sel) =>
+    targetsFor(scan, rule).filter((target) => String(target).includes(sel)).length;
 
   const legs = [
     {
@@ -1926,15 +1926,17 @@ async function selfProof(browser) {
       detected:
         names(injectedAxe, 'color-contrast', '__sp_contrast') &&
         names(injectedAxe, 'image-alt', '__sp_img') &&
-        nodesFor(injectedAxe, 'color-contrast') > nodesFor(baselineAxe, 'color-contrast') &&
-        nodesFor(injectedAxe, 'image-alt') > nodesFor(baselineAxe, 'image-alt'),
+        scopedNodesFor(baselineAxe, 'color-contrast', '__sp_contrast') === 0 &&
+        scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') === 1 &&
+        scopedNodesFor(baselineAxe, 'image-alt', '__sp_img') === 0 &&
+        scopedNodesFor(injectedAxe, 'image-alt', '__sp_img') === 1,
       detail:
-        'color-contrast nodes ' +
-        nodesFor(baselineAxe, 'color-contrast') + ' -> ' + nodesFor(injectedAxe, 'color-contrast') +
-        ' names #__sp_contrast=' + names(injectedAxe, 'color-contrast', '__sp_contrast') +
-        '; image-alt nodes ' +
-        nodesFor(baselineAxe, 'image-alt') + ' -> ' + nodesFor(injectedAxe, 'image-alt') +
-        ' names #__sp_img=' + names(injectedAxe, 'image-alt', '__sp_img'),
+        'authored color-contrast target ' +
+        scopedNodesFor(baselineAxe, 'color-contrast', '__sp_contrast') + ' -> ' +
+        scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') +
+        '; authored image-alt target ' +
+        scopedNodesFor(baselineAxe, 'image-alt', '__sp_img') + ' -> ' +
+        scopedNodesFor(injectedAxe, 'image-alt', '__sp_img'),
     },
     {
       leg: 'focus detector sees the suppressed indicator',
@@ -1985,18 +1987,23 @@ async function selfProof(browser) {
         restoredContrast.pairs.some((f) => /selfproof low contrast/.test(f.text)),
     },
     {
-      // Per-rule node counts, and the injected selectors must be GONE by name.
-      leg: 'axe returns to baseline after removal (per-rule node counts, by name)',
+      // Only the authored self-proof targets are contractual. Dynamic app
+      // content can change its own whole-page counts between these scans.
+      leg: 'axe removes each injected target after the authored fixture is removed',
       detected:
-        nodesFor(restoredAxe, 'color-contrast') === nodesFor(baselineAxe, 'color-contrast') &&
-        nodesFor(restoredAxe, 'image-alt') === nodesFor(baselineAxe, 'image-alt') &&
+        scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') === 1 &&
+        scopedNodesFor(restoredAxe, 'color-contrast', '__sp_contrast') === 0 &&
+        scopedNodesFor(injectedAxe, 'image-alt', '__sp_img') === 1 &&
+        scopedNodesFor(restoredAxe, 'image-alt', '__sp_img') === 0 &&
         !names(restoredAxe, 'color-contrast', '__sp_contrast') &&
         !names(restoredAxe, 'image-alt', '__sp_img'),
       detail:
-        'color-contrast nodes ' + nodesFor(injectedAxe, 'color-contrast') + ' -> ' +
-        nodesFor(restoredAxe, 'color-contrast') + ' (baseline ' + nodesFor(baselineAxe, 'color-contrast') + ')' +
-        '; image-alt nodes ' + nodesFor(injectedAxe, 'image-alt') + ' -> ' +
-        nodesFor(restoredAxe, 'image-alt') + ' (baseline ' + nodesFor(baselineAxe, 'image-alt') + ')',
+        'authored color-contrast target ' +
+        scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') + ' -> ' +
+        scopedNodesFor(restoredAxe, 'color-contrast', '__sp_contrast') +
+        '; authored image-alt target ' +
+        scopedNodesFor(injectedAxe, 'image-alt', '__sp_img') + ' -> ' +
+        scopedNodesFor(restoredAxe, 'image-alt', '__sp_img'),
     },
     {
       // Was: "focusable population returns to baseline after removal", comparing
