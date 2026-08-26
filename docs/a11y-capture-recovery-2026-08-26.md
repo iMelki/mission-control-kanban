@@ -69,7 +69,8 @@ ledger has zero exclusions and one entry for every discovered gate. The a11y,
 Markdown-link, and component-sourcing callers have direct broken/restored
 proof. The three workflow entries and the runtime wrapper record bounded local
 caller-command evidence and state the boundary explicitly: GitHub-hosted
-negative canaries remain tracked in #161. The local production-mode runtime
+negative canaries remain tracked in issue
+[#161](https://github.com/iMelki/mission-control-kanban/issues/161). The local production-mode runtime
 caller now passes after the #148 correction, but its negative fixture was run
 in development mode on Windows rather than the hosted Ubuntu workflow. No
 local diagnostic is described as a hosted Actions run. Numeric broken and
@@ -178,8 +179,9 @@ contract. Refactoring capture, pure leg evaluation, and cleanup before the next
 feature growth is tracked in #160 with a 2026-09-15 target.
 
 The first local production build and PR #162's first hosted Runtime Regression
-run both compiled successfully, then exited `1` at the already-tracked #148
-type error in `scripts/derive-captured-surfaces.ts:426` (`record.viewports` is
+run both compiled successfully, then exited `1` at the type error already tracked
+in [#148](https://github.com/iMelki/mission-control-kanban/issues/148):
+`scripts/derive-captured-surfaces.ts:426` reported that `record.viewports` is
 `unknown`) before browser smoke. The bounded correction binds the parsed
 property once to `capturedViewports`, narrows that stable local with
 `Array.isArray`, and reuses it for the unknown-label and uncovered-label checks.
