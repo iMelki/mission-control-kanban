@@ -246,8 +246,8 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
       >
         <DialogHeader className="flex-row items-center justify-between gap-3 p-4 border-b border-mc-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded bg-mc-accent-cyan/15">
-              <Github className="size-5 text-mc-accent-cyan" />
+            <div className="p-2 rounded bg-mc-accent/15">
+              <Github className="size-5 text-mc-accent" />
             </div>
             <div>
               <DialogTitle>Import GitHub Issue</DialogTitle>
@@ -278,7 +278,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
               type="button"
               onClick={handleLoadIssue}
               disabled={isLoadingSource}
-              className="px-4 py-2 bg-mc-accent-cyan text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-cyan/90 disabled:opacity-50"
+              className="px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50 active:scale-[0.98]"
             >
               {isLoadingSource ? 'Loading GitHub...' : 'Load from GitHub'}
             </button>

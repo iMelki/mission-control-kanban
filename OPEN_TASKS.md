@@ -575,7 +575,16 @@ the local operator entrypoint; historical task notes remain in
     `role="dialog"`, `aria-labelledby` bound to the title, focus inside the
     dialog, Escape closes, desktop and mobile screenshots captured, no
     non-whitelisted console errors.
-  - Still open from the report: semantic tone tokens and the 156 raw
-    emerald/amber/rose usages, the bespoke n8n-sync-history table, next/font
-    loading, the two-accent CTA in `MissionQueue`, and
-    `prefers-reduced-motion` coverage.
+  - Still open from the report: the rest of the 156 raw emerald/amber/rose
+    usages, the bespoke n8n-sync-history table, and a11y follow-ups
+    #150 / #151 / #152. next/font (JetBrains Mono), heading role, reduced
+    motion, one-accent board CTAs, skip link, and instant sidebar width
+    are landed; see the 2026-08-27 note below.
+  - **UI lift 2026-08-27 (not gauntlet-scored).** One-accent CTAs
+    (`New Task` filled `mc-accent`, `Import GitHub` outline), skip link
+    (WCAG 2.4.1), instant sidebar width toggle, `mc-success`/`mc-warn`/
+    `mc-danger` on the worst pill maps, dashboard skeleton instead of a
+    spinner wall. Reduced-motion contract was already in `globals.css`.
+    JetBrains Mono remains the only typeface. Evidence:
+    `docs/uiux-awwwards-lift-2026-08-27.md`. Composite **UNMEASURED / 5.7
+    carried** — no production-build capture this pass.

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Cockpit CTA and a11y lift (2026-08-27, #139)** -
+  `Import GitHub` and `New Task` now share `mc-accent` (outline + filled
+  primary). Sidebars toggle width instantly (`transition-none`). A skip
+  link lands on `#main-content` on every served page. Added
+  `mc-success` / `mc-warn` / `mc-danger` and migrated the board, readiness,
+  and agent runtime pill maps only. Dashboard loading uses skeleton cards
+  instead of a pulsing glyph. Reduced-motion was already the fleet
+  contract in `globals.css`. Score remains **UNMEASURED / 5.7 carried** —
+  see `docs/uiux-awwwards-lift-2026-08-27.md`. No 8.0 claim.
+
 ### Fixed
 
 - **Capture probes refuse the dying next-dev listener (2026-08-27, #164, #139)** -

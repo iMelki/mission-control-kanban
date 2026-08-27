@@ -254,7 +254,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <button
             type="button"
             onClick={() => dispatchUi({ type: 'open_github_import_modal' })}
-            className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-cyan text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-cyan/90"
+            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium border border-mc-accent/70 text-mc-accent hover:bg-mc-accent/10 active:scale-[0.98] transition-transform duration-fast"
           >
             <Github className="size-4" />
             Import GitHub
@@ -262,7 +262,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <button
             type="button"
             onClick={() => dispatchUi({ type: 'open_create_modal' })}
-            className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent-pink text-mc-bg rounded text-sm font-medium hover:bg-mc-accent-pink/90"
+            className="flex items-center gap-2 px-3 py-1.5 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 active:scale-[0.98] transition-transform duration-fast"
           >
             <Plus className="size-4" />
             New Task
@@ -464,11 +464,11 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
   const pillClass = (tone: 'ready' | 'warn' | 'risk' | 'neutral') => {
     switch (tone) {
       case 'ready':
-        return 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30';
+        return 'bg-mc-success/10 text-mc-success border border-mc-success/30';
       case 'warn':
-        return 'bg-amber-500/10 text-amber-300 border border-amber-500/30';
+        return 'bg-mc-warn/10 text-mc-warn border border-mc-warn/30';
       case 'risk':
-        return 'bg-rose-500/10 text-rose-300 border border-rose-500/30';
+        return 'bg-mc-danger/10 text-mc-danger border border-mc-danger/30';
       default:
         return 'bg-mc-bg-tertiary text-mc-text-secondary border border-mc-border/50';
     }

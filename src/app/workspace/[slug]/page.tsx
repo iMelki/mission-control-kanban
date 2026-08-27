@@ -367,7 +367,7 @@ export default function WorkspacePage() {
   if (notFound) {
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
-        <div className="text-center">
+        <main id="main-content" tabIndex={-1} className="text-center outline-none">
           <SearchX aria-hidden="true" className="w-14 h-14 mx-auto mb-4 text-mc-text-secondary" />
           <h1 className="text-2xl font-bold mb-2">Workspace Not Found</h1>
           <p className="text-mc-text-secondary mb-6">
@@ -380,7 +380,7 @@ export default function WorkspacePage() {
             <ChevronLeft className="w-4 h-4" />
             Back to Dashboard
           </Link>
-        </div>
+        </main>
       </div>
     );
   }
@@ -497,7 +497,7 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+      <main id="main-content" tabIndex={-1} className="flex flex-1 min-h-0 flex-col overflow-hidden outline-none">
         {section === 'board' && (
           // Below lg the two fixed-width rails (w-64 + w-80 = 576px) exceed a 390px
           // viewport and squeeze MissionQueue to a 0px content box, so the cockpit
@@ -530,7 +530,7 @@ export default function WorkspacePage() {
             <LiveFeed />
           </div>
         )}
-      </div>
+      </main>
 
       {/* Debug Panel - only shows when debug mode enabled */}
       <SSEDebugPanel />

@@ -27,20 +27,20 @@ interface ReadinessRow {
 function stateClassName(state: ReadinessState): string {
   switch (state) {
     case 'ready':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100';
+      return 'border-mc-success/30 bg-mc-success/10 text-mc-success';
     case 'limited':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-100';
+      return 'border-mc-warn/30 bg-mc-warn/10 text-mc-warn';
     default:
-      return 'border-rose-500/30 bg-rose-500/10 text-rose-100';
+      return 'border-mc-danger/30 bg-mc-danger/10 text-mc-danger';
   }
 }
 
 function StateIcon({ state }: { state: ReadinessState }) {
   if (state === 'ready') {
-    return <CheckCircle2 className="size-4 text-emerald-300" />;
+    return <CheckCircle2 className="size-4 text-mc-success" />;
   }
 
-  return <AlertTriangle className={`size-4 ${state === 'limited' ? 'text-amber-300' : 'text-rose-300'}`} />;
+  return <AlertTriangle className={`size-4 ${state === 'limited' ? 'text-mc-warn' : 'text-mc-danger'}`} />;
 }
 
 function buildRows(diagnostics: GitHubDiagnostics | null): ReadinessRow[] {

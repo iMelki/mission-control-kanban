@@ -155,9 +155,10 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
       {/*
         Below lg this rail is a full-width stacked section with a bounded height;
         from lg up it returns to the fixed-width side rail (#142).
+        Width is an instant toggle (`transition-none`): do not animate `width`.
       */}
       <aside
-        className={`shrink-0 bg-mc-bg-secondary border-b lg:border-b-0 lg:border-r border-mc-border flex flex-col overflow-hidden w-full max-h-[45vh] lg:max-h-none ${
+        className={`shrink-0 bg-mc-bg-secondary border-b lg:border-b-0 lg:border-r border-mc-border flex flex-col overflow-hidden w-full max-h-[45vh] lg:max-h-none transition-none ${
           isCollapsed ? 'lg:w-12' : 'lg:w-64'
         }`}
         aria-label="Agents sidebar"
@@ -363,10 +364,10 @@ function getRuntimeHealth(agent: Agent, openclawSession?: OpenClawSession | null
   }
   if (runtime.effective_type === 'openclaw') {
     return openclawSession
-      ? { label: 'OpenClaw ready', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' }
-      : { label: 'OpenClaw link?', className: 'bg-amber-500/10 text-amber-300 border-amber-500/30' };
+      ? { label: 'OpenClaw ready', className: 'bg-mc-success/10 text-mc-success border-mc-success/30' }
+      : { label: 'OpenClaw link?', className: 'bg-mc-warn/10 text-mc-warn border-mc-warn/30' };
   }
-  return { label: 'Webhook ready', className: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' };
+  return { label: 'Webhook ready', className: 'bg-mc-accent/10 text-mc-accent border-mc-accent/30' };
 }
 
 function AgentsPanelHeader({

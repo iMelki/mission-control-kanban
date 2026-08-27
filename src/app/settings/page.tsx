@@ -109,19 +109,16 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Success Message */}
+      <main id="main-content" tabIndex={-1} className="max-w-4xl mx-auto px-6 py-8 outline-none">
         {successMessage && (
-          <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded text-green-400">
-            ✓ {successMessage}
+          <div className="mb-6 p-4 bg-mc-success/10 border border-mc-success/30 rounded text-mc-success">
+            {successMessage}
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded text-red-400">
-            ✗ {error}
+          <div className="mb-6 p-4 bg-mc-danger/10 border border-mc-danger/30 rounded text-mc-danger">
+            {error}
           </div>
         )}
 
@@ -240,7 +237,7 @@ export default function SettingsPage() {
             Environment variables take precedence over UI settings for server-side operations.
           </p>
         </section>
-      </div>
+      </main>
     </div>
   );
 }

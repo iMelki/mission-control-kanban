@@ -38,6 +38,16 @@ function formatAge(hours: number | null) {
   return `${hours.toFixed(1)} hours ago`;
 }
 
+function ClientUpdatedAt({ value }: { value: string }) {
+  const [text, setText] = useState('');
+
+  useEffect(() => {
+    setText(new Date(value).toLocaleString());
+  }, [value]);
+
+  return <div suppressHydrationWarning>{text || value}</div>;
+}
+
 export default function RuntimeRegressionPage() {
   const [payload, setPayload] = useState<RuntimeRegressionPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +56,10 @@ export default function RuntimeRegressionPage() {
     setLoading(true);
     try {
       const response = await fetch('/api/runtime/regression', { cache: 'no-store' });
+      if (!response.ok) {
+        setPayload(null);
+        return;
+      }
       setPayload(await response.json());
     } finally {
       setLoading(false);
@@ -59,7 +73,7 @@ export default function RuntimeRegressionPage() {
   const latest = payload?.latest ?? null;
 
   return (
-    <main className="min-h-screen bg-mc-bg p-4 text-mc-text md:p-8">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-mc-bg p-4 text-mc-text outline-none md:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -96,7 +110,7 @@ export default function RuntimeRegressionPage() {
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <div className="rounded border border-mc-border bg-mc-bg p-3">
                 <div className="mb-1 flex items-center gap-2 text-xs uppercase text-mc-text-secondary"><Clock className="size-4" /> Updated</div>
-                <div>{new Date(latest.updated_at).toLocaleString()}</div>
+                <ClientUpdatedAt value={latest.updated_at} />
                 <div className="text-xs text-mc-text-secondary">{formatAge(payload?.latest_age_hours ?? null)}</div>
               </div>
               <div className="rounded border border-mc-border bg-mc-bg p-3">

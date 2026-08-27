@@ -42,11 +42,31 @@ export function WorkspaceDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-mc-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4 animate-pulse">🦞</div>
-          <p className="text-mc-text-secondary">Loading workspaces...</p>
-        </div>
+      <div className="min-h-screen bg-mc-bg">
+        <header className="border-b border-mc-border bg-mc-bg-secondary">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="h-7 w-48 rounded bg-mc-bg-tertiary" />
+          </div>
+        </header>
+        <main id="main-content" tabIndex={-1} className="max-w-7xl mx-auto px-6 py-8 outline-none">
+          <div className="mb-8 space-y-2">
+            <div className="h-7 w-56 rounded bg-mc-bg-tertiary" />
+            <div className="h-4 w-80 max-w-full rounded bg-mc-bg-tertiary" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {['a', 'b', 'c'].map((slot) => (
+              <div
+                key={slot}
+                className="min-h-[200px] rounded-xl border border-mc-border bg-mc-bg-secondary p-6"
+              >
+                <div className="mb-4 h-6 w-2/3 rounded bg-mc-bg-tertiary" />
+                <div className="h-4 w-1/2 rounded bg-mc-bg-tertiary" />
+                <div className="mt-6 h-4 w-1/3 rounded bg-mc-bg-tertiary" />
+              </div>
+            ))}
+          </div>
+          <p className="sr-only">Loading workspaces</p>
+        </main>
       </div>
     );
   }
@@ -74,7 +94,7 @@ export function WorkspaceDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main id="main-content" tabIndex={-1} className="max-w-7xl mx-auto px-6 py-8 outline-none">
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-2">All Workspaces</h2>
           <p className="text-mc-text-secondary">
