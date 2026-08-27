@@ -125,3 +125,41 @@ test('runPreflight: an uncovered component fails with remediation guidance', () 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// Regression: agent-settings#780 sibling. parseRecord read ONLY the label line, so a
+// field value that wrapped onto a continuation line was cut at the line break and a
+// value written entirely below its label read as MISSING. These two records are
+// identical but for one line break, and before the fix the second one failed.
+const WRAPPED_RECORD = VALID_RECORD.replace(
+  '- Chosen source lane and why: vendored primitive, matches house conventions',
+  '- Chosen source lane and why:\n  vendored primitive, matches house conventions',
+);
+
+test('runPreflight: a field value written on a continuation line is still read', () => {
+  const root = makeFixture({ components: ['src/components/Foo.tsx'], record: WRAPPED_RECORD });
+  try {
+    const { failures } = runPreflight(root);
+    assert.deepEqual(failures, [], 'a wrapped field value must not read as missing');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// Guards the OPPOSITE error: an over-greedy continuation that swallows the following
+// field would make a genuinely missing field look present, turning the fix into a new
+// fail-open. The wrap here sits directly above a field that has been deleted.
+const WRAPPED_THEN_MISSING_RECORD = WRAPPED_RECORD.replace(
+  '- License/access/dependency result: MIT, no new dependencies\n',
+  '',
+);
+
+test('runPreflight: a continuation does not swallow the next field', () => {
+  const root = makeFixture({ components: ['src/components/Foo.tsx'], record: WRAPPED_THEN_MISSING_RECORD });
+  try {
+    const { failures } = runPreflight(root);
+    assert.equal(failures.length, 1);
+    assert.match(failures[0], /license\/access\/dependency result/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

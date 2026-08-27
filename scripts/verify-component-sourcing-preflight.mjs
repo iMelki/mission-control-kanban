@@ -60,19 +60,37 @@ function parseRecord(filePath) {
   const text = readFileSync(filePath, 'utf8');
   const fieldValues = new Map();
   const covers = [];
-  for (const rawLine of text.split(/\r?\n/)) {
-    const match = rawLine.trim().match(/^(?:[-*]\s+|\d+\.\s+)?(.+?):\s*(.*)$/);
+  // A field value may WRAP onto continuation lines. Reading only the label line cut
+  // every value at the first line break, so the gate judged each record on a fragment
+  // of what its author wrote -- and a complete answer written below its label read as
+  // MISSING. Sibling of agent-settings#780; this file is documented as mirroring
+  // shared/tools/Test-FrontendComponentSourcingPreflight.ps1, so it uses that fix's
+  // continuation rule verbatim to keep the two implementations in agreement.
+  const lines = text.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index++) {
+    const match = lines[index].trim().match(/^(?:[-*]\s+|\d+\.\s+)?(.+?):\s*(.*)$/);
     if (!match) continue;
     const label = normalizeLabel(match[1]);
+    // A continuation is a NON-BLANK line beginning neither a new list item nor a
+    // heading, so a blank line, the next field and a new section all end the value.
+    const parts = [match[2].trim()];
+    for (let next = index + 1; next < lines.length; next++) {
+      const line = lines[next];
+      if (!line.trim()) break;
+      if (/^\s*(?:[-*]\s+|\d+\.\s+)/.test(line)) break;
+      if (/^\s*#/.test(line)) break;
+      parts.push(line.trim());
+    }
+    const value = parts.filter(Boolean).join(' ').trim();
     if (label === 'covers') {
-      for (const target of match[2].split(',')) {
+      for (const target of value.split(',')) {
         if (target.trim()) covers.push(target.trim().replace(/\\/g, '/'));
       }
       continue;
     }
     for (let i = 0; i < REQUIRED_FIELD_ALIASES.length; i++) {
       if (REQUIRED_FIELD_ALIASES[i].some((alias) => normalizeLabel(alias) === label) && !fieldValues.has(i)) {
-        fieldValues.set(i, match[2].trim());
+        fieldValues.set(i, value);
       }
     }
   }
