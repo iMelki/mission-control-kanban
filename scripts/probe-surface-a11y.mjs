@@ -129,7 +129,10 @@
  * Usage:
  *   node scripts/probe-surface-a11y.mjs --self-proof   # prove the probe only
  *   node scripts/probe-surface-a11y.mjs                # measure all surfaces
- *   MCK_BASE_URL=http://127.0.0.1:3021 node scripts/probe-surface-a11y.mjs
+ *   MCK_BASE_URL=http://127.0.0.1:3121 MCK_BUILD_ID=<id> node scripts/probe-surface-a11y.mjs
+ *
+ * This probe refuses the supervised next-dev listener on :3021 before it
+ * launches Chromium (#164). See docs/production-capture.md.
  *
  * Env knobs:
  *   MCK_A11Y_SELFPROOF_ROUTE   pin the self-proof to a named surface
@@ -144,9 +147,13 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  prepareProductionCaptureTarget,
+  exitIfCaptureTargetUnscoreable,
+} from './assert-production-capture-target.mjs';
 
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), '..', '..');
-const base = (process.env.MCK_BASE_URL || 'http://127.0.0.1:3021').replace(/\/$/, '');
+const base = (process.env.MCK_BASE_URL || '').replace(/\/$/, '');
 const AXE_PATH = path.join(repoRoot, 'node_modules', 'axe-core', 'axe.min.js');
 const SELF_PROOF_ONLY = process.argv.includes('--self-proof');
 const positional = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -2134,6 +2141,7 @@ async function selfProof(browser) {
 
 /* ------------------------------------------------------------------ main --- */
 async function main() {
+  exitIfCaptureTargetUnscoreable(await prepareProductionCaptureTarget({ repoRoot }));
   fs.mkdirSync(outDir, { recursive: true });
   const browser = await chromium.launch({ args: ['--disable-extensions'] });
   const started = new Date().toISOString();

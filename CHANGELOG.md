@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Capture probes refuse the dying next-dev listener (2026-08-27, #164, #139)** -
+  `scripts/assert-production-capture-target.mjs` is now the shared preflight for
+  `surfaces:probe` and `probe-surface-a11y.mjs`. `MCK_BASE_URL` is required;
+  `http://127.0.0.1:3021` is refused without a GET, because that GET is the
+  on-demand compile that killed the supervised server. A leftover
+  `.next/BUILD_ID` does not make next-dev scoreable. Negative proofs cover the
+  missing URL, 3021, next-dev HTML, missing BUILD_ID, and the CLI exit-2 path
+  the probes actually invoke. Operator rule: `docs/production-capture.md`.
+  Also landed the `capturedViewports` narrowing in
+  `scripts/derive-captured-surfaces.ts` so `next build` is no longer blocked by
+  `'record.viewports' is of type 'unknown'`.
+
 ### Documentation
 
 - **First production-build capture (2026-08-26, #164, #165)** -

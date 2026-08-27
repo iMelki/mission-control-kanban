@@ -23,16 +23,26 @@
  * a reassuring row of zeroes.
  *
  * Usage:
- *   npm run surfaces:probe                       # against MCK_BASE_URL or :3021
+ *   MCK_BASE_URL=http://127.0.0.1:3121 MCK_BUILD_ID=<id> npm run surfaces:probe
  *   node scripts/probe-surface-clipping.mjs <outDir>
+ *
+ * This probe refuses the supervised next-dev listener on :3021 before it
+ * navigates (#164). See docs/production-capture.md.
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  prepareProductionCaptureTarget,
+  exitIfCaptureTargetUnscoreable,
+} from './assert-production-capture-target.mjs';
 
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), '..', '..');
-const base = process.env.MCK_BASE_URL || 'http://127.0.0.1:3021';
+const captureTarget = exitIfCaptureTargetUnscoreable(
+  await prepareProductionCaptureTarget({ repoRoot })
+);
+const base = (process.env.MCK_BASE_URL || captureTarget.href).replace(/\/$/, '');
 const outDir = path.resolve(process.argv[2] || path.join(repoRoot, 'artifacts', 'surface-captures'));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'docs', 'captured-surfaces.json'), 'utf8'));

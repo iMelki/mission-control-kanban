@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-24
+Last updated: 2026-08-27
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -16,7 +16,13 @@ the local operator entrypoint; historical task notes remain in
   - Removed at the source, not worked around: `next build` + `next start` from a
     detached worktree answers 200 on 11 of 11 routes in 18-161 ms and stays up.
     Evidence and the reproduce steps: `docs/production-capture-2026-08-26.md`.
-  - Blocked on #148: `next build` does not currently succeed on `dev`.
+  - **Harness harden 2026-08-27:** `scripts/assert-production-capture-target.mjs`
+    plus both surface probes refuse port 3021 *without fetching it*, require
+    `MCK_BASE_URL` and a production BUILD_ID, and refuse next-dev HTML. Operator
+    path: `docs/production-capture.md`. Not a gauntlet score.
+  - Still needed for a surviving scored capture: serve from a detached worktree
+    (`next build` / `next start` on 3121), then re-run the probes. The
+    `capturedViewports` narrowing that blocked `next build` is now on `dev`.
 
 - [#165 - two served workspace routes are invisible to both captured-surface gates](https://github.com/iMelki/mission-control-kanban/issues/165)
   - `/workspace/default` and `/workspace/mck-sync-test-assistants` both answer
@@ -542,6 +548,11 @@ the local operator entrypoint; historical task notes remain in
     Awwwards rubric. Full report: `docs/uiux-awwwards-report-2026-08-09.md`.
     Scores are code-inspection estimates pending a Frontend Proof Bundle.
     Fleet rollup: iMelki/agent-settings#586.
+  - **Not gauntlet-scored (2026-08-27).** The original audit was code-only.
+    Later browser rounds either measured a dying `next dev` (#164) or a
+    production build that still refused 5 of 18 units and wrote no
+    frontend-sota scorecard. Capture probes now refuse 3021. See
+    `docs/production-capture.md`.
   - DONE 2026-08-11 — dialog semantics: all six hand-rolled `fixed inset-0`
     overlays moved onto primitives this repo already owned. `AgentModal`,
     `TaskModal`, `GitHubImportModal`, and `WorkspaceDashboard`'s

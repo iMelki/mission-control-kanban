@@ -1,5 +1,9 @@
 # Production-build capture - 2026-08-26
 
+Current operator rule: `docs/production-capture.md`. This file is the dated
+evidence for the first production-build measurement. Capture probes now refuse
+port 3021 before navigating.
+
 The first time this app has been measured off `next dev`.
 
 Every UI/UX round before this one measured Mission Control Kanban against a

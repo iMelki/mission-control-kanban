@@ -408,14 +408,15 @@ export function validateManifestShape(parsed: unknown): SurfaceProblem[] {
           `shown to be stale. Print it with: npm run surfaces:fingerprint`,
       });
     }
-    if (!Array.isArray(record.viewports) || record.viewports.length === 0) {
+    const capturedViewports = record.viewports;
+    if (!Array.isArray(capturedViewports) || capturedViewports.length === 0) {
       problems.push({
         route,
         code: 'capture_viewports_invalid',
         detail: `"capturedAt.viewports" must list at least one viewport label`,
       });
     } else if (viewportLabels.size > 0) {
-      const unknown = record.viewports.filter((label) => !viewportLabels.has(String(label)));
+      const unknown = capturedViewports.filter((label) => !viewportLabels.has(String(label)));
       if (unknown.length > 0) {
         problems.push({
           route,
@@ -423,7 +424,9 @@ export function validateManifestShape(parsed: unknown): SurfaceProblem[] {
           detail: `"capturedAt.viewports" names ${JSON.stringify(unknown)}, absent from the manifest "viewports" list`,
         });
       }
-      const uncovered = [...viewportLabels].filter((label) => !record.viewports.map(String).includes(label));
+      const uncovered = [...viewportLabels].filter(
+        (label) => !capturedViewports.map(String).includes(label)
+      );
       if (uncovered.length > 0) {
         problems.push({
           route,
