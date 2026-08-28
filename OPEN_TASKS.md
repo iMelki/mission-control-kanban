@@ -553,6 +553,9 @@ the local operator entrypoint; historical task notes remain in
     production build that still refused 5 of 18 units and wrote no
     frontend-sota scorecard. Capture probes now refuse 3021. See
     `docs/production-capture.md`.
+  - **2026-08-28 closeout:** still **unscored**. Do not GET or steal
+    `3021`. Production `next start` on `3121` only; no worktree. Note:
+    `S:\source\CCAI\Assistants\agent-settings\shared\catalog\frontend-sota-fleet-uiux-closeout-2026-08-28.md`.
   - DONE 2026-08-11 — dialog semantics: all six hand-rolled `fixed inset-0`
     overlays moved onto primitives this repo already owned. `AgentModal`,
     `TaskModal`, `GitHubImportModal`, and `WorkspaceDashboard`'s
