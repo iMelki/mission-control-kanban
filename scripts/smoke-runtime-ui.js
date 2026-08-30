@@ -234,7 +234,7 @@ async function main() {
     await page.keyboard.press('Escape');
     await page.getByLabel(/Runtime type/i).waitFor({ state: 'hidden', timeout: 10_000 });
 
-    const taskCard = page.locator('li > [role="button"]').filter({ hasText: task.title });
+    const taskCard = page.locator('li [data-task-open]').filter({ hasText: task.title });
     await taskCard.waitFor({ timeout: 10_000 });
     await taskCard.getByText(/Webhook auto/i).waitFor({ timeout: 10_000 });
     await taskCard.getByText(/Blocked by 1/i).waitFor({ timeout: 10_000 });
@@ -252,7 +252,7 @@ async function main() {
     await page.getByRole('button', { name: /Retry webhook/i }).waitFor({ state: 'hidden', timeout: 10_000 });
     await page.getByRole('button', { name: /All runtimes/i }).click();
 
-    const checklistCard = page.locator('li > [role="button"]').filter({ hasText: checklistTask.title });
+    const checklistCard = page.locator('li [data-task-open]').filter({ hasText: checklistTask.title });
     await checklistCard.waitFor({ timeout: 10_000 });
     await checklistCard.click();
     await page.getByRole('button', { name: /Apply ready-for-agent checklist/i }).click();

@@ -12,7 +12,11 @@ import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { WorkspaceRuntimePolicyPanel } from '@/components/WorkspaceRuntimePolicyPanel';
 import { DispatchFailureQueue } from '@/components/DispatchFailureQueue';
 import { RuntimeAuditPanel } from '@/components/RuntimeAuditPanel';
-import { WorkspaceSectionTabs, type WorkspaceSection } from '@/components/workspace/WorkspaceSectionTabs';
+import {
+  WorkspaceSectionContent,
+  WorkspaceSectionTabs,
+  type WorkspaceSection,
+} from '@/components/workspace/WorkspaceSectionTabs';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
@@ -416,121 +420,122 @@ export default function WorkspacePage() {
       data-workspace-ready={loadedWorkspace ? 'true' : 'false'}
     >
       <Header workspace={workspace} />
-      <WorkspaceSectionTabs section={section} onSectionChange={setSection} />
-      {section === 'settings' && <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />}
-
-      {workspace.github_project_owner && workspace.github_project_number && (
-        <div className="border-b border-mc-border bg-mc-bg-secondary px-4 py-2">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-col gap-1 text-sm text-mc-text-secondary">
-              <div className="flex flex-wrap items-center gap-2">
-                {githubSyncState.state === 'syncing' ? (
-                  <Loader2 className="size-4 animate-spin text-mc-accent-cyan" />
-                ) : githubSyncState.state === 'error' ? (
-                  <AlertTriangle className="size-4 text-rose-300" />
-                ) : githubSyncState.state === 'success' ? (
-                  <CheckCircle2 className="size-4 text-emerald-300" />
-                ) : (
-                  <RefreshCw className="size-4 text-mc-accent-cyan" />
-                )}
-                <span>
-                  GitHub Project #{workspace.github_project_number}
-                  {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
-                </span>
-                {githubSyncState.message && (
-                  <span className={githubSyncState.state === 'error' ? 'text-rose-200' : 'text-mc-text-secondary'}>
-                    {githubSyncState.message}
+      <WorkspaceSectionTabs section={section} onSectionChange={setSection}>
+        {workspace.github_project_owner && workspace.github_project_number && (
+          <div className="border-b border-mc-border bg-mc-bg-secondary px-4 py-2">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-1 text-sm text-mc-text-secondary">
+                <div className="flex flex-wrap items-center gap-2">
+                  {githubSyncState.state === 'syncing' ? (
+                    <Loader2 className="size-4 animate-spin text-mc-accent-cyan" />
+                  ) : githubSyncState.state === 'error' ? (
+                    <AlertTriangle className="size-4 text-rose-300" />
+                  ) : githubSyncState.state === 'success' ? (
+                    <CheckCircle2 className="size-4 text-emerald-300" />
+                  ) : (
+                    <RefreshCw className="size-4 text-mc-accent-cyan" />
+                  )}
+                  <span>
+                    GitHub Project #{workspace.github_project_number}
+                    {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
                   </span>
-                )}
-              </div>
-              {githubSyncState.statusNotes && githubSyncState.statusNotes.length > 0 && (
-                <div className="flex items-start gap-2 text-amber-200">
-                  <AlertTriangle className="size-4 mt-0.5 shrink-0" />
-                  <div className="space-y-0.5">
-                    <span className="block">GitHub/MCK status reconciliation is visible for this sync.</span>
-                    {githubSyncState.statusNotes.map((note: string) => (
-                      <span key={note} className="block text-xs text-amber-100/90">{note}</span>
-                    ))}
-                  </div>
+                  {githubSyncState.message && (
+                    <span className={githubSyncState.state === 'error' ? 'text-rose-200' : 'text-mc-text-secondary'}>
+                      {githubSyncState.message}
+                    </span>
+                  )}
                 </div>
-              )}
-              <div className={n8nSyncPresentation?.state === 'error'
-                ? 'flex flex-wrap items-center gap-2 text-rose-200'
-                : n8nSyncPresentation?.state === 'warning'
-                  ? 'flex flex-wrap items-center gap-2 text-amber-200'
-                  : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
-                {n8nSyncPresentation?.state === 'error' ? (
-                  <AlertTriangle className="size-4 shrink-0" />
-                ) : n8nSyncPresentation?.state === 'warning' ? (
-                  <AlertTriangle className="size-4 shrink-0 text-amber-300" />
-                ) : n8nSyncPresentation ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
-                ) : (
-                  <RefreshCw className="size-4 shrink-0" />
+                {githubSyncState.statusNotes && githubSyncState.statusNotes.length > 0 && (
+                  <div className="flex items-start gap-2 text-amber-200">
+                    <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+                    <div className="space-y-0.5">
+                      <span className="block">GitHub/MCK status reconciliation is visible for this sync.</span>
+                      {githubSyncState.statusNotes.map((note: string) => (
+                        <span key={note} className="block text-xs text-amber-100/90">{note}</span>
+                      ))}
+                    </div>
+                  </div>
                 )}
-                <span>
-                  n8n sync: {n8nSyncPresentation?.label ?? 'waiting for first scheduled run'}
-                </span>
-                <span>
-                  Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - {formatSyncCadence(latestN8nSync)}
-                </span>
-                <Link href="/n8n-sync-history" className="text-mc-accent-cyan hover:text-mc-accent">
-                  View history
-                </Link>
-                {latestN8nSync?.alert_message && n8nSyncPresentation?.showMessage && (
-                  <span>{latestN8nSync.alert_message}</span>
-                )}
+                <div className={n8nSyncPresentation?.state === 'error'
+                  ? 'flex flex-wrap items-center gap-2 text-rose-200'
+                  : n8nSyncPresentation?.state === 'warning'
+                    ? 'flex flex-wrap items-center gap-2 text-amber-200'
+                    : 'flex flex-wrap items-center gap-2 text-mc-text-secondary'}>
+                  {n8nSyncPresentation?.state === 'error' ? (
+                    <AlertTriangle className="size-4 shrink-0" />
+                  ) : n8nSyncPresentation?.state === 'warning' ? (
+                    <AlertTriangle className="size-4 shrink-0 text-amber-300" />
+                  ) : n8nSyncPresentation ? (
+                    <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
+                  ) : (
+                    <RefreshCw className="size-4 shrink-0" />
+                  )}
+                  <span>
+                    n8n sync: {n8nSyncPresentation?.label ?? 'waiting for first scheduled run'}
+                  </span>
+                  <span>
+                    Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - {formatSyncCadence(latestN8nSync)}
+                  </span>
+                  <Link href="/n8n-sync-history" className="text-mc-accent-cyan hover:text-mc-accent">
+                    View history
+                  </Link>
+                  {latestN8nSync?.alert_message && n8nSyncPresentation?.showMessage && (
+                    <span>{latestN8nSync.alert_message}</span>
+                  )}
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => void runGitHubProjectSync(workspace, 'manual')}
+                disabled={githubSyncState.state === 'syncing'}
+                aria-label="Sync workspace now from GitHub Project"
+                title="Sync workspace now from GitHub Project"
+                className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-1.5 text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
+              >
+                {githubSyncState.state === 'syncing' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                Sync now
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => void runGitHubProjectSync(workspace, 'manual')}
-              disabled={githubSyncState.state === 'syncing'}
-              aria-label="Sync workspace now from GitHub Project"
-              title="Sync workspace now from GitHub Project"
-              className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-1.5 text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
-            >
-              {githubSyncState.state === 'syncing' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-              Sync now
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-        {section === 'board' && (
-          // Below lg the two fixed-width rails (w-64 + w-80 = 576px) exceed a 390px
-          // viewport and squeeze MissionQueue to a 0px content box, so the cockpit
-          // stacks into a single scrolling column instead (#142, WCAG 1.4.10).
-          <div className="flex flex-col lg:flex-row flex-1 min-w-0 min-h-0 overflow-y-auto lg:overflow-hidden">
+        <WorkspaceSectionContent section={section} value="board">
+          {/* Below lg the two fixed-width rails (w-64 + w-80 = 576px) exceed a
+              390px viewport and squeeze MissionQueue to a 0px content box, so
+              the cockpit stacks into a single scrolling column instead (#142,
+              WCAG 1.4.10). */}
+          <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
             <AgentsSidebar workspaceId={workspace.id} />
             <MissionQueue workspaceId={workspace.id} />
             <LiveFeed />
           </div>
-        )}
-        {section === 'agents' && (
+        </WorkspaceSectionContent>
+        <WorkspaceSectionContent section={section} value="agents">
           <div className="flex flex-col lg:flex-row h-full min-w-0 overflow-y-auto lg:overflow-hidden">
             <AgentsSidebar workspaceId={workspace.id} />
             <div className="flex-1 min-w-0 overflow-auto p-4">
               <RuntimeAuditPanel />
             </div>
           </div>
-        )}
-        {section === 'dispatch' && <DispatchFailureQueue workspaceId={workspace.id} />}
-        {section === 'settings' && (
+        </WorkspaceSectionContent>
+        <WorkspaceSectionContent section={section} value="dispatch">
+          <DispatchFailureQueue workspaceId={workspace.id} />
+        </WorkspaceSectionContent>
+        <WorkspaceSectionContent section={section} value="settings">
           <div className="h-full overflow-auto p-4">
+            <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />
             <RuntimeAuditPanel />
           </div>
-        )}
-        {section === 'activity' && (
+        </WorkspaceSectionContent>
+        <WorkspaceSectionContent section={section} value="activity">
           <div className="flex flex-col lg:flex-row h-full min-w-0 overflow-y-auto lg:overflow-hidden">
             <div className="flex-1 min-w-0 overflow-auto p-4">
               <DispatchFailureQueue workspaceId={workspace.id} />
             </div>
             <LiveFeed />
           </div>
-        )}
-      </div>
+        </WorkspaceSectionContent>
+      </WorkspaceSectionTabs>
 
       {/* Debug Panel - only shows when debug mode enabled */}
       <SSEDebugPanel />

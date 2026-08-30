@@ -67,6 +67,7 @@ export function Header({ workspace }: HeaderProps) {
           <div className="flex items-center gap-2 min-w-0">
             <Link
               href="/"
+              aria-label="Back to all workspaces"
               className="flex items-center gap-1 shrink-0 text-mc-text-secondary hover:text-mc-accent transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -128,7 +129,7 @@ export function Header({ workspace }: HeaderProps) {
           className={`flex items-center gap-2 px-2 sm:px-3 py-1 rounded border text-sm font-medium ${
             isOnline
               ? 'bg-mc-accent-green/20 border-mc-accent-green text-mc-accent-green'
-              : 'bg-mc-accent-red/20 border-mc-accent-red text-mc-accent-red'
+              : 'bg-mc-accent-red/20 border-mc-accent-red text-rose-200'
           }`}
         >
           <span

@@ -1,9 +1,9 @@
 'use client';
 
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { Activity, Bot, KanbanSquare, RadioTower, Settings } from 'lucide-react';
 
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export type WorkspaceSection = 'board' | 'agents' | 'dispatch' | 'settings' | 'activity';
 
@@ -15,10 +15,24 @@ const sections: Array<{ id: WorkspaceSection; label: string; icon: ComponentType
   { id: 'activity', label: 'Activity', icon: Activity },
 ];
 
-export function WorkspaceSectionTabs({ section, onSectionChange }: { section: WorkspaceSection; onSectionChange: (section: WorkspaceSection) => void }) {
+interface WorkspaceSectionTabsProps {
+  section: WorkspaceSection;
+  onSectionChange: (section: WorkspaceSection) => void;
+  children: ReactNode;
+}
+
+export function WorkspaceSectionTabs({
+  section,
+  onSectionChange,
+  children,
+}: WorkspaceSectionTabsProps) {
   return (
-    <nav className="border-b border-mc-border bg-mc-bg px-4 py-2" aria-label="Workspace sections">
-      <Tabs value={section} onValueChange={(value) => onSectionChange(value as WorkspaceSection)}>
+    <Tabs
+      value={section}
+      onValueChange={(value) => onSectionChange(value as WorkspaceSection)}
+      className="min-h-0 flex-1 gap-0"
+    >
+      <nav className="border-b border-mc-border bg-mc-bg px-4 py-2" aria-label="Workspace sections">
         <TabsList>
           {sections.map((item) => {
             const Icon = item.icon;
@@ -30,7 +44,34 @@ export function WorkspaceSectionTabs({ section, onSectionChange }: { section: Wo
             );
           })}
         </TabsList>
-      </Tabs>
-    </nav>
+      </nav>
+      {children}
+    </Tabs>
+  );
+}
+
+interface WorkspaceSectionContentProps {
+  section: WorkspaceSection;
+  value: WorkspaceSection;
+  children: ReactNode;
+}
+
+export function WorkspaceSectionContent({
+  section,
+  value,
+  children,
+}: WorkspaceSectionContentProps) {
+  const active = section === value;
+
+  return (
+    <TabsContent
+      value={value}
+      forceMount
+      hidden={!active}
+      tabIndex={active ? 0 : -1}
+      className="min-h-0 flex-1 overflow-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"
+    >
+      {active ? children : null}
+    </TabsContent>
   );
 }

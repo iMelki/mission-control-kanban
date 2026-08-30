@@ -626,8 +626,21 @@ const FOCUS_EVIDENCE = (element) => {
           const parts = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
           return parts.length < 4 ? true : parts[3] > 0.05;
         };
-        const shadowVisible = (shadow) =>
-          shadow !== 'none' && shadow !== '' && !/rgba\([^)]*,\s*0\s*\)/.test(shadow);
+        // A computed box-shadow is a comma-separated list, and Tailwind rings
+        // include a transparent bookkeeping component. Judge each component,
+        // not the whole list, or every real Tailwind ring becomes a false miss.
+        const shadowVisible = (shadow) => {
+          if (!shadow || shadow === 'none') return false;
+          return shadow.split(/,(?![^(]*\))/).some((component) => {
+            const color = /rgba?\([^)]*\)/.exec(component);
+            if (!color || !opaque(color[0])) return false;
+            const lengths = component.replace(color[0], '').match(/-?\d+(?:\.\d+)?px/g);
+            if (!lengths) return false;
+            const values = lengths.map(Number.parseFloat);
+            const [offsetX = 0, offsetY = 0, blur = 0, spread = 0] = values;
+            return Math.max(Math.abs(offsetX), Math.abs(offsetY)) + Math.max(0, blur) + spread > 0;
+          });
+        };
         const focusVisible = element.matches(':focus-visible');
         const rect = element.getBoundingClientRect();
         // OCCLUSION (#155). The first version hit-tested the centre of the
@@ -1445,6 +1458,12 @@ const BAD_MARKUP =
   '<button id="__sp_transparent" style="outline:2px solid transparent !important;' +
   'box-shadow:none !important;border:0;background:#ffffff;color:#000000">' +
   'selfproof transparent outline</button>' +
+  '<button id="__sp_contracted" style="outline:2px solid transparent !important;' +
+  'box-shadow:rgb(0,0,255) 0 0 0 -2px !important;border:0;background:#ffffff;color:#000000">' +
+  'selfproof contracted outer shadow</button>' +
+  '<button id="__sp_contracted_inset" style="outline:2px solid transparent !important;' +
+  'box-shadow:inset rgb(0,0,255) 0 0 0 -2px !important;border:0;background:#ffffff;color:#000000">' +
+  'selfproof contracted inset shadow</button>' +
   '<img id="__sp_img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"' +
   ' style="width:24px;height:24px">' +
   '</div>';
@@ -1526,7 +1545,11 @@ async function injectOcclusionSample(page, spec) {
       'style',
       'position:relative;z-index:2147483000;background:#ffffff;padding:8px'
     );
-    const ring = 'outline:2px solid #0000ff';
+    // Matches Tailwind's computed composite ring, including the transparent
+    // bookkeeping shadow that the old whole-list detector rejected.
+    const ring =
+      'outline:2px solid transparent;' +
+      'box-shadow:0 0 0 0 #ffffff, 0 0 0 2px rgba(88,166,255,0.6), 0 0 rgba(0,0,0,0)';
     const mk = (bid, text, extra) => {
       const b = document.createElement('button');
       b.id = bid;
@@ -1724,6 +1747,12 @@ async function selfProof(browser) {
   const spTransparent = injectedFocusPass.evidence.find((e) =>
     /selfproof transparent outline/.test(e.label)
   );
+  const spContracted = injectedFocusPass.evidence.find((e) =>
+    /selfproof contracted outer shadow/.test(e.label)
+  );
+  const spContractedInset = injectedFocusPass.evidence.find((e) =>
+    /selfproof contracted inset shadow/.test(e.label)
+  );
 
   await removeById(page, '__a11y_selfproof');
   await delay(250);
@@ -1835,9 +1864,9 @@ async function selfProof(browser) {
   const spContrast = injectedContrast.pairs.find((p) => /selfproof low contrast/.test(p.text));
   const targetsFor = (scan, rule) =>
     scan.violations.filter((v) => v.id === rule).flatMap((v) => v.targets);
-  const nodesFor = (scan, rule) =>
-    scan.violations.filter((v) => v.id === rule).reduce((n, v) => n + v.nodeCount, 0);
   const names = (scan, rule, sel) => targetsFor(scan, rule).some((t) => String(t).includes(sel));
+  const scopedNodesFor = (scan, rule, sel) =>
+    targetsFor(scan, rule).filter((target) => String(target).includes(sel)).length;
 
   const legs = [
     {
@@ -1876,15 +1905,17 @@ async function selfProof(browser) {
       detected:
         names(injectedAxe, 'color-contrast', '__sp_contrast') &&
         names(injectedAxe, 'image-alt', '__sp_img') &&
-        nodesFor(injectedAxe, 'color-contrast') > nodesFor(baselineAxe, 'color-contrast') &&
-        nodesFor(injectedAxe, 'image-alt') > nodesFor(baselineAxe, 'image-alt'),
+        scopedNodesFor(baselineAxe, 'color-contrast', '__sp_contrast') === 0 &&
+        scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') === 1 &&
+        scopedNodesFor(baselineAxe, 'image-alt', '__sp_img') === 0 &&
+        scopedNodesFor(injectedAxe, 'image-alt', '__sp_img') === 1,
       detail:
-        'color-contrast nodes ' +
-        nodesFor(baselineAxe, 'color-contrast') + ' -> ' + nodesFor(injectedAxe, 'color-contrast') +
-        ' names #__sp_contrast=' + names(injectedAxe, 'color-contrast', '__sp_contrast') +
-        '; image-alt nodes ' +
-        nodesFor(baselineAxe, 'image-alt') + ' -> ' + nodesFor(injectedAxe, 'image-alt') +
-        ' names #__sp_img=' + names(injectedAxe, 'image-alt', '__sp_img'),
+        'authored color-contrast target ' +
+        scopedNodesFor(baselineAxe, 'color-contrast', '__sp_contrast') + ' -> ' +
+        scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') +
+        '; authored image-alt target ' +
+        scopedNodesFor(baselineAxe, 'image-alt', '__sp_img') + ' -> ' +
+        scopedNodesFor(injectedAxe, 'image-alt', '__sp_img'),
     },
     {
       leg: 'focus detector sees the suppressed indicator',
@@ -1906,6 +1937,21 @@ async function selfProof(browser) {
         : 'injected transparent-outline control was never measured',
     },
     {
+      leg: 'opaque outer and inset shadows contracted behind the control are NOT scored as visible',
+      detected:
+        Boolean(spContracted) &&
+        spContracted.visible === false &&
+        spContracted.transparentOutlineOnly === true &&
+        Boolean(spContractedInset) &&
+        spContractedInset.visible === false &&
+        spContractedInset.transparentOutlineOnly === true,
+      detail: spContracted && spContractedInset
+        ? 'outerVisible=' + spContracted.visible + ' insetVisible=' + spContractedInset.visible +
+          ' outer=' + (spContracted.styles[0] ? spContracted.styles[0].boxShadow : '?') +
+          ' inset=' + (spContractedInset.styles[0] ? spContractedInset.styles[0].boxShadow : '?')
+        : 'one or both injected contracted-shadow controls were never measured',
+    },
+    {
       // Same reason as the leg above: assert the injected run is GONE by name.
       // Comparing whole-page failed counts read "3 -> 2 (baseline 1)" on a
       // surface whose own content changed mid-proof, and killed a healthy run.
@@ -1920,29 +1966,35 @@ async function selfProof(browser) {
         restoredContrast.pairs.some((f) => /selfproof low contrast/.test(f.text)),
     },
     {
-      // Per-rule node counts, and the injected selectors must be GONE by name.
-      leg: 'axe returns to baseline after removal (per-rule node counts, by name)',
+      // Dynamic app content can change whole-page counts between scans. Only
+      // the authored self-proof targets are contractual here.
+      leg: 'axe removes each injected target after the authored fixture is removed',
       detected:
-        nodesFor(restoredAxe, 'color-contrast') === nodesFor(baselineAxe, 'color-contrast') &&
-        nodesFor(restoredAxe, 'image-alt') === nodesFor(baselineAxe, 'image-alt') &&
+        scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') === 1 &&
+        scopedNodesFor(restoredAxe, 'color-contrast', '__sp_contrast') === 0 &&
+        scopedNodesFor(injectedAxe, 'image-alt', '__sp_img') === 1 &&
+        scopedNodesFor(restoredAxe, 'image-alt', '__sp_img') === 0 &&
         !names(restoredAxe, 'color-contrast', '__sp_contrast') &&
         !names(restoredAxe, 'image-alt', '__sp_img'),
       detail:
-        'color-contrast nodes ' + nodesFor(injectedAxe, 'color-contrast') + ' -> ' +
-        nodesFor(restoredAxe, 'color-contrast') + ' (baseline ' + nodesFor(baselineAxe, 'color-contrast') + ')' +
-        '; image-alt nodes ' + nodesFor(injectedAxe, 'image-alt') + ' -> ' +
-        nodesFor(restoredAxe, 'image-alt') + ' (baseline ' + nodesFor(baselineAxe, 'image-alt') + ')',
+        'authored color-contrast target ' +
+        scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') + ' -> ' +
+        scopedNodesFor(restoredAxe, 'color-contrast', '__sp_contrast') +
+        '; authored image-alt target ' +
+        scopedNodesFor(injectedAxe, 'image-alt', '__sp_img') + ' -> ' +
+        scopedNodesFor(restoredAxe, 'image-alt', '__sp_img'),
     },
     {
       // Was: "focusable population returns to baseline after removal", comparing
       // focus.checked over the WHOLE page. That number is unstable on any dynamic
       // surface -- it read "baseline 7 -> restored 9" on /workspace/frontend-revenue
       // and killed the run for a defect that was not there. Scoped to the harness's
-      // own injected container, where the expected values are 2 and 0 exactly.
+      // own injected container, where the expected values are 4 and 0 exactly.
       leg: 'the injected controls are measured while present and absent after removal',
       detected:
         baselineScoped.coverage.population === 0 &&
-        injectedFocusPass.coverage.measuredFromPopulation === 2 &&
+        injectedFocusPass.coverage.population === 4 &&
+        injectedFocusPass.coverage.measuredFromPopulation === 4 &&
         restoredScoped.coverage.population === 0 &&
         restoredScoped.coverage.measuredFromPopulation === 0,
       detail:

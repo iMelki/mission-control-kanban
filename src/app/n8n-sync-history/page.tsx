@@ -164,7 +164,11 @@ export default function N8nSyncHistoryPage() {
           </div>
         </section>
 
-        <div className="overflow-x-auto border border-mc-border">
+        <div
+          tabIndex={0}
+          aria-label="n8n sync history horizontal scroll area"
+          className="overflow-x-auto border border-mc-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"
+        >
           <table className="min-w-full divide-y divide-mc-border text-sm">
             <thead className="bg-mc-bg-secondary text-left text-xs uppercase text-mc-text-secondary">
               <tr>
