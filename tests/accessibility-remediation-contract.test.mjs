@@ -46,6 +46,7 @@ test('navigation, diagnostics, scrolling, and offline contrast stay named', () =
   const diagnostics = source('src/components/runtime/RuntimeConfigTemplateGallery.tsx');
   const table = source('src/components/ui/DataTable.tsx');
   const history = source('src/app/n8n-sync-history/page.tsx');
+  const liveFeed = source('src/components/LiveFeed.tsx');
   const workspace = source('src/app/workspace/[slug]/page.tsx');
 
   assert.match(header, /aria-label="Back to all workspaces"/);
@@ -53,6 +54,8 @@ test('navigation, diagnostics, scrolling, and offline contrast stay named', () =
   assert.match(diagnostics, /role="group"/);
   assert.match(table, /role="region"/);
   assert.match(history, /role="region"/);
+  assert.match(liveFeed, /aria-label="Live feed events"/);
+  assert.match(liveFeed, /tabIndex=\{0\}/);
   assert.match(table, /tabIndex=\{0\}/);
   assert.match(history, /tabIndex=\{0\}/);
   assert.doesNotMatch(workspace, /text-mc-text-secondary\/70/);

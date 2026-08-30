@@ -171,7 +171,12 @@ function LiveFeedExpandedPanel({
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div
+        role="region"
+        tabIndex={0}
+        aria-label="Live feed events"
+        className="flex-1 overflow-y-auto p-2 space-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"
+      >
         {events.length === 0 ? (
           <div className="text-center py-8 text-mc-text-secondary text-sm">No events yet</div>
         ) : (
