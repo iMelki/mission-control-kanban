@@ -366,6 +366,7 @@ export function DataTable<T extends { id?: string }>({
       ) : null}
       <div className="overflow-hidden rounded-lg border border-mc-border bg-mc-bg-secondary">
         <div
+          role="region"
           tabIndex={0}
           aria-label={caption ? `${caption} horizontal scroll area` : 'Data table horizontal scroll area'}
           className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"

@@ -165,6 +165,7 @@ export default function N8nSyncHistoryPage() {
         </section>
 
         <div
+          role="region"
           tabIndex={0}
           aria-label="n8n sync history horizontal scroll area"
           className="overflow-x-auto border border-mc-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"

@@ -51,6 +51,8 @@ test('navigation, diagnostics, scrolling, and offline contrast stay named', () =
   assert.match(header, /aria-label="Back to all workspaces"/);
   assert.match(header, /bg-mc-accent-red\/20 border-mc-accent-red text-rose-200/);
   assert.match(diagnostics, /role="group"/);
+  assert.match(table, /role="region"/);
+  assert.match(history, /role="region"/);
   assert.match(table, /tabIndex=\{0\}/);
   assert.match(history, /tabIndex=\{0\}/);
   assert.doesNotMatch(workspace, /text-mc-text-secondary\/70/);

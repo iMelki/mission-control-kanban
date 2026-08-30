@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "date": "2026-08-26",
+  "cases": [
+    {
+      "id": "ci-precommit-trailing-whitespace",
+      "gate": ".github/workflows/ci.yml",
+      "break": "Append trailing spaces to one tracked README.md heading and assert the file hash changed.",
+      "caller": "pre-commit run --show-diff-on-failure --color=always --all-files",
+      "expected": "exit 1 naming trailing-whitespace and README.md; the hook repairs the deliberate break"
+    },
+    {
+      "id": "runtime-regression-wrong-server",
+      "gate": ".github/workflows/runtime-regression.yml",
+      "break": "Bind the requested local port to an asserted fixture server that returns a non-MCK page.",
+      "caller": "MCK_REGRESSION_SERVER_MODE=dev MCK_REGRESSION_PORT=5392 MCK_SMOKE_URL=http://127.0.0.1:5392 npm run check:runtime-regressions",
+      "expected": "exit 1 because runtime UI smoke cannot find the MCK shell and cleanup cannot prove synthetic undefined entities absent on the fixture server"
+    },
+    {
+      "id": "secret-scan-synthetic-credential",
+      "gate": ".github/workflows/secret-scan.yml",
+      "break": "Commit a generated synthetic credential only inside an isolated artifact repository.",
+      "caller": "gitleaks detect --redact=100 --verbose --exit-code=2 --report-format=sarif --log-opts='--all'",
+      "expected": "exit 2 naming generic-api-key while logs and SARIF redact the synthetic value"
+    },
+    {
+      "id": "markdown-broken-local-link",
+      "gate": "scripts/check-markdown-links.ps1",
+      "break": "Add an asserted missing repo-local link to tracked README.md.",
+      "caller": "pwsh -NoProfile -File scripts/check-markdown-links.ps1",
+      "expected": "exit 1 naming README.md and the missing target"
+    },
+    {
+      "id": "runtime-regression-script-wrong-server",
+      "gate": "scripts/check-runtime-regressions.js",
+      "break": "Use the same asserted non-MCK fixture server as the workflow-step proof.",
+      "caller": "MCK_REGRESSION_SERVER_MODE=dev MCK_REGRESSION_PORT=5392 MCK_SMOKE_URL=http://127.0.0.1:5392 npm run check:runtime-regressions",
+      "expected": "exit 1 because runtime UI smoke is red while React Doctor remains green"
+    },
+    {
+      "id": "component-sourcing-uncovered-file",
+      "gate": "scripts/verify-component-sourcing-preflight.mjs",
+      "break": "Create src/components/__gate_negative__.tsx without a baseline or sourcing record and assert it exists.",
+      "caller": "node scripts/verify-component-sourcing-preflight.mjs",
+      "expected": "exit 1 naming the uncovered component and the missing sourcing-preflight record"
+    }
+  ]
+}
