@@ -329,7 +329,12 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden p-3">
+        <div
+          role="region"
+          tabIndex={0}
+          aria-label="Mission queue board"
+          className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"
+        >
           {COLUMNS.map((column) => (
             <KanbanColumn
               key={column.id}

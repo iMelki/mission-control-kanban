@@ -21,6 +21,9 @@
  *     rather than on the focused node, and a naive check misses that.
  *   - runAxeScan: the WCAG tag set, dedup-by-rule-id, and the rule that
  *     critical/serious *incomplete* findings block rather than pass silently.
+ *     App scans delegate color contrast to the proven computed-style pass:
+ *     axe's viewport grid throws on legitimate offscreen board columns. The
+ *     scoped axe self-proof keeps that rule enabled as an independent canary.
  *
  * Deliberately NOT ported, and why
  * --------------------------------
@@ -289,8 +292,14 @@ if (!fs.existsSync(AXE_PATH)) {
 async function runAxeScan(page, contextSelector = null) {
   await page.addScriptTag({ path: AXE_PATH });
   const raw = await page.evaluate(
-    async ({ tags, contextSelector: selector }) =>
-      await window.axe.run(
+    async ({ tags, contextSelector: selector }) => {
+      const options = { runOnly: { type: 'tag', values: tags } };
+      // Axe's visual color rule throws `Element midpoint exceeds the grid
+      // bounds` for legitimate offscreen columns inside the horizontal board.
+      // The proven computed-style auditor below owns contrast for app scans;
+      // keep axe color-contrast enabled for the scoped self-proof canary.
+      if (!selector) options.rules = { 'color-contrast': { enabled: false } };
+      return await window.axe.run(
         {
           // A self-proof scan must be scoped to its authored fixture. Axe can
           // classify the whole color-contrast rule as `incomplete` when an
@@ -300,8 +309,9 @@ async function runAxeScan(page, contextSelector = null) {
           // Exclude the dev-server overlay; see defineAppElementFilter.
           exclude: [['nextjs-portal'], ['[data-nextjs-dev-tools-button]'], ['#__next-dev-tools']],
         },
-        { runOnly: { type: 'tag', values: tags } }
-      ),
+        options
+      );
+    },
     { tags: AXE_TAGS, contextSelector }
   );
   const shape = (f) => ({
@@ -333,6 +343,7 @@ async function runAxeScan(page, contextSelector = null) {
     violations,
     incomplete,
     blockingIncomplete,
+    delegatedRules: contextSelector ? [] : ['color-contrast'],
     metrics: {
       violations: violations.length,
       violationNodes: violations.reduce((n, v) => n + v.nodeCount, 0),
@@ -340,6 +351,7 @@ async function runAxeScan(page, contextSelector = null) {
       incomplete: incomplete.length,
       blockingIncomplete: blockingIncomplete.length,
       passes: raw.passes.length,
+      delegatedRules: contextSelector ? [] : ['color-contrast'],
     },
   };
 }

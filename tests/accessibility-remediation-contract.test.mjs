@@ -37,6 +37,7 @@ test('task cards expose sibling open and reorder buttons', () => {
   assert.match(taskCard, /data-task-card/);
   assert.match(taskCard, /data-task-drag-handle/);
   assert.match(taskCard, /data-task-open/);
+  assert.match(queue, /aria-label="Mission queue board"/);
   assert.doesNotMatch(taskCard, /role="button"/);
   assert.doesNotMatch(taskCard, /text-mc-text-secondary\/60/);
 });
@@ -68,6 +69,7 @@ test('a11y self-proof parses painted shadow components and rejects contraction',
   assert.match(probe, /selfproof contracted outer shadow/);
   assert.match(probe, /authored color-contrast target/);
   assert.match(probe, /runAxeScan\(page, '#__a11y_selfproof'\)/);
+  assert.match(probe, /delegatedRules: contextSelector \? \[\] : \['color-contrast'\]/);
   assert.match(probe, /selfproof repaired image/);
   assert.match(probe, /injectedFocusPass\.coverage\.population === 4/);
 });
