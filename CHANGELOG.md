@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Workspace accessibility barriers remediated (2026-08-30, #150, #151,
+  #152)** - Settings now reuse the pinned shadcn Input focus contract; cockpit
+  tabs own valid mounted Radix panels; task cards expose sibling open and drag
+  buttons; the home link is named; data-table, queue, and live-feed scroll
+  regions are keyboard-focusable named regions; diagnostics use valid group
+  semantics; and the
+  remaining timestamp, sync-status, and offline badge contrast pairs meet AA.
+  The accessibility self-proof now scopes axe to its authored fixture so an
+  unrelated manual-review node cannot hide the injected contrast failure.
+  Re-capture found 0 clipped elements in all 18 route/viewport measurements.
+
 - **Capture probes refuse the dying next-dev listener (2026-08-27, #164, #139)** -
   `scripts/assert-production-capture-target.mjs` is now the shared preflight for
   `surfaces:probe` and `probe-surface-a11y.mjs`. `MCK_BASE_URL` is required;

@@ -15,6 +15,17 @@
       ]
     },
     {
+      "id": "computed-contrast-known-bad-repaired-too-early",
+      "target": "scripts/probe-surface-a11y.mjs",
+      "find": "color:#bbbbbb;background:#ffffff",
+      "replace": "color:#111111;background:#ffffff",
+      "expectedExit": 2,
+      "expectedOutput": [
+        "DEAD  contrast detector flags the injected low-contrast text",
+        "pass=true"
+      ]
+    },
+    {
       "id": "whole-shadow-transparent-regex",
       "target": "scripts/probe-surface-a11y.mjs",
       "find": "const shadowVisible = (shadow) => {",

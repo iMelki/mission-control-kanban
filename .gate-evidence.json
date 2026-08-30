@@ -9,16 +9,17 @@
       "negativeFixture": "tests/fixtures/a11y-selfproof-negative-inputs.json",
       "observedFailure": {
         "date": "2026-08-30",
-        "command": "MCK_BASE_URL=http://127.0.0.1:5396 node scripts/probe-surface-a11y.mjs --self-proof artifacts/accessibility-remediation-20260830/<case>",
-        "brokenExitCodes": [2, 2, 2],
+        "command": "MCK_BASE_URL=http://127.0.0.1:5399 node scripts/probe-surface-a11y.mjs --self-proof artifacts/accessibility-remediation-20260830/<case>",
+        "brokenExitCodes": [2, 2, 2, 2],
         "restoredExitCode": 0,
-        "reason": "Three asserted source mutations exited 2 for their intended named reason: renaming #__sp_contrast made the authored axe target legs DEAD at 0 -> 0; restoring the old whole-shadow regex made the contracted-shadow leg DEAD; bypassing shadow geometry made the same contracted outer/inset leg DEAD with outerVisible=true and insetVisible=true.",
+        "reason": "Four asserted source mutations exited 2 for their intended named reason: renaming #__sp_contrast made the authored axe target legs DEAD at 0 -> 0; repairing the injected computed-contrast sample too early produced ratio 18.88 and made its detector leg DEAD; restoring the old whole-shadow regex made the contracted-shadow leg DEAD; bypassing shadow geometry made the same contracted outer/inset leg DEAD with outerVisible=true and insetVisible=true.",
         "restoredPass": "After restoring the source, the exact caller passed all 18 authored legs and exited 0; the full sweep repeated the same self-proof before measuring any app surface.",
         "evidence": [
-          "artifacts/accessibility-remediation-20260830/negative-authored-axe-target-exit/self-proof.json",
-          "artifacts/accessibility-remediation-20260830/negative-whole-shadow/self-proof.json",
-          "artifacts/accessibility-remediation-20260830/negative-shadow-geometry/self-proof.json",
-          "artifacts/accessibility-remediation-20260830/a11y-sweep-cfaefa8/self-proof.json"
+          "artifacts/accessibility-remediation-20260830/negative-final-authored-axe-valid/self-proof.json",
+          "artifacts/accessibility-remediation-20260830/negative-final-computed-contrast/self-proof.json",
+          "artifacts/accessibility-remediation-20260830/negative-final-whole-shadow/self-proof.json",
+          "artifacts/accessibility-remediation-20260830/negative-final-shadow-geometry-valid/self-proof.json",
+          "artifacts/accessibility-remediation-20260830/a11y-sweep-stable-c55fbae/a11y-report.json"
         ]
       }
     },

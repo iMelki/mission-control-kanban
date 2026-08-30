@@ -1,6 +1,6 @@
 # mission-control-kanban Open Tasks
 
-Last updated: 2026-08-25
+Last updated: 2026-08-30
 
 GitHub Issues are enabled for `iMelki/mission-control-kanban`. Use GitHub issues as the canonical task records and keep this file as the local index.
 
@@ -22,6 +22,25 @@ Open on GitHub: **57** (verified 2026-08-25). The a11y cluster (#150-#153,
     Incremental; the proof recipe must stay `pass` after each batch.
 - [#148 - Root type errors are ungated](https://github.com/iMelki/mission-control-kanban/issues/148)
   - Goal: add a `typecheck` script and stop `tsc --noEmit` failing unobserved.
+- [#150 - Give the four settings inputs visible keyboard focus](https://github.com/iMelki/mission-control-kanban/issues/150)
+  - Local `dev` implementation and production proof are complete in the
+    isolated recovery clone; GitHub remains open until the reviewed change is
+    pushed and promoted.
+- [#151 - Repair the three WCAG AA contrast decisions](https://github.com/iMelki/mission-control-kanban/issues/151)
+  - Local implementation removes the secondary-token opacity reductions and
+    strengthens the offline badge text; the new production sweep is recorded
+    in `docs/accessibility-remediation-2026-08-30.md`.
+- [#152 - Remove axe interaction and semantics violations](https://github.com/iMelki/mission-control-kanban/issues/152)
+  - Local implementation covers nested task-card actions, Radix tab panels,
+    the home-link name, focusable table regions, and diagnostic semantics.
+- [#160 - Decompose the accessibility self-proof lifecycle](https://github.com/iMelki/mission-control-kanban/issues/160)
+  - Still open. The recovery keeps the 18-leg contract stable and makes a
+    caller-faithful correction, but the oversized lifecycle remains the owner
+    for a no-feature refactor before future expansion.
+- [#159 - Fail closed when accessibility populations collapse](https://github.com/iMelki/mission-control-kanban/issues/159)
+  - Still open. A discarded run against a partially staged standalone tree
+    again produced collapsed surface populations; only the rebuilt stable run
+    may be cited as evidence.
 - [#7 - Use relevant skills for market research, competitor analysis, and monetization planning](https://github.com/iMelki/mission-control-kanban/issues/7)
   - Goal: map competitors, ICPs, monetization options, and positioning for mission-control-kanban.
 - [#8 - Design and build a landing page](https://github.com/iMelki/mission-control-kanban/issues/8)
@@ -29,6 +48,11 @@ Open on GitHub: **57** (verified 2026-08-25). The a11y cluster (#150-#153,
 
 ## Latest Progress
 
+- 2026-08-30: selectively reconciled PR #162 onto current `dev` without
+  merging its conflicting branch. Source fixes for #150-#152, the composite
+  shadow parser, contracted-shadow canaries, gate ledger, and current capture
+  evidence are retained. Stale screenshots and the branch's older capture
+  manifest are not. See `docs/accessibility-remediation-2026-08-30.md`.
 - 2026-08-25: verified the #149 commit-lock unlock end to end. The genome
   `$schema` pin, the byte-faithful local schema mirror, and the captured-surface
   adoption are all on `origin/dev`; `npm run test:doctor-genome` passes 4/4 and
@@ -76,5 +100,15 @@ Open on GitHub: **57** (verified 2026-08-25). The a11y cluster (#150-#153,
 
 ## Local Follow-Ups
 
+- Review and push the isolated local `dev` commits, then promote through the
+  repo's normal `dev -> main` path; no GitHub state was mutated in this recovery.
+- Close or supersede conflicting PR #162 only after the replacement changes are
+  visible on GitHub and its useful evidence links have been preserved.
+- Extend #164 so `MCK_CAPTURE_COMMIT` is checked against build provenance. The
+  current preflight proves server mode and BUILD_ID, but accepts any 40-hex
+  report label.
+- File a runtime-staging collision issue when GitHub mutation is authorized.
+  `check:runtime-regressions` hit `EBUSY` and partially replaced the served
+  standalone tree when it was invoked before the capture server stopped.
 - Keep `dev` and `main` aligned after bootstrap PRs merge.
 - Keep `.github/labels.yml` synced with GitHub labels when taxonomy changes.

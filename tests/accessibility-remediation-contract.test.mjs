@@ -64,6 +64,7 @@ test('navigation, diagnostics, scrolling, and offline contrast stay named', () =
 
 test('a11y self-proof parses painted shadow components and rejects contraction', () => {
   const probe = source('scripts/probe-surface-a11y.mjs');
+  const negativeCases = JSON.parse(source('tests/fixtures/a11y-selfproof-negative-inputs.json'));
 
   assert.match(probe, /shadow\.split\(\/,[^\n]+\.some/);
   assert.match(probe, /selfproof contracted outer shadow/);
@@ -72,4 +73,5 @@ test('a11y self-proof parses painted shadow components and rejects contraction',
   assert.match(probe, /delegatedRules: contextSelector \? \[\] : \['color-contrast'\]/);
   assert.match(probe, /selfproof repaired image/);
   assert.match(probe, /injectedFocusPass\.coverage\.population === 4/);
+  assert.equal(negativeCases.cases.length, 4);
 });
