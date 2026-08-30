@@ -12,6 +12,8 @@ test('settings fields reuse the pinned Input focus contract', () => {
 
   assert.match(input, /data-slot="input"/);
   assert.match(input, /focus-visible:ring-2 focus-visible:ring-mc-accent/);
+  assert.match(input, /transition-colors/);
+  assert.doesNotMatch(input, /transition-\[[^\]]*box-shadow/);
   assert.match(input, /aria-\[invalid=true\]:border-mc-accent-red/);
   assert.equal([...settings.matchAll(/<Input\b/g)].length, 4);
   assert.doesNotMatch(settings, /focus:outline-none/);
@@ -60,5 +62,7 @@ test('a11y self-proof parses painted shadow components and rejects contraction',
   assert.match(probe, /shadow\.split\(\/,[^\n]+\.some/);
   assert.match(probe, /selfproof contracted outer shadow/);
   assert.match(probe, /authored color-contrast target/);
+  assert.match(probe, /runAxeScan\(page, '#__a11y_selfproof'\)/);
+  assert.match(probe, /selfproof repaired image/);
   assert.match(probe, /injectedFocusPass\.coverage\.population === 4/);
 });

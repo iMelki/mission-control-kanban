@@ -286,16 +286,23 @@ if (!fs.existsSync(AXE_PATH)) {
 }
 
 /* ------------------------------------------------------------------ axe --- */
-async function runAxeScan(page) {
+async function runAxeScan(page, contextSelector = null) {
   await page.addScriptTag({ path: AXE_PATH });
   const raw = await page.evaluate(
-    async (tags) =>
+    async ({ tags, contextSelector: selector }) =>
       await window.axe.run(
-        // Exclude the dev-server overlay; see defineAppElementFilter.
-        { exclude: [['nextjs-portal'], ['[data-nextjs-dev-tools-button]'], ['#__next-dev-tools']] },
+        {
+          // A self-proof scan must be scoped to its authored fixture. Axe can
+          // classify the whole color-contrast rule as `incomplete` when an
+          // unrelated app node needs manual review, hiding a known-bad node
+          // that the same rule correctly reports in isolation.
+          ...(selector ? { include: [[selector]] } : {}),
+          // Exclude the dev-server overlay; see defineAppElementFilter.
+          exclude: [['nextjs-portal'], ['[data-nextjs-dev-tools-button]'], ['#__next-dev-tools']],
+        },
         { runOnly: { type: 'tag', values: tags } }
       ),
-    AXE_TAGS
+    { tags: AXE_TAGS, contextSelector }
   );
   const shape = (f) => ({
     id: f.id,
@@ -1450,7 +1457,7 @@ async function measure(browser, route, vp) {
 /* ------------------------------------------------------------- self-proof --- */
 const BAD_MARKUP =
   '<div id="__a11y_selfproof" style="position:relative;z-index:2147483000;background:#ffffff;padding:8px">' +
-  '<p id="__sp_contrast" style="color:#bbbbbb;background:#ffffff;font-size:14px;font-weight:400">' +
+  '<p id="__sp_contrast" style="position:relative;z-index:2147483001;color:#bbbbbb;background:#ffffff;font-size:14px;font-weight:400">' +
   'selfproof low contrast sample text</p>' +
   '<button id="__sp_focus" style="outline:none !important;box-shadow:none !important;border:0;' +
   'background:#ffffff;color:#000000">selfproof no focus ring</button>' +
@@ -1724,7 +1731,7 @@ async function selfProof(browser) {
   }, BAD_MARKUP);
   await delay(250);
 
-  const injectedAxe = await runAxeScan(page);
+  const injectedAxe = await runAxeScan(page, '#__a11y_selfproof');
   const injectedContrast = await runComputedContrastAudit(page);
   const injectedFocusRaw = await page.evaluate(() => {
     const el = document.getElementById('__sp_focus');
@@ -1754,9 +1761,16 @@ async function selfProof(browser) {
     /selfproof contracted inset shadow/.test(e.label)
   );
 
+  await page.evaluate(() => {
+    const contrast = document.getElementById('__sp_contrast');
+    const image = document.getElementById('__sp_img');
+    if (contrast) contrast.style.color = '#111111';
+    if (image) image.setAttribute('alt', 'selfproof repaired image');
+  });
+  await delay(250);
+  const restoredAxe = await runAxeScan(page, '#__a11y_selfproof');
   await removeById(page, '__a11y_selfproof');
   await delay(250);
-  const restoredAxe = await runAxeScan(page);
   const restoredContrast = await runComputedContrastAudit(page);
   const restoredScoped = await verifyFocusIndicators(page, 0, {
     selector: '#__a11y_selfproof button',
@@ -1968,7 +1982,7 @@ async function selfProof(browser) {
     {
       // Dynamic app content can change whole-page counts between scans. Only
       // the authored self-proof targets are contractual here.
-      leg: 'axe removes each injected target after the authored fixture is removed',
+      leg: 'axe removes each injected target after the authored fixture is repaired',
       detected:
         scopedNodesFor(injectedAxe, 'color-contrast', '__sp_contrast') === 1 &&
         scopedNodesFor(restoredAxe, 'color-contrast', '__sp_contrast') === 0 &&

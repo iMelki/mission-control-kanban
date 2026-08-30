@@ -21,7 +21,7 @@
       "replaceDescription": "Replace the component parser with the old whole-string test.",
       "expectedExit": 2,
       "expectedOutput": [
-        "DEAD  ROVING: an identical widget with intact rings reports 2/2 measured and ZERO failures"
+        "DEAD  opaque outer and inset shadows contracted behind the control are NOT scored as visible"
       ]
     },
     {
