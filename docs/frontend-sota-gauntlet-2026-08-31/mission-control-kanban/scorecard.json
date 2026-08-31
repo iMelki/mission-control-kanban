@@ -1,0 +1,134 @@
+{
+  "app": "mission-control-kanban",
+  "round": "fleet UI/UX score run 2026-08-31 — FIRST gauntlet measurement of MCK (the app was deliberately kept unscored on the gauntlet board until this run; see f0459f6 'docs: keep MCK unscored and refuse a 3021 steal')",
+  "identity": {
+    "servedUrl": "http://127.0.0.1:3021",
+    "commit": "ac94d73820c82fbaf697271d54c85330881385a6",
+    "branch": "dev",
+    "srcVerification": "git diff 8a56829..ac94d73 -- src is EMPTY; ac94d73 and f0459f6 are docs-only on top of 8a56829, the last src-touching commit, so the served src surface IS the tip surface. Commit identity of the running process supplied source-verified by the run orchestrator.",
+    "runMode": "next dev --webpack (dev server; run mode stated per fleet round-16 rule). Next 16.2.9, React 19.2.7, Tailwind 3.4.17.",
+    "capturedAt": "2026-08-31T20:01-20:20 +03:00"
+  },
+  "method": {
+    "harness": "repo-local playwright 1.58.1, headless Chromium, script preserved at probe-*.json inputs (audit script run from scratchpad; all outputs committed here)",
+    "viewports": ["desktop 1440x900", "mobile 375x812 (isMobile, touch, dpr 2)"],
+    "distinctRenderedViews": 9,
+    "routeSource": "docs/captured-surfaces.json — all nine 'required' surfaces, none excluded, finalPath==requestedPath and HTTP 200 on 18/18 route-x-viewport units",
+    "settleRule": "text-length settle (4 consecutive equal 500ms samples) PLUS a fixed 10-12s wait; the two are reported separately because they disagree on this app (see findings.stuckLoads)",
+    "rubricCompliance": {
+      "overflowSignal": "body.scrollWidth - body.clientWidth; in-run in-flow positive control moved it 0 -> +1160 on the actual page (probe-desktop2.json docOverflowControl.proven=true), so the zeros are readings, not blindness",
+      "clipping": "counted only where the element's own overflow-x is hidden/clip; sr-only boxes (WCAG 2.4.1 feature), text-overflow:ellipsis truncation and native INPUT value scroll excluded per rubric §2.10; positive control (nowrap clipping div) CAUGHT and negative control (overflow:visible extender) EXCLUDED in the same run on every unit (probe-clipping-corrected.json: ctlProven=true on 18/18)",
+      "contrast": "sRGB relative-luminance math on computed colors with alpha compositing over the resolved ancestor background; canvas readback used only as fallback parser with two sentinels proven per capture (valid rgb(0,128,255) parsed exactly; 'notacolour-zzz' failed CLOSED). Coverage stated per unit as resolved/enumerated; 100% on the units quoted below (e.g. memsys desktop 1117/1117)",
+      "targetSize": "2.5.8 Target Size (Minimum) is AA at 24x24 CSS px; 2.5.5 Target Size (Enhanced) is AAA at 44x44. Both counted RAW (pre-exception); criteria named on every claim below",
+      "motion": "auto-running motion judged under WCAG 2.2.2 Level A (not 2.3.3); reduced-motion contexts measured separately with information-parity text lengths",
+      "domElementCount": "not used as a loaded-content discriminator (retired signal); rendered text length + named content assertions used instead"
+    }
+  },
+  "measuredHeadlines": {
+    "http": "18/18 route-x-viewport units HTTP 200; finalPath == requestedPath on all",
+    "coldFirstHitHttpMs": { "/": 69, "/n8n-sync-history": 1571, "/runtime-regression": 1000, "/settings": 1244, "/workspace/assistants": 2439, "/workspace/memsys": 124, "/workspace/content-factory": 110, "/workspace/asimtop": 130, "/workspace/frontend-revenue": 117, "note": "curl wall-clock, first hit of this session; server pre-warm state unknown, so these are not guaranteed cold-compile numbers" },
+    "warmTimings": { "/": { "wallMs": 2103, "ttfb": 71, "dcl": 148 }, "/workspace/assistants": { "wallMs": 1209, "ttfb": 125, "dcl": 273 }, "/n8n-sync-history": { "wallMs": 1014, "ttfb": 77, "dcl": 107 } },
+    "horizontalOverflow": "0px on 18/18 units, positive control proven in-run (0 -> +1160)",
+    "elementClipping": "control-proven on 18/18 units. Zeros: home, n8n-sync-history, runtime-regression, settings, asimtop (both viewports). Non-zero, ONE class only: kanban card H4 titles under line-clamp-2 horizontally cut long unbreakable tokens with no ellipsis — assistants 19, memsys 10, content-factory 1, frontend-revenue 1 (identical at both viewports; data-dependent, not viewport damage). Sample: 'Start-LocalNextDevApp.Tests.ps1...' sw 203-276 vs cw 168",
+    "contrast": {
+      "coverage": "100% resolved/enumerated on every quoted unit (memsys desktop 1117/1117 text-bearing elements, 33 distinct decisions); sentinels proven on every capture",
+      "cleanUnits": "home 4.95 min, runtime-regression 5.32, settings 4.95, n8n desktop 4.05 (OFFLINE badge only)",
+      "failingClassA": "text-mc-text-secondary/60 timestamps ('4 days ago', '2 minutes ago') rgb(92,100,108) on rgb(22,27,34) = 2.87:1 at 10px/400 — 184 elements on memsys, 304 on loaded assistants; the known mck#151 worst pair, UNCHANGED at ac94d73",
+      "failingClassB": "OFFLINE badge rgb(248,81,73) on its red tint = 4.05:1 at 14px/500 (needs 4.5) — 1 element per cockpit header",
+      "verdict": "1-3 failing distinct decisions per cockpit unit, min 2.87:1; zero failures on the four non-cockpit surfaces except the OFFLINE badge"
+    },
+    "targetSize": {
+      "under24_258AA_raw": "0 on home/runtime; 1 on n8n (back-link 175x20); 5 on settings (table sort-header buttons 38-60x16); 3 per cockpit (View history 101x20, Check button 51x22, icon link 36x16) — RAW pre-exception; sort headers and inline links are exception candidates but were not adjudicated, so these are NOT claimed as 2.5.8 failures, only as under-floor raw counts",
+      "under44_255AAA_raw": "broadly unmet on dense surfaces: loaded assistants 614/1203 visible controls under 44px, memsys 211/395, frontend-revenue 257/489, settings 31/31, home 18/26. 2.5.5 AAA is NOT claimed",
+      "criterionNote": "2.5.8 AA = 24x24 (five exceptions); 2.5.5 AAA = 44x44. This scorecard claims neither a 2.5.8 pass nor fail without exception adjudication; it reports raw counts"
+    },
+    "keyboard": {
+      "skipLink": "present and FIRST tab stop on every audited route ('Skip to main content', sr-only focus:not-sr-only) — the R15 'no 2.4.1 mechanism' finding is FIXED at this commit",
+      "focusIndicators": "home: 27/27 real controls show a computed focus-indicator delta (the 1 miss is Next.js dev-tools NEXTJS-PORTAL, not app UI); /workspace/assistants: 40/40 tab stops show indicator delta",
+      "rovingTabs": "cockpit tab bar [role=tablist] with 5 tabs: ArrowRight moves focus AND the arrived tab shows a focus indicator — the mck#150 class (0/40 roving controls with indicator at R15) is FIXED at this commit",
+      "traps": "no keyboard trap encountered in 68 recorded stops across 2 routes (bounded pass, not the app's own 635-stop harness)"
+    },
+    "motionWcag222": {
+      "normal": "2 infinite 'spin' 1000ms spinners on loaded assistants (busy/sync indicators); 1 transient spinner on n8n during load; zero running animations on the other 7 desktop units at audit time",
+      "reduce": "under prefers-reduced-motion: reduce, spin is REPLACED by fleet-busy-pulse 1600ms (fleet motion primitive v1.1 essential-loop pattern); home/settings/n8n run ZERO animations under reduce",
+      "informationParity": "reduce vs normal text lengths: home 2137 vs 2149, assistants 120696 vs 118483-118653 (live data +/-2%) — information survives without motion",
+      "verdict": "2.2.2: the only auto-running >5s motion is a busy indicator (progress-indicator class) with a deliberate reduced alternative; no scrolljacking, no decorative loops"
+    },
+    "console": "0 page errors on 18/18 units; console errors on 1/18 (home: one 503 from the OpenClaw gateway status probe — backend integration down, surfaced honestly in UI as 'Check failed'/OFFLINE) plus 4 aborted API fetches on home handled without UI damage",
+    "stuckLoads": "see findings.stuckLoads — the round's principal defect"
+  },
+  "findings": {
+    "stuckLoads": {
+      "what": "Intermittent silent stuck data load on cockpits: the page paints a complete, confident PRE-DATA state and sometimes never replaces it — with zero console errors, zero failed requests, no persistent spinner and no retry affordance",
+      "evidence": "/workspace/assistants held 964-1077 chars past settle + >=12s fixed wait in BOTH main desktop passes, while five later loads reached 102,305-120,696 chars; /workspace/frontend-revenue held 988 chars past 12s on 1 of 5 loads (others 56,493-58,702, byte-stable across 3 confirmation loads). Observed stuck: ~3 of 13 cockpit loads this session",
+      "why_it_is_worse_than_a_spinner": "the stuck state ASSERTS false diagnostics as settled fact: 'No token detected - 0/3 lanes ready', red 'Needs GH_GENERAL_TOKEN' readiness cards, 'Showing 0/0', 'No events yet', and header 'ONLINE' — the loaded state says 'GitHub connected @iMelki - 3/3 lanes ready', 'Showing 588/588', header 'OFFLINE'. Screenshots: workspace_assistants-desktop.png (stuck) vs workspace_assistants-desktop-loaded.png (loaded)",
+      "relation_to_prior": "R15 booked composite 1.6 5.0->4.5 for the transient form of this exact class ('a wrong answer presented as settled is worse than a spinner'); at ac94d73 the transient form persists and a stuck-indefinite form was additionally observed"
+    },
+    "fixedSinceR15": [
+      "skip link exists and is first tab stop (R15: 'WCAG 2.4.1 has no mechanism in this app')",
+      "roving cockpit tabs show focus indicators on arrow-key arrival (R15/mck#150: 40/40 fail)",
+      "frontend-revenue cockpit renders usable at mobile width, 0 overflow, 0 damage-class clipping (R15: 'unusable at 390px')"
+    ],
+    "unchangedSinceR15": [
+      "2.87:1 muted-timestamp contrast class (mck#151) — now measured at 184-304 elements per cockpit",
+      "2.5.5 AAA target size broadly unmet on dense surfaces"
+    ],
+    "newThisRound": [
+      "kanban card H4 line-clamp-2 horizontally cuts long unbreakable tokens without ellipsis (19+10+1+1 cards across four cockpits, both viewports)",
+      "OFFLINE header badge 4.05:1 (needs 4.5)",
+      "stuck-indefinite silent cockpit load (see stuckLoads)",
+      "operator-chosen lobster brand emoji renders in home header and workspace pills — data-emoji lane, operator decision, NOT swept, noted per emoji boundary"
+    ]
+  },
+  "gauntlet": {
+    "scale": "frontend-sota-gauntlet 7 areas x 0-3, total /21; first-ever MCK gauntlet measurement, all areas MEASURED, nothing carried",
+    "areas": {
+      "visualDirection": { "score": 2, "why": "Coherent, polished mono-terminal operator identity (JetBrains Mono everywhere, rgb(13,17,23) dark tokens, consistent mc-* badge/panel language, no pure #000, real data). Not 3: several saturated accents compete (blue CTA, cyan, green, amber, pink feed, violet stat), h1 hierarchy inconsistent across routes (16px cockpit h1 vs 24/30px elsewhere), and the 2.87:1 muted class dulls the polish." },
+      "uxClarity": { "score": 2, "why": "Clear and scannable: labeled tab shell, breadcrumbs, honest counts ('Showing 588/588'), exemplary inbox safety-gate copy naming exactly what to fill in. Not 3: pre-data states actively mislead (stuck cockpits assert wrong answers), and jargon leaks ('Stale proof', 'post-migration', '0/3 lanes ready')." },
+      "motionInteractivity": { "score": 2, "why": "Motion supports content with real restraint: only busy-state spinners; fleet motion primitive adopted — spin 1000ms swaps to fleet-busy-pulse 1600ms under reduce with information parity proven. Not 3: no signature moment anywhere in the nine surfaces." },
+      "technicalQuality": { "score": 2, "why": "Solid: 0 page errors, console clean on 17/18 units, proven-zero overflow, honest offline handling of a genuinely down gateway, TanStack-backed table, working roving-tabs a11y. Explicitly NOT 3 because the failure fallback has a hole: cockpit data loads can stick silently in a false pre-data state (~3/13 loads) with no error path, and card titles clip long tokens." },
+      "responsiveness": { "score": 2, "why": "375x812 genuinely adapted (stacked cockpit, wrapped tab pills, usable board), 0px overflow and control-proven clipping zeros at both viewports. Capped at 2 by the standing fleet rule: two viewports are a scoped receipt, not multi-viewport quality; no 15x4 matrix, no AT/manual." },
+      "verification": { "score": 2, "why": "Browser-evidenced end to end: 18 units, screenshots, console, in-run positive AND negative controls for overflow/clipping/contrast sentinels, reduced-motion contexts with parity, keyboard pass. Capped at 2 by the same standing rule (Verification stays 2 until 15x4 + AT/manual); axe not run this session." },
+      "complexityFit": { "score": 2, "why": "An operator kanban cockpit at operator density — no overbuild, no 3D/cinematic excess; complexity is carried by real GitHub Projects data and dispatch gates. Not 3: fit is evident but not argued anywhere as a chosen level with its proof burden, and the stuck-load class undercuts 'fully proved'." }
+    },
+    "total": 14,
+    "band": "usable (14-18); 5 points below the 19/21 strong-benchmark floor",
+    "comparableFleetRows": "component-marketplace 14, memsys console 15, hermes 15, command-center 18, openai-proxy 21 — MCK's 14 is a full-app 9-surface measure, not a login-only or locked-shell row"
+  },
+  "awwwardsComposite": {
+    "scale": "fleet 0-10 ledger (uiux-fleet-rescore-2026-08-12.md); dims folded per the ledger's own validated formula: Design=mean(1.1,1.2,1.4), Usability=mean(1.3,1.5,1.6), Creativity=1.8, Content=1.7; weights 0.4/0.3/0.2/0.1",
+    "dimensions": {
+      "1.1_visualCraft": { "score": 6.0, "provenance": "MEASURED", "why": "coherent dark token system, mono hierarchy, real content; multiple accents and uneven h1 scale hold it at the 6 anchor" },
+      "1.2_motionInteraction": { "score": 6.5, "provenance": "MEASURED", "why": "reduced-motion honored with a working alternative (fleet primitive, parity proven), transform/opacity only; no signature choreography, hover/press cycles not exhaustively measured. Down 0.5 from the carried 7.0 — the carry predates the fleet's RM measurement era and nothing above the 6 anchor was demonstrable beyond the RM excellence" },
+      "1.3_iaUserFlows": { "score": 6.5, "provenance": "MEASURED", "why": "separated routes, unique headers, counts on sliced lists, progressive disclosure, working keyboard path incl. roving tabs; no command palette, decision-in-one-glance undermined by pre-data states (priced in 1.6)" },
+      "1.4_designSystem": { "score": 7.0, "provenance": "MEASURED (rendered consistency) + standing code facts", "why": "components.json + DataTable-on-TanStack pattern (rubric §4), uniform mc-* primitives across all nine rendered surfaces, no visible same-purpose divergence; known n8n table leak persists" },
+      "1.5_accessibility": { "score": 5.5, "provenance": "MEASURED", "why": "UP 0.5 from 5.0: skip link shipped (2.4.1 mechanism exists), roving-tab indicators fixed (mck#150 closed class), 67/68 tab stops with visible indicator, 100%-coverage contrast measurement. Held below 6: the 2.87:1 timestamp class persists at hundreds of elements per cockpit, OFFLINE badge 4.05:1, raw under-24 controls on settings sort headers, 2.5.5 AAA broadly unmet, axe not run" },
+      "1.6_perceivedPerformance": { "score": 4.5, "provenance": "MEASURED", "why": "explicit net-zero HOLD: warm TTFB 71-125ms / DCL 107-273ms and fast warm reloads (up-pressure) cancel against the same R15 wrong-answer class now also observed as stuck-indefinite silent loads with false diagnostics (~3/13 cockpit loads)" },
+      "1.7_contentMicrocopy": { "score": 6.5, "provenance": "MEASURED", "why": "real data everywhere, honest failure states, empty states carry the next step, relative dates, counts; operatorese leaks and the stuck state's false copy (priced in 1.6) keep it at 6.5" },
+      "1.8_delight": { "score": 4.0, "provenance": "MEASURED", "why": "nothing measurably signature; the calm-density inbox gate is the closest moment. No movement invented" }
+    },
+    "arithmetic": {
+      "design": "mean(6.0, 6.5, 7.0) = 6.5",
+      "usability": "mean(6.5, 5.5, 4.5) = 5.5",
+      "creativity": "4.0",
+      "content": "6.5",
+      "composite": "0.4*6.5 + 0.3*5.5 + 0.2*4.0 + 0.1*6.5 = 2.60 + 1.65 + 0.80 + 0.65 = 5.70",
+      "print": "5.7"
+    },
+    "deltaVsLedger": "ledger carried MCK 5.7167 (prints 5.7) from R15; first full re-measure lands 5.70 — unrounded -0.0167, printed tenth UNCHANGED at 5.7. Internal movement is real and cancels: 1.5 +0.5 (measured fixes), 1.2 -0.5, others hold",
+    "awardBarHonesty": "5.70 is 0.80 BELOW the published Awwwards Honorable Mention bar of 6.5. No award claim is made, and none would be defensible. Gauntlet 14/21 and composite 5.7 are stated on their own scales and NOT cross-walked"
+  },
+  "honestLimits": [
+    "Run mode is next dev --webpack, not a production build; production next build is known-broken on origin/dev (scripts/derive-captured-surfaces.ts:426, fix stranded on feature/a11y-focus-proof-150) so a prod-serve measure was impossible without source/branch mutation, which this lane is forbidden",
+    "Cold-compile first-hit numbers are not trustworthy as 'cold': the server had been up and mostly pre-compiled; recorded curl first-hits (69ms-2.44s) are labeled as session-first-hit only",
+    "axe was not run this session; the a11y picture rests on this lane's own probes plus the repo's committed baselines",
+    "Target-size raw counts are pre-exception; 2.5.8 exception adjudication (spacing/inline) was not performed, so no 2.5.8 pass/fail verdict is claimed",
+    "Hover/press interaction cycles, command-latency (sub-100ms) sampling, and frame-rate profiling were not measured",
+    "Contrast enumerates elements with direct text nodes; gradient/image backgrounds were excluded as unresolved (counted in denominators where present)",
+    "The stuck-load rate (~3/13) is a small-sample observation across one session, not a statistically settled frequency",
+    "Mobile pass used one settle+10s window; mobile assistants unit's settle-time text (1011) vs audit-time controls (1203) shows the audit ran post-arrival — per-field timing inside that unit is mixed-state and only the audit-time numbers are quoted",
+    "Composite 1.4 leans on standing code facts (components.json, TanStack DataTable) from the fleet rubric's app notes; rendered-surface consistency was measured, the code facts were not re-derived this session"
+  ],
+  "followUps": "recommended for repo issues (not filed by this scoring lane): (1) stuck silent cockpit load / false pre-data diagnostics — top item; (2) text-mc-text-secondary/60 timestamp class to >=4.5:1 or >=18.66px/700; (3) line-clamp-2 card titles need break-word or ellipsis for long tokens; (4) OFFLINE badge pair to 4.5:1",
+  "evidenceFiles": "probe-desktop.json (settle-accept pass), probe-desktop2.json (+10s fixed-wait pass), probe-desktop2-workspace_assistants.json (loaded cockpit re-audit), probe-mobile.json, probe-extras.json (warm timings, keyboard, roving, reduced-motion), probe-clipping-corrected.json (control-proven clipping, 18 units), 28 PNG screenshots incl. stuck-vs-loaded cockpit pair and home-desktop-full.png"
+}

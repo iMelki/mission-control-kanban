@@ -1,0 +1,1924 @@
+{
+  "phase": "desktop2",
+  "base": "http://127.0.0.1:3021",
+  "capturedAt": "2026-08-31T17:05:36.196Z",
+  "runMode": "next dev --webpack (dev server; run mode stated per fleet rule)",
+  "commit": "ac94d73820c82fbaf697271d54c85330881385a6",
+  "units": [
+    {
+      "route": "/",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/",
+      "gotoMs": 75,
+      "settle": {
+        "settled": true,
+        "ms": 4120,
+        "textLength": 2137,
+        "preFixedWaitText": 2137,
+        "postFixedWaitText": 2149,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 50,
+        "dcl": 71,
+        "load": 1085,
+        "transferSize": 3640
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 578,
+          "clipped": 20,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 205,
+              "cw": 1,
+              "text": "Current MCK surface is running."
+            },
+            {
+              "tag": "SPAN",
+              "cls": "min-w-0 truncate text-[11px] text-mc-text-secondary",
+              "sw": 224,
+              "cw": 108,
+              "text": "current host /workspace/assistants"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 99,
+              "cw": 1,
+              "text": "Open to inspect"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 99,
+              "cw": 1,
+              "text": "Open to inspect"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 99,
+              "cw": 1,
+              "text": "Open to inspect"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 244,
+              "cw": 1,
+              "text": "Failed to connect to OpenClaw Gateway"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "min-w-0 truncate text-[11px] text-mc-text-secondary",
+              "sw": 132,
+              "cw": 97,
+              "text": "/api/openclaw/status"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 99,
+              "cw": 1,
+              "text": "Open to inspect"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 403,
+              "cw": 1,
+              "text": "620 updated, 2 status reconciled, 19 upstream drift warnings"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "min-w-0 truncate text-[11px] text-mc-text-secondary",
+              "sw": 112,
+              "cw": 97,
+              "text": "/n8n-sync-history"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 363,
+              "cw": 1,
+              "text": "Latest runtime-regression proof is older than 24 hours."
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 109,
+          "resolvedElements": 109,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 11,
+          "failingDecisions": 0,
+          "minRatio": 4.95,
+          "failures": []
+        },
+        "targets": {
+          "visibleControls": 26,
+          "under24": 0,
+          "under44": 18,
+          "under24Samples": [],
+          "under44Samples": [
+            {
+              "tag": "BUTTON",
+              "w": 181,
+              "h": 40,
+              "text": "New Workspace"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open MCK Assistants details"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open MCK Assistants"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open Mission Control"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open Command Center"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open MemSys Web Console"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open OpenClaw Status details"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open OpenClaw Status"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open Hermes Native"
+            },
+            {
+              "tag": "A",
+              "w": 32,
+              "h": 32,
+              "text": "Open MCK Sync History details"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 2149,
+        "h1": [
+          {
+            "text": "Mission Control",
+            "fontSize": "20px"
+          }
+        ],
+        "headingCount": 14,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 0,
+        "tabs": 0,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "consoleErrorCount": 1,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "url": "http://127.0.0.1:3021/api/openclaw/sessions",
+          "err": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://127.0.0.1:3021/api/n8n/mck-sync-status?limit=5",
+          "err": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://127.0.0.1:3021/api/runtime/regression",
+          "err": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://127.0.0.1:3021/api/github/diagnostics",
+          "err": "net::ERR_ABORTED"
+        }
+      ],
+      "screenshot": "home-desktop-loaded.png"
+    },
+    {
+      "route": "/n8n-sync-history",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/n8n-sync-history",
+      "gotoMs": 1944,
+      "settle": {
+        "settled": true,
+        "ms": 3526,
+        "textLength": 7015,
+        "preFixedWaitText": 7015,
+        "postFixedWaitText": 7015,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 1873,
+        "dcl": 1943,
+        "load": 2942,
+        "transferSize": 5282
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 456,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 222,
+          "resolvedElements": 222,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 10,
+          "failingDecisions": 1,
+          "minRatio": 4.05,
+          "failures": [
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 4,
+          "under24": 1,
+          "under44": 4,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "mb-3 inline-flex items-center gap-2 text-sm text-mc-text-sec",
+              "w": 175,
+              "h": 20,
+              "text": "Back to workspaces",
+              "display": "inline-flex",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 166,
+              "h": 28,
+              "text": "All Workspaces"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "A",
+              "w": 175,
+              "h": 20,
+              "text": "Back to workspaces"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 109,
+              "h": 38,
+              "text": "Refresh"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 7015,
+        "h1": [
+          {
+            "text": "n8n MCK Sync History",
+            "fontSize": "24px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 0,
+        "tabs": 0,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "n8n-sync-history-desktop-loaded.png"
+    },
+    {
+      "route": "/runtime-regression",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/runtime-regression",
+      "gotoMs": 930,
+      "settle": {
+        "settled": true,
+        "ms": 3195,
+        "textLength": 1235,
+        "preFixedWaitText": 1235,
+        "postFixedWaitText": 1235,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 869,
+        "dcl": 928,
+        "load": 1604,
+        "transferSize": 5011
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 109,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 42,
+          "resolvedElements": 42,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 8,
+          "failingDecisions": 0,
+          "minRatio": 5.32,
+          "failures": []
+        },
+        "targets": {
+          "visibleControls": 1,
+          "under24": 0,
+          "under44": 1,
+          "under24Samples": [],
+          "under44Samples": [
+            {
+              "tag": "BUTTON",
+              "w": 109,
+              "h": 38,
+              "text": "Refresh"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 1235,
+        "h1": [
+          {
+            "text": "Runtime Regression Evidence",
+            "fontSize": "30px"
+          }
+        ],
+        "headingCount": 2,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 0,
+        "tabs": 0,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "runtime-regression-desktop-loaded.png"
+    },
+    {
+      "route": "/settings",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/settings",
+      "gotoMs": 1190,
+      "settle": {
+        "settled": true,
+        "ms": 2210,
+        "textLength": 3173,
+        "preFixedWaitText": 3173,
+        "postFixedWaitText": 3811,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 1107,
+        "dcl": 1188,
+        "load": 1890,
+        "transferSize": 7972
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 283,
+          "clipped": 6,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 115,
+          "resolvedElements": 115,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 15,
+          "failingDecisions": 0,
+          "minRatio": 4.95,
+          "failures": []
+        },
+        "targets": {
+          "visibleControls": 31,
+          "under24": 5,
+          "under44": 31,
+          "under24Samples": [
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 60,
+              "h": 16,
+              "text": "DeliverySort state: none",
+              "display": "inline-flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 38,
+              "h": 16,
+              "text": "EventSort state: none",
+              "display": "inline-flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 45,
+              "h": 16,
+              "text": "StatusSort state: none",
+              "display": "inline-flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 60,
+              "h": 16,
+              "text": "ReceivedSort state: none",
+              "display": "inline-flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 45,
+              "h": 16,
+              "text": "ReasonSort state: none",
+              "display": "inline-flex",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "BUTTON",
+              "w": 86,
+              "h": 40,
+              "text": "← Back"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 221,
+              "h": 42,
+              "text": "Reset to Defaults"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 171,
+              "h": 40,
+              "text": "Save Changes"
+            },
+            {
+              "tag": "INPUT",
+              "w": 798,
+              "h": 42,
+              "text": ""
+            },
+            {
+              "tag": "INPUT",
+              "w": 798,
+              "h": 42,
+              "text": ""
+            },
+            {
+              "tag": "INPUT",
+              "w": 798,
+              "h": 42,
+              "text": ""
+            },
+            {
+              "tag": "INPUT",
+              "w": 798,
+              "h": 42,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 210,
+              "h": 38,
+              "text": "Refresh runtime ops"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 152,
+              "h": 38,
+              "text": "Dry-run cleanup"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 159,
+              "h": 38,
+              "text": "Apply cleanup"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 3811,
+        "h1": [
+          {
+            "text": "Settings",
+            "fontSize": "24px"
+          }
+        ],
+        "headingCount": 9,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 0,
+        "tabs": 0,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "settings-desktop-loaded.png"
+    },
+    {
+      "route": "/workspace/assistants",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/assistants",
+      "gotoMs": 442,
+      "settle": {
+        "settled": true,
+        "ms": 5344,
+        "textLength": 1076,
+        "preFixedWaitText": 1076,
+        "postFixedWaitText": 1077,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 342,
+        "dcl": 438,
+        "load": 1258,
+        "transferSize": 7747
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 272,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 75,
+          "resolvedElements": 75,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 23,
+          "failingDecisions": 2,
+          "minRatio": 3.43,
+          "failures": [
+            {
+              "fg": [
+                103.9,
+                111.69999999999999,
+                120.8
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 3.43,
+              "pass": false,
+              "count": 2,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "",
+                "text": "n8n sync: waiting for first scheduled run",
+                "fontSize": 14,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 27,
+          "under24": 3,
+          "under44": 27,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Sync now"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 1077,
+        "h1": [
+          {
+            "text": "Assistants",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_assistants-desktop-loaded.png"
+    },
+    {
+      "route": "/workspace/memsys",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/memsys",
+      "gotoMs": 12756,
+      "settle": {
+        "settled": true,
+        "ms": 6788,
+        "textLength": 44589,
+        "preFixedWaitText": 44589,
+        "postFixedWaitText": 42389,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 12577,
+        "dcl": 12754,
+        "load": 14647,
+        "transferSize": 7747
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 5027,
+          "clipped": 11,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 211,
+              "cw": 168,
+              "text": "/api/operations/qmd/status returns 500 on every load: Railwa"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 179,
+              "cw": 168,
+              "text": "system status: review-queue guard reads raw memsys_router.he"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 171,
+              "cw": 168,
+              "text": "Bug: web-console drops backend failure state — Hindsight fai"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 260,
+              "cw": 168,
+              "text": "Invoke-MemSysDependencyHealthReview.ps1 is non-functional: @"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 268,
+              "cw": 168,
+              "text": "Bug: New-HindsightUpgradeRuntimeConfig.ps1 fails closed on a"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 227,
+              "cw": 168,
+              "text": "Bug: MEMSYS_MEMPALACE_INSTANCE_ID never injected at launch —"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 292,
+              "cw": 168,
+              "text": "Split BootstrapSourceConfigurationPlan.tsx (4,197 lines) int"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 276,
+              "cw": 168,
+              "text": "bootstrap.py's classify_text/clustering/relations all hand-r"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 195,
+              "cw": 168,
+              "text": "Review or discard 4 orphan scripts rescued from a 2026-08-16"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 187,
+              "cw": 168,
+              "text": "Pre-push gate blocks ALL commits to dev: scratch/test_latenc"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 1117,
+          "resolvedElements": 1117,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 33,
+          "failingDecisions": 2,
+          "minRatio": 2.87,
+          "failures": [
+            {
+              "fg": [
+                92.19999999999999,
+                99.6,
+                108.4
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 2.87,
+              "pass": false,
+              "count": 184,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "text-[10px] text-mc-text-secondary/60",
+                "text": "4 days ago",
+                "fontSize": 10,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 395,
+          "under24": 3,
+          "under44": 210,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            }
+          ]
+        },
+        "animations": {
+          "running": 2,
+          "detail": [
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            },
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            }
+          ],
+          "infinite": 2
+        },
+        "textLength": 42389,
+        "h1": [
+          {
+            "text": "MemSys",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_memsys-desktop-loaded.png"
+    },
+    {
+      "route": "/workspace/content-factory",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/content-factory",
+      "gotoMs": 582,
+      "settle": {
+        "settled": true,
+        "ms": 6226,
+        "textLength": 8148,
+        "preFixedWaitText": 8148,
+        "postFixedWaitText": 6094,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 444,
+        "dcl": 580,
+        "load": 1756,
+        "transferSize": 7754
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 1047,
+          "clipped": 2,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 195,
+              "cw": 168,
+              "text": "Flaky test: source-artifact.service.spec.ts OCR-import asser"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 250,
+          "resolvedElements": 250,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 35,
+          "failingDecisions": 2,
+          "minRatio": 2.87,
+          "failures": [
+            {
+              "fg": [
+                92.19999999999999,
+                99.6,
+                108.4
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 2.87,
+              "pass": false,
+              "count": 21,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "text-[10px] text-mc-text-secondary/60",
+                "text": "18 days ago",
+                "fontSize": 10,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 71,
+          "under24": 3,
+          "under44": 48,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 6094,
+        "h1": [
+          {
+            "text": "Content Factory",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_content-factory-desktop-loaded.png"
+    },
+    {
+      "route": "/workspace/asimtop",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/asimtop",
+      "gotoMs": 645,
+      "settle": {
+        "settled": true,
+        "ms": 4381,
+        "textLength": 7405,
+        "preFixedWaitText": 7405,
+        "postFixedWaitText": 5205,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 509,
+        "dcl": 643,
+        "load": 1436,
+        "transferSize": 7746
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 970,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 233,
+          "resolvedElements": 233,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 33,
+          "failingDecisions": 2,
+          "minRatio": 2.87,
+          "failures": [
+            {
+              "fg": [
+                92.19999999999999,
+                99.6,
+                108.4
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 2.87,
+              "pass": false,
+              "count": 18,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "text-[10px] text-mc-text-secondary/60",
+                "text": "27 days ago",
+                "fontSize": 10,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 63,
+          "under24": 3,
+          "under44": 44,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 5205,
+        "h1": [
+          {
+            "text": "Asimtop",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_asimtop-desktop-loaded.png"
+    },
+    {
+      "route": "/workspace/frontend-revenue",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/frontend-revenue",
+      "gotoMs": 9248,
+      "settle": {
+        "settled": true,
+        "ms": 2176,
+        "textLength": 988,
+        "preFixedWaitText": 988,
+        "postFixedWaitText": 988,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 5438,
+        "dcl": 9083,
+        "load": 0,
+        "transferSize": 7756
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 235,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 71,
+          "resolvedElements": 71,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 21,
+          "failingDecisions": 1,
+          "minRatio": 4.05,
+          "failures": [
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 25,
+          "under24": 2,
+          "under44": 25,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 74,
+              "h": 24,
+              "text": "working"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 988,
+        "h1": [
+          {
+            "text": "frontend-revenue Workspace",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_frontend-revenue-desktop-loaded.png"
+    }
+  ]
+}

@@ -1,0 +1,314 @@
+{
+  "desktop /": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 2149
+  },
+  "desktop /n8n-sync-history": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 7015
+  },
+  "desktop /runtime-regression": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 1235
+  },
+  "desktop /settings": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 3811
+  },
+  "desktop /workspace/assistants": {
+    "clipped": 19,
+    "samples": [
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 203,
+        "cw": 168,
+        "text": "A quoted here-document deletes REMOTE_PAYLOAD"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 203,
+        "cw": 168,
+        "text": "Start-LocalNextDevApp.Tests.ps1 blocks almost"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 276,
+        "cw": 168,
+        "text": "WinCodexBarTlsRevocation.Tests.ps1 is red on "
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 171,
+        "cw": 168,
+        "text": "Test-UiuxAuditMethodClaims R2 fail-open: an u"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 211,
+        "cw": 168,
+        "text": "Workspace governance: ignore-nothing inventor"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 195,
+        "cw": 168,
+        "text": "Pre-push mapper silently drops every path out"
+      }
+    ],
+    "positiveControlCaught": true,
+    "textLength": 118653
+  },
+  "desktop /workspace/memsys": {
+    "clipped": 10,
+    "samples": [
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 211,
+        "cw": 168,
+        "text": "/api/operations/qmd/status returns 500 on eve"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 179,
+        "cw": 168,
+        "text": "system status: review-queue guard reads raw m"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 171,
+        "cw": 168,
+        "text": "Bug: web-console drops backend failure state "
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 260,
+        "cw": 168,
+        "text": "Invoke-MemSysDependencyHealthReview.ps1 is no"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 268,
+        "cw": 168,
+        "text": "Bug: New-HindsightUpgradeRuntimeConfig.ps1 fa"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 227,
+        "cw": 168,
+        "text": "Bug: MEMSYS_MEMPALACE_INSTANCE_ID never injec"
+      }
+    ],
+    "positiveControlCaught": true,
+    "textLength": 42476
+  },
+  "desktop /workspace/content-factory": {
+    "clipped": 1,
+    "samples": [
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 195,
+        "cw": 168,
+        "text": "Flaky test: source-artifact.service.spec.ts O"
+      }
+    ],
+    "positiveControlCaught": true,
+    "textLength": 6181
+  },
+  "desktop /workspace/asimtop": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 5292
+  },
+  "desktop /workspace/frontend-revenue": {
+    "clipped": 1,
+    "samples": [
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 244,
+        "cw": 168,
+        "text": "[P24-002] Move approved Hero/Projects/Capabil"
+      }
+    ],
+    "positiveControlCaught": true,
+    "textLength": 56580
+  },
+  "mobile /": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 2149
+  },
+  "mobile /n8n-sync-history": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 6982
+  },
+  "mobile /runtime-regression": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 1235
+  },
+  "mobile /settings": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 3811
+  },
+  "mobile /workspace/assistants": {
+    "clipped": 19,
+    "samples": [
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 203,
+        "cw": 168,
+        "text": "A quoted here-document deletes REMOTE_PAYLOAD"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 203,
+        "cw": 168,
+        "text": "Start-LocalNextDevApp.Tests.ps1 blocks almost"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 276,
+        "cw": 168,
+        "text": "WinCodexBarTlsRevocation.Tests.ps1 is red on "
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 171,
+        "cw": 168,
+        "text": "Test-UiuxAuditMethodClaims R2 fail-open: an u"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 211,
+        "cw": 168,
+        "text": "Workspace governance: ignore-nothing inventor"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 195,
+        "cw": 168,
+        "text": "Pre-push mapper silently drops every path out"
+      }
+    ],
+    "positiveControlCaught": true,
+    "textLength": 118585
+  },
+  "mobile /workspace/memsys": {
+    "clipped": 10,
+    "samples": [
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 211,
+        "cw": 168,
+        "text": "/api/operations/qmd/status returns 500 on eve"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 179,
+        "cw": 168,
+        "text": "system status: review-queue guard reads raw m"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 171,
+        "cw": 168,
+        "text": "Bug: web-console drops backend failure state "
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 260,
+        "cw": 168,
+        "text": "Invoke-MemSysDependencyHealthReview.ps1 is no"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 268,
+        "cw": 168,
+        "text": "Bug: New-HindsightUpgradeRuntimeConfig.ps1 fa"
+      },
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 227,
+        "cw": 168,
+        "text": "Bug: MEMSYS_MEMPALACE_INSTANCE_ID never injec"
+      }
+    ],
+    "positiveControlCaught": true,
+    "textLength": 42408
+  },
+  "mobile /workspace/content-factory": {
+    "clipped": 1,
+    "samples": [
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 195,
+        "cw": 168,
+        "text": "Flaky test: source-artifact.service.spec.ts O"
+      }
+    ],
+    "positiveControlCaught": true,
+    "textLength": 6114
+  },
+  "mobile /workspace/asimtop": {
+    "clipped": 0,
+    "samples": [],
+    "positiveControlCaught": true,
+    "textLength": 5225
+  },
+  "mobile /workspace/frontend-revenue": {
+    "clipped": 1,
+    "samples": [
+      {
+        "tag": "H4",
+        "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+        "sw": 244,
+        "cw": 168,
+        "text": "[P24-002] Move approved Hero/Projects/Capabil"
+      }
+    ],
+    "positiveControlCaught": true,
+    "textLength": 56512
+  }
+}

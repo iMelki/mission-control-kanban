@@ -1,0 +1,327 @@
+{
+  "phase": "desktop2",
+  "base": "http://127.0.0.1:3021",
+  "capturedAt": "2026-08-31T17:12:03.069Z",
+  "runMode": "next dev --webpack (dev server; run mode stated per fleet rule)",
+  "commit": "ac94d73820c82fbaf697271d54c85330881385a6",
+  "units": [
+    {
+      "route": "/workspace/assistants",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/assistants",
+      "gotoMs": 1672,
+      "settle": {
+        "settled": true,
+        "ms": 10344,
+        "textLength": 118483,
+        "preFixedWaitText": 118483,
+        "postFixedWaitText": 118568,
+        "preDataSettleSuspect": false
+      },
+      "nav": {
+        "ttfb": 1523,
+        "dcl": 1668,
+        "load": 3193,
+        "transferSize": 7752
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 8000,
+          "clipped": 20,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 203,
+              "cw": 168,
+              "text": "A quoted here-document deletes REMOTE_PAYLOAD_EXECUTION: the"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 203,
+              "cw": 168,
+              "text": "Start-LocalNextDevApp.Tests.ps1 blocks almost every push: on"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 276,
+              "cw": 168,
+              "text": "WinCodexBarTlsRevocation.Tests.ps1 is red on dev and, via th"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 171,
+              "cw": 168,
+              "text": "Test-UiuxAuditMethodClaims R2 fail-open: an unrelated percen"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 211,
+              "cw": 168,
+              "text": "Workspace governance: ignore-nothing inventory of tmp/cache/"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 195,
+              "cw": 168,
+              "text": "Pre-push mapper silently drops every path outside shared/too"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 179,
+              "cw": 168,
+              "text": "Web-console watchdog's operator-alert channel is inert: Writ"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 171,
+              "cw": 168,
+              "text": "[BUG] Install-WinCodexBar.Tests.ps1 flakes in pre-push and b"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 252,
+              "cw": 168,
+              "text": "ProjectsOpsRecurringHealthSweep has written no weekly artifa"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 219,
+              "cw": 168,
+              "text": "OPAQUE_COMMAND_SUBSTITUTION is inverted: it denies 98.5% of "
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 195,
+              "cw": 168,
+              "text": "WindowlessProcessHost.cs has forked into v1 (agent-settings)"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 1734,
+          "resolvedElements": 1734,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 32,
+          "failingDecisions": 2,
+          "minRatio": 2.87,
+          "failures": [
+            {
+              "fg": [
+                92.19999999999999,
+                99.6,
+                108.4
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 2.87,
+              "pass": false,
+              "count": 304,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "text-[10px] text-mc-text-secondary/60",
+                "text": "2 minutes ago",
+                "fontSize": 10,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 1203,
+          "under24": 3,
+          "under44": 614,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            }
+          ]
+        },
+        "animations": {
+          "running": 2,
+          "detail": [
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            },
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            }
+          ],
+          "infinite": 2
+        },
+        "textLength": 118568,
+        "h1": [
+          {
+            "text": "Assistants",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_assistants-desktop-loaded.png"
+    }
+  ]
+}

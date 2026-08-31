@@ -1,0 +1,742 @@
+{
+  "phase": "extras",
+  "base": "http://127.0.0.1:3021",
+  "capturedAt": "2026-08-31T17:15:03.882Z",
+  "runMode": "next dev --webpack (dev server; run mode stated per fleet rule)",
+  "commit": "ac94d73820c82fbaf697271d54c85330881385a6",
+  "warmTimings": [
+    {
+      "route": "/",
+      "warmReloadWallMs": 2103,
+      "nav": {
+        "ttfb": 71,
+        "dcl": 148,
+        "load": 2101
+      }
+    },
+    {
+      "route": "/workspace/assistants",
+      "warmReloadWallMs": 1209,
+      "nav": {
+        "ttfb": 125,
+        "dcl": 273,
+        "load": 1207
+      }
+    },
+    {
+      "route": "/n8n-sync-history",
+      "warmReloadWallMs": 1014,
+      "nav": {
+        "ttfb": 77,
+        "dcl": 107,
+        "load": 1012
+      }
+    }
+  ],
+  "keyboard": [
+    {
+      "route": "/",
+      "stops": [
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "sr-only focus:not-sr-only focus:absolute focus:lef",
+          "text": "Skip to main content",
+          "outline": "solid 2px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "flex items-center gap-2 px-4 py-2 bg-mc-accent tex",
+          "text": "New Workspace",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open MCK Assistants details",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open MCK Assistants",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open Mission Control",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open Command Center",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open MemSys Web Console",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open OpenClaw Status details",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open OpenClaw Status",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open Hermes Native",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open MCK Sync History details",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open MCK Sync History",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open Runtime Regression details",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open Runtime Regression",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open n8n Local",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open Health Reports",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open GitHub Diagnostics",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open Managed Sync Route details",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "inline-flex size-8 items-center justify-center rou",
+          "text": "Open Managed Sync Route",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "",
+          "text": "AAsimtop/asimtop18 tasks0 agentsGitHub P",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "",
+          "text": "AAssistants/assistants588 tasks0 agentsG",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "",
+          "text": "CContent Factory/content-factory21 tasks",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "",
+          "text": "🏠Default Workspace/default2 tasks0 agen",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "",
+          "text": "FFrontend Revenue/frontend-revenue231 ta",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "",
+          "text": "TMCK Sync Test - Assistants/mck-sync-tes",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "",
+          "text": "MMemSys/memsys184 tasks0 agentsGitHub Pr",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "border-2 border-dashed border-mc-border rounded-xl",
+          "text": "Add Workspace",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "NEXTJS-PORTAL",
+          "role": null,
+          "cls": "",
+          "text": "",
+          "outline": "none 0px",
+          "indicatorDelta": false,
+          "offscreen": true
+        },
+        {
+          "tag": "BODY"
+        }
+      ],
+      "roving": {
+        "tablist": false
+      },
+      "arrowCheck": null
+    },
+    {
+      "route": "/workspace/assistants",
+      "stops": [
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "sr-only focus:not-sr-only focus:absolute focus:lef",
+          "text": "Skip to main content",
+          "outline": "solid 2px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "flex items-center gap-1 shrink-0 text-mc-text-seco",
+          "text": "",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-s",
+          "text": "",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": "tab",
+          "cls": "inline-flex items-center gap-2 rounded border bord",
+          "text": "Board",
+          "outline": "solid 2px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "cls": "text-mc-accent-cyan hover:text-mc-accent",
+          "text": "View history",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "rounded p-1 text-mc-text-secondary hover:bg-mc-bg-",
+          "text": "Collapse agents sidebar",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "px-3 py-1 text-xs rounded uppercase bg-mc-accent t",
+          "text": "all",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "px-3 py-1 text-xs rounded uppercase text-mc-text-s",
+          "text": "working",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "px-3 py-1 text-xs rounded uppercase text-mc-text-s",
+          "text": "standby",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "w-full flex items-center justify-center gap-2 px-3",
+          "text": "Add Agent",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "rounded border border-mc-border px-2 py-0.5 text-[",
+          "text": "Check",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "flex items-center gap-2 px-3 py-1.5 rounded text-s",
+          "text": "Import GitHub",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "flex items-center gap-2 px-3 py-1.5 bg-mc-accent t",
+          "text": "New Task",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "inline-flex items-center gap-1 rounded border bord",
+          "text": "Refresh",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "rounded-full border px-3 py-1 text-xs transition-c",
+          "text": "All runtimes",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "rounded-full border px-3 py-1 text-xs transition-c",
+          "text": "Manual",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "rounded-full border px-3 py-1 text-xs transition-c",
+          "text": "OpenClaw",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "rounded-full border px-3 py-1 text-xs transition-c",
+          "text": "Webhook",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "cls": "rounded-full border px-3 py-1 text-xs transition-c",
+          "text": "Dispatch off",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "20 shapes still allowed after five prefi",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task 20 shapes still allowed aft",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "A quoted here-document deletes REMOTE_PA",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task A quoted here-document dele",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "P0: every destructive-command fix since ",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task P0: every destructive-comma",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "P0: Dev Service Manager admin host execu",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task P0: Dev Service Manager adm",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "Redirecting into a raw block device is a",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task Redirecting into a raw bloc",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "Bug: Claude Desktop long-lived sessions ",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task Bug: Claude Desktop long-li",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "Billing tape weekly cadence produces onl",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task Billing tape weekly cadence",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "Secret sprawl: 180 distinct secrets / 39",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task Secret sprawl: 180 distinct",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "Bug: billing floor reconciler publishes ",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task Bug: billing floor reconcil",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "Repair pre-existing agent asset catalog ",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "flex items-center justify-center py-1.5 border-b b",
+          "text": "Reorder task Repair pre-existing agent a",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        },
+        {
+          "tag": "DIV",
+          "role": "button",
+          "cls": "group w-full bg-mc-bg-secondary border rounded-lg ",
+          "text": "Build a privacy-safe companion asset pac",
+          "outline": "auto 1px",
+          "indicatorDelta": true,
+          "offscreen": false
+        }
+      ],
+      "roving": {
+        "tablist": true,
+        "tabs": 5,
+        "firstTabFocusStyle": {
+          "outline": "solid 2px",
+          "boxShadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(88, 166, 255, 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+        },
+        "firstTabTabindex": "0",
+        "ariaSelected": "true"
+      },
+      "arrowCheck": {
+        "arrowMoved": true,
+        "movedTo": "Agents",
+        "indicatorOnArrivedTab": true
+      }
+    }
+  ],
+  "reducedMotion": [
+    {
+      "route": "/",
+      "viewport": "desktop",
+      "matchesReduce": true,
+      "running": 0,
+      "infinite": 0,
+      "detail": [],
+      "textLength": 2137
+    },
+    {
+      "route": "/workspace/assistants",
+      "viewport": "desktop",
+      "matchesReduce": true,
+      "running": 2,
+      "infinite": 2,
+      "detail": [
+        {
+          "kind": "CSSAnimation",
+          "name": "fleet-busy-pulse",
+          "duration": 1600,
+          "iterations": "Infinity"
+        },
+        {
+          "kind": "CSSAnimation",
+          "name": "fleet-busy-pulse",
+          "duration": 1600,
+          "iterations": "Infinity"
+        }
+      ],
+      "textLength": 120696
+    },
+    {
+      "route": "/settings",
+      "viewport": "desktop",
+      "matchesReduce": true,
+      "running": 0,
+      "infinite": 0,
+      "detail": [],
+      "textLength": 3173
+    },
+    {
+      "route": "/n8n-sync-history",
+      "viewport": "desktop",
+      "matchesReduce": true,
+      "running": 0,
+      "infinite": 0,
+      "detail": [],
+      "textLength": 7015
+    },
+    {
+      "route": "/",
+      "viewport": "mobile",
+      "matchesReduce": true,
+      "running": 0,
+      "infinite": 0,
+      "detail": [],
+      "textLength": 2149
+    }
+  ]
+}
