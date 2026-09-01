@@ -84,7 +84,10 @@ function parseRecord(filePath) {
     const value = parts.filter(Boolean).join(' ').trim();
     if (label === 'covers') {
       for (const target of value.split(',')) {
-        if (target.trim()) covers.push(target.trim().replace(/\\/g, '/'));
+        // Authors backtick-wrap paths in markdown (`path`); backticks are never part
+        // of a component path, so strip them or the cover can never match (memsys#601).
+        const cleaned = target.trim().replace(/`/g, '').trim();
+        if (cleaned) covers.push(cleaned.replace(/\\/g, '/'));
       }
       continue;
     }

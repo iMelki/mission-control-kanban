@@ -145,6 +145,42 @@ test('runPreflight: a field value written on a continuation line is still read',
   }
 });
 
+// Authors backtick-wrap paths in markdown (`path`); backticks are never part of a
+// component path, so before the strip a backticked cover could never match its
+// component (memsys#601 sibling).
+const BACKTICKED_COVERS_RECORD = VALID_RECORD.replace(
+  '- Covers: src/components/**/*.tsx',
+  '- Covers: `src/components/Foo.tsx`',
+);
+
+test('runPreflight: a backtick-wrapped cover entry still covers its component', () => {
+  const root = makeFixture({ components: ['src/components/Foo.tsx'], record: BACKTICKED_COVERS_RECORD });
+  try {
+    const { failures } = runPreflight(root);
+    assert.deepEqual(failures, [], 'a backticked cover must still match its component');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// Matched pair for the backtick strip: stripping must not make a NON-matching
+// cover match -- a backticked cover naming a different file still fails the gate.
+const BACKTICKED_WRONG_COVERS_RECORD = VALID_RECORD.replace(
+  '- Covers: src/components/**/*.tsx',
+  '- Covers: `src/components/Other.tsx`',
+);
+
+test('runPreflight: a backticked cover naming a different file does not cover', () => {
+  const root = makeFixture({ components: ['src/components/Foo.tsx'], record: BACKTICKED_WRONG_COVERS_RECORD });
+  try {
+    const { failures } = runPreflight(root);
+    assert.equal(failures.length, 1, 'a non-matching backticked cover must not cover');
+    assert.match(failures[0], /Foo\.tsx: new component with no sourcing-preflight record/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // Guards the OPPOSITE error: an over-greedy continuation that swallows the following
 // field would make a genuinely missing field look present, turning the fix into a new
 // fail-open. The wrap here sits directly above a field that has been deleted.
