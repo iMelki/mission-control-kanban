@@ -510,7 +510,7 @@ export default function WorkspacePage() {
                 ? 'flex flex-wrap items-center gap-2 text-rose-200'
                 : n8nSyncPresentation?.state === 'warning'
                   ? 'flex flex-wrap items-center gap-2 text-amber-200'
-                  : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
+                  : 'flex flex-wrap items-center gap-2 text-mc-text-secondary'}>
                 {n8nSyncPresentation?.state === 'error' ? (
                   <AlertTriangle className="size-4 shrink-0" />
                 ) : n8nSyncPresentation?.state === 'warning' ? (

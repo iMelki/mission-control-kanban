@@ -95,7 +95,10 @@ the local operator entrypoint; historical task notes remain in
     computed style, not from hand-authored annotations.
   - **2026-09-01:** timestamp class landed at the token/class level
     (`text-mc-text-muted` solid `#8b949e`, sRGB >=4.5:1 on the real card and
-    column backdrops). n8n `/70` status line and OFFLINE badge still open.
+    column backdrops). **2026-09-01 leftover:** n8n default line dropped
+    `/70` (`text-mc-text-secondary` solid, fixture 5.62:1). OFFLINE badge
+    fill is `bg-mc-bg` (live 5.65:1 on `:3123`). Source no longer contains
+    the 3.43 / 4.04 classes.
 
 - [#152 - 45 axe WCAG violations including one critical](https://github.com/iMelki/mission-control-kanban/issues/152)
   - `nested-interactive` (692 nodes, workspace task cards), `color-contrast`,

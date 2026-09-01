@@ -133,7 +133,7 @@ export function Header({ workspace }: HeaderProps) {
               ? 'bg-mc-bg-tertiary border-mc-border text-mc-text-secondary'
               : connectionStatus === 'online'
                 ? 'bg-mc-accent-green/20 border-mc-accent-green text-mc-accent-green'
-                : 'bg-mc-accent-red/20 border-mc-accent-red text-mc-accent-red'
+                : 'bg-mc-bg border-mc-accent-red text-mc-accent-red'
           }`}
         >
           <span

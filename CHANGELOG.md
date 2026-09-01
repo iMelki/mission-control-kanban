@@ -27,8 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `text-[10px] text-mc-text-secondary/60` composited to rgb(92,100,108) on
   the task-card `#161b22` at ~2.87:1. Replaced at the token/class level with
   solid `text-mc-text-muted` (`#8b949e`) which is >=4.5:1 on `#0d1117`,
-  `#161b22`, and `#21262d`. The n8n status line and OFFLINE badge pairs are
-  unchanged. Regression: `npm run test:contrast-tokens`.
+  `#161b22`, and `#21262d`.
+
+- **n8n and OFFLINE leftover contrast (2026-09-01, #151)** -
+  Default n8n status line dropped `text-mc-text-secondary/70` (3.45:1 on
+  `#161b22`) for solid `text-mc-text-secondary` (5.62:1). OFFLINE badge fill
+  moved from `bg-mc-accent-red/20` (4.05:1 live on `:3122`) to existing
+  `bg-mc-bg` (5.65:1 live on `:3123`). No new tokens. Regression:
+  `npm run test:contrast-tokens`.
 
 ### Changed
 

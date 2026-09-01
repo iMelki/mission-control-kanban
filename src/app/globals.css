@@ -133,7 +133,7 @@ h6 {
 }
 
 .status-offline {
-  @apply bg-mc-accent-red/20 text-mc-accent-red border border-mc-accent-red/50;
+  @apply bg-mc-bg text-mc-accent-red border border-mc-accent-red/50;
 }
 
 /* Priority badge styles */
