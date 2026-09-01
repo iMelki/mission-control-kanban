@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Silent stuck cockpit loads no longer present false pre-data as settled
+  (2026-09-01, #166, 2026-08-31 gauntlet row)** -
+  Workspace metadata arrival no longer clears the loading flag before tasks
+  exist, the placeholder cockpit is a skeleton instead of a confident empty
+  board, GitHub readiness treats "not fetched yet" as Checking rather than
+  "No token detected / 0/3 lanes ready", and the header connection badge
+  stays Checking until the OpenClaw probe finishes. Local SSE open/error no
+  longer writes that badge (it is not OpenClaw). Task fetch is no longer
+  blocked behind agents/events, hangs become a retryable error after 10s,
+  and `data-workspace-ready` is true only when the board phase is ready.
+  Regression: `npm run test:cockpit-load-state`.
+
+- **Muted timestamp contrast (2026-09-01, #151)** -
+  `text-[10px] text-mc-text-secondary/60` composited to rgb(92,100,108) on
+  the task-card `#161b22` at ~2.87:1. Replaced at the token/class level with
+  solid `text-mc-text-muted` (`#8b949e`) which is >=4.5:1 on `#0d1117`,
+  `#161b22`, and `#21262d`. The n8n status line and OFFLINE badge pairs are
+  unchanged. Regression: `npm run test:contrast-tokens`.
+
 ### Changed
 
 - **Cockpit CTA and a11y lift (2026-08-27, #139)** -

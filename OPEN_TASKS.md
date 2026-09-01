@@ -1,12 +1,22 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-27
+Last updated: 2026-09-01
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
+
+- [#166 - cockpit loads can stick in a false pre-data board and present it as settled](https://github.com/iMelki/mission-control-kanban/issues/166)
+  - 2026-08-31 gauntlet: ~3/13 cockpit loads painted "Showing 0/0", "No events
+    yet", "No token detected · 0/3 lanes ready", and header ONLINE as settled
+    fact. No console errors, no retry.
+  - **2026-09-01 Wave 2:** pending vs empty-after-load split, loading shell,
+    GitHub null-as-checking, SSE no longer writes the OpenClaw badge, 10s
+    fetch budget, `data-workspace-ready` only when the board is ready.
+    Regression: `npm run test:cockpit-load-state`. Live 13/13 on a production
+    side-serve (not :3021) with `stuckCount` 0.
 
 - [#164 - the capture harness cannot survive its own subject: the dev server dies under on-demand compile](https://github.com/iMelki/mission-control-kanban/issues/164)
   - `next dev` first-hit compiles measured at 15-54 s per route; the process
@@ -83,6 +93,9 @@ the local operator entrypoint; historical task notes remain in
   - 10px timestamps using `text-mc-text-secondary/60` (2.87:1), the n8n status
     line (3.43:1), and the `OFFLINE` badge (4.04:1). Contrast is computed from
     computed style, not from hand-authored annotations.
+  - **2026-09-01:** timestamp class landed at the token/class level
+    (`text-mc-text-muted` solid `#8b949e`, sRGB >=4.5:1 on the real card and
+    column backdrops). n8n `/70` status line and OFFLINE badge still open.
 
 - [#152 - 45 axe WCAG violations including one critical](https://github.com/iMelki/mission-control-kanban/issues/152)
   - `nested-interactive` (692 nodes, workspace task cards), `color-contrast`,

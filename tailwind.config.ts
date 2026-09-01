@@ -16,6 +16,7 @@ const config: Config = {
         'mc-border': '#30363d',
         'mc-text': '#c9d1d9',
         'mc-text-secondary': '#8b949e',
+        'mc-text-muted': '#8b949e',
         'mc-accent': '#58a6ff',
         'mc-accent-green': '#3fb950',
         'mc-accent-yellow': '#d29922',

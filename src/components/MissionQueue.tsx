@@ -23,6 +23,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Plus, ChevronRight, GripVertical, AlertTriangle } from 'lucide-react';
 import { Github } from '@/components/icons/BrandIcons';
 import { EntityEmoji } from '@/components/ui/EntityEmoji';
+import { presentBoardCount } from '@/lib/cockpit-load-state';
 import { useMissionControl } from '@/lib/store';
 import {
   READINESS_LABELS,
@@ -120,7 +121,7 @@ function missionQueueUiReducer(
 }
 
 export function MissionQueue({ workspaceId }: MissionQueueProps) {
-  const { tasks, updateTaskStatus, addEvent } = useMissionControl();
+  const { tasks, updateTaskStatus, addEvent, boardLoadStatus } = useMissionControl();
   const [uiState, dispatchUi] = useReducer(
     missionQueueUiReducer,
     initialMissionQueueUiState,
@@ -288,8 +289,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             {filterOption.label}
           </button>
         ))}
-        <span className="ml-auto text-xs text-mc-text-secondary">
-          Showing {visibleTasks.length}/{tasks.length}
+        <span className="ml-auto text-xs text-mc-text-secondary" role="status">
+          {presentBoardCount(boardLoadStatus, visibleTasks.length, tasks.length).text}
         </span>
       </div>
 
@@ -583,7 +584,7 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
               {task.priority}
             </span>
           </div>
-          <span className="text-[10px] text-mc-text-secondary/60" suppressHydrationWarning>
+          <span className="text-[10px] text-mc-text-muted" suppressHydrationWarning>
             {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
           </span>
         </div>

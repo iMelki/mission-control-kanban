@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { debug } from './debug';
+import type { ConnectionPhase, LoadPhase } from './cockpit-load-state';
 import type { Agent, Task, Conversation, Message, Event, TaskStatus, OpenClawSession } from './types';
 
 interface MissionControlState {
@@ -22,6 +23,9 @@ interface MissionControlState {
   selectedTask: Task | null;
   isOnline: boolean;
   isLoading: boolean;
+  boardLoadStatus: LoadPhase;
+  eventsLoadStatus: LoadPhase;
+  connectionStatus: ConnectionPhase;
   selectedBusiness: string;
 
   // Actions
@@ -37,6 +41,10 @@ interface MissionControlState {
   setSelectedTask: (task: Task | null) => void;
   setIsOnline: (online: boolean) => void;
   setIsLoading: (loading: boolean) => void;
+  setBoardLoadStatus: (status: LoadPhase) => void;
+  setEventsLoadStatus: (status: LoadPhase) => void;
+  setConnectionStatus: (status: ConnectionPhase) => void;
+  resetCockpitData: () => void;
   setSelectedBusiness: (business: string) => void;
 
   // Task mutations
@@ -68,6 +76,9 @@ export const useMissionControl = create<MissionControlState>((set) => ({
   selectedTask: null,
   isOnline: false,
   isLoading: true,
+  boardLoadStatus: 'pending',
+  eventsLoadStatus: 'pending',
+  connectionStatus: 'pending',
   selectedBusiness: 'all',
 
   // Setters
@@ -91,9 +102,25 @@ export const useMissionControl = create<MissionControlState>((set) => ({
   },
   setIsOnline: (online) => {
     debug.store('setIsOnline called', { online });
-    set({ isOnline: online });
+    set({ isOnline: online, connectionStatus: online ? 'online' : 'offline' });
   },
   setIsLoading: (loading) => set({ isLoading: loading }),
+  setBoardLoadStatus: (status) => set({ boardLoadStatus: status, isLoading: status === 'pending' }),
+  setEventsLoadStatus: (status) => set({ eventsLoadStatus: status }),
+  setConnectionStatus: (status) => set({
+    connectionStatus: status,
+    isOnline: status === 'online',
+  }),
+  resetCockpitData: () => set({
+    agents: [],
+    tasks: [],
+    events: [],
+    isLoading: true,
+    boardLoadStatus: 'pending',
+    eventsLoadStatus: 'pending',
+    connectionStatus: 'pending',
+    isOnline: false,
+  }),
   setSelectedBusiness: (business) => set({ selectedBusiness: business }),
 
   // Task mutations

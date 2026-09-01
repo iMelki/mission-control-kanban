@@ -17,6 +17,7 @@ import {
   UserPlus,
   UserRound,
 } from 'lucide-react';
+import { presentEventsEmpty, type LoadPhase } from '@/lib/cockpit-load-state';
 import { useMissionControl } from '@/lib/store';
 import type { Event } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -54,7 +55,7 @@ function getServerCollapsedPreference() {
 }
 
 export function LiveFeed() {
-  const { events } = useMissionControl();
+  const { events, eventsLoadStatus } = useMissionControl();
   const [filter, setFilter] = useState<FeedFilter>('all');
   const isCollapsed = useSyncExternalStore(
     subscribeCollapsedPreference,
@@ -94,6 +95,7 @@ export function LiveFeed() {
       ) : (
         <LiveFeedExpandedPanel
           events={filteredEvents}
+          eventsLoadStatus={eventsLoadStatus}
           filter={filter}
           onCollapse={() => setIsCollapsed(true)}
           onFilterChange={setFilter}
@@ -128,11 +130,13 @@ function LiveFeedCollapsedRail({ eventCount, onExpand }: { eventCount: number; o
 
 function LiveFeedExpandedPanel({
   events,
+  eventsLoadStatus,
   filter,
   onCollapse,
   onFilterChange,
 }: {
   events: Event[];
+  eventsLoadStatus: LoadPhase;
   filter: FeedFilter;
   onCollapse: () => void;
   onFilterChange: (filter: FeedFilter) => void;
@@ -174,7 +178,9 @@ function LiveFeedExpandedPanel({
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {events.length === 0 ? (
-          <div className="text-center py-8 text-mc-text-secondary text-sm">No events yet</div>
+          <div className="text-center py-8 text-mc-text-secondary text-sm" role="status">
+            {presentEventsEmpty(eventsLoadStatus).text}
+          </div>
         ) : (
           events.map((event) => <EventItem key={event.id} event={event} />)
         )}

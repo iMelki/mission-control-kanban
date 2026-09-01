@@ -1,29 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Github } from '@/components/icons/BrandIcons';
-
-interface GitHubDiagnostics {
-  status: 'ok' | 'limited' | 'missing_token' | 'error';
-  token_source: 'GH_GENERAL_TOKEN' | 'GITHUB_TOKEN' | null;
-  authenticated: boolean;
-  issue_read_available?: boolean;
-  viewer_login?: string;
-  project_read_available: boolean;
-  project_count_visible?: number | null;
-  project_probe_error?: string;
-  message: string;
-}
+import { fetchWithBudget } from '@/lib/fetch-budget';
+import {
+  presentGitHubConnection,
+  type GitHubDiagnostics,
+} from '@/lib/github-readiness';
 
 export function GitHubConnectionStatus() {
   const [diagnostics, setDiagnostics] = useState<GitHubDiagnostics | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/github/diagnostics', { cache: 'no-store' });
+      const response = await fetchWithBudget('/api/github/diagnostics');
       if (!response.ok) {
         throw new Error(`GitHub diagnostics request failed (${response.status})`);
       }
@@ -47,17 +40,24 @@ export function GitHubConnectionStatus() {
     void refresh();
   }, []);
 
-  const status = diagnostics?.status ?? 'missing_token';
-  const ok = status === 'ok';
-  const limited = status === 'limited';
+  const presented = useMemo(
+    () => presentGitHubConnection({ diagnostics, loading }),
+    [diagnostics, loading],
+  );
+  const checking = presented.phase === 'pending';
+  const ok = diagnostics?.status === 'ok';
+  const limited = diagnostics?.status === 'limited';
 
   return (
-    <div className="flex items-center gap-2 rounded border border-mc-border/70 bg-mc-bg-secondary/70 px-3 py-1.5 text-xs text-mc-text-secondary">
+    <div
+      className="flex items-center gap-2 rounded border border-mc-border/70 bg-mc-bg-secondary/70 px-3 py-1.5 text-xs text-mc-text-secondary"
+      data-github-connection-phase={presented.phase}
+    >
       <Github className="size-4 text-mc-accent-cyan" />
-      {loading && !diagnostics ? (
+      {checking ? (
         <>
           <Loader2 className="size-3 animate-spin" />
-          <span>Checking GitHub…</span>
+          <span role="status">{presented.title}</span>
         </>
       ) : (
         <>
@@ -66,12 +66,8 @@ export function GitHubConnectionStatus() {
           ) : (
             <AlertTriangle className={`size-3 ${limited ? 'text-amber-300' : 'text-rose-300'}`} />
           )}
-          <span className="font-medium text-mc-text">
-            {ok ? 'GitHub connected' : limited ? 'GitHub limited' : 'GitHub setup needed'}
-          </span>
-          <span>
-            {diagnostics?.viewer_login ? `@${diagnostics.viewer_login}` : diagnostics?.token_source ?? 'no token'}
-          </span>
+          <span className="font-medium text-mc-text">{presented.title}</span>
+          {presented.detail ? <span>{presented.detail}</span> : null}
           <button
             type="button"
             onClick={() => void refresh()}

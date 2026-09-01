@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Zap, Settings, ChevronLeft, LayoutGrid } from 'lucide-react';
 import { EntityEmoji } from '@/components/ui/EntityEmoji';
+import { presentConnection } from '@/lib/cockpit-load-state';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import { RuntimeHealthBadges } from '@/components/RuntimeHealthBadges';
@@ -16,7 +17,8 @@ interface HeaderProps {
 
 export function Header({ workspace }: HeaderProps) {
   const router = useRouter();
-  const { agents, tasks, isOnline } = useMissionControl();
+  const { agents, tasks, connectionStatus } = useMissionControl();
+  const connection = presentConnection(connectionStatus);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeSubAgents, setActiveSubAgents] = useState(0);
 
@@ -123,21 +125,28 @@ export function Header({ workspace }: HeaderProps) {
         */}
         <div
           role="status"
-          aria-label={isOnline ? 'Connection online' : 'Connection offline'}
-          title={isOnline ? 'ONLINE' : 'OFFLINE'}
+          aria-label={connection.ariaLabel}
+          title={connection.label}
+          data-connection-phase={connectionStatus}
           className={`flex items-center gap-2 px-2 sm:px-3 py-1 rounded border text-sm font-medium ${
-            isOnline
-              ? 'bg-mc-accent-green/20 border-mc-accent-green text-mc-accent-green'
-              : 'bg-mc-accent-red/20 border-mc-accent-red text-mc-accent-red'
+            connectionStatus === 'pending'
+              ? 'bg-mc-bg-tertiary border-mc-border text-mc-text-secondary'
+              : connectionStatus === 'online'
+                ? 'bg-mc-accent-green/20 border-mc-accent-green text-mc-accent-green'
+                : 'bg-mc-accent-red/20 border-mc-accent-red text-mc-accent-red'
           }`}
         >
           <span
             aria-hidden="true"
             className={`w-2 h-2 rounded-full ${
-              isOnline ? 'bg-mc-accent-green animate-pulse' : 'bg-mc-accent-red'
+              connectionStatus === 'pending'
+                ? 'bg-mc-text-secondary'
+                : connectionStatus === 'online'
+                  ? 'bg-mc-accent-green animate-pulse'
+                  : 'bg-mc-accent-red'
             }`}
           />
-          <span className="hidden sm:inline">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+          <span className="hidden sm:inline">{connection.label}</span>
         </div>
         <button
               type="button"

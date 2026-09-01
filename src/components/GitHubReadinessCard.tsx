@@ -3,26 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import { Github } from '@/components/icons/BrandIcons';
-
-interface GitHubDiagnostics {
-  status: 'ok' | 'limited' | 'missing_token' | 'error';
-  token_source: 'GH_GENERAL_TOKEN' | 'GITHUB_TOKEN' | null;
-  authenticated: boolean;
-  issue_read_available?: boolean;
-  viewer_login?: string;
-  project_read_available: boolean;
-  project_count_visible?: number | null;
-  project_probe_error?: string;
-  message: string;
-}
-
-type ReadinessState = 'ready' | 'limited' | 'blocked';
-
-interface ReadinessRow {
-  label: string;
-  state: ReadinessState;
-  message: string;
-}
+import { fetchWithBudget } from '@/lib/fetch-budget';
+import {
+  presentGitHubReadiness,
+  type GitHubDiagnostics,
+  type ReadinessState,
+} from '@/lib/github-readiness';
 
 function stateClassName(state: ReadinessState): string {
   switch (state) {
@@ -30,6 +16,8 @@ function stateClassName(state: ReadinessState): string {
       return 'border-mc-success/30 bg-mc-success/10 text-mc-success';
     case 'limited':
       return 'border-mc-warn/30 bg-mc-warn/10 text-mc-warn';
+    case 'pending':
+      return 'border-mc-border bg-mc-bg-tertiary/40 text-mc-text-secondary';
     default:
       return 'border-mc-danger/30 bg-mc-danger/10 text-mc-danger';
   }
@@ -39,83 +27,21 @@ function StateIcon({ state }: { state: ReadinessState }) {
   if (state === 'ready') {
     return <CheckCircle2 className="size-4 text-mc-success" />;
   }
+  if (state === 'pending') {
+    return <Loader2 className="size-4 animate-spin text-mc-text-secondary" />;
+  }
 
   return <AlertTriangle className={`size-4 ${state === 'limited' ? 'text-mc-warn' : 'text-mc-danger'}`} />;
 }
 
-function buildRows(diagnostics: GitHubDiagnostics | null): ReadinessRow[] {
-  if (!diagnostics || diagnostics.status === 'missing_token') {
-    return [
-      {
-        label: 'Import preview',
-        state: 'blocked',
-        message: 'Needs GH_GENERAL_TOKEN or GITHUB_TOKEN so MCK can read GitHub issues and Project fields.',
-      },
-      {
-        label: 'Dry-run write-back',
-        state: 'blocked',
-        message: 'Needs GitHub auth to resolve linked issues and prepare a trustworthy write-back plan.',
-      },
-      {
-        label: 'Apply write-back',
-        state: 'blocked',
-        message: 'Needs GitHub auth before MCK can post comments or update allowed Project fields.',
-      },
-    ];
-  }
-
-  if (diagnostics.status === 'error' || !diagnostics.authenticated) {
-    return [
-      {
-        label: 'Import preview',
-        state: 'blocked',
-        message: diagnostics.message,
-      },
-      {
-        label: 'Dry-run write-back',
-        state: 'blocked',
-        message: diagnostics.message,
-      },
-      {
-        label: 'Apply write-back',
-        state: 'blocked',
-        message: diagnostics.message,
-      },
-    ];
-  }
-
-  const projectState: ReadinessState = diagnostics.project_read_available ? 'ready' : 'limited';
-  return [
-    {
-      label: 'Import preview',
-      state: projectState,
-      message: diagnostics.project_read_available
-        ? 'Issue import plus GitHub Project field parsing are available.'
-        : 'Issue reads should work, but Project field parsing may be incomplete without read:project.',
-    },
-    {
-      label: 'Dry-run write-back',
-      state: 'ready',
-      message: 'MCK can prepare the local write-back plan without mutating GitHub.',
-    },
-    {
-      label: 'Apply write-back',
-      state: projectState,
-      message: diagnostics.project_read_available
-        ? 'Issue comments and allowed Project field updates are available.'
-        : 'Issue comments may work, but Project field updates will be skipped or noisy.',
-    },
-  ];
-}
-
 export function GitHubReadinessCard() {
   const [diagnostics, setDiagnostics] = useState<GitHubDiagnostics | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/github/diagnostics', { cache: 'no-store' });
+      const response = await fetchWithBudget('/api/github/diagnostics');
       if (!response.ok) {
         throw new Error(`GitHub diagnostics request failed (${response.status})`);
       }
@@ -139,20 +65,25 @@ export function GitHubReadinessCard() {
     void refresh();
   }, []);
 
-  const rows = useMemo(() => buildRows(diagnostics), [diagnostics]);
-  const readyCount = rows.filter((row) => row.state === 'ready').length;
+  const presented = useMemo(
+    () => presentGitHubReadiness({ diagnostics, loading }),
+    [diagnostics, loading],
+  );
 
   return (
-    <div className="mx-3 mt-3 rounded-xl border border-mc-border bg-mc-bg-secondary/70 p-3 text-sm text-mc-text-secondary">
+    <div
+      className="mx-3 mt-3 rounded-xl border border-mc-border bg-mc-bg-secondary/70 p-3 text-sm text-mc-text-secondary"
+      data-readiness-phase={presented.phase}
+    >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="flex items-start gap-2">
           <Github className="mt-0.5 size-5 text-mc-accent-cyan" />
           <div>
             <div className="font-semibold text-mc-text">GitHub import/write-back readiness</div>
-            <p className="mt-1 text-xs">
-              {diagnostics?.viewer_login ? `Using @${diagnostics.viewer_login}` : diagnostics?.token_source ?? 'No token detected'} · {readyCount}/3 lanes ready
+            <p className="mt-1 text-xs" role="status">
+              {presented.summary}
             </p>
-            <p className="mt-1 text-xs">{diagnostics?.message ?? 'Checking GitHub connectivity and Project field access.'}</p>
+            <p className="mt-1 text-xs">{presented.detail}</p>
             {diagnostics?.project_probe_error ? (
               <p className="mt-1 text-xs text-amber-200">{diagnostics.project_probe_error}</p>
             ) : null}
@@ -169,7 +100,7 @@ export function GitHubReadinessCard() {
         </button>
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
-        {rows.map((row) => (
+        {presented.rows.map((row) => (
           <div key={row.label} className={`rounded-lg border px-3 py-2 ${stateClassName(row.state)}`}>
             <div className="flex items-center gap-2 font-medium">
               <StateIcon state={row.state} />

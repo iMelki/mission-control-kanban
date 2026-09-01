@@ -9,6 +9,8 @@
   --mc-border: #30363d;
   --mc-text: #c9d1d9;
   --mc-text-secondary: #8b949e;
+  /* Solid muted metadata. Do not fade this with /60 — that composites to 2.87:1 (mck#151). */
+  --mc-text-muted: #8b949e;
   --mc-accent: #58a6ff;
   --mc-accent-green: #3fb950;
   --mc-accent-yellow: #d29922;
