@@ -12,11 +12,11 @@ probes refuse that port **without fetching it**.
 A leftover `.next/BUILD_ID` next to `next dev` is not provenance. Production
 evidence is a non-3021 target plus a BUILD_ID that belongs to that serve.
 
-**This app is not gauntlet-scored.** The 2026-08-09 audit was code-only. Later
-browser rounds either hit a dying `next dev` or measured a production build that
-still refused 5 of 18 route×viewport units and did not write a frontend-sota
-scorecard. Do not claim a gauntlet score from `next dev`, and do not claim one
-from a production capture that did not survive and record a scorecard.
+**First production gauntlet (2026-09-01): 14/21** on `127.0.0.1:3121`
+`next start`, SHA `74f6717`, BUILD_ID `S8HgxCEJWRAGRBloUGmn1`. Scorecard:
+`docs/frontend-sota-gauntlet-2026-09-01/scorecard.md`. Do not claim that
+number from `next dev`, and do not reuse the 2026-08-31 `:3021` card as
+this row. Do not GET 3021.
 
 ## How to serve a capture target
 

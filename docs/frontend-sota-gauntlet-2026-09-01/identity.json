@@ -1,0 +1,23 @@
+{
+  "app": "mission-control-kanban",
+  "capturedAt": "2026-09-01T04:39:14.639Z",
+  "host": "http://127.0.0.1:3121",
+  "serverMode": "production",
+  "preflight": {
+    "ok": true,
+    "scoreable": true,
+    "code": "production_ok",
+    "buildId": "S8HgxCEJWRAGRBloUGmn1",
+    "httpStatus": 200,
+    "fetched": true
+  },
+  "servedBuildId": "S8HgxCEJWRAGRBloUGmn1",
+  "servedSha": "74f671740019e26a540405bcfe52f1e6a83d900e",
+  "originDevAtWrite": "5dff8357676d27f22794c390ceac099db040cf92",
+  "shaNote": "3121 serves 74f6717 (docs-only on the 8a56829 src surface). origin/dev HEAD 5dff835 includes Wave 2 #166/#151 and was not scored.",
+  "notFetched": ["http://127.0.0.1:3021"],
+  "otherHosts": {
+    "3123": "down",
+    "3122": "next start from tmp/mck-prod-wave2 serving crFugjhxjk7cE1Ztoh-3N — not scored"
+  }
+}

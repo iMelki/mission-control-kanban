@@ -1,0 +1,14 @@
+{
+  "ok": false,
+  "servedBuildId": null,
+  "expectedBuildId": "S8HgxCEJWRAGRBloUGmn1",
+  "expectedSha": "74f671740019e26a540405bcfe52f1e6a83d900e",
+  "serverMode": "production",
+  "summary": {
+    "unitCount": 7,
+    "http200": 7,
+    "overflowZero": 7,
+    "consoleErrorCount": 2,
+    "pageErrorCount": 0
+  }
+}

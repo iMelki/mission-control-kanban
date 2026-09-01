@@ -1,0 +1,461 @@
+{
+  "app": "mission-control-kanban",
+  "round": "first production frontend-sota-gauntlet 2026-09-01",
+  "base": "http://127.0.0.1:3121",
+  "expectedBuildId": "S8HgxCEJWRAGRBloUGmn1",
+  "expectedSha": "74f671740019e26a540405bcfe52f1e6a83d900e",
+  "capturedAt": "2026-09-01T04:39:14.639Z",
+  "waitUntil": "domcontentloaded",
+  "networkidle": false,
+  "units": [
+    {
+      "route": "/",
+      "id": "home",
+      "viewport": "1440x900",
+      "reducedMotion": false,
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3121/",
+      "buildId": null,
+      "nextDevMarkers": [],
+      "settle": {
+        "settled": true,
+        "ms": 2839,
+        "textLength": 2150,
+        "mode": "signature-stable"
+      },
+      "overflow": 0,
+      "overflowWithControl": 760,
+      "overflowAfter": 0,
+      "overflowControlProven": true,
+      "visibleControls": 27,
+      "under24": 1,
+      "under44": 19,
+      "under24Samples": [
+        {
+          "w": 1,
+          "h": 1,
+          "tag": "A",
+          "text": "Skip to main content"
+        }
+      ],
+      "runningAnimations": 0,
+      "animationNames": [],
+      "h1": [
+        "Mission Control"
+      ],
+      "readyAttr": null,
+      "textLength": 2150,
+      "textHead": "Skip to main content 🦞 Mission Control New Workspace All Workspaces Select a cockpit workspace. Project-backed workspaces mirror GitHub Projects into local MCK tasks. LOCAL CONTROL Workspace surfaces and health Diagnostics refreshed WORK COCKPITS MCK Assistants Ready Current MCK",
+      "title": "Mission Control",
+      "screenshot": "shots/home-1440x900.png",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "pageErrors": []
+    },
+    {
+      "route": "/",
+      "id": "home",
+      "viewport": "390x844",
+      "reducedMotion": false,
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3121/",
+      "buildId": null,
+      "nextDevMarkers": [],
+      "settle": {
+        "settled": true,
+        "ms": 2435,
+        "textLength": 2150,
+        "mode": "signature-stable"
+      },
+      "overflow": 0,
+      "overflowWithControl": 1810,
+      "overflowAfter": 0,
+      "overflowControlProven": true,
+      "visibleControls": 27,
+      "under24": 1,
+      "under44": 18,
+      "under24Samples": [
+        {
+          "w": 1,
+          "h": 1,
+          "tag": "A",
+          "text": "Skip to main content"
+        }
+      ],
+      "runningAnimations": 0,
+      "animationNames": [],
+      "h1": [
+        "Mission Control"
+      ],
+      "readyAttr": null,
+      "textLength": 2150,
+      "textHead": "Skip to main content 🦞 Mission Control New Workspace All Workspaces Select a cockpit workspace. Project-backed workspaces mirror GitHub Projects into local MCK tasks. LOCAL CONTROL Workspace surfaces and health Diagnostics refreshed WORK COCKPITS MCK Assistants Ready Current MCK",
+      "title": "Mission Control",
+      "screenshot": "shots/home-390x844.png",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "pageErrors": []
+    },
+    {
+      "route": "/workspace/assistants",
+      "id": "assistants",
+      "viewport": "1440x900",
+      "reducedMotion": false,
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3121/workspace/assistants",
+      "buildId": null,
+      "nextDevMarkers": [],
+      "settle": {
+        "settled": true,
+        "ms": 3867,
+        "textLength": 123075,
+        "mode": "signature-stable"
+      },
+      "overflow": 0,
+      "overflowWithControl": 760,
+      "overflowAfter": 0,
+      "overflowControlProven": true,
+      "visibleControls": 1218,
+      "under24": 4,
+      "under44": 622,
+      "under24Samples": [
+        {
+          "w": 1,
+          "h": 1,
+          "tag": "A",
+          "text": "Skip to main content"
+        },
+        {
+          "w": 36,
+          "h": 16,
+          "tag": "A",
+          "text": ""
+        },
+        {
+          "w": 101,
+          "h": 20,
+          "tag": "A",
+          "text": "View history"
+        },
+        {
+          "w": 51,
+          "h": 22,
+          "tag": "BUTTON",
+          "text": "Check"
+        }
+      ],
+      "runningAnimations": 2,
+      "animationNames": [
+        "spin",
+        "spin"
+      ],
+      "h1": [
+        "Assistants"
+      ],
+      "readyAttr": "true",
+      "textLength": 123075,
+      "textHead": "Skip to main content MISSION CONTROL / A Assistants 0 AGENTS ACTIVE 358 TASKS IN QUEUE 07:39:24 OFFLINE Board Agents Dispatch Settings Activity GitHub Project #13 (Assistants) is the source for this workspace. Auto-syncing workspace from GitHub Project... n8n sync: Review needed ",
+      "title": "Mission Control",
+      "screenshot": "shots/assistants-1440x900.png",
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "route": "/workspace/assistants",
+      "id": "assistants",
+      "viewport": "390x844",
+      "reducedMotion": false,
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3121/workspace/assistants",
+      "buildId": null,
+      "nextDevMarkers": [],
+      "settle": {
+        "settled": true,
+        "ms": 2672,
+        "textLength": 123007,
+        "mode": "signature-stable"
+      },
+      "overflow": 0,
+      "overflowWithControl": 1810,
+      "overflowAfter": 0,
+      "overflowControlProven": true,
+      "visibleControls": 1218,
+      "under24": 4,
+      "under44": 623,
+      "under24Samples": [
+        {
+          "w": 1,
+          "h": 1,
+          "tag": "A",
+          "text": "Skip to main content"
+        },
+        {
+          "w": 36,
+          "h": 16,
+          "tag": "A",
+          "text": ""
+        },
+        {
+          "w": 101,
+          "h": 20,
+          "tag": "A",
+          "text": "View history"
+        },
+        {
+          "w": 51,
+          "h": 22,
+          "tag": "BUTTON",
+          "text": "Check"
+        }
+      ],
+      "runningAnimations": 2,
+      "animationNames": [
+        "spin",
+        "spin"
+      ],
+      "h1": [
+        "Assistants"
+      ],
+      "readyAttr": "true",
+      "textLength": 123007,
+      "textHead": "Skip to main content / A Assistants Board Agents Dispatch Settings Activity GitHub Project #13 (Assistants) is the source for this workspace. Auto-syncing workspace from GitHub Project... n8n sync: Review needed Last run Aug 14, 09:37 AM - 1030 scanned, 620 updated, 0 errors, 2 s",
+      "title": "Mission Control",
+      "screenshot": "shots/assistants-390x844.png",
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "route": "/settings",
+      "id": "settings",
+      "viewport": "1440x900",
+      "reducedMotion": false,
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3121/settings",
+      "buildId": null,
+      "nextDevMarkers": [],
+      "settle": {
+        "settled": true,
+        "ms": 1637,
+        "textLength": 3811,
+        "mode": "signature-stable"
+      },
+      "overflow": 0,
+      "overflowWithControl": 760,
+      "overflowAfter": 0,
+      "overflowControlProven": true,
+      "visibleControls": 32,
+      "under24": 6,
+      "under44": 32,
+      "under24Samples": [
+        {
+          "w": 1,
+          "h": 1,
+          "tag": "A",
+          "text": "Skip to main content"
+        },
+        {
+          "w": 60,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "DELIVERY\nSORT STATE: NONE"
+        },
+        {
+          "w": 38,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "EVENT\nSORT STATE: NONE"
+        },
+        {
+          "w": 45,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "STATUS\nSORT STATE: NONE"
+        },
+        {
+          "w": 60,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "RECEIVED\nSORT STATE: NONE"
+        },
+        {
+          "w": 45,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "REASON\nSORT STATE: NONE"
+        }
+      ],
+      "runningAnimations": 0,
+      "animationNames": [],
+      "h1": [
+        "Settings"
+      ],
+      "readyAttr": null,
+      "textLength": 3811,
+      "textHead": "Skip to main content ← Back Settings Reset to Defaults Save Changes Workspace Paths Configure where Mission Control stores projects and deliverables. Workspace Base Path Base directory for all Mission Control files. Use ~ for home directory. Projects Path Directory where project ",
+      "title": "Mission Control",
+      "screenshot": "shots/settings-1440x900.png",
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "route": "/settings",
+      "id": "settings",
+      "viewport": "390x844",
+      "reducedMotion": false,
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3121/settings",
+      "buildId": null,
+      "nextDevMarkers": [],
+      "settle": {
+        "settled": true,
+        "ms": 1218,
+        "textLength": 3811,
+        "mode": "signature-stable"
+      },
+      "overflow": 0,
+      "overflowWithControl": 1810,
+      "overflowAfter": 0,
+      "overflowControlProven": true,
+      "visibleControls": 32,
+      "under24": 6,
+      "under44": 30,
+      "under24Samples": [
+        {
+          "w": 1,
+          "h": 1,
+          "tag": "A",
+          "text": "Skip to main content"
+        },
+        {
+          "w": 60,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "DELIVERY\nSORT STATE: NONE"
+        },
+        {
+          "w": 38,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "EVENT\nSORT STATE: NONE"
+        },
+        {
+          "w": 45,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "STATUS\nSORT STATE: NONE"
+        },
+        {
+          "w": 60,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "RECEIVED\nSORT STATE: NONE"
+        },
+        {
+          "w": 45,
+          "h": 16,
+          "tag": "BUTTON",
+          "text": "REASON\nSORT STATE: NONE"
+        }
+      ],
+      "runningAnimations": 0,
+      "animationNames": [],
+      "h1": [
+        "Settings"
+      ],
+      "readyAttr": null,
+      "textLength": 3811,
+      "textHead": "Skip to main content ← Back Settings Reset to Defaults Save Changes Workspace Paths Configure where Mission Control stores projects and deliverables. Workspace Base Path Base directory for all Mission Control files. Use ~ for home directory. Projects Path Directory where project ",
+      "title": "Mission Control",
+      "screenshot": "shots/settings-390x844.png",
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "route": "/workspace/assistants",
+      "id": "assistants",
+      "viewport": "1440x900",
+      "reducedMotion": true,
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3121/workspace/assistants",
+      "buildId": null,
+      "nextDevMarkers": [],
+      "settle": {
+        "settled": true,
+        "ms": 2293,
+        "textLength": 123125,
+        "mode": "signature-stable"
+      },
+      "overflow": 0,
+      "overflowWithControl": 760,
+      "overflowAfter": 0,
+      "overflowControlProven": true,
+      "visibleControls": 1217,
+      "under24": 3,
+      "under44": 621,
+      "under24Samples": [
+        {
+          "w": 1,
+          "h": 1,
+          "tag": "A",
+          "text": "Skip to main content"
+        },
+        {
+          "w": 36,
+          "h": 16,
+          "tag": "A",
+          "text": ""
+        },
+        {
+          "w": 101,
+          "h": 20,
+          "tag": "A",
+          "text": "View history"
+        }
+      ],
+      "runningAnimations": 4,
+      "animationNames": [
+        "fleet-busy-pulse",
+        "fleet-busy-pulse",
+        "fleet-busy-pulse",
+        "fleet-busy-pulse"
+      ],
+      "h1": [
+        "Assistants"
+      ],
+      "readyAttr": "true",
+      "textLength": 123125,
+      "textHead": "Skip to main content MISSION CONTROL / A Assistants 0 AGENTS ACTIVE 358 TASKS IN QUEUE 07:39:34 OFFLINE Board Agents Dispatch Settings Activity GitHub Project #13 (Assistants) is the source for this workspace. Auto-syncing workspace from GitHub Project... n8n sync: Review needed ",
+      "title": "Mission Control",
+      "screenshot": "shots/assistants-1440x900-rm.png",
+      "consoleErrors": [],
+      "pageErrors": []
+    }
+  ],
+  "consoleErrors": [
+    {
+      "route": "/",
+      "viewport": "1440x900",
+      "t": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "route": "/",
+      "viewport": "390x844",
+      "t": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    }
+  ],
+  "pageErrors": [],
+  "servedBuildId": "S8HgxCEJWRAGRBloUGmn1",
+  "buildIdMatch": true,
+  "buildIdSource": "first-document HTML flight b + assert-production-capture-target.mjs; hydrated page.content() omitted /_next/static/<id>/ so unit.buildId stayed null",
+  "serverMode": "production",
+  "overflowMax": 0,
+  "summary": {
+    "unitCount": 7,
+    "http200": 7,
+    "overflowZero": 7,
+    "consoleErrorCount": 2,
+    "pageErrorCount": 0
+  }
+}

@@ -572,6 +572,13 @@ the local operator entrypoint; historical task notes remain in
   - **2026-08-28 closeout:** still **unscored**. Do not GET or steal
     `3021`. Production `next start` on `3121` only; no worktree. Note:
     `S:\source\CCAI\Assistants\agent-settings\shared\catalog\frontend-sota-fleet-uiux-closeout-2026-08-28.md`.
+  - **2026-09-01 first production gauntlet: 14/21** on `127.0.0.1:3121`
+    `next start`, SHA `74f671740019e26a540405bcfe52f1e6a83d900e`,
+    BUILD_ID `S8HgxCEJWRAGRBloUGmn1`. Receipt:
+    `docs/frontend-sota-gauntlet-2026-09-01/scorecard.md`. The
+    2026-08-31 14/21 card was `next dev` on `:3021` and is not this row.
+    This SHA predates Wave 2 (`5dff835`). Goal stays open. Wave 3 not
+    started. Do not close this issue.
   - DONE 2026-08-11 — dialog semantics: all six hand-rolled `fixed inset-0`
     overlays moved onto primitives this repo already owned. `AgentModal`,
     `TaskModal`, `GitHubImportModal`, and `WorkspaceDashboard`'s

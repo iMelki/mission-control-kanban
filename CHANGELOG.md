@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **First production Frontend SOTA Gauntlet (2026-09-01, #139)** -
+  Isolated `next start` on `127.0.0.1:3121` scored **14/21**
+  (`2/2/2/2/2/2/2`) at SHA `74f6717` / BUILD_ID `S8HgxCEJWRAGRBloUGmn1`.
+  Prototype band; not 19–21. Not Awwwards. `:3021` was not fetched.
+  Scorecard: `docs/frontend-sota-gauntlet-2026-09-01/scorecard.md`.
+
 ### Fixed
 
 - **Silent stuck cockpit loads no longer present false pre-data as settled
