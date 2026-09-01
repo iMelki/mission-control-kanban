@@ -9,6 +9,7 @@ const eslintConfig = [
       'integrations/paperclip-bridge/dist/**',
       'integrations/paperclip-bridge/node_modules/**',
       'artifacts/**',
+      'tmp/**',
       'scripts/**/*.js',
       'react-doctor-report.json',
     ],
