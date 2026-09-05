@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "exclude": [],
+  "gates": [
+    {
+      "id": "a11y-self-proof",
+      "path": "scripts/probe-surface-a11y.mjs",
+      "description": "Refuses accessibility reports unless authored axe, focus, coverage, occlusion, shadow, and roving-tab detectors all prove they can distinguish injected failure from restored content.",
+      "negativeFixture": "tests/fixtures/a11y-selfproof-negative-inputs.json",
+      "observedFailure": {
+        "date": "2026-08-26",
+        "command": "MCK_BASE_URL=http://127.0.0.1:5391 node scripts/probe-surface-a11y.mjs --self-proof artifacts/recovery-217c312-20260826/<negative-case>",
+        "brokenExitCodes": [2, 2, 2],
+        "restoredExitCode": 0,
+        "reason": "Three asserted source mutations each exited 2 for the intended named reason: renaming #__sp_contrast made the authored axe target legs DEAD at 0 -> 0; restoring the old whole-shadow transparent regex made the contracted-shadow leg and intact-ring roving leg DEAD; bypassing shadow geometry made the contracted outer/inset shadow leg DEAD with outerVisible=true and insetVisible=true.",
+        "restoredPass": "After restoring the reviewed diff SHA-256 cf7a4dc6d80fa714a4dbbd27b29522e9791d6eee250f0ca1849401787ce29c40, MCK_BASE_URL=http://127.0.0.1:5391 node scripts/probe-surface-a11y.mjs --self-proof artifacts/recovery-217c312-20260826/final-self-proof passed 18/18 authored legs and exited 0.",
+        "evidence": [
+          "artifacts/recovery-217c312-20260826/negative-selector.log",
+          "artifacts/recovery-217c312-20260826/negative-whole-shadow-regex.log",
+          "artifacts/recovery-217c312-20260826/negative-shadow-geometry.log",
+          "artifacts/recovery-217c312-20260826/final-self-proof.log",
+          "artifacts/recovery-217c312-20260826/final-self-proof/self-proof.json"
+        ]
+      }
+    },
+    {
+      "id": "ci-pre-commit-step",
+      "path": ".github/workflows/ci.yml",
+      "description": "Runs the repository pre-commit configuration and rejects formatting, syntax, secret, documentation, component-sourcing, and captured-surface violations before the Paperclip job.",
+      "negativeFixture": "tests/fixtures/repository-gate-negative-inputs.json",
+      "proofScope": "Local execution of the exact pre-commit workflow step; hosted-runner and Paperclip-job canaries remain tracked in #161.",
+      "observedFailure": {
+        "date": "2026-08-26",
+        "command": "pre-commit run --show-diff-on-failure --color=always --all-files",
+        "brokenExitCode": 1,
+        "restoredExitCode": 0,
+        "reason": "After asserting that tracked README.md had a changed SHA-256 and one trailing-whitespace break with otherwise uniform CRLF, the workflow-step command exited 1, named hook trailing-whitespace and README.md, and all other hooks passed.",
+        "restoredPass": "The hook restored README.md to exact SHA-256 58c719350d6e7d03429a63a881a7d4eb9fc1164a16e8033f7fbb7020974195d5; the same exact command then passed every hook and exited 0.",
+        "evidence": [
+          "artifacts/recovery-217c312-20260826/negative-ci-precommit-clean.log",
+          "artifacts/recovery-217c312-20260826/restored-ci-precommit.log"
+        ]
+      }
+    },
+    {
+      "id": "runtime-regression-workflow-step",
+      "path": ".github/workflows/runtime-regression.yml",
+      "description": "Runs React Doctor and the runtime UI smoke, including temporary-entity cleanup proof and responsive screenshots.",
+      "negativeFixture": "tests/fixtures/runtime-regression-wrong-server.mjs",
+      "proofScope": "Caller-command equivalent in the documented local development mode on Windows; the hosted Ubuntu production-mode negative canary remains tracked in #161. A restored local production-mode caller passes after #148.",
+      "observedFailure": {
+        "date": "2026-08-26",
+        "command": "MCK_REGRESSION_SERVER_MODE=dev MCK_REGRESSION_PORT=5392 MCK_SMOKE_URL=http://127.0.0.1:5392 MCK_SMOKE_ARTIFACT_DIR=artifacts/recovery-217c312-20260826/runtime-negative-smoke npm run check:runtime-regressions",
+        "brokenExitCode": 1,
+        "restoredExitCode": 0,
+        "reason": "An asserted owned fixture server on port 5392 returned a non-MCK page. The caller exited 1 with React Doctor green and runtime UI smoke red: Mission Queue timed out and cleanup could not prove the fixture's synthetic undefined entities absent. The owned PID 73616 was then stopped and port 5392 was proven released.",
+        "restoredPass": "Against a fresh isolated Next 16.2.9 development server on the same port, the same caller command with the restored artifact directory exited 0: both checks passed, all 16 smoke assertions passed, and cleanup proved all 4 temporary entities absent. Owned PID 61452 was stopped and the port was proven released. After #148, the default local production-mode caller on port 5393 also exited 0 with 16/16 browser assertions, four screenshots, 4/4 entities absent, and a released port.",
+        "evidence": [
+          "artifacts/recovery-217c312-20260826/negative-runtime-regression.log",
+          "artifacts/recovery-217c312-20260826/runtime-negative-server.log",
+          "artifacts/recovery-217c312-20260826/runtime-negative-server-cleanup.json",
+          "artifacts/recovery-217c312-20260826/restored-runtime-regression.log",
+          "artifacts/recovery-217c312-20260826/runtime-restored-smoke/cleanup-receipt.json",
+          "artifacts/recovery-217c312-20260826/runtime-restored-server-cleanup.json",
+          "artifacts/recovery-217c312-20260826/issue-148-production-runtime.log",
+          "artifacts/recovery-217c312-20260826/issue-148-production-runtime/cleanup-receipt.json",
+          "artifacts/recovery-217c312-20260826/issue-148-production-runtime-server-cleanup.json"
+        ]
+      }
+    },
+    {
+      "id": "secret-scan-action-equivalent",
+      "path": ".github/workflows/secret-scan.yml",
+      "description": "Rejects credential-shaped values in Git history with redacted evidence.",
+      "negativeFixture": "tests/fixtures/repository-gate-negative-inputs.json",
+      "proofScope": "Redacted local invocation matching the action's detect mode, exit code, report format, and Git-history scan; a deliberate hosted-action canary remains tracked in #161.",
+      "observedFailure": {
+        "date": "2026-08-26",
+        "command": "gitleaks detect --redact=100 --verbose --exit-code=2 --report-format=sarif --report-path <artifact> --log-opts='--all' --no-banner",
+        "brokenExitCode": 2,
+        "restoredExitCode": 0,
+        "reason": "After asserting a generated synthetic credential existed only in an ignored isolated Git history, the action-equivalent caller exited 2, reported exactly one generic-api-key finding in proof.env, and both log and SARIF readback contained REDACTED instead of the value.",
+        "restoredPass": "The identical command against a separate clean isolated Git history scanned one commit, reported no leaks, wrote an empty SARIF result set, and exited 0. The owning repository never tracked the synthetic value.",
+        "evidence": [
+          "artifacts/recovery-217c312-20260826/negative-secret-scan-action-equivalent.log",
+          "artifacts/recovery-217c312-20260826/negative-secret-scan-action-equivalent.sarif",
+          "artifacts/recovery-217c312-20260826/restored-secret-scan-action-equivalent.log",
+          "artifacts/recovery-217c312-20260826/restored-secret-scan-action-equivalent.sarif"
+        ]
+      }
+    },
+    {
+      "id": "markdown-link-check",
+      "path": "scripts/check-markdown-links.ps1",
+      "description": "Rejects unresolved repo-local Markdown links while ignoring external URLs and fenced examples.",
+      "negativeFixture": "tests/fixtures/repository-gate-negative-inputs.json",
+      "observedFailure": {
+        "date": "2026-08-26",
+        "command": "pwsh -NoProfile -File scripts/check-markdown-links.ps1",
+        "brokenExitCode": 1,
+        "restoredExitCode": 0,
+        "reason": "After asserting README.md referenced an absent ./__gate_negative_missing__.md target and its hash changed, the direct caller exited 1 and named README.md:3 plus that exact missing target.",
+        "restoredPass": "README.md was restored to exact SHA-256 58c719350d6e7d03429a63a881a7d4eb9fc1164a16e8033f7fbb7020974195d5; the same direct caller reported Local Markdown links look valid and exited 0.",
+        "evidence": [
+          "artifacts/recovery-217c312-20260826/negative-markdown-link.log",
+          "artifacts/recovery-217c312-20260826/restored-markdown-link.log"
+        ]
+      }
+    },
+    {
+      "id": "runtime-regression-script",
+      "path": "scripts/check-runtime-regressions.js",
+      "description": "Combines React Doctor with a fail-closed runtime UI smoke and cleanup receipt.",
+      "negativeFixture": "tests/fixtures/runtime-regression-wrong-server.mjs",
+      "proofScope": "Direct caller in the script's documented local development mode on Windows; the restored local production-mode caller also passes after #148, while the hosted Ubuntu production-mode negative canary remains tracked in #161.",
+      "observedFailure": {
+        "date": "2026-08-26",
+        "command": "MCK_REGRESSION_SERVER_MODE=dev MCK_REGRESSION_PORT=5392 MCK_SMOKE_URL=http://127.0.0.1:5392 MCK_SMOKE_ARTIFACT_DIR=artifacts/recovery-217c312-20260826/runtime-negative-smoke npm run check:runtime-regressions",
+        "brokenExitCode": 1,
+        "restoredExitCode": 0,
+        "reason": "With the asserted non-MCK fixture server bound, the script exited 1 and its final JSON named React Doctor ok=true but runtime UI responsive smoke ok=false; the smoke also failed closed when deletion readback stayed HTTP 200 instead of 404.",
+        "restoredPass": "With the fixture removed and a fresh isolated MCK server bound, the same development-mode caller exited 0 with both checks true, 16 browser assertions, four screenshots, and a cleanup receipt proving 4/4 temporary entities absent. After #148, the default local production-mode caller on port 5393 independently exited 0 with the same 16/16 browser and 4/4 cleanup contract, then released its owned server and port.",
+        "evidence": [
+          "artifacts/recovery-217c312-20260826/negative-runtime-regression.log",
+          "artifacts/recovery-217c312-20260826/restored-runtime-regression.log",
+          "artifacts/recovery-217c312-20260826/runtime-restored-smoke/cleanup-receipt.json",
+          "artifacts/recovery-217c312-20260826/issue-148-production-runtime.log",
+          "artifacts/recovery-217c312-20260826/issue-148-production-runtime/cleanup-receipt.json",
+          "artifacts/recovery-217c312-20260826/issue-148-production-runtime-server-cleanup.json"
+        ]
+      }
+    },
+    {
+      "id": "component-sourcing-preflight",
+      "path": "scripts/verify-component-sourcing-preflight.mjs",
+      "description": "Requires every component to have either a reviewed baseline reason or a complete sourcing record, and rejects stale baseline entries.",
+      "negativeFixture": "tests/fixtures/repository-gate-negative-inputs.json",
+      "observedFailure": {
+        "date": "2026-08-26",
+        "command": "node scripts/verify-component-sourcing-preflight.mjs",
+        "brokenExitCode": 1,
+        "restoredExitCode": 0,
+        "reason": "After asserting src/components/__gate_negative__.tsx existed without a baseline or sourcing record, the direct CLI exited 1, named that exact file, and reported new component with no sourcing-preflight record.",
+        "restoredPass": "After removing only the deliberate fixture and asserting it was absent, the same CLI reported pass for 39 components (30 baselined, 9 record-covered; 4 records) and exited 0.",
+        "evidence": [
+          "artifacts/recovery-217c312-20260826/negative-component-sourcing.log",
+          "artifacts/recovery-217c312-20260826/restored-component-sourcing.log"
+        ]
+      }
+    }
+  ]
+}

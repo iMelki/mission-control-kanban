@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **#162 rebase recapture (2026-09-05, #150)** -
+  After rebasing the cockpit tab-ring change onto `origin/dev`, the five
+  workspace captures were re-probed on production `127.0.0.1:3121`
+  (BUILD_ID `zjCB9QIMpCkNMgTzqIZuh`, detached `/tmp/mck-prod`). All five
+  measured 0 clipped at both viewports and now share sourceDigest
+  `3eaa0d2de234e9e6` over 58 files. `surfaces:check` is green again.
+
 - **First production Frontend SOTA Gauntlet (2026-09-01, #139)** -
   Isolated `next start` on `127.0.0.1:3121` scored **14/21**
   (`2/2/2/2/2/2/2`) at SHA `74f6717` / BUILD_ID `S8HgxCEJWRAGRBloUGmn1`.
@@ -97,6 +104,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agent-settings#691 asks for is still the missing half.
 
 ### Fixed
+
+- **Corrected 50 false focus-ring failures and raised cockpit tabs above the
+  repository's focus-contrast floor (2026-08-25, #150, #154)** - the accessibility
+  probe judged a computed `box-shadow` list as one value and rejected the entire
+  list if any component was transparent. Tailwind appends a transparent
+  bookkeeping component to every painted ring, so the ten selected `Board`
+  controls and all forty arrow-only cockpit tabs were reported as having no
+  visible indicator even though `TabsTrigger` has carried a 2px
+  `mc-accent/60` ring since `de22f9a` on 2026-08-02. The corrected #150 count is
+  **8 of 4194 observed focus checks**, all four `/settings` inputs at both
+  viewports; modal and dialog paths remain unmeasured. #154 remains closed
+  because its arrow-key pass reaches all 40 controls, while its original
+  all-40-fail result is withdrawn. The detector now scores comma-separated
+  shadow components independently and requires opaque colour plus conservative
+  paintable geometry. Its authored fixtures use Tailwind's real composite
+  shadow shape and reject both outer and inset opaque `0 0 0 -2px` shadows.
+  Growing the injected focus fixture from two controls to four made the first
+  exact-caller run refuse to report: its scoped accounting leg still required
+  two even though it measured all four (`before 0 -> present 4/4 -> after 0/0`).
+  That contract now requires population 4 and measured 4, so future fixture
+  growth cannot silently weaken the accounting proof.
+  The UI ring moves from 3.4075:1 (`mc-accent/60` over `mc-bg`) to 7.4918:1
+  (full `mc-accent`): the old ring met WCAG 2.4.11's 3:1 non-text minimum, while
+  the new ring clears this repository's stricter 4.5:1 floor.
+
+  This narrow change has an independently reviewed maintainability exception,
+  not a claim that the probe is within policy. Human-authored source grows
+  2,358 to 2,424 lines; `FOCUS_EVIDENCE` grows 144 to 170 lines (decision proxy
+  48 to 51, nesting 6), `injectRovingWidget` grows 78 to 89 (proxy 13, nesting
+  3), and `selfProof` grows 474 to 496 (proxy 70 to 80, nesting 6). The collector
+  must remain self-contained for page serialization and the authored widgets
+  must exercise that exact collector, so splitting this correction alone would
+  weaken the proof contract. Extraction of the collector and fixtures is
+  tracked before any further growth.
+
+  **Recovered proof status (2026-08-26):** the stale port 5391 process tree was
+  stopped and a fresh isolated server returned HTTP 200 for all five cockpits.
+  Issue #157's two flaky axe legs now count only the authored selectors instead
+  of the live page's moving totals. Three deliberate broken inputs each make the
+  caller exit 2 for the intended named reason, and the final restored
+  self-proof passes 18/18. The no-budget exhaustive caller exits 0 with 18/18
+  route/viewport rows complete, no partial surfaces or destroyed samples,
+  4,372/4,376 Tab-reachable controls measured (99.9%), and 40/40 roving
+  controls visible and unobscured. The five stale cockpit records were
+  re-captured at both viewports: 18 caller-required measurements, zero clipping,
+  digest `57c47aa411d855f3`. `surfaces:check` passes 9/9,
+  `test:captured-surfaces` passes 25/25, and the canonical gate/self-test pass
+  9/9 and 38/38. The remaining four `/settings` inputs at two viewports plus
+  the axe/contrast findings stay tracked in #150-#152; they are not hidden by
+  the green evidence-harness result. Full recovery details and local artifact
+  paths are in `docs/a11y-capture-recovery-2026-08-26.md`.
+
+- **Restored the root production build by preserving parsed-viewport narrowing
+  (2026-08-26, #148)** - `record.viewports` is intentionally `unknown` until the
+  manifest validator checks it. TypeScript discarded the property narrowing
+  after an intervening `problems.push(...)`, so the production build compiled
+  and then failed type checking before Runtime Regression could start its
+  browser smoke. The validator now binds the property once to the stable local
+  `capturedViewports` and narrows that value with `Array.isArray`; validation
+  codes and runtime behavior are unchanged. Root `tsc --noEmit`, the 25-case
+  captured-surface suite, and the full Next 16.2.9 production build now pass.
+  The existing hosted Runtime Regression build remains the authority, so no new
+  CI job or typecheck gate was added.
 
 - **The captured-surface gate accepted a stale capture (2026-08-16, #147)** -
   `docs/captured-surfaces.json` records a `capturedAt.commit` per surface, and nothing

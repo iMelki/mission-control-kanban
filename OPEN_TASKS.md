@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-09-01
+Last updated: 2026-09-05
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -44,50 +44,79 @@ the local operator entrypoint; historical task notes remain in
   - **Do not "fix" this by adding the slugs to the config** - that greens the
     gate and deletes the only signal.
 
-- [#150 - focus:outline-none without a focus-visible ring: 18 of 4192 Tab-reachable controls, plus 40 of 40 arrow-key ones](https://github.com/iMelki/mission-control-kanban/issues/150)
+- [#150 - focus indicators: 8 settings inputs have no visible ring; cockpit tabs are being hardened above the repository floor](https://github.com/iMelki/mission-control-kanban/issues/150)
   - First ever keyboard/focus/contrast/axe measurement landed:
     `scripts/probe-surface-a11y.mjs` plus `docs/a11y-baseline-2026-08-24.md`.
   - **The "58 of 208" figures were measured over 4.9% of the app** and were
-    restated on 2026-08-25 (#156). At 99.9% coverage it is **18 of 4192**, and
-    those 18 are only TWO distinct call sites: the four `/settings` inputs that
-    share one className (8 of the 18, one edit) and the cockpit `Board` control
-    (10). The old `208/208 focus unobscured` is **withdrawn** entirely - it
-    measured the probe's own scroll state, not the app (#155).
-  - Plus **40 of 40** roving `tabindex="-1"` cockpit tab controls
-    (Agents/Dispatch/Settings/Activity, five cockpits, both viewports), which no
-    earlier run could reach at all (#154).
-  - All of them are one defect: `focus:outline-none` with no
-    `focus-visible:ring-*`. The repo already uses the correct pattern in 9 of
-    its 40 `focus:outline-none` sites, so the fix extends an existing
-    convention rather than inventing one. The sites in modals and dialogs are
-    **unmeasured, not clean** - the probe does not open them.
-  - **Blocked on a coordinated change, not on a decision:** any `src/` edit
-    moves `sourceDigest` and invalidates existing clipping captures. Proven
-    with a control (one `aria-label` in `Header.tsx` produced
-    `captured-surface drift: 6 problem(s) across 9 derived route(s)`, then
-    reverted). Landing the fix also means re-probing and re-recording
-    `capturedAt` for the affected surfaces.
+    restated on 2026-08-25 (#156), but that restatement also needs correction.
+    Its 18-of-4194 result includes 10 false negatives from the cockpit `Board`
+    control. Rescoring the same observations leaves **8 of 4194**, the four
+    `/settings` inputs that share one className at both viewports. The old
+    `208/208 focus unobscured` is also **withdrawn** entirely: it measured the
+    probe's scroll state, not the app (#155).
+  - The 10 selected `Board` controls and all **40 of 40** arrow-only cockpit
+    tabs already carried `focus-visible:ring-2 focus-visible:ring-mc-accent/60`.
+    Source history dates that class to `de22f9a` on 2026-08-02. The detector
+    rejected the real ring because Tailwind's computed `box-shadow` list also
+    contains a transparent bookkeeping component.
+  - The `/60` ring measures 3.4075:1 over `mc-bg`: above WCAG 2.4.11's 3:1
+    non-text minimum but below this repository's chosen 4.5:1 floor. The staged
+    UI change lifts it to full `mc-accent`, 7.4918:1. That hardens an existing
+    ring; it does not add a previously absent cockpit indicator.
+  - The eight settings-input failures remain open. Modal and dialog call sites
+    are **unmeasured, not clean** because the probe does not open them.
+  - **2026-09-05 rebase onto origin/dev:** the five cockpit clipping records
+    were re-probed on production `127.0.0.1:3121` (BUILD_ID
+    `zjCB9QIMpCkNMgTzqIZuh`) after the tab ring change. All five are 0 clipped
+    at both viewports and now share sourceDigest `3eaa0d2de234e9e6` over 58
+    files. The staleness gate is green again.
 
 - a11y probe follow-ups, opened 2026-08-24 and worked 2026-08-25:
   - [#154](https://github.com/iMelki/mission-control-kanban/issues/154) roving
     `tabindex="-1"` children never focus-audited - **implemented**: a separate
-    arrow-key pass reaches all 40 (`rovingEnumeratedNotAudited: 0`) and every
-    one of them fails.
+    arrow-key pass reaches all 40 (`rovingEnumeratedNotAudited: 0`). The claim
+    that every one lacked a visible indicator is **withdrawn**: all 40 had a
+    visible `/60` ring, and the whole-list shadow parser produced false
+    negatives. #154 remains closed for reachability.
   - [#155](https://github.com/iMelki/mission-control-kanban/issues/155) 960
     controls off-viewport at mobile - **not a UI defect**: a probe artifact,
     refuted with three controls over 157 failures. Occlusion is now measured on
     the control's visible rect and the detector has self-proof legs for the
     first time.
   - [#156](https://github.com/iMelki/mission-control-kanban/issues/156) restate
-    #150 - **done**, above.
+    #150 - **superseded**, because its 18-of-4194 restatement includes 10
+    selected-tab false negatives and treats the 40 roving false negatives as
+    additional missing indicators.
   - [#157](https://github.com/iMelki/mission-control-kanban/issues/157) two
     self-proof legs compare whole-page axe node counts and fail closed about
-    half the time; a full sweep needed 4 attempts. **Open.**
+    half the time; a full sweep needed 4 attempts. **Fix proven on the
+    2026-08-26 recovery branch:** authored targets now prove `0 -> 1 -> 0`,
+    three deliberate mutations exit 2 for their named reasons, and the restored
+    exhaustive caller exits 0 with 18/18 rows complete. Open until the feature
+    PR lands.
   - [#159](https://github.com/iMelki/mission-control-kanban/issues/159) the
     coverage reporter scores a surface that rendered ZERO controls as `full` at
     100%, and ignores its own `unaccounted` invariant (observed at `-1`). The
     "99.9% coverage" headline is not reproducible: 99.9% / 92.7% / 88.7% on the
     same surface, same unmodified code, one session. **Open.**
+    The no-budget recovery completed without an empty or partial row, but that
+    successful sample does not repair the zero-population acceptance bug.
+  - [#160](https://github.com/iMelki/mission-control-kanban/issues/160) extract the serialized focus
+    collector and its authored self-proof fixture contract before the probe
+    grows again. The 2026-08-26 independent review approved the seven-line
+    #157 recovery exception (`selfProof` 483 -> 490 nonblank lines; decision
+    proxy 77 -> 81; nesting unchanged at 6) and requires capture, pure leg
+    evaluation, and cleanup to be decomposed by 2026-09-15 and before the next
+    feature growth.
+  - [#161](https://github.com/iMelki/mission-control-kanban/issues/161) complete
+    authoritative hosted-canary coverage for the three workflow gates. The
+    changed a11y caller and both direct verification scripts have exact
+    broken/restored proof. The six legacy paths now also have bounded local
+    caller-command evidence with zero exclusions; the workflow entries state
+    their limits explicitly. The #148 correction now restores the local
+    production-mode runtime caller. The hosted Ubuntu production-mode negative
+    canary, hosted Gitleaks action, and full CI job matrix still lack deliberate
+    current red/green canaries.
 
 - [#151 - Three colour pairs below WCAG AA, worst 2.87:1](https://github.com/iMelki/mission-control-kanban/issues/151)
   - 10px timestamps using `text-mc-text-secondary/60` (2.87:1), the n8n status
@@ -188,10 +217,21 @@ the local operator entrypoint; historical task notes remain in
     `scripts/derive-captured-surfaces.ts ... TS18046: 'record.viewports' is of
     type 'unknown'`. Proven pre-existing by restoring the HEAD version of that
     file and re-running `tsc` - the same error appears at its old line number.
-  - Nothing runs it: `package.json` has no `typecheck` script, and the only
-    `npm run typecheck` in `.github/workflows/ci.yml` is inside the
-    `paperclip-bridge` job with `working-directory: integrations/paperclip-bridge`.
-    Filed separately rather than fixed inline, to keep #147 to one concern.
+  - **Fix proven on PR #162:** bind the unknown property once to
+    `capturedViewports`, then narrow that stable local with `Array.isArray`
+    before both the unknown-label and uncovered-label checks. Runtime behavior
+    is unchanged; the existing viewport contract still passes 25/25.
+  - Root `tsc --noEmit --incremental false` and `npm run build` now exit 0. No
+    new metered job was added: the existing Runtime Regression workflow already
+    calls the production build, and its first PR #162 run reproduced the exact
+    line-426 failure before this correction. Keep open until the replacement
+    hosted run reaches the browser smoke and the PR lands.
+
+- [#163 - Decompose captured-manifest validator before substantive future growth](https://github.com/iMelki/mission-control-kanban/issues/163)
+  - `validateManifestShape` is now 178 physical / 168 nonblank lines with a
+    decision proxy of 33 and maximum decision nesting of 3. Independent review
+    approved #148's one-line stable-narrowing boundary, but requires cohesive
+    pure checks by 2026-09-30 and before substantive validator growth.
 
 - [#145 - /settings clips 17 elements at 1440px](https://github.com/iMelki/mission-control-kanban/issues/145)
   - Live shipped defect, found by the first ever capture of `/settings`. Rooted
