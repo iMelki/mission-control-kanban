@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-09-01
+Last updated: 2026-09-05
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -65,9 +65,11 @@ the local operator entrypoint; historical task notes remain in
     ring; it does not add a previously absent cockpit indicator.
   - The eight settings-input failures remain open. Modal and dialog call sites
     are **unmeasured, not clean** because the probe does not open them.
-  - **Local change is not push-ready:** the cockpit source edit made exactly
-    five clipping captures stale. A source-bound AFTER sweep, exact negative
-    proof, canonical re-capture, and green staleness gate are still required.
+  - **2026-09-05 rebase onto origin/dev:** the five cockpit clipping records
+    were re-probed on production `127.0.0.1:3121` (BUILD_ID
+    `zjCB9QIMpCkNMgTzqIZuh`) after the tab ring change. All five are 0 clipped
+    at both viewports and now share sourceDigest `3eaa0d2de234e9e6` over 58
+    files. The staleness gate is green again.
 
 - a11y probe follow-ups, opened 2026-08-24 and worked 2026-08-25:
   - [#154](https://github.com/iMelki/mission-control-kanban/issues/154) roving

@@ -91,80 +91,80 @@
     {
       "route": "/workspace/assistants",
       "capture": "required",
-      "note": "Assistants cockpit (GitHub Project #13). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2).",
+      "note": "Assistants cockpit (GitHub Project #13). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2). Re-probed after the #150 tab-ring rebase onto origin/dev on 2026-09-05: 0 clipped elements at both viewports (production build zjCB9QIMpCkNMgTzqIZuh on 127.0.0.1:3121 from detached /tmp/mck-prod). All five cockpits now share sourceDigest 3eaa0d2de234e9e6 over 58 files.",
       "capturedAt": {
-        "commit": "0a4a3ef147bbea3ce1526e3db2ae1d379c9e3283",
-        "date": "2026-09-01",
+        "commit": "80c6a1d32d436210b699c2808f2767e487337194",
+        "date": "2026-09-05",
         "viewports": [
           "mobile",
           "desktop"
         ],
         "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
-        "sourceDigest": "4409528bf8e97ea3",
+        "sourceDigest": "3eaa0d2de234e9e6",
         "sourceFileCount": 58
       }
     },
     {
       "route": "/workspace/memsys",
       "capture": "required",
-      "note": "MemSys cockpit (GitHub Project #12). Found by the derivation gate on its first run: this cockpit had never been in the surface list either. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2).",
+      "note": "MemSys cockpit (GitHub Project #12). Found by the derivation gate on its first run: this cockpit had never been in the surface list either. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2). Re-probed after the #150 tab-ring rebase onto origin/dev on 2026-09-05: 0 clipped elements at both viewports (production build zjCB9QIMpCkNMgTzqIZuh on 127.0.0.1:3121 from detached /tmp/mck-prod). All five cockpits now share sourceDigest 3eaa0d2de234e9e6 over 58 files.",
       "capturedAt": {
-        "commit": "0a4a3ef147bbea3ce1526e3db2ae1d379c9e3283",
-        "date": "2026-09-01",
+        "commit": "80c6a1d32d436210b699c2808f2767e487337194",
+        "date": "2026-09-05",
         "viewports": [
           "mobile",
           "desktop"
         ],
         "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
-        "sourceDigest": "4409528bf8e97ea3",
+        "sourceDigest": "3eaa0d2de234e9e6",
         "sourceFileCount": 58
       }
     },
     {
       "route": "/workspace/content-factory",
       "capture": "required",
-      "note": "Content Factory cockpit (GitHub Project #14). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2).",
+      "note": "Content Factory cockpit (GitHub Project #14). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2). Re-probed after the #150 tab-ring rebase onto origin/dev on 2026-09-05: 0 clipped elements at both viewports (production build zjCB9QIMpCkNMgTzqIZuh on 127.0.0.1:3121 from detached /tmp/mck-prod). All five cockpits now share sourceDigest 3eaa0d2de234e9e6 over 58 files.",
       "capturedAt": {
-        "commit": "0a4a3ef147bbea3ce1526e3db2ae1d379c9e3283",
-        "date": "2026-09-01",
+        "commit": "80c6a1d32d436210b699c2808f2767e487337194",
+        "date": "2026-09-05",
         "viewports": [
           "mobile",
           "desktop"
         ],
         "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
-        "sourceDigest": "4409528bf8e97ea3",
+        "sourceDigest": "3eaa0d2de234e9e6",
         "sourceFileCount": 58
       }
     },
     {
       "route": "/workspace/asimtop",
       "capture": "required",
-      "note": "Asimtop cockpit (GitHub Project #8). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2).",
+      "note": "Asimtop cockpit (GitHub Project #8). STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2). Re-probed after the #150 tab-ring rebase onto origin/dev on 2026-09-05: 0 clipped elements at both viewports (production build zjCB9QIMpCkNMgTzqIZuh on 127.0.0.1:3121 from detached /tmp/mck-prod). All five cockpits now share sourceDigest 3eaa0d2de234e9e6 over 58 files.",
       "capturedAt": {
-        "commit": "0a4a3ef147bbea3ce1526e3db2ae1d379c9e3283",
-        "date": "2026-09-01",
+        "commit": "80c6a1d32d436210b699c2808f2767e487337194",
+        "date": "2026-09-05",
         "viewports": [
           "mobile",
           "desktop"
         ],
         "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
-        "sourceDigest": "4409528bf8e97ea3",
+        "sourceDigest": "3eaa0d2de234e9e6",
         "sourceFileCount": 58
       }
     },
     {
       "route": "/workspace/frontend-revenue",
       "capture": "required",
-      "note": "Frontend Revenue cockpit (GitHub Project #15). Added to this list by #142 after shipping in 690a5fb without ever being captured. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2).",
+      "note": "Frontend Revenue cockpit (GitHub Project #15). Added to this list by #142 after shipping in 690a5fb without ever being captured. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). All five cockpits share sourceDigest d98ee8d43bcc40de over 58 files because they are the same src/app/workspace/[slug]/page.tsx tree; only their DATA differs, which sourceDigest does not cover. Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2). Re-probed after the #150 tab-ring rebase onto origin/dev on 2026-09-05: 0 clipped elements at both viewports (production build zjCB9QIMpCkNMgTzqIZuh on 127.0.0.1:3121 from detached /tmp/mck-prod). All five cockpits now share sourceDigest 3eaa0d2de234e9e6 over 58 files.",
       "capturedAt": {
-        "commit": "0a4a3ef147bbea3ce1526e3db2ae1d379c9e3283",
-        "date": "2026-09-01",
+        "commit": "80c6a1d32d436210b699c2808f2767e487337194",
+        "date": "2026-09-05",
         "viewports": [
           "mobile",
           "desktop"
         ],
         "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
-        "sourceDigest": "4409528bf8e97ea3",
+        "sourceDigest": "3eaa0d2de234e9e6",
         "sourceFileCount": 58
       }
     }

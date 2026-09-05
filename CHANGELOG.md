@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **#162 rebase recapture (2026-09-05, #150)** -
+  After rebasing the cockpit tab-ring change onto `origin/dev`, the five
+  workspace captures were re-probed on production `127.0.0.1:3121`
+  (BUILD_ID `zjCB9QIMpCkNMgTzqIZuh`, detached `/tmp/mck-prod`). All five
+  measured 0 clipped at both viewports and now share sourceDigest
+  `3eaa0d2de234e9e6` over 58 files. `surfaces:check` is green again.
+
 - **First production Frontend SOTA Gauntlet (2026-09-01, #139)** -
   Isolated `next start` on `127.0.0.1:3121` scored **14/21**
   (`2/2/2/2/2/2/2`) at SHA `74f6717` / BUILD_ID `S8HgxCEJWRAGRBloUGmn1`.
