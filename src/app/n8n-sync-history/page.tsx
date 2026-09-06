@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw } from 'lucide-react';
 import { Header } from '@/components/Header';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { presentMckN8nSyncRun } from '@/lib/n8n-sync-presentation';
 import type { MckN8nSyncRun, MckN8nSyncStatusResponse } from '@/lib/types';
 
@@ -61,6 +62,69 @@ function formatCadence(run: MckN8nSyncRun | null): string {
 
   return [schedule, timezone].filter(Boolean).join(' ') || 'configured schedule';
 }
+
+const columns: DataTableColumn<MckN8nSyncRun>[] = [
+  {
+    key: 'run',
+    header: 'Run',
+    render: (run) => (
+      <div>
+        <div className="font-medium">{formatDate(run.received_at)}</div>
+        <div className="text-xs text-mc-text-secondary">{run.id}</div>
+      </div>
+    ),
+  },
+  {
+    key: 'mode',
+    header: 'Mode',
+    render: (run) => (
+      <div>
+        <div>{run.mode}</div>
+        <div className="text-xs text-mc-text-secondary">{run.dry_run ? 'dry run' : 'apply'}</div>
+      </div>
+    ),
+  },
+  {
+    key: 'workspaces',
+    header: 'Workspaces',
+    render: (run) => formatWorkspaces(run),
+  },
+  {
+    key: 'counts',
+    header: 'Counts',
+    render: (run) => {
+      const summary = (run.summary ?? {}) as Record<string, unknown>;
+      return (
+        <div>
+          {formatCount(summary.scanned_items)} scanned, {formatCount(summary.imported)} imported, {formatCount(summary.updated)} updated, {formatCount(summary.errors)} errors{formatReconciliationSuffix(summary)}
+        </div>
+      );
+    },
+  },
+  {
+    key: 'alert',
+    header: 'Alert',
+    render: (run) => {
+      const presentation = presentMckN8nSyncRun(run);
+      const alertClassName = presentation.state === 'error'
+        ? 'text-rose-200'
+        : presentation.state === 'warning'
+          ? 'text-amber-200'
+          : 'text-emerald-200';
+      return (
+        <div className={alertClassName}>
+          <div className="flex items-center gap-2">
+            {presentation.state === 'ok' ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
+            {presentation.label}
+          </div>
+          {run.alert_message && (
+            <div className="mt-1 max-w-xl text-xs text-mc-text-secondary">{run.alert_message}</div>
+          )}
+        </div>
+      );
+    },
+  },
+];
 
 export default function N8nSyncHistoryPage() {
   const [status, setStatus] = useState<MckN8nSyncStatusResponse | null>(null);
@@ -164,69 +228,18 @@ export default function N8nSyncHistoryPage() {
           </div>
         </section>
 
-        <div className="overflow-x-auto border border-mc-border">
-          <table className="min-w-full divide-y divide-mc-border text-sm">
-            <thead className="bg-mc-bg-secondary text-left text-xs uppercase text-mc-text-secondary">
-              <tr>
-                <th className="px-4 py-3 font-medium">Run</th>
-                <th className="px-4 py-3 font-medium">Mode</th>
-                <th className="px-4 py-3 font-medium">Workspaces</th>
-                <th className="px-4 py-3 font-medium">Counts</th>
-                <th className="px-4 py-3 font-medium">Alert</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-mc-border">
-              {loading && !status ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-mc-text-secondary">
-                    Loading history...
-                  </td>
-                </tr>
-              ) : status?.history.length ? (
-                status.history.map((run) => {
-                  const summary = (run.summary ?? {}) as Record<string, unknown>;
-                  const presentation = presentMckN8nSyncRun(run);
-                  const alertClassName = presentation.state === 'error'
-                    ? 'px-4 py-3 align-top text-rose-200'
-                    : presentation.state === 'warning'
-                      ? 'px-4 py-3 align-top text-amber-200'
-                      : 'px-4 py-3 align-top text-emerald-200';
-                  return (
-                    <tr key={run.id} className="bg-mc-bg hover:bg-mc-bg-secondary/70">
-                      <td className="px-4 py-3 align-top">
-                        <div className="font-medium">{formatDate(run.received_at)}</div>
-                        <div className="text-xs text-mc-text-secondary">{run.id}</div>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div>{run.mode}</div>
-                        <div className="text-xs text-mc-text-secondary">{run.dry_run ? 'dry run' : 'apply'}</div>
-                      </td>
-                      <td className="px-4 py-3 align-top">{formatWorkspaces(run)}</td>
-                      <td className="px-4 py-3 align-top">
-                        {formatCount(summary.scanned_items)} scanned, {formatCount(summary.imported)} imported, {formatCount(summary.updated)} updated, {formatCount(summary.errors)} errors{formatReconciliationSuffix(summary)}
-                      </td>
-                      <td className={alertClassName}>
-                        <div className="flex items-center gap-2">
-                          {presentation.state === 'ok' ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
-                          {presentation.label}
-                        </div>
-                        {run.alert_message && (
-                          <div className="mt-1 max-w-xl text-xs text-mc-text-secondary">{run.alert_message}</div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-mc-text-secondary">
-                    No n8n sync runs have been recorded yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {loading && !status ? (
+          <div className="border border-mc-border bg-mc-bg-secondary px-4 py-8 text-center text-sm text-mc-text-secondary">
+            Loading history...
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={status?.history || []}
+            empty="No n8n sync runs have been recorded yet."
+            caption="n8n MCK sync run history"
+          />
+        )}
       </main>
     </div>
   );

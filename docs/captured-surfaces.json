@@ -45,15 +45,15 @@
       "capture": "required",
       "note": "n8n MCK sync history table. First ever capture: 2026-08-13. STALENESS AUDIT (#147): this capture previously cited e50e256 (2026-08-13). 5b846ce then changed src/app/globals.css, which the root layout imports and every surface renders through, so the capture had silently drifted back to unmeasured while the gate stayed green. Re-probed at 8f72854 on 2026-08-16: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2).",
       "capturedAt": {
-        "commit": "0a4a3ef147bbea3ce1526e3db2ae1d379c9e3283",
-        "date": "2026-09-01",
+        "commit": "c91f637574e958e022f37847faf0ec11cf1bc702",
+        "date": "2026-09-06",
         "viewports": [
           "mobile",
           "desktop"
         ],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0)",
-        "sourceDigest": "147a8d2b9fa65f84",
-        "sourceFileCount": 14
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; modernized table to DataTable component)",
+        "sourceDigest": "b4d3bf21dd5d5d72",
+        "sourceFileCount": 15
       }
     },
     {

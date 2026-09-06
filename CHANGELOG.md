@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Modernize n8n MCK sync history with shared `DataTable` primitive (2026-09-06)** -
+  Replaced the bespoke ad-hoc `<table>` markup in `src/app/n8n-sync-history/page.tsx`
+  with the standard typed `DataTable` component (`DataTableColumn<MckN8nSyncRun>[]`),
+  matching `RuntimeAuditPanel.tsx` conventions and preserving alert styling,
+  formatted timestamps, counts, and empty states. Updated surface dependency digest.
+
 ### Documentation
 
 - **#162 rebase recapture (2026-09-05, #150)** -
