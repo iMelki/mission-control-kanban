@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-09-05
+Last updated: 2026-09-07
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -128,6 +128,17 @@ the local operator entrypoint; historical task notes remain in
     `/70` (`text-mc-text-secondary` solid, fixture 5.62:1). OFFLINE badge
     fill is `bg-mc-bg` (live 5.65:1 on `:3123`). Source no longer contains
     the 3.43 / 4.04 classes.
+  - **2026-09-07 lane-3 verification: landed in source, still unproven.** The
+    three failing classes are confirmed absent from `src/` -
+    `text-mc-text-secondary/60` and `text-mc-text-secondary/70` both return no
+    matches, and `text-mc-text-muted` is live at
+    `src/components/MissionQueue.tsx:587`. But the contrast probe has NOT been
+    re-run since the 2026-09-01 change, so `contrastFailed === 0` is a source
+    grep, not a measurement. The last real run
+    (`artifacts/surface-a11y/a11y-report.json`, untracked, finished
+    2026-08-24T17:37:58Z) still reads `contrastFailed` 15 of 553 checked,
+    `contrastMinimumRatio` 2.87. Closing this needs the detached-worktree
+    production re-probe of `docs/production-capture.md`, not `:3021` (#164).
 
 - [#152 - 45 axe WCAG violations including one critical](https://github.com/iMelki/mission-control-kanban/issues/152)
   - `nested-interactive` (692 nodes, workspace task cards), `color-contrast`,
@@ -136,6 +147,75 @@ the local operator entrypoint; historical task notes remain in
     (Radix Tabs `aria-controls` pointing at an unmounted panel).
   - Smallest first: `link-name` and `scrollable-region-focusable` are one
     attribute each.
+  - **2026-09-07 lane-3 triage: 6 components, not 46 violations.** Counted by
+    rule and then back to the source site, from
+    `artifacts/surface-a11y/a11y-report.json` (untracked; run finished
+    2026-08-24T17:37:58Z; axe-core 4.11.1; 18 route x viewport results over 9
+    surfaces). That run reads **46** violation results / **756** violating
+    nodes; the "45" in the issue body is the earlier run of the same day.
+    Mapping: `nested-interactive` 713 nodes -> **1** component
+    (`src/components/MissionQueue.tsx:480`, the only `role="button"` in
+    `src/`); `scrollable-region-focusable` 11 nodes -> **3**
+    (`src/components/ui/DataTable.tsx:368`,
+    `src/components/AgentsSidebar.tsx:315`, `src/components/LiveFeed.tsx:179`);
+    `aria-valid-attr-value` 10 nodes -> **1**
+    (`src/components/workspace/WorkspaceSectionTabs.tsx` via
+    `src/components/ui/tabs.tsx`); `link-name` 10 nodes -> **1**
+    (`src/components/Header.tsx:70-77`); `color-contrast` 12 nodes -> the three
+    colour decisions of #151, fixed in source 2026-09-01, not re-measured.
+  - **The 692/713 figure is one component times the task table.** It is the
+    node count of the single `nested-interactive` rule - not 692 findings, and
+    not an incomplete/needs-review count. Per route: 231 on
+    `/workspace/frontend-revenue`, 173 on `/workspace/memsys`, 21 on
+    `/workspace/content-factory`, 18 on `/workspace/asimtop`, at both
+    viewports. Every node is the same
+    `<div role="button" tabindex="0" class="group w-full bg-mc-bg-secondary ...">`
+    from one JSX site. There is **no `no-*` rule anywhere in the report**:
+    `grep -o '"id":"no-[a-z-]*"'` returns no matches, with a positive control
+    on the same file in the same run (`grep -c 'nested-interactive'` -> 14).
+  - **The published root cause of the CRITICAL is wrong; corrected here.**
+    `forceMount` would change nothing, because `TabsContent` is never rendered
+    anywhere in this app: `grep -rn "TabsContent" src/` returns only its own
+    definition and export in `src/components/ui/tabs.tsx`, and the sole
+    consumer (`WorkspaceSectionTabs.tsx:6`) imports `Tabs, TabsList,
+    TabsTrigger` only. Independently, axe-core 4.11.1 already exempts the
+    unmounted-inactive-panel case in the bundled rule
+    (`node_modules/axe-core/axe.js:26516`): a dangling `aria-controls` is
+    checked only when the element is not `aria-selected="false"` /
+    `aria-expanded="false"` and has no truthy `aria-haspopup`. That is why
+    `nodeCount` is 1 per route and not 5 - Radix marks the four inactive
+    triggers `aria-selected="false"` and they are exempt, so the node that
+    fails is the **active** trigger, whose panel is supposed to exist. Real
+    defect: a `role="tablist"` with five `role="tab"` buttons and **zero**
+    `role="tabpanel"` elements, inside `<nav aria-label="Workspace sections">`.
+    The WAI-ARIA APG Tabs pattern requires the pairing - "Each element with
+    role `tab` has the property `aria-controls` referring to its associated
+    `tabpanel` element" (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/, read
+    2026-09-07) - and WAI-ARIA 1.2 8.6.1 ID Reference Error Processing makes an
+    unresolved IDREF invalid
+    (https://www.w3.org/TR/wai-aria-1.2/#aria-controls, read 2026-09-07).
+  - **The repair is an operator/IA call, left open per rubric 2.9.** (A)
+    complete the widget: lift `Tabs.Root` into
+    `src/app/workspace/[slug]/page.tsx` and render the five section bodies
+    (`page.tsx:552-583`, inside `<main id="main-content">`) as `TabsContent` -
+    but `role="tabpanel"` displaces the `main` landmark, the settings panel at
+    `page.tsx:472` sits outside `<main>` and would be orphaned from its panel,
+    and the flex layout depends on the current nesting. (B) drop the false
+    widget: the wrapper already declares `<nav aria-label="Workspace
+    sections">`, so make the five controls plain buttons carrying
+    `aria-current`; two files, no layout change, removes `role=tab`,
+    `role=tablist`, `aria-controls` and `aria-selected` outright - but the
+    roving-tabindex arrow model becomes five Tab stops, which is ground
+    #150/#154 already adjudicated. Lane 3 recommends **(B)**, because
+    `TabsContent` was never written (nobody intended panels) and a `tablist`
+    inside a `nav` landmark is a category error either way. Lane 3 did not
+    make the call.
+  - **Nothing was landed in `src/` by lane 3, deliberately.** Every fix above
+    moves `sourceDigest` and invalidates 6 captured surfaces, and re-proof
+    needs the detached-worktree production serve of
+    `docs/production-capture.md` (#164) - the probes refuse `:3021` without
+    fetching it. Landing a one-attribute fix without that serve would leave
+    the captured-surfaces gate red for the reporter lane working #157/#159.
 
 - [#153 - Bind a11y evidence to the captured-surfaces staleness gate](https://github.com/iMelki/mission-control-kanban/issues/153)
   - Deliberate decision: a11y evidence rides the **existing**
