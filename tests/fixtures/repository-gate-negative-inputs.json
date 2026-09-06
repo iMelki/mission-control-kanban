@@ -43,6 +43,13 @@
       "break": "Create src/components/__gate_negative__.tsx without a baseline or sourcing record and assert it exists.",
       "caller": "node scripts/verify-component-sourcing-preflight.mjs",
       "expected": "exit 1 naming the uncovered component and the missing sourcing-preflight record"
+    },
+    {
+      "id": "production-capture-target-refused",
+      "gate": "scripts/assert-production-capture-target.mjs",
+      "break": "Invoke capture-target preflight without required MCK_BASE_URL or on supervised 3021.",
+      "caller": "node scripts/assert-production-capture-target.mjs",
+      "expected": "exit 2 for base_url_required without attempting any HTTP fetch"
     }
   ]
 }

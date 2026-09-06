@@ -147,6 +147,23 @@
           "artifacts/recovery-217c312-20260826/restored-component-sourcing.log"
         ]
       }
+    },
+    {
+      "id": "production-capture-target",
+      "path": "scripts/assert-production-capture-target.mjs",
+      "description": "Refuses supervised next-dev port 3021 and missing MCK_BASE_URL before fetching, enforcing detached production serve for scoring.",
+      "negativeFixture": "tests/fixtures/repository-gate-negative-inputs.json",
+      "observedFailure": {
+        "date": "2026-08-27",
+        "command": "node scripts/assert-production-capture-target.mjs",
+        "brokenExitCode": 2,
+        "restoredExitCode": 0,
+        "reason": "Without MCK_BASE_URL set, caller exited 2 for base_url_required without attempting any network fetch.",
+        "restoredPass": "With MCK_BASE_URL pointing to detached production build and MCK_BUILD_ID matching, preflight approves the scoreable target and exits 0.",
+        "evidence": [
+          "tests/assert-production-capture-target.test.mjs"
+        ]
+      }
     }
   ]
 }
