@@ -151,6 +151,9 @@ import {
   prepareProductionCaptureTarget,
   exitIfCaptureTargetUnscoreable,
 } from './assert-production-capture-target.mjs';
+// The ONLY place a coverage ratio is derived in this repo (#159). A zero
+// denominator is an outcome ('empty'), never a 100% score.
+import { classifyCoverage, formatCoveragePct } from './lib/coverage-denominator.mjs';
 
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), '..', '..');
 const base = (process.env.MCK_BASE_URL || '').replace(/\/$/, '');
@@ -1018,7 +1021,15 @@ async function verifyFocusIndicators(page, limit, options = {}) {
   // The largest Tab-reachable population this surface was ever observed to
   // hold during the pass. Taking anything smaller would flatter the coverage.
   const denominator = Math.max(populationAtStart, populationAtEnd, fromInitial);
-  const coveragePct = denominator === 0 ? 100 : Math.round((fromInitial / denominator) * 1000) / 10;
+  // #159: `denominator === 0 ? 100` used to live here and reported a surface
+  // that rendered ZERO controls as 100% / full. classifyCoverage returns
+  // status 'empty' with a null percentage instead -- see scripts/lib.
+  const verdict = classifyCoverage({
+    population: denominator,
+    measured: fromInitial,
+    staleAfterSampleDestroyed: outcome.staleAfterSampleDestroyed,
+  });
+  const coveragePct = verdict.coveragePct;
   // Reconciliation: population = measured + every named reason for not
   // measuring. `outcome.measured` is excluded because `fromInitial` already
   // carries it, and `notTabReachable` is excluded because the population is
@@ -1066,7 +1077,13 @@ async function verifyFocusIndicators(page, limit, options = {}) {
     // coverage percentage above.
     measuredAfterRemount: evidence.length - fromInitial,
     coveragePct,
-    status: coveragePct >= 99.5 && outcome.staleAfterSampleDestroyed === 0 ? 'full' : 'partial',
+    // 'full' | 'partial' | 'empty' | 'invalid'. 'empty' means the surface
+    // enumerated no Tab-reachable controls at all, which on this app means the
+    // page did not render -- never that it was fully covered (#159).
+    status: verdict.status,
+    // Why this measurement is not scorable, when it is not. null when it is.
+    coverageReason: verdict.reason,
+    scorable: verdict.scorable,
     sampleDestroyed: destructionEvents.length > 0,
     destroyedBy: destructionEvents.length ? destructionEvents[0].afterFocusing : null,
     destructionEvents,
@@ -1378,7 +1395,10 @@ async function auditRovingChildren(page, options = {}) {
     containersArrowInert,
     population,
     measured,
-    coveragePct: population === 0 ? 100 : Math.round((measured / population) * 1000) / 10,
+    // #159: was `population === 0 ? 100`. A roving pass that found no
+    // containers is 'empty', not fully audited.
+    coveragePct: classifyCoverage({ population, measured }).coveragePct,
+    coverageStatus: classifyCoverage({ population, measured }).status,
     notAudited: Math.max(0, population - measured),
     visible: evidence.filter((e) => e.visible).length,
     transparentOutlineOnly: evidence.filter((e) => e.transparentOutlineOnly).length,
@@ -2254,7 +2274,7 @@ async function main() {
             ' contrast=' + r.contrast.passed + '/' + r.contrast.checked + ' min=' + r.contrast.minimumRatio +
             ' focus=' + r.focus.visible + '/' + r.focus.checked + 'vis ' +
             r.focus.unobscured + '/' + r.focus.checked + 'unobs' +
-            ' COVERAGE=' + r.focusCoverage.coveragePct + '% (' +
+            ' COVERAGE=' + formatCoveragePct(r.focusCoverage.coveragePct, r.focusCoverage.status) + ' (' +
             r.focusCoverage.measuredFromPopulation + '/' + r.focusCoverage.population + ' ' +
             r.focusCoverage.status.toUpperCase() + ')' +
             (r.focusCoverage.sampleDestroyed
@@ -2329,10 +2349,14 @@ async function main() {
     const mins = results.map((r) => r.contrast.minimumRatio).filter((n) => typeof n === 'number');
     totals.contrastMinimumRatio = mins.length ? Math.min.apply(null, mins) : null;
 
-    totals.focusCoveragePct =
-      totals.focusPopulation === 0
-        ? 100
-        : Math.round((totals.focusMeasured / totals.focusPopulation) * 1000) / 10;
+    // #159: the app-wide figure had the same zero-denominator short circuit as
+    // the per-surface one. A sweep that measured nothing must not print 100%.
+    const focusVerdict = classifyCoverage({
+      population: totals.focusPopulation,
+      measured: totals.focusMeasured,
+    });
+    totals.focusCoveragePct = focusVerdict.coveragePct;
+    totals.focusCoverageStatus = focusVerdict.status;
 
     const partial = results.filter((r) => r.focusCoverage.status !== 'full');
     const destroyed = results.filter((r) => r.focusCoverage.sampleDestroyed);
@@ -2352,10 +2376,14 @@ async function main() {
       // pass could not reach, not the whole roving population.
       rovingPopulation: totals.rovingPopulation,
       rovingMeasured: totals.rovingMeasured,
-      rovingCoveragePct:
-        totals.rovingPopulation === 0
-          ? 100
-          : Math.round((totals.rovingMeasured / totals.rovingPopulation) * 1000) / 10,
+      rovingCoveragePct: classifyCoverage({
+        population: totals.rovingPopulation,
+        measured: totals.rovingMeasured,
+      }).coveragePct,
+      rovingCoverageStatus: classifyCoverage({
+        population: totals.rovingPopulation,
+        measured: totals.rovingMeasured,
+      }).status,
       rovingEnumeratedNotAudited: totals.rovingNotAudited,
       rovingSkippedByTabPass: totals.rovingSkippedByTabPass,
       rovingContainersArrowInert: totals.rovingContainersArrowInert,
