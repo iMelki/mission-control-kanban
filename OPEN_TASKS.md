@@ -101,6 +101,25 @@ the local operator entrypoint; historical task notes remain in
     same surface, same unmodified code, one session. **Open.**
     The no-budget recovery completed without an empty or partial row, but that
     successful sample does not repair the zero-population acceptance bug.
+  - **2026-09-07 instrument lane: zero-population acceptance FIXED and pushed
+    (`a8aa3122`).** Reproduced first: the published input (population 0) returned
+    `coveragePct 100 / status full / unaccounted -1 / countedAtFullCoverage true`
+    from the `origin/dev` expressions verbatim. The short circuit was hand-rolled
+    at **four** sites, not the two in the issue - per-surface (1021), roving
+    (1381), and both app-wide aggregates (2332, 2356); fixing only the named two
+    would have left an empty sweep reporting 100% app-wide. Extracted
+    `scripts/lib/coverage-denominator.mjs` (`classifyCoverage` ->
+    `full|partial|empty|invalid` with `coveragePct: null`, plus
+    `assertDenominator` for the "scored N of M, M>0" class), migrated all four,
+    added a comment-stripping ratchet with its own positive control, and wired
+    `test:coverage-denominator` into `npm test`. Negative proof: 15 tests,
+    13 pass / 2 fail before (both naming the probe), 15/15 after; controls
+    unchanged (26/26 full, 981/1058 partial, rounding 99.9/67.3/33.3).
+    Prior art cited in the module: axe-core `inapplicable`, Lighthouse
+    `notApplicable`; pa11y is a null result and cannot tell empty from clean.
+    **Still open:** `unaccounted !== 0` is surfaced per surface but not yet
+    refused at the banner/exit level, and the population-stability reporting
+    this issue also asks for is untouched.
   - [#160](https://github.com/iMelki/mission-control-kanban/issues/160) extract the serialized focus
     collector and its authored self-proof fixture contract before the probe
     grows again. The 2026-08-26 independent review approved the seven-line
