@@ -8,6 +8,39 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
+- [#152 - the workspace cockpit announced a five-tab widget that controls nothing; now navigation](https://github.com/iMelki/mission-control-kanban/issues/152)
+  - **Landed 2026-09-07.** `role="tablist"` + five `role="tab"` with **zero**
+    `role="tabpanel"`, inside `<nav aria-label="Workspace sections">`. All five
+    `aria-controls` values were dangling; axe fails only the *selected* one
+    because its `aria-controls` preCheck exempts `aria-selected="false"`
+    (axe-core 4.11.1, `axe.js:26516-26522`). So one critical node, five broken
+    promises.
+  - The previously published cause and remedy were both wrong: `TabsContent`
+    has **zero consumers** (two lines in `src/components/ui/tabs.tsx`, its own
+    definition and export), so `forceMount` had nothing to force. Verified again
+    on `origin/dev` before acting.
+  - Operator chose the **navigation** reading. `WorkspaceSectionTabs` now renders
+    five plain `<button>`s in a `<ul>` inside the existing `nav`, current one
+    marked `aria-current="true"`. `ui/tabs.tsx` keeps the shadcn primitive and
+    gains the contract comment that would have prevented this.
+  - Proof, production `127.0.0.1:3121`, `/workspace/frontend-revenue`, desktop:
+    BEFORE BUILD_ID `02QxqHc7qVm-Y9tCVxnmM` tablist 1 / tab 5 / tabpanel 0 /
+    dangling 5, axe `aria-valid-attr-value` 1 node. AFTER BUILD_ID
+    `2dkzBFp0faELAfaxibj0J` tablist 0 / tab 0 / dangling 0, rule absent. The
+    other three rules are byte-identical either side (`link-name` 1,
+    `nested-interactive` 231, `scrollable-region-focusable` 1), so the change is
+    scoped. A positive control ran in BOTH scans and moved the count each time
+    (1->2->1 before, 0->1->0 after), so the AFTER zero is a measured zero.
+  - **Resume line / not done:** the five `/workspace/*` captured surfaces are now
+    stale (`recorded 3eaa0d2de234e9e6 -> current fec8007fc3fc23e4`) and
+    `npm run surfaces:check` exits 1. Re-record them from a production serve:
+    see `docs/production-capture.md`, then `npm run surfaces:probe`. Also still
+    open on #152: `link-name` (1 attribute, `Header.tsx`),
+    `scrollable-region-focusable` (3 components), `nested-interactive`
+    (`MissionQueue.tsx:480`, 1 component).
+  - Instrument limit: `prefers-reduced-motion` (WCAG 2.3.3 / the 2.2.2 pause
+    control) is **not measurable** by this probe and was not scored either way.
+
 - [#166 - cockpit loads can stick in a false pre-data board and present it as settled](https://github.com/iMelki/mission-control-kanban/issues/166)
   - 2026-08-31 gauntlet: ~3/13 cockpit loads painted "Showing 0/0", "No events
     yet", "No token detected · 0/3 lanes ready", and header ONLINE as settled
