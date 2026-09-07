@@ -155,9 +155,10 @@ the local operator entrypoint; historical task notes remain in
     nodes; the "45" in the issue body is the earlier run of the same day.
     Mapping: `nested-interactive` 713 nodes -> **1** component
     (`src/components/MissionQueue.tsx:480`, the only `role="button"` in
-    `src/`); `scrollable-region-focusable` 11 nodes -> **3**
-    (`src/components/ui/DataTable.tsx:368`,
-    `src/components/AgentsSidebar.tsx:315`, `src/components/LiveFeed.tsx:179`);
+    `src/`); `scrollable-region-focusable` 11 nodes -> **3** elements
+    (`src/components/MissionQueue.tsx:333` the horizontal column scroller,
+    `src/components/LiveFeed.tsx:179`, and the pre-`25d0b2c` hand-rolled n8n
+    table at `src/app/n8n-sync-history/page.tsx:167`);
     `aria-valid-attr-value` 10 nodes -> **1**
     (`src/components/workspace/WorkspaceSectionTabs.tsx` via
     `src/components/ui/tabs.tsx`); `link-name` 10 nodes -> **1**
@@ -216,6 +217,28 @@ the local operator entrypoint; historical task notes remain in
     `docs/production-capture.md` (#164) - the probes refuse `:3021` without
     fetching it. Landing a one-attribute fix without that serve would leave
     the captured-surfaces gate red for the reporter lane working #157/#159.
+  - **2026-09-07 correction to the line above, same lane.** My first
+    `scrollable-region-focusable` mapping was wrong on two of three entries: I
+    matched class strings without checking the combinator the report actually
+    recorded. `grep -rn "lg:border-t-0" src/` returns exactly one line
+    (`LiveFeed.tsx:88`), which pins both `.lg\:border-t-0 > ...` targets to
+    `LiveFeed.tsx:179` - they are one element rendered two ways by axe's
+    selector generator, not two. The `.overflow-x-auto` targets on the
+    workspace routes are `MissionQueue.tsx:333`, not `DataTable`.
+    **`src/components/AgentsSidebar.tsx:315` and `src/components/MissionQueue.tsx:392`
+    are NOT defects and must not be "fixed"** - both contain focusable content,
+    which is the rule's own second remedy ("the element either has to be
+    focusable itself, or contain a focusable element within it",
+    https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable, read
+    2026-09-07); adding `tabIndex={0}` would insert a redundant tab stop in
+    front of a list of controls. `ui/DataTable.tsx:368` renders its sort
+    headers as real `<button>`s inside `<th>`, so the shared primitive
+    plausibly already satisfies the rule by that same remedy, and `25d0b2c`
+    swapped the n8n table onto it after the run - plausibly, not proven.
+    Currently open: **4 files, 5 defects** - `MissionQueue.tsx` twice
+    (`nested-interactive` at `:480`, `scrollable-region-focusable` at `:333`),
+    `LiveFeed.tsx:179`, `Header.tsx:70-77`, and the critical in
+    `WorkspaceSectionTabs.tsx` / `ui/tabs.tsx`.
 
 - [#153 - Bind a11y evidence to the captured-surfaces staleness gate](https://github.com/iMelki/mission-control-kanban/issues/153)
   - Deliberate decision: a11y evidence rides the **existing**
