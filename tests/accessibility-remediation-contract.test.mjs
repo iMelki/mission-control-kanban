@@ -79,4 +79,8 @@ test('the runtime UI smoke locates cards by the new open button, not the removed
 
   assert.doesNotMatch(smoke, /li > \[role="button"\]/);
   assert.equal([...smoke.matchAll(/li \[data-task-open\]/g)].length, 2);
+  // ac9b5f3 turned the workspace section controls from Radix tabs into plain
+  // navigation buttons; a `tab` role lookup in the nav can never resolve again.
+  assert.doesNotMatch(smoke, /getByRole\('tab'/);
+  assert.equal([...smoke.matchAll(/workspaceNav\.getByRole\('button'/g)].length, 3);
 });

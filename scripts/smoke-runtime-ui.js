@@ -14,7 +14,7 @@ const artifactDir = process.env.MCK_SMOKE_ARTIFACT_DIR || path.join(process.cwd(
 async function waitForWorkspaceReady(page) {
   const readyShell = page.locator('[data-workspace-ready="true"]');
   const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
-  const settingsTab = workspaceNav.getByRole('tab', { name: /^Settings$/i });
+  const settingsTab = workspaceNav.getByRole('button', { name: /^Settings$/i });
   try {
     await readyShell.waitFor({ timeout: 20_000 });
     await workspaceNav.waitFor({ timeout: 10_000 });
@@ -179,7 +179,7 @@ async function main() {
     await waitForWorkspaceReady(page);
     const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
     await workspaceNav.waitFor({ timeout: 20_000 });
-    const workspaceSettingsTab = workspaceNav.getByRole('tab', { name: /^Settings$/i });
+    const workspaceSettingsTab = workspaceNav.getByRole('button', { name: /^Settings$/i });
     await workspaceSettingsTab.waitFor({ timeout: 20_000 });
     await workspaceSettingsTab.click({ force: true });
     await page.getByRole('heading', { name: /Workspace runtime defaults/i }).waitFor({ timeout: 20_000 });
@@ -208,7 +208,7 @@ async function main() {
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForTimeout(1500);
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
-    await workspaceNav.getByRole('tab', { name: /^Board$/i }).click();
+    await workspaceNav.getByRole('button', { name: /^Board$/i }).click();
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
     await page.waitForTimeout(1500);
 
