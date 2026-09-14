@@ -58,7 +58,11 @@ export function RuntimeConfigTemplateGallery({
               <div className="text-sm font-medium text-mc-text">{template.label}</div>
               <p className="mt-1 min-h-8 text-xs text-mc-text-secondary">{template.description}</p>
               {templateDiagnostics.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5" aria-label={`${template.label} env diagnostics`}>
+                <div
+                  role="group"
+                  className="mt-2 flex flex-wrap gap-1.5"
+                  aria-label={`${template.label} env diagnostics`}
+                >
                   {templateDiagnostics.map((diagnostic) => (
                     // min-w-0 lets the badge shrink below the env name's min-content width (flex
                     // items default to min-width:auto); break-all then wraps the name instead of

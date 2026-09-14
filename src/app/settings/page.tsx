@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Settings, Save, RotateCcw, FolderOpen, Link as LinkIcon } from 'lucide-react';
 import { getConfig, updateConfig, resetConfig, type MissionControlConfig } from '@/lib/config';
 import { ActionReviewDialog } from '@/components/ui/action-review-dialog';
+import { Input } from '@/components/ui/input';
 import { RuntimeOpsSettings } from '@/components/RuntimeOpsSettings';
 
 export default function SettingsPage() {
@@ -137,13 +138,12 @@ export default function SettingsPage() {
               <label htmlFor="settings-workspace-base-path" className="block text-sm font-medium text-mc-text mb-2">
                 Workspace Base Path
               </label>
-              <input
+              <Input
                 id="settings-workspace-base-path"
                 type="text"
                 value={config.workspaceBasePath}
                 onChange={(e) => handleChange('workspaceBasePath', e.target.value)}
                 placeholder="~/Documents/Shared"
-                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
               />
               <p className="text-xs text-mc-text-secondary mt-1">
                 Base directory for all Mission Control files. Use ~ for home directory.
@@ -154,13 +154,12 @@ export default function SettingsPage() {
               <label htmlFor="settings-projects-path" className="block text-sm font-medium text-mc-text mb-2">
                 Projects Path
               </label>
-              <input
+              <Input
                 id="settings-projects-path"
                 type="text"
                 value={config.projectsPath}
                 onChange={(e) => handleChange('projectsPath', e.target.value)}
                 placeholder="~/Documents/Shared/projects"
-                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
               />
               <p className="text-xs text-mc-text-secondary mt-1">
                 Directory where project folders are created. Each project gets its own folder.
@@ -171,13 +170,12 @@ export default function SettingsPage() {
               <label htmlFor="settings-default-project-name" className="block text-sm font-medium text-mc-text mb-2">
                 Default Project Name
               </label>
-              <input
+              <Input
                 id="settings-default-project-name"
                 type="text"
                 value={config.defaultProjectName}
                 onChange={(e) => handleChange('defaultProjectName', e.target.value)}
                 placeholder="mission-control"
-                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
               />
               <p className="text-xs text-mc-text-secondary mt-1">
                 Default name for new projects. Can be changed per project.
@@ -201,13 +199,12 @@ export default function SettingsPage() {
               <label htmlFor="settings-mission-control-url" className="block text-sm font-medium text-mc-text mb-2">
                 Mission Control URL
               </label>
-              <input
+              <Input
                 id="settings-mission-control-url"
                 type="text"
                 value={config.missionControlUrl}
                 onChange={(e) => handleChange('missionControlUrl', e.target.value)}
                 placeholder="http://localhost:3000"
-                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
               />
               <p className="text-xs text-mc-text-secondary mt-1">
                 URL where Mission Control is running. Auto-detected by default. Change for remote access.

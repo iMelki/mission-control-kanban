@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-09-07
+Last updated: 2026-09-14
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -40,6 +40,25 @@ the local operator entrypoint; historical task notes remain in
     (`MissionQueue.tsx:480`, 1 component).
   - Instrument limit: `prefers-reduced-motion` (WCAG 2.3.3 / the 2.2.2 pause
     control) is **not measurable** by this probe and was not scored either way.
+  - **2026-09-14 rescue review (draft PR, branch
+    `rescue/mck-a11y-20260830-review-20260914`).** Six commits from an unpushed
+    2026-08-30 clone were compared hunk-by-hunk against `origin/dev`. Re-applied
+    only what dev never landed: `link-name` (`Header.tsx` back link
+    `aria-label`), `scrollable-region-focusable` (`MissionQueue.tsx:333` board
+    scroller and `LiveFeed.tsx:179` as focusable `role="region"`),
+    `nested-interactive` (`MissionQueue.tsx:480` split into sibling open and
+    reorder buttons; `smoke-runtime-ui.js` selector follows), the #150 settings
+    inputs (new `ui/input.tsx` with a `focus-visible` ring), and a `role="group"`
+    under the env-diagnostics label. Deliberately NOT re-applied: the
+    `TabsContent` restructure (superseded by the navigation decision above), the
+    `/60` ring and probe parser (`c9598b6`), the OFFLINE/timestamp/n8n contrast
+    pairs (`5dff835`, `e3de15d`), the n8n table region (`25d0b2c`), and a
+    `DataTable` `tabIndex` (the 2026-09-07 correction says the sort-header
+    buttons plausibly satisfy the rule). Proof so far is source-level only:
+    eslint, `tsc --noEmit`, preflight, and the node suites pass; the seven
+    surfaces that render these files are stale until the production re-probe
+    of `docs/production-capture.md`, and the `nested-interactive` /
+    `scrollable-region-focusable` / `link-name` counts have not been re-measured.
 
 - [#166 - cockpit loads can stick in a false pre-data board and present it as settled](https://github.com/iMelki/mission-control-kanban/issues/166)
   - 2026-08-31 gauntlet: ~3/13 cockpit loads painted "Showing 0/0", "No events

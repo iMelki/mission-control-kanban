@@ -330,7 +330,12 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden p-3">
+        <div
+          role="region"
+          tabIndex={0}
+          aria-label="Mission queue board"
+          className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"
+        >
           {COLUMNS.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -477,31 +482,39 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if ((event.key === 'Enter' || event.key === ' ') && onClick) {
-          event.preventDefault();
-          onClick();
-        }
-      }}
+      data-task-card
       className={`group w-full bg-mc-bg-secondary border rounded-lg cursor-pointer text-left transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/20 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${isOverlay ? 'shadow-xl shadow-black/40' : ''} ${isPlanning ? 'border-purple-500/40 hover:border-purple-500' : 'border-mc-border/50 hover:border-mc-accent/40'}`}
     >
-        {/* Drag handle bar */}
-        <div
+      {/* The reorder and open actions are sibling buttons. A clickable card
+          wrapper around the dnd-kit handle creates nested interactive controls. */}
+      {dragAttributes && dragListeners ? (
+        <button
+          type="button"
+          data-task-drag-handle
           {...(dragAttributes ?? {})}
           {...(dragListeners ?? {})}
-          className="flex items-center justify-center py-1.5 border-b border-mc-border/30 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
           aria-label={`Reorder task ${task.title}`}
+          className="flex w-full cursor-grab items-center justify-center border-b border-mc-border/30 py-1.5 opacity-0 transition-opacity hover:bg-mc-bg-tertiary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100"
         >
           <GripVertical className="size-4 text-mc-text-secondary/50" />
+        </button>
+      ) : (
+        <div aria-hidden="true" className="flex items-center justify-center border-b border-mc-border/30 py-1.5">
+          <GripVertical className="size-4 text-mc-text-secondary/50" />
         </div>
+      )}
 
       {/* Card content */}
-      <div className="p-4">
+      <button
+        type="button"
+        data-task-open
+        onClick={onClick}
+        disabled={!onClick}
+        aria-label={`Open task ${task.title}`}
+        className="block w-full rounded-b-lg p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"
+      >
         {/* Title */}
         <h4 className="text-sm font-medium leading-snug line-clamp-2 mb-3">
           {task.title}
@@ -588,7 +601,7 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
             {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
           </span>
         </div>
-      </div>
+      </button>
     </div>
   );
 }

@@ -9,7 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+### Fixed
+
+- **Re-applied a11y hunks from the unpushed 2026-08-30 clone (2026-09-14, #150, #152)** -
+  Six local commits (`c3696ba`..`7599fcc`) were compared hunk-by-hunk against
+  `origin/dev`; only the hunks dev never landed are re-applied here, on top of
+  dev's versions. `/settings`: the four text fields share a new copy-owned
+  `src/components/ui/input.tsx` (shadcn structure on `mc-*` tokens) with a
+  `focus-visible` ring instead of `focus:outline-none` (#150's 8 remaining
+  observations). Task cards: the `role="button"` wrapper around the dnd-kit
+  handle becomes two sibling `<button>`s (`data-task-open`,
+  `data-task-drag-handle`), the handle now surfaces on keyboard focus
+  (`nested-interactive`, `MissionQueue.tsx:480`). The horizontal board scroller
+  and the live-feed list are focusable `role="region"`s
+  (`scrollable-region-focusable`). The icon-only cockpit back link gets an
+  accessible name (`link-name`). The env-diagnostics `aria-label` sits on a
+  `role="group"`. `scripts/smoke-runtime-ui.js` follows the new card selector;
+  `tests/accessibility-remediation-contract.test.mjs` pins the shapes. Superseded
+  hunks were NOT re-applied: the Radix `TabsContent` panel restructure (dev chose
+  navigation in `ac9b5f3`), the `/60` tab ring (`c9598b6`), the OFFLINE and
+  timestamp contrast pairs (`5dff835`, `e3de15d`), the hand-rolled n8n table
+  region (`25d0b2c`), and the probe shadow parser (`c9598b6`). Source-only: the
+  captured surfaces are stale until a production re-probe.
 
 - **Modernize n8n MCK sync history with shared `DataTable` primitive (2026-09-06)** -
   Replaced the bespoke ad-hoc `<table>` markup in `src/app/n8n-sync-history/page.tsx`
