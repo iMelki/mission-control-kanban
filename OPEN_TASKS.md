@@ -59,6 +59,14 @@ the local operator entrypoint; historical task notes remain in
     surfaces that render these files are stale until the production re-probe
     of `docs/production-capture.md`, and the `nested-interactive` /
     `scrollable-region-focusable` / `link-name` counts have not been re-measured.
+    CI on the branch is green, including `runtime-regression`, which reaches the
+    task cards through the new `li [data-task-open]` selector.
+  - **[#169](https://github.com/iMelki/mission-control-kanban/issues/169), found
+    by that CI run:** `scripts/smoke-runtime-ui.js` still looked the section
+    controls up as `role="tab"` after the navigation change above, so the
+    runtime UI smoke has timed out on every `dev` push since 2026-09-07 (runs
+    34723572329, 34799619361). Fix carried on the same branch; it should land on
+    `dev` on its own if the a11y PR stalls.
 
 - [#166 - cockpit loads can stick in a false pre-data board and present it as settled](https://github.com/iMelki/mission-control-kanban/issues/166)
   - 2026-08-31 gauntlet: ~3/13 cockpit loads painted "Showing 0/0", "No events

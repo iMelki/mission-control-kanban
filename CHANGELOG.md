@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   region (`25d0b2c`), and the probe shadow parser (`c9598b6`). Source-only: the
   captured surfaces are stale until a production re-probe.
 
+- **Runtime UI smoke red on every `dev` push since `ac9b5f3` (2026-09-14, #169)** -
+  `scripts/smoke-runtime-ui.js` waited for `getByRole('tab', ...)` inside the
+  workspace nav after #152 turned those controls into plain buttons, so
+  `waitForWorkspaceReady` timed out before any task card was reached. The three
+  nav lookups use the button role; the contract test ratchets `getByRole('tab'`
+  out of the smoke.
+
 - **Modernize n8n MCK sync history with shared `DataTable` primitive (2026-09-06)** -
   Replaced the bespoke ad-hoc `<table>` markup in `src/app/n8n-sync-history/page.tsx`
   with the standard typed `DataTable` component (`DataTableColumn<MckN8nSyncRun>[]`),
