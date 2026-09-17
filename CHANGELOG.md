@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Re-captured stale surfaces and excluded ignored temporary worktrees from
+  production typechecking (2026-09-17, #131, #147)** - Root `tsconfig.json`
+  now excludes the ignored `tmp/` workspace so a nested Paperclip fixture cannot
+  poison the MCK production build. A fresh production build (`BUILD_ID
+  ObV3-lrSx_aEb83vcxjs1`) and `next start` capture on `127.0.0.1:3121`
+  passed the capture-target preflight; the clipping probe self-proof passed,
+  all 18 route/viewport measurements returned HTTP 200, and 0 surfaces were
+  clipped. `docs/captured-surfaces.json` records the exact commit, source
+  digests, file counts, and method for all seven previously stale surfaces.
+
 - **Re-applied a11y hunks from the unpushed 2026-08-30 clone (2026-09-14, #150, #152)** -
   Six local commits (`c3696ba`..`7599fcc`) were compared hunk-by-hunk against
   `origin/dev`; only the hunks dev never landed are re-applied here, on top of

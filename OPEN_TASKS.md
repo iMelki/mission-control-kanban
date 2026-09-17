@@ -1,6 +1,6 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-09-14
+Last updated: 2026-09-17
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
@@ -389,6 +389,15 @@ the local operator entrypoint; historical task notes remain in
   - All nine surfaces re-probed at `8f72854` on 2026-08-16 against the running
     dev server: 18 measurements, 0 clipped, probe self-proof alive (injection
     moved clipped 0 -> 1 while document overflow stayed 0).
+  - **Fresh production re-probe 2026-09-17:** root `tsconfig.json` excludes the
+    ignored `tmp/` workspace after `npm run build` proved that a nested
+    Paperclip fixture otherwise enters the root TypeScript glob. Production
+    `next start` on `127.0.0.1:3121` passed preflight with BUILD_ID
+    `ObV3-lrSx_aEb83vcxjs1`; the probe self-proof passed and all 18 route /
+    viewport rows returned HTTP 200 with 0 clipped surfaces. The seven stale
+    records were refreshed at commit `15d3acfd19f6a2ebb22da0798ee9be1d749ad0dc`
+    with current source digests. Evidence is retained under
+    `artifacts/doctor-mesh-capture-20260917/` and tracked in #131.
   - Wired on the same free local layer as #144: `npm test` ->
     `test:captured-surfaces` plus `surfaces:check`, reached by
     `.git/hooks/pre-push`. No CI job added.
