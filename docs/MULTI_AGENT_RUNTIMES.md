@@ -231,7 +231,9 @@ MCK pins a repo-owned `doctor.config.mjs` policy for raw full-project React Doct
 
 The pre-commit wrapper is intentionally narrower than a branch or full-project scan. Pre-commit passes matching staged frontend paths to `scripts/run-react-doctor.js`, and the wrapper invokes React Doctor with `--scope files --staged --blocking warning --no-score`. This keeps unrelated `dev -> main` diagnostics out of the commit boundary, fails on warnings introduced in the staged frontend set, and avoids score-service availability as a commit dependency. If the staged Git index cannot be read or React Doctor cannot complete, the wrapper fails closed.
 
-Use `npm run doctor:react` to run the same staged gate manually. Use `npx -y react-doctor@latest . --score` only for explicit full-project closeout evidence; it is not the pre-commit decision source.
+Use `npm run doctor:react` to run the same staged gate manually. The command
+requires a qualified absolute `REACT_DOCTOR_ARTIFACT_PATH` and otherwise fails
+closed; do not use floating package resolution for closeout evidence.
 
 The research basis, failure model, validation cases, and emergency bypass are recorded in [REACT_DOCTOR_PRECOMMIT_GATE.md](REACT_DOCTOR_PRECOMMIT_GATE.md).
 

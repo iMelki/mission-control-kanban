@@ -12,7 +12,7 @@ const {
   buildReactDoctorArgs,
   classifyReactDoctorResult,
   readStagedFrontendFiles,
-  resolveNpxInvocation,
+  resolveReactDoctorArtifact,
   selectFrontendFiles,
 } = reactDoctorPrecommit;
 
@@ -46,6 +46,7 @@ test("selects only safe, staged-scope frontend paths", () => {
 test("builds a staged local gate without changed-branch or score API scope", () => {
   const args = buildReactDoctorArgs();
 
+  assert.equal(args.some((arg) => arg.includes("@")), false);
   assert.deepEqual(args.slice(args.indexOf("--scope"), args.indexOf("--scope") + 2), [
     "--scope",
     "files",
@@ -60,38 +61,37 @@ test("builds a staged local gate without changed-branch or score API scope", () 
   ]);
 });
 
-test("launches npx through node on Windows instead of spawning a cmd shim", () => {
-  const execPath = "C:\\node\\node.exe";
-  const expectedCli = path.win32.join(
-    path.win32.dirname(execPath),
-    "node_modules",
-    "npm",
-    "bin",
-    "npx-cli.js",
-  );
-  const result = resolveNpxInvocation({
+test("accepts only an existing absolute Windows artifact", () => {
+  const result = resolveReactDoctorArtifact({
     platform: "win32",
-    execPath,
-    existsSync: (candidate) => candidate === expectedCli,
+    artifactPath: "C:\\artifacts\\react-doctor.exe",
+    existsSync: (candidate) => candidate === "C:\\artifacts\\react-doctor.exe",
   });
 
   assert.deepEqual(result, {
     ok: true,
-    command: execPath,
-    prefixArgs: [expectedCli],
+    command: "C:\\artifacts\\react-doctor.exe",
+    prefixArgs: [],
   });
-  assert.equal(result.command.endsWith(".cmd"), false);
 });
 
-test("fails closed when the Windows npx JavaScript entrypoint is unavailable", () => {
-  const result = resolveNpxInvocation({
+test("fails closed when an exact artifact is absent or relative", () => {
+  const missing = resolveReactDoctorArtifact({
     platform: "win32",
-    execPath: "C:\\node\\node.exe",
+    artifactPath: "C:\\artifacts\\react-doctor.exe",
     existsSync: () => false,
   });
 
-  assert.equal(result.ok, false);
-  assert.match(result.error, /npx-cli\.js/);
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /artifact is missing/);
+
+  const relative = resolveReactDoctorArtifact({
+    platform: "win32",
+    artifactPath: "tools/react-doctor.exe",
+    existsSync: () => true,
+  });
+  assert.equal(relative.ok, false);
+  assert.match(relative.error, /absolute REACT_DOCTOR_ARTIFACT_PATH/);
 });
 
 test("reads the staged Git index and excludes unrelated branch files", () => {

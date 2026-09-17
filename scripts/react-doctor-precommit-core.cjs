@@ -1,3 +1,5 @@
+const path = require("node:path");
+
 const FRONTEND_SOURCE_PATTERN = /^(src|app|components|lib|hooks)\/.*\.(ts|tsx|js|jsx|mjs|cjs)$/i;
 
 function normalizeRepoRelativePath(candidate) {
@@ -61,8 +63,6 @@ function readStagedFrontendFiles({ spawnSync, repoRoot }) {
 
 function buildReactDoctorArgs() {
   return [
-    "-y",
-    "react-doctor@latest",
     ".",
     "--verbose",
     "--scope",
@@ -75,21 +75,19 @@ function buildReactDoctorArgs() {
   ];
 }
 
-function resolveNpxInvocation({ platform, execPath, existsSync }) {
-  if (platform !== "win32") {
-    return { ok: true, command: "npx", prefixArgs: [] };
-  }
-
-  const nodeDir = execPath.replace(/[\\/][^\\/]+$/, "");
-  const npxCli = [nodeDir, "node_modules", "npm", "bin", "npx-cli.js"].join("\\");
-  if (!existsSync(npxCli)) {
+function resolveReactDoctorArtifact({ platform, artifactPath, existsSync }) {
+  const candidate = String(artifactPath ?? "").trim();
+  const isAbsolute = platform === "win32" ? path.win32.isAbsolute(candidate) : path.posix.isAbsolute(candidate);
+  if (!candidate || !isAbsolute) {
     return {
       ok: false,
-      error: `Could not resolve npm's npx-cli.js beside ${execPath}.`,
+      error: "An absolute REACT_DOCTOR_ARTIFACT_PATH is required; floating package resolution is disabled.",
     };
   }
-
-  return { ok: true, command: execPath, prefixArgs: [npxCli] };
+  if (!existsSync(candidate)) {
+    return { ok: false, error: `React Doctor artifact is missing: ${candidate}.` };
+  }
+  return { ok: true, command: candidate, prefixArgs: [] };
 }
 
 function classifyReactDoctorResult(result, output) {
@@ -125,6 +123,6 @@ module.exports = {
   classifyReactDoctorResult,
   normalizeRepoRelativePath,
   readStagedFrontendFiles,
-  resolveNpxInvocation,
+  resolveReactDoctorArtifact,
   selectFrontendFiles,
 };

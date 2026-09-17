@@ -2,10 +2,14 @@
 
 ## Decision
 
-The commit gate scans only matching frontend files in the staged Git index. It uses React Doctor's local warning-level exit status and deliberately disables the remote score request:
+The commit gate scans only matching frontend files in the staged Git index. It
+uses a reviewed, absolute `REACT_DOCTOR_ARTIFACT_PATH` when one has been
+qualified locally. Without that exact offline artifact, the gate fails closed;
+it never installs or resolves a floating package. A qualified artifact receives
+these arguments:
 
 ```text
-react-doctor@latest . --verbose --scope files --staged --blocking warning --no-score --no-color
+. --verbose --scope files --staged --blocking warning --no-score --no-color
 ```
 
 This is a commit-boundary check, not a replacement for an explicit full-project audit.
@@ -29,19 +33,22 @@ The design therefore uses pre-commit's filename filter for fast routing, React D
 | Git index cannot be read | Fail closed | The wrapper cannot prove its input boundary. |
 | React Doctor cannot start or terminates unexpectedly | Fail closed | No trustworthy diagnostic result exists. |
 
-On Windows, `.cmd` files are shell scripts and cannot be passed portably to
-Node's `spawnSync` with `shell: false`. The wrapper resolves npm's
-`node_modules/npm/bin/npx-cli.js` beside `process.execPath` and launches it with
-that same Node executable. Missing launcher evidence fails closed; the hook does
-not enable `shell: true` or interpolate staged filenames into a command string.
+The wrapper does not invoke `npx`, `npm exec`, or a package manager. The
+artifact path must be absolute and exist before launch; missing, relative, or
+floating paths fail closed. The hook does not enable `shell: true` or
+interpolate staged filenames into a command string.
 
 ## Validation
 
 `npm run test:react-doctor-hook` covers path filtering, a real temporary Git
 index, clean and blocking results, score-outage text, no-source behavior,
-index-read failure, process failure, and Windows npx entrypoint resolution.
+index-read failure, process failure, and exact-artifact/relative-path failure
+boundaries.
 
-For an explicit full-project closeout, run `npx -y react-doctor@latest . --score` separately and record whether the remote score was available. Do not treat that remote result as the commit gate.
+For a future full-project closeout, first qualify and pin an offline artifact
+with independent license, dependency, network-denial, and Windows/Linux
+receipts. Do not treat an unqualified or remotely resolved result as the commit
+gate.
 
 ## Emergency Bypass
 

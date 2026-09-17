@@ -5,7 +5,7 @@ const {
   buildReactDoctorArgs,
   classifyReactDoctorResult,
   readStagedFrontendFiles,
-  resolveNpxInvocation,
+  resolveReactDoctorArtifact,
   selectFrontendFiles,
 } = require("./react-doctor-precommit-core.cjs");
 
@@ -33,19 +33,19 @@ if (stagedFiles.length === 0) {
 
 console.log(`Running React Doctor for ${stagedFiles.length} staged frontend file(s)...`);
 
-const npxInvocation = resolveNpxInvocation({
+const artifact = resolveReactDoctorArtifact({
   platform: process.platform,
-  execPath: process.execPath,
+  artifactPath: process.env.REACT_DOCTOR_ARTIFACT_PATH,
   existsSync: fs.existsSync,
 });
-if (!npxInvocation.ok) {
-  console.error(`React Doctor pre-commit gate failed closed: ${npxInvocation.error}`);
+if (!artifact.ok) {
+  console.error(`React Doctor pre-commit gate failed closed: ${artifact.error}`);
   process.exit(1);
 }
 
 const result = spawnSync(
-  npxInvocation.command,
-  [...npxInvocation.prefixArgs, ...buildReactDoctorArgs()],
+  artifact.command,
+  buildReactDoctorArgs(),
   {
     cwd: repoRoot,
     maxBuffer: MAX_BUFFER_BYTES,
