@@ -402,6 +402,14 @@ the local operator entrypoint; historical task notes remain in
     `test:captured-surfaces` plus `surfaces:check`, reached by
     `.git/hooks/pre-push`. No CI job added.
 
+- [#131 - React Doctor exact-artifact and production capture boundary](https://github.com/iMelki/mission-control-kanban/issues/131)
+  - The 2026-09-17 publication gate exposed a lint-scope defect: generated
+    `.tmp/private-index-commit` worktrees and existing CommonJS helper scripts
+    were included by `eslint .`, yielding 19 `no-require-imports` errors
+    unrelated to authored TypeScript. The config now ignores `.tmp/**` and
+    `scripts/**/*.cjs`; rerun the focused lint and full push gate before
+    publication.
+
 - [#148 - Root type errors are ungated: no `typecheck` script, and `tsc --noEmit` is already failing](https://github.com/iMelki/mission-control-kanban/issues/148)
   - Found while working #147, pre-existing and NOT introduced by it:
     `npx tsc --noEmit` at the repo root reports

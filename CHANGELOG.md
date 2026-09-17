@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Keep generated fixtures and CommonJS helpers out of the TypeScript lint
+  boundary (2026-09-17, #131)** - ESLint now ignores the repository's `.tmp/`
+  private-index fixture worktrees and the existing `scripts/**/*.cjs` helper
+  surface. The pre-push lint was otherwise traversing generated CommonJS files
+  and reporting 19 `@typescript-eslint/no-require-imports` errors even though
+  the source and test contracts were green.
+
 - **Re-captured stale surfaces and excluded ignored temporary worktrees from
   production typechecking (2026-09-17, #131, #147)** - Root `tsconfig.json`
   now excludes the ignored `tmp/` workspace so a nested Paperclip fixture cannot
