@@ -409,6 +409,10 @@ the local operator entrypoint; historical task notes remain in
     JavaScript entry point through Node on Windows, where npm's `.cmd` shim is
     not spawnable with `shell: false`. Targeted contracts, TypeScript, lint, the
     staged warning-level diagnostic, and the CI-equivalent pre-commit run pass.
+    The production capture refresh measured all 18 declared route/viewport
+    pairs from detached build `oKnH3V6PBCE48rvB25JHc` at commit `75f1a42`:
+    every response was HTTP 200 with zero clipping, and the probe's injected
+    overflow control moved clipped elements from 0 to 1.
   - The 2026-09-17 publication gate exposed a lint-scope defect: generated
     `.tmp/private-index-commit` worktrees and existing CommonJS helper scripts
     were included by `eslint .`, yielding 19 `no-require-imports` errors

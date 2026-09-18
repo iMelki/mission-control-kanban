@@ -17,7 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fail-closed pre-commit wrapper. On Windows, the same qualified JavaScript CLI
   entry runs through Node rather than an unspawnable `.cmd` shim. A rejected
   board retry now returns the cockpit to its visible error state instead of
-  leaving it indefinitely pending.
+  leaving it indefinitely pending. The five affected workspace captures were
+  re-measured against production build `oKnH3V6PBCE48rvB25JHc`: all 18 required
+  route/viewport checks returned HTTP 200 with zero clipping, and the overflow
+  probe's injected negative control moved from 0 to 1 clipped element.
 
 - **Keep generated fixtures and CommonJS helpers out of the TypeScript lint
   boundary (2026-09-17, #131)** - ESLint now ignores the repository's `.tmp/`
