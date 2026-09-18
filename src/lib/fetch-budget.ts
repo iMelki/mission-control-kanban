@@ -35,29 +35,39 @@ export async function fetchWithBudget(
   if (signal?.aborted) throw createAbortError(signal.reason);
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response | undefined;
+  const discardBody = () => {
+    if (!controller.signal.aborted) controller.abort();
+    void response?.body?.cancel().catch(() => undefined);
+  };
+  const timer = setTimeout(discardBody, timeoutMs);
 
-  const onAbort = () => controller.abort(signal?.reason);
+  const onAbort = () => {
+    if (!controller.signal.aborted) controller.abort(signal?.reason);
+    void response?.body?.cancel().catch(() => undefined);
+  };
   signal?.addEventListener('abort', onAbort, { once: true });
   let released = false;
   const release = () => {
     if (released) return;
     released = true;
+    discardBody();
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
   };
 
   try {
-    const response = await fetch(input, {
+    const fetchedResponse = await fetch(input, {
       ...rest,
       cache: rest.cache ?? 'no-store',
       signal: controller.signal,
     });
+    response = fetchedResponse;
     return {
-      response,
+      response: fetchedResponse,
       json: async <T>() => {
         try {
-          return await readJsonWithinBudget<T>(response, controller.signal);
+          return await readJsonWithinBudget<T>(fetchedResponse, controller.signal);
         } finally {
           release();
         }

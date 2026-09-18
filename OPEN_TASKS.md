@@ -421,7 +421,8 @@ the local operator entrypoint; historical task notes remain in
   - **Review P2 repair (2026-09-18):** the original fetch budget ended after
     headers, leaving JSON-body stalls unbounded. `fetchWithBudget` now retains
     the deadline through `json()` consumption and short-circuits already
-    aborted callers; the focused fixture covers both paths. Fresh detached
+    aborted callers; releasing a non-OK response now also aborts and cancels
+    its unread body. Focused fixtures cover all three paths. Fresh detached
     build `nUsHVMOg36oyCuHqsHQ5n` at `57b335e` re-measured all 18 declared
     route/viewport pairs: HTTP 200 throughout, zero clipping, and the injected
     overflow control moved 0->1.

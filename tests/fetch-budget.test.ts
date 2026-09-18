@@ -28,6 +28,32 @@ test('keeps the deadline active while a JSON body is stalled', async () => {
   }
 });
 
+test('release cancels an unread error response body', async () => {
+  let requestSignal: AbortSignal | undefined;
+  let bodyCancelled = false;
+  globalThis.fetch = (async (_input, init) => {
+    requestSignal = init?.signal as AbortSignal;
+    return new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"error":'));
+      },
+      cancel() {
+        bodyCancelled = true;
+      },
+    }), { status: 500, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+
+  try {
+    const request = await fetchWithBudget('/api/tasks', { timeoutMs: 10 });
+    request.release();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(requestSignal?.aborted, true);
+    assert.equal(bodyCancelled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('does not start a request when the caller signal is already aborted', async () => {
   const controller = new AbortController();
   controller.abort(new DOMException('Unmounted.', 'AbortError'));
