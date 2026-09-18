@@ -403,6 +403,12 @@ the local operator entrypoint; historical task notes remain in
     `.git/hooks/pre-push`. No CI job added.
 
 - [#131 - React Doctor exact-artifact and production capture boundary](https://github.com/iMelki/mission-control-kanban/issues/131)
+  - **PR #170 follow-up (2026-09-18):** CI installs the lockfile-pinned
+    `react-doctor@0.9.12` artifact and supplies its absolute Linux workspace
+    binary path to the fail-closed wrapper. The wrapper also supports the exact
+    JavaScript entry point through Node on Windows, where npm's `.cmd` shim is
+    not spawnable with `shell: false`. Targeted contracts, TypeScript, lint, the
+    staged warning-level diagnostic, and the CI-equivalent pre-commit run pass.
   - The 2026-09-17 publication gate exposed a lint-scope defect: generated
     `.tmp/private-index-commit` worktrees and existing CommonJS helper scripts
     were included by `eslint .`, yielding 19 `no-require-imports` errors

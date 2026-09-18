@@ -160,6 +160,16 @@ export default function WorkspacePage() {
     setBoardLoadStatus('ready');
   }, [setBoardLoadStatus, setTasks]);
 
+  const retryBoardLoad = useCallback(async (workspaceIdToLoad: string) => {
+    setBoardLoadStatus('pending');
+    try {
+      await loadWorkspaceTasks(workspaceIdToLoad);
+    } catch (error) {
+      console.error('Failed to retry task load:', error);
+      setBoardLoadStatus('error');
+    }
+  }, [loadWorkspaceTasks, setBoardLoadStatus]);
+
   const runGitHubProjectSync = useCallback(async (
     workspaceToSync: Workspace,
     trigger: 'auto' | 'manual'
@@ -459,10 +469,7 @@ export default function WorkspacePage() {
           <span>Board data failed to load. The empty columns are not a settled count.</span>
           <button
             type="button"
-            onClick={() => {
-              setBoardLoadStatus('pending');
-              void loadWorkspaceTasks(workspace.id);
-            }}
+            onClick={() => void retryBoardLoad(workspace.id)}
             className="rounded border border-mc-border px-2 py-1 text-xs hover:bg-mc-bg-tertiary"
           >
             Retry board load

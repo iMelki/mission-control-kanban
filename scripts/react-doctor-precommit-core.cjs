@@ -75,7 +75,7 @@ function buildReactDoctorArgs() {
   ];
 }
 
-function resolveReactDoctorArtifact({ platform, artifactPath, existsSync }) {
+function resolveReactDoctorArtifact({ platform, artifactPath, existsSync, nodePath = process.execPath }) {
   const candidate = String(artifactPath ?? "").trim();
   const isAbsolute = platform === "win32" ? path.win32.isAbsolute(candidate) : path.posix.isAbsolute(candidate);
   if (!candidate || !isAbsolute) {
@@ -86,6 +86,9 @@ function resolveReactDoctorArtifact({ platform, artifactPath, existsSync }) {
   }
   if (!existsSync(candidate)) {
     return { ok: false, error: `React Doctor artifact is missing: ${candidate}.` };
+  }
+  if (platform === "win32" && /\.(?:c?js|mjs)$/i.test(candidate)) {
+    return { ok: true, command: nodePath, prefixArgs: [candidate] };
   }
   return { ok: true, command: candidate, prefixArgs: [] };
 }

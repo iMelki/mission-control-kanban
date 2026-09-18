@@ -4,9 +4,14 @@
 
 The commit gate scans only matching frontend files in the staged Git index. It
 uses a reviewed, absolute `REACT_DOCTOR_ARTIFACT_PATH` when one has been
-qualified locally. Without that exact offline artifact, the gate fails closed;
+qualified locally. CI installs the lockfile-pinned `react-doctor` artifact and
+passes its absolute workspace path to the wrapper. Without that exact offline artifact, the gate fails closed;
 it never installs or resolves a floating package. A qualified artifact receives
 these arguments:
+
+On Windows, set the local path to the lockfile-installed JavaScript entry point
+(`node_modules/react-doctor/bin/react-doctor.js`); the wrapper launches that exact
+artifact through the current Node executable instead of relying on a `.cmd` shim.
 
 ```text
 . --verbose --scope files --staged --blocking warning --no-score --no-color

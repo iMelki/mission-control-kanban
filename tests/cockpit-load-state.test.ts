@@ -132,3 +132,11 @@ test('call sites consume the extracted presenters (old inline copies cannot snea
   assert.match(page, /isCockpitSettled/);
   assert.doesNotMatch(sse, /setIsOnline\(/);
 });
+
+test('a rejected board retry restores the error state instead of leaving the cockpit pending', () => {
+  const page = readSrc('app/workspace/[slug]/page.tsx');
+
+  assert.match(page, /const retryBoardLoad = useCallback\(async \(workspaceIdToLoad: string\) => \{/);
+  assert.match(page, /setBoardLoadStatus\('pending'\);[\s\S]*await loadWorkspaceTasks\(workspaceIdToLoad\);[\s\S]*catch \(error\) \{[\s\S]*setBoardLoadStatus\('error'\);/);
+  assert.match(page, /onClick=\{\(\) => void retryBoardLoad\(workspace\.id\)\}/);
+});

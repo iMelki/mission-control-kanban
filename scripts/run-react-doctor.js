@@ -45,7 +45,7 @@ if (!artifact.ok) {
 
 const result = spawnSync(
   artifact.command,
-  buildReactDoctorArgs(),
+  [...artifact.prefixArgs, ...buildReactDoctorArgs()],
   {
     cwd: repoRoot,
     maxBuffer: MAX_BUFFER_BYTES,

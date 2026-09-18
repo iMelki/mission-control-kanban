@@ -29,6 +29,15 @@ test("pre-commit invokes React Doctor once and keeps line-ending checks read-onl
   assert.match(config, /- id: mixed-line-ending[\s\S]*?args:\s*\[--fix=no\]/);
 });
 
+test("CI installs the lockfile artifact and supplies its absolute path to the gate", () => {
+  const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
+
+  assert.match(workflow, /actions\/setup-node@[\w]+/);
+  assert.match(workflow, /node-version: "24\.18\.0"/);
+  assert.match(workflow, /npm ci --ignore-scripts/);
+  assert.match(workflow, /REACT_DOCTOR_ARTIFACT_PATH: \$\{\{ github\.workspace \}\}\/node_modules\/\.bin\/react-doctor/);
+});
+
 test("selects only safe, staged-scope frontend paths", () => {
   assert.deepEqual(
     selectFrontendFiles([
@@ -72,6 +81,21 @@ test("accepts only an existing absolute Windows artifact", () => {
     ok: true,
     command: "C:\\artifacts\\react-doctor.exe",
     prefixArgs: [],
+  });
+});
+
+test("runs a qualified Windows JavaScript CLI artifact through Node", () => {
+  const result = resolveReactDoctorArtifact({
+    platform: "win32",
+    artifactPath: "C:\\repo\\node_modules\\react-doctor\\bin\\react-doctor.js",
+    existsSync: () => true,
+    nodePath: "C:\\Program Files\\nodejs\\node.exe",
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    command: "C:\\Program Files\\nodejs\\node.exe",
+    prefixArgs: ["C:\\repo\\node_modules\\react-doctor\\bin\\react-doctor.js"],
   });
 });
 

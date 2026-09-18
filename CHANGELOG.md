@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Restore the React Doctor CI artifact contract and failed-board retry state
+  (2026-09-18, #131, PR #170)** - CI now installs the exact lockfile-pinned
+  React Doctor CLI and supplies its absolute workspace artifact to the
+  fail-closed pre-commit wrapper. On Windows, the same qualified JavaScript CLI
+  entry runs through Node rather than an unspawnable `.cmd` shim. A rejected
+  board retry now returns the cockpit to its visible error state instead of
+  leaving it indefinitely pending.
+
 - **Keep generated fixtures and CommonJS helpers out of the TypeScript lint
   boundary (2026-09-17, #131)** - ESLint now ignores the repository's `.tmp/`
   private-index fixture worktrees and the existing `scripts/**/*.cjs` helper
