@@ -16,11 +16,12 @@ export function GitHubConnectionStatus() {
   const refresh = async () => {
     setLoading(true);
     try {
-      const response = await fetchWithBudget('/api/github/diagnostics');
-      if (!response.ok) {
-        throw new Error(`GitHub diagnostics request failed (${response.status})`);
+      const request = await fetchWithBudget('/api/github/diagnostics');
+      if (!request.response.ok) {
+        request.release();
+        throw new Error(`GitHub diagnostics request failed (${request.response.status})`);
       }
-      const payload = (await response.json()) as GitHubDiagnostics;
+      const payload = await request.json<GitHubDiagnostics>();
       setDiagnostics(payload);
     } catch (error) {
       setDiagnostics({

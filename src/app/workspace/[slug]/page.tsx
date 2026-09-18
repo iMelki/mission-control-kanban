@@ -147,14 +147,15 @@ export default function WorkspacePage() {
     workspaceIdToLoad: string,
     signal?: AbortSignal,
   ) => {
-    const tasksRes = await fetchWithBudget(
+    const tasksRequest = await fetchWithBudget(
       `/api/tasks?workspace_id=${workspaceIdToLoad}`,
       { signal },
     );
-    if (!tasksRes.ok) {
-      throw new Error(`Task load failed (${tasksRes.status})`);
+    if (!tasksRequest.response.ok) {
+      tasksRequest.release();
+      throw new Error(`Task load failed (${tasksRequest.response.status})`);
     }
-    const tasksData = await tasksRes.json();
+    const tasksData = await tasksRequest.json<Task[]>();
     debug.api('Loaded tasks', { count: tasksData.length });
     setTasks(tasksData);
     setBoardLoadStatus('ready');
@@ -244,13 +245,14 @@ export default function WorkspacePage() {
 
     async function loadWorkspace() {
       try {
-        const res = await fetchWithBudget(`/api/workspaces/${slug}`, { signal: controller.signal });
-        if (res.ok) {
-          const data = await res.json();
+        const workspaceRequest = await fetchWithBudget(`/api/workspaces/${slug}`, { signal: controller.signal });
+        if (workspaceRequest.response.ok) {
+          const data = await workspaceRequest.json<Workspace>();
           setWorkspace(data);
           return;
         }
-        if (res.status === 404) {
+        workspaceRequest.release();
+        if (workspaceRequest.response.status === 404) {
           setNotFound(true);
           setBoardLoadStatus('error');
           return;
@@ -289,16 +291,21 @@ export default function WorkspacePage() {
       }
 
       try {
-        const [agentsRes, eventsRes] = await Promise.all([
+        const [agentsRequest, eventsRequest] = await Promise.all([
           fetchWithBudget(`/api/agents?workspace_id=${workspaceId}`, { signal: controller.signal }),
           fetchWithBudget('/api/events', { signal: controller.signal }),
         ]);
 
-        if (agentsRes.ok) setAgents(await agentsRes.json());
-        if (eventsRes.ok) {
-          setEvents(await eventsRes.json());
+        if (agentsRequest.response.ok) {
+          setAgents(await agentsRequest.json());
+        } else {
+          agentsRequest.release();
+        }
+        if (eventsRequest.response.ok) {
+          setEvents(await eventsRequest.json());
           setEventsLoadStatus('ready');
         } else {
+          eventsRequest.release();
           setEventsLoadStatus('error');
         }
       } catch (error) {

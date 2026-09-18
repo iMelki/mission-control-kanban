@@ -77,6 +77,11 @@ the local operator entrypoint; historical task notes remain in
     fetch budget, `data-workspace-ready` only when the board is ready.
     Regression: `npm run test:cockpit-load-state`. Live 13/13 on a production
     side-serve (not :3021) with `stuckCount` 0.
+  - **2026-09-18 PR #170 review repair:** the budget now remains active while
+    a successful response body is parsed, not only until headers arrive. The
+    `fetch-budget` regression fixture proves a body that never completes
+    rejects at the deadline, and an already-aborted caller signal never starts
+    the fetch.
 
 - [#164 - the capture harness cannot survive its own subject: the dev server dies under on-demand compile](https://github.com/iMelki/mission-control-kanban/issues/164)
   - `next dev` first-hit compiles measured at 15-54 s per route; the process
