@@ -22,7 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   consumption. The five affected workspace captures were
   re-measured against production build `oKnH3V6PBCE48rvB25JHc`: all 18 required
   route/viewport checks returned HTTP 200 with zero clipping, and the overflow
-  probe's injected negative control moved from 0 to 1 clipped element.
+  probe's injected negative control moved from 0 to 1 clipped element. The
+  review repair then re-ran the five changed cockpit records from detached
+  production build `nUsHVMOg36oyCuHqsHQ5n` at `57b335e`, again with 18/18 HTTP
+  200 and zero clipping.
 
 - **Keep generated fixtures and CommonJS helpers out of the TypeScript lint
   boundary (2026-09-17, #131)** - ESLint now ignores the repository's `.tmp/`

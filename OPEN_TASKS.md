@@ -418,6 +418,13 @@ the local operator entrypoint; historical task notes remain in
     pairs from detached build `oKnH3V6PBCE48rvB25JHc` at commit `75f1a42`:
     every response was HTTP 200 with zero clipping, and the probe's injected
     overflow control moved clipped elements from 0 to 1.
+  - **Review P2 repair (2026-09-18):** the original fetch budget ended after
+    headers, leaving JSON-body stalls unbounded. `fetchWithBudget` now retains
+    the deadline through `json()` consumption and short-circuits already
+    aborted callers; the focused fixture covers both paths. Fresh detached
+    build `nUsHVMOg36oyCuHqsHQ5n` at `57b335e` re-measured all 18 declared
+    route/viewport pairs: HTTP 200 throughout, zero clipping, and the injected
+    overflow control moved 0->1.
   - The 2026-09-17 publication gate exposed a lint-scope defect: generated
     `.tmp/private-index-commit` worktrees and existing CommonJS helper scripts
     were included by `eslint .`, yielding 19 `no-require-imports` errors
