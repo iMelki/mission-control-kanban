@@ -15,9 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `next` and `eslint-config-next` to 16.3.6 with a refreshed lockfile. The
   local production audit drops from six findings (one critical, three high,
   two moderate) to two moderate findings. Local Webpack build, typecheck, and
-  18 production clipping measurements pass; hosted PR validation and review
-  remain pending. The optional Turbopack production build is separately
-  tracked in #175 and is not claimed green.
+  18 production clipping measurements pass. An independent advisory code review
+  and hosted PR checks passed before PR #176 merged at
+  `67d045bafe02a9dded874307f65f4237d4050c20`; post-merge checks then
+  passed. The merge lacked separately consulted operator land approval; see
+  [agent-settings #1249](https://github.com/iMelki/agent-settings/issues/1249).
+  The remaining moderate findings are tracked in #177; the optional
+  direct Turbopack build remains tracked in #175 and is not claimed green.
 
 
 - **Reject HTTP error pages during production capture (2026-09-24, #173,
