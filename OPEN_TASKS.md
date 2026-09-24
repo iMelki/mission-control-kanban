@@ -621,10 +621,12 @@ the local operator entrypoint; historical task notes remain in
   - Closed after PR #176 merged at
     `67d045bafe02a9dded874307f65f4237d4050c20`. Local Webpack build,
     typecheck, tests, lint, and 18 production clipping measurements passed;
-    superior review, PR checks, and post-merge checks passed. The production
-    audit fell from six findings to two moderate findings, tracked in #177;
-    direct Turbopack build compatibility remains open in #175. See the
-    [upgrade record](docs/preflight/records/2026-09-24-nextjs-16-3-6-upgrade.md).
+    advisory code review, PR checks, and post-merge checks passed. The merge
+    lacked separately consulted operator land approval, tracked in
+    [agent-settings #1249](https://github.com/iMelki/agent-settings/issues/1249).
+    The production audit fell from six findings to two moderate findings,
+    tracked in #177; direct Turbopack build compatibility remains open in #175.
+    See the [upgrade record](docs/preflight/records/2026-09-24-nextjs-16-3-6-upgrade.md).
 
 - [#173 - Fail closed when production capture receives HTTP error pages](https://github.com/iMelki/mission-control-kanban/issues/173)
   - Closed after the shared HTTP-success guard, 404/500 negative tests, HTTP

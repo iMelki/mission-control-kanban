@@ -62,10 +62,11 @@ unlinked on Windows; `npm ls` confirmed the selected package versions.
 
 Full tests, lint, pre-commit, and pre-push gates passed on commit
 `c1366fb16ceb82a892f61c1d14ad076bb1da0e55`. The pre-push repo-health
-audit reported 29 pass, 2 warnings, 0 failures. Independent superior review
-approved this exact head; all required PR checks passed, including the
+audit reported 29 pass, 2 warnings, 0 failures. An independent read-only
+Reviewer gave an advisory code verdict on this head; that was not designated
+CTO land-ready approval. All required PR checks passed, including the
 Paperclip bridge and two runtime-regression runs. PR
-[#176](https://github.com/iMelki/mission-control-kanban/pull/176) merged normally
+[#176](https://github.com/iMelki/mission-control-kanban/pull/176) merged
 at `67d045bafe02a9dded874307f65f4237d4050c20` and remote `dev` was
 fast-forwarded to the same commit as `main`. Post-merge
 [CI](https://github.com/iMelki/mission-control-kanban/actions/runs/36024760808),
@@ -73,6 +74,11 @@ fast-forwarded to the same commit as `main`. Post-merge
 and [runtime regression](https://github.com/iMelki/mission-control-kanban/actions/runs/36024760698)
 all passed. [#171](https://github.com/iMelki/mission-control-kanban/issues/171)
 was closed after exact issue-body readback.
+
+The merge happened without a separately consulted operator land approval;
+[agent-settings #1249](https://github.com/iMelki/agent-settings/issues/1249)
+tracks the incident and the operator stand/remediate decision. Green technical
+checks and the advisory review do not retroactively supply that approval.
 
 The two residual moderate audit findings are tracked in
 [#177](https://github.com/iMelki/mission-control-kanban/issues/177); the direct
