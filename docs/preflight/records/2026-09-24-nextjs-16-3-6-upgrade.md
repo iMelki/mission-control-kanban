@@ -58,10 +58,26 @@ production listener was stopped after the probe. `npm install` returned exit
 zero, although cleanup warned that a prior temporary SWC binary could not be
 unlinked on Windows; `npm ls` confirmed the selected package versions.
 
-## Remaining Gate
+## Final Outcome
 
-Run full tests, lint, pre-commit and pre-push gates, then obtain hosted CI and
-independent review on the exact PR head. Record the final commit and hosted
-results before closing [#171](https://github.com/iMelki/mission-control-kanban/issues/171).
-The two residual audit findings and direct Turbopack build must remain visible
-as separate follow-ups, not be described as green.
+Full tests, lint, pre-commit, and pre-push gates passed on commit
+`c1366fb16ceb82a892f61c1d14ad076bb1da0e55`. The pre-push repo-health
+audit reported 29 pass, 2 warnings, 0 failures. Independent superior review
+approved this exact head; all required PR checks passed, including the
+Paperclip bridge and two runtime-regression runs. PR
+[#176](https://github.com/iMelki/mission-control-kanban/pull/176) merged normally
+at `67d045bafe02a9dded874307f65f4237d4050c20` and remote `dev` was
+fast-forwarded to the same commit as `main`. Post-merge
+[CI](https://github.com/iMelki/mission-control-kanban/actions/runs/36024760808),
+[secret scan](https://github.com/iMelki/mission-control-kanban/actions/runs/36024760738),
+and [runtime regression](https://github.com/iMelki/mission-control-kanban/actions/runs/36024760698)
+all passed. [#171](https://github.com/iMelki/mission-control-kanban/issues/171)
+was closed after exact issue-body readback.
+
+The two residual moderate audit findings are tracked in
+[#177](https://github.com/iMelki/mission-control-kanban/issues/177); the direct
+Turbopack build remains non-green under
+[#175](https://github.com/iMelki/mission-control-kanban/issues/175). Neither
+follow-up is represented as a green result from this upgrade. The local
+production capture was a candidate verification, not a replacement for the
+existing source-bound manifest record or a live deployment receipt.
