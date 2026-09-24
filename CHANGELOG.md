@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Avoid the Paperclip migration CI startup race (2026-09-24, #172, PR #170)** -
+  The migration harness now waits for PostgreSQL's TCP listener inside the
+  pinned container, so the temporary Unix-socket-only initialization server
+  cannot be mistaken for final readiness. The hosted migration check is the
+  remaining validation gate; no local Docker operation was run.
+
 - **Restore the React Doctor CI artifact contract and failed-board retry state
   (2026-09-18, #131, PR #170)** - CI now installs the exact lockfile-pinned
   React Doctor CLI and supplies its absolute workspace artifact to the

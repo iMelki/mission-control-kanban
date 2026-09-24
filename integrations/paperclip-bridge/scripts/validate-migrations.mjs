@@ -68,7 +68,9 @@ function docker(args, options = {}) {
 function waitForPostgres() {
   for (let attempt = 1; attempt <= READY_ATTEMPTS; attempt += 1) {
     const result = docker(
-      ["exec", containerName, "pg_isready", "-U", "postgres"],
+      // The image's temporary init server accepts Unix-socket probes, then stops.
+      // TCP is available only after the final PostgreSQL server starts.
+      ["exec", containerName, "pg_isready", "-h", "127.0.0.1", "-U", "postgres"],
       { allowFailure: true, timeoutMs: 5_000 },
     );
     if (result.status === 0) {
@@ -76,7 +78,7 @@ function waitForPostgres() {
     }
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
   }
-  throw new Error("Pinned PostgreSQL 17 container did not become ready");
+  throw new Error("Pinned PostgreSQL 17 container did not become ready on TCP");
 }
 
 function psql(database, sql, options = {}) {

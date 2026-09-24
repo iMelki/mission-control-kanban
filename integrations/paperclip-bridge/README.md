@@ -52,7 +52,10 @@ The migration checks separately run every SQL statement through the exact
 declared Paperclip host validator and exercise the empty install, legacy
 backfill/composite constraints, cross-company rejection, and fail-closed
 legacy cases in a short-lived digest-pinned PostgreSQL 17 container. Every
-`psql` call uses `-X` and `ON_ERROR_STOP`.
+`psql` call uses `-X` and `ON_ERROR_STOP`. Readiness probes the final server's
+TCP listener inside the container, because the image's temporary initialization
+server can accept Unix-socket checks before stopping. See [the CI startup-race
+record](../../docs/preflight/records/2026-09-24-paperclip-migration-startup-race.md).
 
 ## Paperclip configuration
 

@@ -534,6 +534,14 @@ the local operator entrypoint; historical task notes remain in
       ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190626)).
 
 
+- [#172 - Fix Paperclip bridge migration CI startup readiness race](https://github.com/iMelki/mission-control-kanban/issues/172)
+  - The 2026-09-18 PR #170 Paperclip bridge job passed typecheck and 42 tests,
+    then failed `createdb` after socket-based `pg_isready` reported ready.
+    [Investigation and acceptance gate](docs/preflight/records/2026-09-24-paperclip-migration-startup-race.md).
+  - The harness now probes the final server's TCP listener. Keep this issue open
+    until the new PR head passes the hosted migration check; local Docker was
+    not used. This blocks PR #170 merge, not current production use.
+
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
   - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge
     commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`. PR #137 follow-ups are
