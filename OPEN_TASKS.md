@@ -1,22 +1,12 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-09-17
+Last updated: 2026-09-24
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
-
-- [#173 - Fail closed when production capture receives HTTP error pages](https://github.com/iMelki/mission-control-kanban/issues/173)
-  - Review of PR #170 reproduced HTTP 500 yielding `production_ok` and
-    `scoreable:true`; the clipping probe could likewise call a failed route
-    clean solely because the error page had zero clipped elements.
-  - The preflight and each probe route now require successful HTTP responses;
-    500/404 negative tests and HTTP 200 controls cover the shared guard.
-    Keep promotion held until the repaired head passes hosted CI and full
-    independent review. The previous capture records were not re-measured by
-    this source fix. See `docs/production-capture.md`.
 
 - [#152 - the workspace cockpit announced a five-tab widget that controls nothing; now navigation](https://github.com/iMelki/mission-control-kanban/issues/152)
   - **Landed 2026-09-07.** `role="tablist"` + five `role="tab"` with **zero**
@@ -544,14 +534,6 @@ the local operator entrypoint; historical task notes remain in
       ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190626)).
 
 
-- [#172 - Fix Paperclip bridge migration CI startup readiness race](https://github.com/iMelki/mission-control-kanban/issues/172)
-  - The 2026-09-18 PR #170 Paperclip bridge job passed typecheck and 42 tests,
-    then failed `createdb` after socket-based `pg_isready` reported ready.
-    [Investigation and acceptance gate](docs/preflight/records/2026-09-24-paperclip-migration-startup-race.md).
-  - The harness now probes the final server's TCP listener. Keep this issue open
-    until the new PR head passes the hosted migration check; local Docker was
-    not used. This blocks PR #170 merge, not current production use.
-
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
   - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge
     commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`. PR #137 follow-ups are
@@ -623,6 +605,18 @@ the local operator entrypoint; historical task notes remain in
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 
 ## Recently Completed
+
+- [#173 - Fail closed when production capture receives HTTP error pages](https://github.com/iMelki/mission-control-kanban/issues/173)
+  - Closed after the shared HTTP-success guard, 404/500 negative tests, HTTP
+    200 control, independent review, and hosted CI passed. PR #170 merged at
+    `a79ce5fc1fd09f777f893af8427a165080c243db`. Earlier capture records
+    were not re-measured; see `docs/production-capture.md`.
+
+- [#172 - Fix Paperclip bridge migration CI startup readiness race](https://github.com/iMelki/mission-control-kanban/issues/172)
+  - Closed after the TCP-only readiness probe passed hosted bridge migrations
+    twice and PR #170 merged at `a79ce5fc1fd09f777f893af8427a165080c243db`.
+    No local Docker was used; see the
+    [investigation and outcome](docs/preflight/records/2026-09-24-paperclip-migration-startup-race.md).
 
 - [#140 - Cockpit misses GitHub Project #15 (Frontend Revenue Program)](https://github.com/iMelki/mission-control-kanban/issues/140)
   - Decision: project #15 belongs in MCK. Migration `021`

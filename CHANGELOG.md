@@ -16,13 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   BUILD_ID classification. The clipping probe refuses a failed required route
   before recording a clean result, even when its error page has zero clipped
   elements. Focused fixtures cover HTTP 500, 404, missing responses, and an
-  HTTP 200 control. The repaired head still needs hosted CI and review.
+  HTTP 200 control. Independent review and hosted CI passed before PR #170
+  merged at `a79ce5fc1fd09f777f893af8427a165080c243db`.
 
 - **Avoid the Paperclip migration CI startup race (2026-09-24, #172, PR #170)** -
   The migration harness now waits for PostgreSQL's TCP listener inside the
   pinned container, so the temporary Unix-socket-only initialization server
-  cannot be mistaken for final readiness. The hosted migration check is the
-  remaining validation gate; no local Docker operation was run.
+  cannot be mistaken for final readiness. Hosted migration checks passed twice
+  before PR #170 merged; no local Docker operation was run.
 
 - **Restore the React Doctor CI artifact contract and failed-board retry state
   (2026-09-18, #131, PR #170)** - CI now installs the exact lockfile-pinned
