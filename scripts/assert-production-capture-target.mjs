@@ -230,6 +230,19 @@ export async function inspectLiveHtml(baseHref, { timeoutMs = 5000, fetchImpl = 
   }
 }
 
+export function isSuccessfulCaptureHttpResponse({ ok, status } = {}) {
+  return ok === true && Number.isInteger(status) && status >= 200 && status < 300;
+}
+
+export function requireSuccessfulCapturePageResponse(response, route) {
+  const status = response ? response.status() : null;
+  const ok = response ? response.ok() : false;
+  if (!isSuccessfulCaptureHttpResponse({ ok, status })) {
+    throw new Error(`Capture route ${route} returned HTTP ${status ?? 'no response'}; refusing to score it.`);
+  }
+  return status;
+}
+
 export async function prepareProductionCaptureTarget({
   env = process.env,
   repoRoot,
@@ -258,6 +271,15 @@ export async function prepareProductionCaptureTarget({
       'target_unreachable',
       `Could not GET ${parsed.href}/ (${error && error.message ? error.message : error}).`,
       { buildId, fetched: true }
+    );
+  }
+
+  if (!isSuccessfulCaptureHttpResponse(live)) {
+    const httpStatus = Number.isInteger(live?.status) ? live.status : null;
+    return refused(
+      'target_http_error',
+      `GET ${parsed.href}/ returned HTTP ${httpStatus ?? 'unknown'}; refusing to score the target.`,
+      { buildId, fetched: true, httpStatus }
     );
   }
 

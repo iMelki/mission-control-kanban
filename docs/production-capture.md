@@ -56,8 +56,12 @@ Preflight exit 2 means the target is not scoreable. Typical codes:
 | `build_id_required` | No production BUILD_ID from env, `MCK_NEXT_DIR`, or HTML. |
 | `build_id_mismatch` | Served HTML BUILD_ID disagrees with the declared id. |
 | `target_unreachable` | Capture port did not answer. |
+| `target_http_error` | Capture port answered with a failed or invalid HTTP response; its HTML and BUILD_ID are not scored. |
 
 `MCK_ALLOW_DEV_CAPTURE` does not override 3021.
+The clipping probe also refuses any required route whose navigation has no
+successful HTTP response, before measuring or writing a clean result. A
+zero-clipping error page is not production UI evidence ([#173](https://github.com/iMelki/mission-control-kanban/issues/173)).
 
 ## Evidence already on disk
 

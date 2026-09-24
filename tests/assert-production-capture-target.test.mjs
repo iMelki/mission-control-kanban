@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
 import {
   classifyCaptureTarget,
   prepareProductionCaptureTarget,
   resolveBuildIdFromEnv,
+  requireSuccessfulCapturePageResponse,
   SUPERVISED_DEV_PORT,
   EXIT_REFUSED,
 } from '../scripts/assert-production-capture-target.mjs';
@@ -152,6 +154,94 @@ test('prepare accepts a reachable production target', async () => {
   assert.equal(result.code, 'production_ok');
   assert.equal(result.fetched, true);
   assert.equal(result.httpStatus, 200);
+});
+
+for (const [status, html] of [
+  [500, PROD_HTML],
+  [404, '<html><body>Not Found</body></html>'],
+]) {
+  test(`prepare refuses HTTP ${status} before scoring HTML or BUILD_ID`, async () => {
+    const result = await prepareProductionCaptureTarget({
+      env: { MCK_BASE_URL: 'http://127.0.0.1:3121', MCK_BUILD_ID: 'LhwzqpkXyePprPbNMSBmo' },
+      fetchHtml: async () => ({ ok: false, status, html }),
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.scoreable, false);
+    assert.equal(result.code, 'target_http_error');
+    assert.equal(result.httpStatus, status);
+    assert.equal(result.fetched, true);
+  });
+}
+
+for (const status of [404, 500]) {
+  test(`route response guard rejects HTTP ${status} before clipping is measured`, () => {
+    const response = { ok: () => false, status: () => status };
+    assert.throws(
+      () => requireSuccessfulCapturePageResponse(response, '/workspace/test'),
+      new RegExp(`Capture route /workspace/test returned HTTP ${status}`)
+    );
+  });
+}
+
+test('route response guard requires a real successful response', () => {
+  assert.throws(() => requireSuccessfulCapturePageResponse(null, '/'), /no response/);
+  assert.throws(
+    () => requireSuccessfulCapturePageResponse({ ok: () => false, status: () => 200 }, '/'),
+    /HTTP 200/
+  );
+  assert.equal(
+    requireSuccessfulCapturePageResponse({ ok: () => true, status: () => 200 }, '/'),
+    200
+  );
+});
+
+async function runCliAgainstHttp(status, html) {
+  const server = createServer((_request, response) => {
+    response.writeHead(status, { 'content-type': 'text/html' });
+    response.end(html);
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const port = server.address().port;
+    const child = spawn(process.execPath, [CLI, '--json'], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        MCK_BASE_URL: `http://127.0.0.1:${port}`,
+        MCK_BUILD_ID: 'LhwzqpkXyePprPbNMSBmo',
+      },
+      windowsHide: true,
+      timeout: 10_000,
+    });
+    let stdout = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    const exitCode = await new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', resolve);
+    });
+    return { exitCode, payload: JSON.parse(stdout.trim()) };
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+for (const status of [404, 500]) {
+  test(`CLI refuses live HTTP ${status} before classifying production HTML`, async () => {
+    const { exitCode, payload } = await runCliAgainstHttp(status, PROD_HTML);
+    assert.equal(exitCode, EXIT_REFUSED);
+    assert.equal(payload.code, 'target_http_error');
+    assert.equal(payload.httpStatus, status);
+    assert.equal(payload.scoreable, false);
+  });
+}
+
+test('CLI accepts a live HTTP 200 production target', async () => {
+  const { exitCode, payload } = await runCliAgainstHttp(200, PROD_HTML);
+  assert.equal(exitCode, 0);
+  assert.equal(payload.code, 'production_ok');
+  assert.equal(payload.httpStatus, 200);
+  assert.equal(payload.scoreable, true);
 });
 
 test('CLI as the probes invoke it: unset URL exits 2 for base_url_required', () => {

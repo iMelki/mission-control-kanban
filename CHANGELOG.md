@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reject HTTP error pages during production capture (2026-09-24, #173,
+  PR #170)** - The preflight now rejects failed or invalid HTTP responses before
+  BUILD_ID classification. The clipping probe refuses a failed required route
+  before recording a clean result, even when its error page has zero clipped
+  elements. Focused fixtures cover HTTP 500, 404, missing responses, and an
+  HTTP 200 control. The repaired head still needs hosted CI and review.
+
 - **Avoid the Paperclip migration CI startup race (2026-09-24, #172, PR #170)** -
   The migration harness now waits for PostgreSQL's TCP listener inside the
   pinned container, so the temporary Unix-socket-only initialization server

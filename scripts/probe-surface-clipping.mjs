@@ -36,6 +36,7 @@ import { fileURLToPath } from 'node:url';
 import {
   prepareProductionCaptureTarget,
   exitIfCaptureTargetUnscoreable,
+  requireSuccessfulCapturePageResponse,
 } from './assert-production-capture-target.mjs';
 
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), '..', '..');
@@ -130,6 +131,14 @@ async function measure(browser, route, vp, opts = {}) {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   const response = await page.goto(base + route.url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  let status;
+  try {
+    status = requireSuccessfulCapturePageResponse(response, route.url);
+  } catch (error) {
+    await page.close();
+    await browser.close();
+    throw error;
+  }
   await page.waitForTimeout(3500);
   try { await page.evaluate(() => document.fonts.ready); } catch { /* fonts API unavailable */ }
   if (opts.inject) {
@@ -147,7 +156,7 @@ async function measure(browser, route, vp, opts = {}) {
     await page.screenshot({ path: path.join(outDir, `${route.name}-${vp.label}.png`), fullPage: false });
   }
   await page.close();
-  return { ...data, route: route.name, url: route.url, status: response ? response.status() : null, viewport: vp.label, pageErrors };
+  return { ...data, route: route.name, url: route.url, status, viewport: vp.label, pageErrors };
 }
 
 const browser = await chromium.launch({ headless: true });

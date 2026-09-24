@@ -8,6 +8,16 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
+- [#173 - Fail closed when production capture receives HTTP error pages](https://github.com/iMelki/mission-control-kanban/issues/173)
+  - Review of PR #170 reproduced HTTP 500 yielding `production_ok` and
+    `scoreable:true`; the clipping probe could likewise call a failed route
+    clean solely because the error page had zero clipped elements.
+  - The preflight and each probe route now require successful HTTP responses;
+    500/404 negative tests and HTTP 200 controls cover the shared guard.
+    Keep promotion held until the repaired head passes hosted CI and full
+    independent review. The previous capture records were not re-measured by
+    this source fix. See `docs/production-capture.md`.
+
 - [#152 - the workspace cockpit announced a five-tab widget that controls nothing; now navigation](https://github.com/iMelki/mission-control-kanban/issues/152)
   - **Landed 2026-09-07.** `role="tablist"` + five `role="tab"` with **zero**
     `role="tabpanel"`, inside `<nav aria-label="Workspace sections">`. All five
