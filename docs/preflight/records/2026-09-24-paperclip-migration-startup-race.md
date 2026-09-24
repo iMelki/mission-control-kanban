@@ -46,3 +46,18 @@ with a red required check.
 - [PostgreSQL `pg_isready` reference](https://www.postgresql.org/docs/current/app-pg-isready.html): a zero exit means that the server accepts connections at the moment probed.
 - Bridge harness: `integrations/paperclip-bridge/scripts/validate-migrations.mjs`.
 - Bridge release/install scope: [#47](https://github.com/iMelki/mission-control-kanban/issues/47).
+
+## Final Outcome
+
+The TCP-readiness fix was pushed at `805420cca4df5b45735174d42ad5a255b287f56c`.
+The hosted Paperclip bridge migration job passed twice on the repaired PR head;
+one run reported 42 passing tests and all five migration scenarios. The
+independent review found no remaining code blocker after the separate HTTP
+capture guard fix. All required PR checks passed, and PR #170 merged normally
+at `a79ce5fc1fd09f777f893af8427a165080c243db`. The post-merge
+[CI](https://github.com/iMelki/mission-control-kanban/actions/runs/36018647743),
+[secret scan](https://github.com/iMelki/mission-control-kanban/actions/runs/36018647531),
+and [runtime regression](https://github.com/iMelki/mission-control-kanban/actions/runs/36018647434)
+also passed. Remote `dev` and `main` were aligned to the merge commit. Issue
+#172 was closed after exact readback. This does not constitute a live Paperclip
+installation or dispatch receipt; those remain under #47.
