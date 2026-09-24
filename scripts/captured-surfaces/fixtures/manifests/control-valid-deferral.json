@@ -1,0 +1,30 @@
+{
+  "route": "/settings",
+  "expect_summary": "CONTROL: a justified, tracked deferral is accepted",
+  "expect_codes": [],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "required",
+        "captureDeferred": {
+          "reason": "blocked on seeded runtime fixtures; the page renders empty without them",
+          "issue": "#144"
+        }
+      }
+    ]
+  }
+}

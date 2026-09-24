@@ -1,0 +1,50 @@
+{
+  "route": "/settings",
+  "expect_summary": "HOLE (c): reason x is a refusal to answer dressed as an answer",
+  "expect_codes": [
+    "exclusion_reason_missing_placeholder",
+    "exclusion_untracked"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/",
+        "capture": "required",
+        "capturedAt": {
+          "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+          "date": "2026-08-13",
+          "viewports": [
+            "mobile",
+            "desktop"
+          ],
+          "method": "probe-captured-surfaces.mjs (element-level clipping + liveness)",
+          "liveness": {
+            "httpStatus": 200,
+            "finalPath": "/",
+            "elementCount": 1600,
+            "textLength": 4820,
+            "skeletonMarkers": 0
+          }
+        }
+      },
+      {
+        "route": "/settings",
+        "capture": "excluded",
+        "reason": "x"
+      }
+    ]
+  }
+}

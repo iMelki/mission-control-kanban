@@ -1,0 +1,48 @@
+{
+  "route": "/debug",
+  "expect_summary": "CONTROL: a substantive, attributed exclusion is accepted",
+  "expect_codes": [],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "required",
+        "capturedAt": {
+          "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+          "date": "2026-08-13",
+          "viewports": [
+            "mobile",
+            "desktop"
+          ],
+          "method": "probe-captured-surfaces.mjs (element-level clipping + liveness)",
+          "liveness": {
+            "httpStatus": 200,
+            "finalPath": "/settings",
+            "elementCount": 1600,
+            "textLength": 4820,
+            "skeletonMarkers": 0
+          }
+        }
+      },
+      {
+        "route": "/debug",
+        "capture": "excluded",
+        "reason": "developer-only overlay, never reachable from the shipped navigation",
+        "excludedBy": "#144"
+      }
+    ]
+  }
+}

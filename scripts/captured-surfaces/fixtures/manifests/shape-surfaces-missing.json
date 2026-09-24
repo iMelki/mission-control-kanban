@@ -1,0 +1,8 @@
+{
+  "route": null,
+  "expect_summary": "surfaces missing is a failure",
+  "expect_codes": [
+    "surfaces_not_array"
+  ],
+  "manifest": {}
+}

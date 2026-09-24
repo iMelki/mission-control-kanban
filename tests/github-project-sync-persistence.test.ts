@@ -11,6 +11,7 @@ let closeDb: typeof import('../src/lib/db').closeDb;
 let queryOne: typeof import('../src/lib/db').queryOne;
 let run: typeof import('../src/lib/db').run;
 let syncLoadedGitHubProjectWorkspace: typeof import('../src/lib/github-project-sync').syncLoadedGitHubProjectWorkspace;
+let projectWorkspaceMappings: typeof import('../src/lib/github-project-sync').GITHUB_PROJECT_WORKSPACE_MAPPINGS;
 let parseDispatchMetadata: typeof import('../src/lib/dispatch-contract').parseDispatchMetadata;
 let validateDispatchMetadata: typeof import('../src/lib/dispatch-contract').validateDispatchMetadata;
 
@@ -30,6 +31,7 @@ test.before(async () => {
   queryOne = dbModule.queryOne;
   run = dbModule.run;
   syncLoadedGitHubProjectWorkspace = syncModule.syncLoadedGitHubProjectWorkspace;
+  projectWorkspaceMappings = syncModule.GITHUB_PROJECT_WORKSPACE_MAPPINGS;
   parseDispatchMetadata = dispatchContract.parseDispatchMetadata;
   validateDispatchMetadata = dispatchContract.validateDispatchMetadata;
 });
@@ -209,6 +211,40 @@ test('targeted GitHub Project sync mutates only one exact issue ref', async () =
   assert.equal(result.imported, 1);
   assert.equal(result.updated, 0);
   assert.deepEqual(result.details.map((detail) => detail.issue), ['iMelki/mission-control-kanban#35']);
+});
+
+test('every declared GitHub Project workspace mapping is seeded by the migrations', () => {
+  resetDb();
+
+  for (const mapping of projectWorkspaceMappings) {
+    const row = queryOne<{
+      id: string;
+      name: string;
+      icon: string | null;
+      description: string | null;
+      github_project_owner: string | null;
+      github_project_number: number | null;
+      github_project_title: string | null;
+      github_project_url: string | null;
+      github_project_auto_refresh: number | null;
+    }>(
+      `SELECT id, name, icon, description, github_project_owner, github_project_number,
+              github_project_title, github_project_url, github_project_auto_refresh
+       FROM workspaces WHERE slug = ?`,
+      [mapping.slug]
+    );
+
+    assert.ok(row, `workspace '${mapping.slug}' is declared in code but never seeded by a migration`);
+    assert.equal(row.id, mapping.id);
+    assert.equal(row.name, mapping.name);
+    assert.equal(row.icon, mapping.icon);
+    assert.equal(row.description, mapping.description);
+    assert.equal(row.github_project_owner, mapping.github_project_owner);
+    assert.equal(row.github_project_number, mapping.github_project_number);
+    assert.equal(row.github_project_title, mapping.github_project_title);
+    assert.equal(row.github_project_url, mapping.github_project_url);
+    assert.equal(row.github_project_auto_refresh === 1, mapping.github_project_auto_refresh);
+  }
 });
 
 test('targeted GitHub Project sync fails closed when the issue ref is missing', async () => {

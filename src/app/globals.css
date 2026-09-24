@@ -9,6 +9,8 @@
   --mc-border: #30363d;
   --mc-text: #c9d1d9;
   --mc-text-secondary: #8b949e;
+  /* Solid muted metadata. Do not fade this with /60 — that composites to 2.87:1 (mck#151). */
+  --mc-text-muted: #8b949e;
   --mc-accent: #58a6ff;
   --mc-accent-green: #3fb950;
   --mc-accent-yellow: #d29922;
@@ -16,6 +18,37 @@
   --mc-accent-purple: #a371f7;
   --mc-accent-pink: #db61a2;
   --mc-accent-cyan: #39d353;
+  --mc-success: #3fb950;
+  --mc-warn: #d29922;
+  --mc-danger: #f85149;
+}
+
+/*
+ * fleet-motion-primitive v1.0.0 - BLOCK 1 (tokens).
+ *
+ * Canonical source: agent-settings shared/assets/motion-primitive/motion.css,
+ * standard id `fleet-motion-primitive` in shared/catalog/promoted-standards-register.json.
+ * Adopted verbatim - not re-derived. Every value is an exact reuse (80ms and 360ms
+ * from paperclip, 140ms and 240ms plus --ease-standard from the memsys web-console,
+ * --ease-out / --ease-in are Tailwind's own defaults).
+ *
+ * This app is Tailwind 3.4, so the tokens go on :root, not in an `@theme` block -
+ * `@theme` is the v4 variant of the primitive and would be inert here. The Tailwind
+ * consumption path is tailwind.config.ts (`duration-fast`, `ease-standard`).
+ *
+ * Semantics pick the step, not size:
+ *   instant - a state flips with no travel      fast - hover / focus / press
+ *   slow    - something moves or resizes        slower - a large surface
+ */
+:root {
+  --duration-instant: 80ms;
+  --duration-fast: 140ms;
+  --duration-slow: 240ms;
+  --duration-slower: 360ms;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
 }
 
 * {
@@ -34,6 +67,41 @@ body {
 body {
   background-color: var(--mc-bg);
   color: var(--mc-text);
+}
+
+/*
+ * Heading role (#142).
+ *
+ * The app has already chosen exactly one typeface: JetBrains Mono, loaded as a
+ * variable font by `next/font/google` in src/app/layout.tsx with the full
+ * 100-800 weight axis available. Introducing a second family would be a new
+ * typeface decision, so the heading role is expressed on the axes the chosen
+ * font already provides: a heavier real weight cut plus tighter tracking.
+ * Body text stays 400/normal, so headings no longer rest on size alone.
+ *
+ * These are element selectors on purpose (specificity 0,0,1): any component
+ * that needs a different weight can still override with a Tailwind utility.
+ */
+:root {
+  --mc-heading-weight: 700;
+  --mc-heading-tracking: -0.02em;
+  --mc-body-weight: 400;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--mc-heading-weight);
+  letter-spacing: var(--mc-heading-tracking);
+}
+
+/* Explicit opt-in for headings that also carry sizing utilities. */
+.text-heading {
+  font-weight: var(--mc-heading-weight);
+  letter-spacing: var(--mc-heading-tracking);
 }
 
 /* Custom scrollbar */
@@ -65,7 +133,7 @@ body {
 }
 
 .status-offline {
-  @apply bg-mc-accent-red/20 text-mc-accent-red border border-mc-accent-red/50;
+  @apply bg-mc-bg text-mc-accent-red border border-mc-accent-red/50;
 }
 
 /* Priority badge styles */
@@ -112,6 +180,12 @@ body {
   50% { opacity: 0.7; }
 }
 
+/*
+ * Deliberately NOT tokenised. 2s is an ambient breathing loop, not one of the four
+ * interaction steps, and forcing it onto --duration-slower (360ms) would change the
+ * design rather than adopt a token. Block 2 still reaches it: the blanket sweep sets
+ * animation-iteration-count to 1, which is what actually stops an infinite loop.
+ */
 .animate-pulse-soft {
   animation: pulse-soft 2s ease-in-out infinite;
 }
@@ -127,11 +201,127 @@ body {
   }
 }
 
+/* Something moves and resizes into place, so this is the `slow` step (0.2s -> 240ms). */
 .animate-slide-in {
-  animation: slide-in 0.2s ease-out;
+  animation: slide-in var(--duration-slow) var(--ease-out);
 }
 
 /* Glow effect for online status */
 .online-glow {
   box-shadow: 0 0 10px var(--mc-accent-green), 0 0 20px var(--mc-accent-green);
+}
+
+/*
+ * fleet-motion-primitive v1.0.0 - BLOCK 2 (the reduced-motion contract).
+ *
+ * MUST stay the last motion rule in this file so it wins on source order at equal
+ * specificity, and must sit after `@tailwind utilities` so it also outranks the
+ * generated duration/transition utilities.
+ *
+ * Layer A collapses the tokens themselves - it reaches every rule and every
+ * `duration-fast` utility that resolves through var(), and it is what JS sees from
+ * getComputedStyle().getPropertyValue().
+ *
+ * Layer B is the blanket sweep for what Layer A structurally cannot reach: the 481
+ * elements in this app still carrying Tailwind's hardcoded `transition` (150ms) and
+ * `animate-spin` / `animate-pulse`, none of which reference a token yet. Without
+ * Layer B, adopting this would have meant rewriting every one of those call sites
+ * first; with it, the migration to named tokens can proceed incrementally.
+ *
+ * 0.01ms, NOT 0. CSS Transitions Level 1 requires the combined duration to be
+ * greater than 0s for a transition to be created at all; at 0s `transitionend` never
+ * fires and any JS awaiting it hangs. paperclip already paid for that bug.
+ *
+ * `data-motion-essential` is the WCAG 2.3.3 escape hatch for motion that carries
+ * information (progress that would otherwise read as frozen) - never for decoration.
+ */
+/*
+ * fleet-motion-primitive v1.1.0 - BLOCK 1b (essential-motion tokens).
+ *
+ * MUST stay on :root and MUST NOT move into @theme. Tailwind v4 tree-shakes
+ * @theme variables it does not see used in a class name, and these are read by
+ * the plain rules below rather than by a utility - so in @theme they would be
+ * dropped, the busy indicator would fall back to 0s, and it would never animate
+ * at all. This app has already been bitten by that hole once: --duration-instant
+ * and --duration-slower were declared and silently absent from :root at runtime.
+ */
+:root {
+  --duration-essential-loop: 1000ms;
+  --ease-essential-loop: linear;
+}
+
+@keyframes fleet-busy-spin { to { transform: rotate(360deg); } }
+@keyframes fleet-busy-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.fleet-busy-indicator {
+  animation: fleet-busy-spin var(--duration-essential-loop, 1000ms)
+             var(--ease-essential-loop, linear) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Layer A - collapse the DECORATIVE tokens. --duration-essential-loop is
+     deliberately absent from this list: collapsing it on :root is exactly the
+     v1.0.0 bug, because :root is an ancestor of the elements Layer B skips, so
+     the escape hatch leaked and "exempt" spinners froze anyway. */
+  :root {
+    --duration-instant: 0.01ms;
+    --duration-fast: 0.01ms;
+    --duration-slow: 0.01ms;
+    --duration-slower: 0.01ms;
+
+    /* Essential motion is SLOWED, not stopped. */
+    --duration-essential-loop: 1600ms;
+  }
+
+  /* Layer B - sweep everything the tokens cannot reach. [role="progressbar"] is
+     exempt alongside the explicit attribute: ARIA already defines that role as
+     "displays the progress status for tasks that take a long time", so an app
+     that marked progress semantically should not need a second annotation.
+     aria-busy is deliberately NOT exempt - it is routinely set on whole-region
+     wrappers and would gut this sweep. */
+  *:where(:not(
+    [data-motion-essential], [data-motion-essential] *,
+    [role="progressbar"], [role="progressbar"] *
+  )),
+  *:where(:not(
+    [data-motion-essential], [data-motion-essential] *,
+    [role="progressbar"], [role="progressbar"] *
+  ))::before,
+  *:where(:not(
+    [data-motion-essential], [data-motion-essential] *,
+    [role="progressbar"], [role="progressbar"] *
+  ))::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Layer C - essential motion keeps running, with the vestibular trigger
+     removed: rotation out, opacity pulse in, at a slower cycle.
+     WCAG 2.3.3 exempts motion "essential to the ... information being conveyed",
+     and W3C's definition of essential also requires that the information cannot
+     be conveyed another way that conforms. It can be - a pulse conveys "still
+     working" without rotating - so the exemption buys the right to keep
+     signalling, not the right to keep spinning.
+
+     Bound to `.animate-spin` as well as the primitive class. Audited 2026-08-16:
+     all 19 `animate-spin` source lines in this app are request/busy indicators
+     (Loader2 and RefreshCw/RefreshCcw gated on a loading flag); there is no
+     decorative rotation. Re-audit before adding one, or mark it
+     data-motion-decorative and add that to this selector's :not().
+
+     !important at class specificity is load-bearing: Layer B above is
+     specificity 0, and among !important declarations the cascade is settled by
+     specificity, so (0,1,0) wins. */
+  .animate-spin,
+  .fleet-busy-indicator {
+    animation-name: fleet-busy-pulse !important;
+    animation-duration: var(--duration-essential-loop, 1600ms) !important;
+    animation-timing-function: var(--ease-standard, ease-in-out) !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0s !important;
+  }
 }

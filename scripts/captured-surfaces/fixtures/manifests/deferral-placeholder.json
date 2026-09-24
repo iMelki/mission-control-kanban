@@ -1,0 +1,33 @@
+{
+  "route": "/settings",
+  "expect_summary": "a deferral with reason x and no issue is not a decision",
+  "expect_codes": [
+    "deferral_reason_missing_placeholder",
+    "deferral_untracked"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "required",
+        "captureDeferred": {
+          "reason": "x",
+          "issue": "soon"
+        }
+      }
+    ]
+  }
+}

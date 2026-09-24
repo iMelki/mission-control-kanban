@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw, SearchX } from 'lucide-react';
+import { CockpitLoadingShell } from '@/components/CockpitLoadingShell';
 import { Header } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { MissionQueue } from '@/components/MissionQueue';
@@ -13,6 +14,8 @@ import { WorkspaceRuntimePolicyPanel } from '@/components/WorkspaceRuntimePolicy
 import { DispatchFailureQueue } from '@/components/DispatchFailureQueue';
 import { RuntimeAuditPanel } from '@/components/RuntimeAuditPanel';
 import { WorkspaceSectionTabs, type WorkspaceSection } from '@/components/workspace/WorkspaceSectionTabs';
+import { isCockpitSettled } from '@/lib/cockpit-load-state';
+import { fetchWithBudget } from '@/lib/fetch-budget';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
@@ -125,8 +128,10 @@ export default function WorkspacePage() {
     setTasks,
     setEvents,
     setIsOnline,
-    setIsLoading,
-    isLoading,
+    setBoardLoadStatus,
+    setEventsLoadStatus,
+    resetCockpitData,
+    boardLoadStatus,
   } = useMissionControl();
 
   const [pageState, setPageState] = useReducer(workspacePageReducer, initialWorkspacePageState);
@@ -138,14 +143,33 @@ export default function WorkspacePage() {
   const setSection = useCallback((nextSection: WorkspaceSection) => setPageState({ section: nextSection }), []);
   const autoSyncedWorkspaceRef = useRef<string | null>(null);
 
-  const loadWorkspaceTasks = useCallback(async (workspaceIdToLoad: string) => {
-    const tasksRes = await fetch(`/api/tasks?workspace_id=${workspaceIdToLoad}`);
-    if (tasksRes.ok) {
-      const tasksData = await tasksRes.json();
-      debug.api('Loaded tasks', { count: tasksData.length });
-      setTasks(tasksData);
+  const loadWorkspaceTasks = useCallback(async (
+    workspaceIdToLoad: string,
+    signal?: AbortSignal,
+  ) => {
+    const tasksRequest = await fetchWithBudget(
+      `/api/tasks?workspace_id=${workspaceIdToLoad}`,
+      { signal },
+    );
+    if (!tasksRequest.response.ok) {
+      tasksRequest.release();
+      throw new Error(`Task load failed (${tasksRequest.response.status})`);
     }
-  }, [setTasks]);
+    const tasksData = await tasksRequest.json<Task[]>();
+    debug.api('Loaded tasks', { count: tasksData.length });
+    setTasks(tasksData);
+    setBoardLoadStatus('ready');
+  }, [setBoardLoadStatus, setTasks]);
+
+  const retryBoardLoad = useCallback(async (workspaceIdToLoad: string) => {
+    setBoardLoadStatus('pending');
+    try {
+      await loadWorkspaceTasks(workspaceIdToLoad);
+    } catch (error) {
+      console.error('Failed to retry task load:', error);
+      setBoardLoadStatus('error');
+    }
+  }, [loadWorkspaceTasks, setBoardLoadStatus]);
 
   const runGitHubProjectSync = useCallback(async (
     workspaceToSync: Workspace,
@@ -211,31 +235,41 @@ export default function WorkspacePage() {
   // Connect to SSE for real-time updates
   useSSE();
 
-  // Load workspace data
+  // Load workspace metadata only. Board data is a second phase — do not mark
+  // the cockpit settled here (2026-08-31 stuck-load class).
   // react-doctor-disable-next-line -- Client-only operator shell keeps live workspace state and local interactions hydrated after the initial route render.
   useEffect(() => {
+    const controller = new AbortController();
+    resetCockpitData();
+    autoSyncedWorkspaceRef.current = null;
+
     async function loadWorkspace() {
       try {
-        const res = await fetch(`/api/workspaces/${slug}`);
-        if (res.ok) {
-          const data = await res.json();
+        const workspaceRequest = await fetchWithBudget(`/api/workspaces/${slug}`, { signal: controller.signal });
+        if (workspaceRequest.response.ok) {
+          const data = await workspaceRequest.json<Workspace>();
           setWorkspace(data);
-          setIsLoading(false);
-        } else if (res.status === 404) {
-          setNotFound(true);
-          setIsLoading(false);
           return;
         }
+        workspaceRequest.release();
+        if (workspaceRequest.response.status === 404) {
+          setNotFound(true);
+          setBoardLoadStatus('error');
+          return;
+        }
+        setNotFound(true);
+        setBoardLoadStatus('error');
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error('Failed to load workspace:', error);
         setNotFound(true);
-        setIsLoading(false);
-        return;
+        setBoardLoadStatus('error');
       }
     }
 
-    loadWorkspace();
-  }, [slug, setIsLoading, setNotFound, setWorkspace]);
+    void loadWorkspace();
+    return () => controller.abort();
+  }, [resetCockpitData, setBoardLoadStatus, setNotFound, setWorkspace, slug]);
 
   // Load workspace-specific data
   // react-doctor-disable-next-line -- Every polling interval created here is cleared in the returned cleanup; the OpenClaw abort timeout is bounded and cleared inline.
@@ -244,27 +278,45 @@ export default function WorkspacePage() {
 
     const currentWorkspace = loadedWorkspace;
     const workspaceId = currentWorkspace.id;
+    const controller = new AbortController();
 
     async function loadData() {
       try {
         debug.api('Loading workspace data...', { workspaceId });
+        await loadWorkspaceTasks(workspaceId, controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('Failed to load tasks:', error);
+        setBoardLoadStatus('error');
+      }
 
-        // Fetch workspace-scoped data
-        const [agentsRes, eventsRes] = await Promise.all([
-          fetch(`/api/agents?workspace_id=${workspaceId}`),
-          fetch('/api/events'),
+      try {
+        const [agentsRequest, eventsRequest] = await Promise.all([
+          fetchWithBudget(`/api/agents?workspace_id=${workspaceId}`, { signal: controller.signal }),
+          fetchWithBudget('/api/events', { signal: controller.signal }),
         ]);
 
-        if (agentsRes.ok) setAgents(await agentsRes.json());
-        await loadWorkspaceTasks(workspaceId);
-        if (eventsRes.ok) setEvents(await eventsRes.json());
-        if (currentWorkspace.github_project_owner && currentWorkspace.github_project_number) {
-          void loadN8nSyncStatus();
+        if (agentsRequest.response.ok) {
+          setAgents(await agentsRequest.json());
+        } else {
+          agentsRequest.release();
+        }
+        if (eventsRequest.response.ok) {
+          setEvents(await eventsRequest.json());
+          setEventsLoadStatus('ready');
+        } else {
+          eventsRequest.release();
+          setEventsLoadStatus('error');
         }
       } catch (error) {
-        console.error('Failed to load data:', error);
-      } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          console.error('Failed to load agents/events:', error);
+          setEventsLoadStatus('error');
+        }
+      }
+
+      if (currentWorkspace.github_project_owner && currentWorkspace.github_project_number) {
+        void loadN8nSyncStatus();
       }
 
       if (
@@ -290,9 +342,13 @@ export default function WorkspacePage() {
         if (openclawRes.ok) {
           const status = await openclawRes.json();
           setIsOnline(status.connected);
+          return;
         }
-      } catch {
         setIsOnline(false);
+      } catch {
+        if (!controller.signal.aborted) {
+          setIsOnline(false);
+        }
       }
     }
 
@@ -305,6 +361,7 @@ export default function WorkspacePage() {
         const res = await fetch('/api/events?limit=20');
         if (res.ok) {
           setEvents(await res.json());
+          setEventsLoadStatus('ready');
         }
       } catch (error) {
         console.error('Failed to poll events:', error);
@@ -325,9 +382,10 @@ export default function WorkspacePage() {
               return !current || current.status !== t.status;
             });
 
-          if (hasChanges) {
+          if (hasChanges || useMissionControl.getState().boardLoadStatus !== 'ready') {
             debug.api('[FALLBACK] Task changes detected, updating store');
             setTasks(newTasks);
+            setBoardLoadStatus('ready');
           }
         }
       } catch (error) {
@@ -355,6 +413,7 @@ export default function WorkspacePage() {
       : null;
 
     return () => {
+      controller.abort();
       clearInterval(eventPoll);
       clearInterval(connectionCheck);
       clearInterval(taskPoll);
@@ -362,12 +421,16 @@ export default function WorkspacePage() {
         clearInterval(n8nStatusPoll);
       }
     };
-  }, [loadedWorkspace, setAgents, setTasks, setEvents, setIsOnline, setIsLoading, loadWorkspaceTasks, runGitHubProjectSync, loadN8nSyncStatus]);
+  }, [loadedWorkspace, setAgents, setTasks, setEvents, setIsOnline, setBoardLoadStatus, setEventsLoadStatus, loadWorkspaceTasks, runGitHubProjectSync, loadN8nSyncStatus]);
+
+  if (!loadedWorkspace && !notFound) {
+    return <CockpitLoadingShell slug={slug} />;
+  }
 
   if (notFound) {
     return (
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
-        <div className="text-center">
+        <main id="main-content" tabIndex={-1} className="text-center outline-none">
           <SearchX aria-hidden="true" className="w-14 h-14 mx-auto mb-4 text-mc-text-secondary" />
           <h1 className="text-2xl font-bold mb-2">Workspace Not Found</h1>
           <p className="text-mc-text-secondary mb-6">
@@ -380,28 +443,15 @@ export default function WorkspacePage() {
             <ChevronLeft className="w-4 h-4" />
             Back to Dashboard
           </Link>
-        </div>
+        </main>
       </div>
     );
   }
 
-  const workspace = loadedWorkspace ?? {
-    id: slug,
-    name: `${slug} Workspace`,
-    slug,
-    description: 'Loading workspace metadata…',
-    icon: '🦞',
-    created_at: new Date(0).toISOString(),
-    updated_at: new Date(0).toISOString(),
-    github_project_owner: null,
-    github_project_number: null,
-    github_project_title: null,
-    github_project_url: null,
-    github_project_auto_refresh: 0,
-    default_runtime_type: 'manual',
-    default_runtime_config: null,
-    default_dispatch_enabled: 0,
-  } satisfies Workspace;
+  const workspace = loadedWorkspace;
+  if (!workspace) {
+    return <CockpitLoadingShell slug={slug} />;
+  }
 
   const latestN8nSync = n8nSyncStatus?.latest ?? null;
   const n8nSummary = (latestN8nSync?.summary ?? {}) as Record<string, unknown>;
@@ -413,10 +463,26 @@ export default function WorkspacePage() {
   return (
     <div
       className="min-h-[100dvh] max-h-[100dvh] flex flex-col bg-mc-bg overflow-hidden"
-      data-workspace-ready={loadedWorkspace ? 'true' : 'false'}
+      data-workspace-ready={isCockpitSettled({ workspaceReady: true, boardPhase: boardLoadStatus }) ? 'true' : 'false'}
+      data-cockpit-load={boardLoadStatus}
     >
       <Header workspace={workspace} />
       <WorkspaceSectionTabs section={section} onSectionChange={setSection} />
+      {boardLoadStatus === 'error' && (
+        <div
+          role="alert"
+          className="border-b border-mc-danger/40 bg-mc-danger/10 px-4 py-2 text-sm text-mc-text flex flex-wrap items-center gap-3"
+        >
+          <span>Board data failed to load. The empty columns are not a settled count.</span>
+          <button
+            type="button"
+            onClick={() => void retryBoardLoad(workspace.id)}
+            className="rounded border border-mc-border px-2 py-1 text-xs hover:bg-mc-bg-tertiary"
+          >
+            Retry board load
+          </button>
+        </div>
+      )}
       {section === 'settings' && <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />}
 
       {workspace.github_project_owner && workspace.github_project_number && (
@@ -458,7 +524,7 @@ export default function WorkspacePage() {
                 ? 'flex flex-wrap items-center gap-2 text-rose-200'
                 : n8nSyncPresentation?.state === 'warning'
                   ? 'flex flex-wrap items-center gap-2 text-amber-200'
-                  : 'flex flex-wrap items-center gap-2 text-mc-text-secondary/70'}>
+                  : 'flex flex-wrap items-center gap-2 text-mc-text-secondary'}>
                 {n8nSyncPresentation?.state === 'error' ? (
                   <AlertTriangle className="size-4 shrink-0" />
                 ) : n8nSyncPresentation?.state === 'warning' ? (
@@ -497,18 +563,21 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+      <main id="main-content" tabIndex={-1} className="flex flex-1 min-h-0 flex-col overflow-hidden outline-none">
         {section === 'board' && (
-          <div className="flex flex-1 min-h-0 overflow-hidden">
+          // Below lg the two fixed-width rails (w-64 + w-80 = 576px) exceed a 390px
+          // viewport and squeeze MissionQueue to a 0px content box, so the cockpit
+          // stacks into a single scrolling column instead (#142, WCAG 1.4.10).
+          <div className="flex flex-col lg:flex-row flex-1 min-w-0 min-h-0 overflow-y-auto lg:overflow-hidden">
             <AgentsSidebar workspaceId={workspace.id} />
             <MissionQueue workspaceId={workspace.id} />
             <LiveFeed />
           </div>
         )}
         {section === 'agents' && (
-          <div className="flex h-full overflow-hidden">
+          <div className="flex flex-col lg:flex-row h-full min-w-0 overflow-y-auto lg:overflow-hidden">
             <AgentsSidebar workspaceId={workspace.id} />
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 min-w-0 overflow-auto p-4">
               <RuntimeAuditPanel />
             </div>
           </div>
@@ -520,14 +589,14 @@ export default function WorkspacePage() {
           </div>
         )}
         {section === 'activity' && (
-          <div className="flex h-full overflow-hidden">
-            <div className="flex-1 overflow-auto p-4">
+          <div className="flex flex-col lg:flex-row h-full min-w-0 overflow-y-auto lg:overflow-hidden">
+            <div className="flex-1 min-w-0 overflow-auto p-4">
               <DispatchFailureQueue workspaceId={workspace.id} />
             </div>
             <LiveFeed />
           </div>
         )}
-      </div>
+      </main>
 
       {/* Debug Panel - only shows when debug mode enabled */}
       <SSEDebugPanel />

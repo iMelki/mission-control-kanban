@@ -1,0 +1,14 @@
+{
+  "route": null,
+  "expect_summary": "a bare string is not an entry",
+  "expect_codes": [
+    "liveness_contract_undeclared",
+    "entry_not_object",
+    "programme_empty"
+  ],
+  "manifest": {
+    "surfaces": [
+      "/settings"
+    ]
+  }
+}

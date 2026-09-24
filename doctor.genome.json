@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/iMelki/mission-control-kanban/dev/docs/schemas/doctor-genome.v1.json",
+  "$schema": "https://raw.githubusercontent.com/iMelki/projects-ops/main/docs/schemas/doctor-genome.v1.json",
   "schemaVersion": "doctor-genome.v1",
   "profile": "observe",
   "capabilities": [

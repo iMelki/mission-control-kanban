@@ -1,0 +1,44 @@
+{
+  "route": "/reports/[token]",
+  "expect_summary": "NEW: /reports/[token] cannot be visited; the capture must name the URL it loaded",
+  "expect_codes": [
+    "dynamic_capture_without_concrete_url"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/reports/[token]",
+        "capture": "required",
+        "capturedAt": {
+          "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+          "date": "2026-08-13",
+          "viewports": [
+            "mobile",
+            "desktop"
+          ],
+          "method": "probe-captured-surfaces.mjs (element-level clipping + liveness)",
+          "liveness": {
+            "httpStatus": 200,
+            "finalPath": "/reports/[token]",
+            "elementCount": 1600,
+            "textLength": 4820,
+            "skeletonMarkers": 0
+          }
+        }
+      }
+    ]
+  }
+}

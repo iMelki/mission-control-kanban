@@ -1,0 +1,28 @@
+{
+  "route": "/settings",
+  "expect_summary": "HOLE (b): a misspelled decision is rejected and cannot dodge the reason check",
+  "expect_codes": [
+    "capture_unrecognised"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "excludedd"
+      }
+    ]
+  }
+}

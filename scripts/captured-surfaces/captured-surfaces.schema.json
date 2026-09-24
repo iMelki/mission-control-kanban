@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/iMelki/agent-settings/shared/assets/captured-surface-manifest/captured-surfaces.schema.json",
+  "title": "Captured-surface manifest",
+  "description": "Per-repo record of which UI surfaces the scoring programme covers and which of them have actually been observed. Documentation of the SHAPE only. It is deliberately NOT the gate: a schema cannot express 'required but never captured', 'reason is a placeholder', or 'this capture measured a login redirect'. derive-captured-surfaces.mjs is the authority and validates the parsed value at runtime; a manifest that satisfies this schema can still fail the gate, and that is the point.",
+  "type": "object",
+  "required": ["livenessContract", "viewports", "surfaces"],
+  "additionalProperties": true,
+  "properties": {
+    "description": { "type": "string" },
+    "schemaVersion": { "const": "agent-settings.captured-surface-manifest.v1" },
+    "livenessContract": {
+      "description": "Whether capture records must carry liveness evidence. There is no warn-only mode and no default: an absent declaration is a gate failure.",
+      "oneOf": [
+        { "const": "v1", "description": "Every capture record must carry a valid `liveness` block." },
+        {
+          "type": "object",
+          "required": ["mode", "reason", "issue"],
+          "properties": {
+            "mode": { "const": "none" },
+            "reason": { "type": "string", "minLength": 20, "description": "Substantive. 'x', 'n/a', 'TBD' are rejected." },
+            "issue": { "type": "string", "description": "#issue, a URL, or a 40-hex commit, so an unproven capture programme cannot go quiet." }
+          }
+        }
+      ]
+    },
+    "liveness": {
+      "type": "object",
+      "description": "Per-repo liveness thresholds. A repo may RAISE these; the gate clamps any attempt to lower them below the canonical floor (minElements 100, minTextLength 200).",
+      "properties": {
+        "minElements": { "type": "integer", "minimum": 1 },
+        "minTextLength": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "derivation": {
+      "type": "object",
+      "description": "How routes are derived. May also live in docs/captured-surfaces.config.json, which wins.",
+      "properties": {
+        "router": { "enum": ["next-app-router"] },
+        "appDirs": { "type": "array", "items": { "type": "string" }, "description": "Repo-relative App Router roots, e.g. [\"src/app\"] or [\"apps/dashboard/src/app\"]." },
+        "dynamicExpansions": {
+          "type": "object",
+          "description": "Maps a dynamic pattern to the concrete values it resolves to, e.g. {\"/workspace/[slug]\": [\"memsys\", \"asimtop\"]}. A pattern with no expansion is KEPT as a pattern and still demands a decision.",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "ignoreDirs": { "type": "array", "items": { "type": "string" } },
+        "maxDepth": { "type": "integer", "minimum": 1, "maximum": 24, "description": "Bounded on purpose: unbounded recursive scans have frozen this host for hours." }
+      }
+    },
+    "viewports": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["label", "width", "height"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "width": { "type": "integer", "minimum": 1 },
+          "height": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "surfaces": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/surface" }
+    }
+  },
+  "$defs": {
+    "surface": {
+      "type": "object",
+      "required": ["route", "capture"],
+      "additionalProperties": true,
+      "properties": {
+        "route": { "type": "string", "pattern": "^/" },
+        "capture": {
+          "enum": ["required", "excluded"],
+          "description": "required = in the scoring programme, and must carry `capturedAt` or a tracked `captureDeferred`. excluded = deliberately outside it, and must carry `reason` + `excludedBy`."
+        },
+        "note": { "type": "string" },
+        "reason": { "type": "string", "description": "Mandatory for `excluded`. Minimum 20 chars, placeholders rejected." },
+        "excludedBy": { "type": "string", "description": "Mandatory for `excluded`. #issue, URL, or 40-hex commit." },
+        "probeUrl": { "type": "string", "description": "For a dynamic pattern: the concrete URL the probe should load." },
+        "capturedAt": { "$ref": "#/$defs/captureRecord" },
+        "captureDeferred": {
+          "type": "object",
+          "required": ["reason", "issue"],
+          "properties": {
+            "reason": { "type": "string", "minLength": 20 },
+            "issue": { "type": "string" }
+          }
+        }
+      }
+    },
+    "captureRecord": {
+      "type": "object",
+      "required": ["commit", "date", "viewports", "method"],
+      "additionalProperties": true,
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$", "description": "Full sha. A short sha is ambiguous and cannot be checked against a remote." },
+        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "viewports": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "Must cover every label the manifest declares." },
+        "method": { "type": "string", "minLength": 1, "description": "A capture with no named method cannot be reproduced, so it is not evidence." },
+        "concreteUrl": { "type": "string", "description": "Mandatory when `route` is a dynamic pattern: /reports/[token] cannot be visited." },
+        "clippedElements": { "type": "integer", "minimum": 0 },
+        "liveness": { "$ref": "#/$defs/liveness" }
+      }
+    },
+    "liveness": {
+      "type": "object",
+      "description": "Proof the capture observed the app rather than a socket, a redirect, or a loading state. Mandatory under livenessContract v1.",
+      "required": ["httpStatus", "finalPath", "elementCount", "textLength", "skeletonMarkers"],
+      "properties": {
+        "httpStatus": { "type": "integer", "minimum": 200, "maximum": 299, "description": "A listening port is not a served app: content-factory answered 500 on a live socket for a whole scoring round." },
+        "requestedPath": { "type": "string" },
+        "finalPath": { "type": "string", "description": "Where the browser ended up. Must equal the requested path, or the capture measured a redirect target." },
+        "elementCount": { "type": "integer", "minimum": 1, "description": "DOM elements under body. A fleet login page measured ~78." },
+        "textLength": { "type": "integer", "minimum": 0 },
+        "skeletonMarkers": { "type": "integer", "minimum": 0, "maximum": 0, "description": "aria-busy / data-loading / *skeleton* / animate-pulse. Must be 0." }
+      }
+    }
+  }
+}

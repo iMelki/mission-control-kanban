@@ -1,0 +1,8 @@
+{
+  "route": null,
+  "expect_summary": "the parsed JSON is validated, not cast",
+  "expect_codes": [
+    "manifest_not_object"
+  ],
+  "manifest": null
+}

@@ -14,7 +14,7 @@ const artifactDir = process.env.MCK_SMOKE_ARTIFACT_DIR || path.join(process.cwd(
 async function waitForWorkspaceReady(page) {
   const readyShell = page.locator('[data-workspace-ready="true"]');
   const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
-  const settingsTab = workspaceNav.getByRole('tab', { name: /^Settings$/i });
+  const settingsTab = workspaceNav.getByRole('button', { name: /^Settings$/i });
   try {
     await readyShell.waitFor({ timeout: 20_000 });
     await workspaceNav.waitFor({ timeout: 10_000 });
@@ -179,7 +179,7 @@ async function main() {
     await waitForWorkspaceReady(page);
     const workspaceNav = page.locator('nav[aria-label="Workspace sections"]');
     await workspaceNav.waitFor({ timeout: 20_000 });
-    const workspaceSettingsTab = workspaceNav.getByRole('tab', { name: /^Settings$/i });
+    const workspaceSettingsTab = workspaceNav.getByRole('button', { name: /^Settings$/i });
     await workspaceSettingsTab.waitFor({ timeout: 20_000 });
     await workspaceSettingsTab.click({ force: true });
     await page.getByRole('heading', { name: /Workspace runtime defaults/i }).waitFor({ timeout: 20_000 });
@@ -208,7 +208,7 @@ async function main() {
     await page.goto(workspaceUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForTimeout(1500);
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
-    await workspaceNav.getByRole('tab', { name: /^Board$/i }).click();
+    await workspaceNav.getByRole('button', { name: /^Board$/i }).click();
     await page.getByText(/Mission Queue/i).waitFor({ timeout: 10_000 });
     await page.waitForTimeout(1500);
 
@@ -234,7 +234,7 @@ async function main() {
     await page.keyboard.press('Escape');
     await page.getByLabel(/Runtime type/i).waitFor({ state: 'hidden', timeout: 10_000 });
 
-    const taskCard = page.locator('li > [role="button"]').filter({ hasText: task.title });
+    const taskCard = page.locator('li [data-task-open]').filter({ hasText: task.title });
     await taskCard.waitFor({ timeout: 10_000 });
     await taskCard.getByText(/Webhook auto/i).waitFor({ timeout: 10_000 });
     await taskCard.getByText(/Blocked by 1/i).waitFor({ timeout: 10_000 });
@@ -252,7 +252,7 @@ async function main() {
     await page.getByRole('button', { name: /Retry webhook/i }).waitFor({ state: 'hidden', timeout: 10_000 });
     await page.getByRole('button', { name: /All runtimes/i }).click();
 
-    const checklistCard = page.locator('li > [role="button"]').filter({ hasText: checklistTask.title });
+    const checklistCard = page.locator('li [data-task-open]').filter({ hasText: checklistTask.title });
     await checklistCard.waitFor({ timeout: 10_000 });
     await checklistCard.click();
     await page.getByRole('button', { name: /Apply ready-for-agent checklist/i }).click();

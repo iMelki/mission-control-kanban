@@ -9,7 +9,421 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Reject HTTP error pages during production capture (2026-09-24, #173,
+  PR #170)** - The preflight now rejects failed or invalid HTTP responses before
+  BUILD_ID classification. The clipping probe refuses a failed required route
+  before recording a clean result, even when its error page has zero clipped
+  elements. Focused fixtures cover HTTP 500, 404, missing responses, and an
+  HTTP 200 control. The repaired head still needs hosted CI and review.
+
+- **Avoid the Paperclip migration CI startup race (2026-09-24, #172, PR #170)** -
+  The migration harness now waits for PostgreSQL's TCP listener inside the
+  pinned container, so the temporary Unix-socket-only initialization server
+  cannot be mistaken for final readiness. The hosted migration check is the
+  remaining validation gate; no local Docker operation was run.
+
+- **Restore the React Doctor CI artifact contract and failed-board retry state
+  (2026-09-18, #131, PR #170)** - CI now installs the exact lockfile-pinned
+  React Doctor CLI and supplies its absolute workspace artifact to the
+  fail-closed pre-commit wrapper. On Windows, the same qualified JavaScript CLI
+  entry runs through Node rather than an unspawnable `.cmd` shim. A rejected
+  board retry now returns the cockpit to its visible error state instead of
+  leaving it indefinitely pending, including when JSON body delivery stalls
+  after response headers: the fetch budget now remains active through JSON
+  consumption. The same helper also cancels unread error-response bodies when
+  callers release them, so retries cannot accumulate stalled 4xx/5xx streams.
+  The five affected workspace captures were
+  re-measured against production build `oKnH3V6PBCE48rvB25JHc`: all 18 required
+  route/viewport checks returned HTTP 200 with zero clipping, and the overflow
+  probe's injected negative control moved from 0 to 1 clipped element. The
+  review repair then re-ran the five changed cockpit records from detached
+  production build `nUsHVMOg36oyCuHqsHQ5n` at `57b335e`, again with 18/18 HTTP
+  200 and zero clipping.
+
+- **Keep generated fixtures and CommonJS helpers out of the TypeScript lint
+  boundary (2026-09-17, #131)** - ESLint now ignores the repository's `.tmp/`
+  private-index fixture worktrees and the existing `scripts/**/*.cjs` helper
+  surface. The pre-push lint was otherwise traversing generated CommonJS files
+  and reporting 19 `@typescript-eslint/no-require-imports` errors even though
+  the source and test contracts were green.
+
+- **Re-captured stale surfaces and excluded ignored temporary worktrees from
+  production typechecking (2026-09-17, #131, #147)** - Root `tsconfig.json`
+  now excludes the ignored `tmp/` workspace so a nested Paperclip fixture cannot
+  poison the MCK production build. A fresh production build (`BUILD_ID
+  ObV3-lrSx_aEb83vcxjs1`) and `next start` capture on `127.0.0.1:3121`
+  passed the capture-target preflight; the clipping probe self-proof passed,
+  all 18 route/viewport measurements returned HTTP 200, and 0 surfaces were
+  clipped. `docs/captured-surfaces.json` records the exact commit, source
+  digests, file counts, and method for all seven previously stale surfaces.
+
+- **Re-applied a11y hunks from the unpushed 2026-08-30 clone (2026-09-14, #150, #152)** -
+  Six local commits (`c3696ba`..`7599fcc`) were compared hunk-by-hunk against
+  `origin/dev`; only the hunks dev never landed are re-applied here, on top of
+  dev's versions. `/settings`: the four text fields share a new copy-owned
+  `src/components/ui/input.tsx` (shadcn structure on `mc-*` tokens) with a
+  `focus-visible` ring instead of `focus:outline-none` (#150's 8 remaining
+  observations). Task cards: the `role="button"` wrapper around the dnd-kit
+  handle becomes two sibling `<button>`s (`data-task-open`,
+  `data-task-drag-handle`), the handle now surfaces on keyboard focus
+  (`nested-interactive`, `MissionQueue.tsx:480`). The horizontal board scroller
+  and the live-feed list are focusable `role="region"`s
+  (`scrollable-region-focusable`). The icon-only cockpit back link gets an
+  accessible name (`link-name`). The env-diagnostics `aria-label` sits on a
+  `role="group"`. `scripts/smoke-runtime-ui.js` follows the new card selector;
+  `tests/accessibility-remediation-contract.test.mjs` pins the shapes. Superseded
+  hunks were NOT re-applied: the Radix `TabsContent` panel restructure (dev chose
+  navigation in `ac9b5f3`), the `/60` tab ring (`c9598b6`), the OFFLINE and
+  timestamp contrast pairs (`5dff835`, `e3de15d`), the hand-rolled n8n table
+  region (`25d0b2c`), and the probe shadow parser (`c9598b6`). Source-only: the
+  captured surfaces are stale until a production re-probe.
+
+- **Runtime UI smoke red on every `dev` push since `ac9b5f3` (2026-09-14, #169)** -
+  `scripts/smoke-runtime-ui.js` waited for `getByRole('tab', ...)` inside the
+  workspace nav after #152 turned those controls into plain buttons, so
+  `waitForWorkspaceReady` timed out before any task card was reached. The three
+  nav lookups use the button role; the contract test ratchets `getByRole('tab'`
+  out of the smoke.
+
+- **Modernize n8n MCK sync history with shared `DataTable` primitive (2026-09-06)** -
+  Replaced the bespoke ad-hoc `<table>` markup in `src/app/n8n-sync-history/page.tsx`
+  with the standard typed `DataTable` component (`DataTableColumn<MckN8nSyncRun>[]`),
+  matching `RuntimeAuditPanel.tsx` conventions and preserving alert styling,
+  formatted timestamps, counts, and empty states. Updated surface dependency digest.
+
+### Documentation
+
+- **#162 rebase recapture (2026-09-05, #150)** -
+  After rebasing the cockpit tab-ring change onto `origin/dev`, the five
+  workspace captures were re-probed on production `127.0.0.1:3121`
+  (BUILD_ID `zjCB9QIMpCkNMgTzqIZuh`, detached `/tmp/mck-prod`). All five
+  measured 0 clipped at both viewports and now share sourceDigest
+  `3eaa0d2de234e9e6` over 58 files. `surfaces:check` is green again.
+
+- **First production Frontend SOTA Gauntlet (2026-09-01, #139)** -
+  Isolated `next start` on `127.0.0.1:3121` scored **14/21**
+  (`2/2/2/2/2/2/2`) at SHA `74f6717` / BUILD_ID `S8HgxCEJWRAGRBloUGmn1`.
+  Prototype band; not 19–21. Not Awwwards. `:3021` was not fetched.
+  Scorecard: `docs/frontend-sota-gauntlet-2026-09-01/scorecard.md`.
+
+### Fixed
+
+- **Silent stuck cockpit loads no longer present false pre-data as settled
+  (2026-09-01, #166, 2026-08-31 gauntlet row)** -
+  Workspace metadata arrival no longer clears the loading flag before tasks
+  exist, the placeholder cockpit is a skeleton instead of a confident empty
+  board, GitHub readiness treats "not fetched yet" as Checking rather than
+  "No token detected / 0/3 lanes ready", and the header connection badge
+  stays Checking until the OpenClaw probe finishes. Local SSE open/error no
+  longer writes that badge (it is not OpenClaw). Task fetch is no longer
+  blocked behind agents/events, hangs become a retryable error after 10s,
+  and `data-workspace-ready` is true only when the board phase is ready.
+  Regression: `npm run test:cockpit-load-state`.
+
+- **Muted timestamp contrast (2026-09-01, #151)** -
+  `text-[10px] text-mc-text-secondary/60` composited to rgb(92,100,108) on
+  the task-card `#161b22` at ~2.87:1. Replaced at the token/class level with
+  solid `text-mc-text-muted` (`#8b949e`) which is >=4.5:1 on `#0d1117`,
+  `#161b22`, and `#21262d`.
+
+- **n8n and OFFLINE leftover contrast (2026-09-01, #151)** -
+  Default n8n status line dropped `text-mc-text-secondary/70` (3.45:1 on
+  `#161b22`) for solid `text-mc-text-secondary` (5.62:1). OFFLINE badge fill
+  moved from `bg-mc-accent-red/20` (4.05:1 live on `:3122`) to existing
+  `bg-mc-bg` (5.65:1 live on `:3123`). No new tokens. Regression:
+  `npm run test:contrast-tokens`.
+
 ### Changed
+
+- **Cockpit CTA and a11y lift (2026-08-27, #139)** -
+  `Import GitHub` and `New Task` now share `mc-accent` (outline + filled
+  primary). Sidebars toggle width instantly (`transition-none`). A skip
+  link lands on `#main-content` on every served page. Added
+  `mc-success` / `mc-warn` / `mc-danger` and migrated the board, readiness,
+  and agent runtime pill maps only. Dashboard loading uses skeleton cards
+  instead of a pulsing glyph. Reduced-motion was already the fleet
+  contract in `globals.css`. Score remains **UNMEASURED / 5.7 carried** —
+  see `docs/uiux-awwwards-lift-2026-08-27.md`. No 8.0 claim.
+
+### Fixed
+
+- **Capture probes refuse the dying next-dev listener (2026-08-27, #164, #139)** -
+  `scripts/assert-production-capture-target.mjs` is now the shared preflight for
+  `surfaces:probe` and `probe-surface-a11y.mjs`. `MCK_BASE_URL` is required;
+  `http://127.0.0.1:3021` is refused without a GET, because that GET is the
+  on-demand compile that killed the supervised server. A leftover
+  `.next/BUILD_ID` does not make next-dev scoreable. Negative proofs cover the
+  missing URL, 3021, next-dev HTML, missing BUILD_ID, and the CLI exit-2 path
+  the probes actually invoke. Operator rule: `docs/production-capture.md`.
+  Also landed the `capturedViewports` narrowing in
+  `scripts/derive-captured-surfaces.ts` so `next build` is no longer blocked by
+  `'record.viewports' is of type 'unknown'`.
+
+### Documentation
+
+- **First production-build capture (2026-08-26, #164, #165)** -
+  `docs/production-capture-2026-08-26.md`. Every UI/UX round before this one
+  measured this app on `next dev`, and `next dev` does not survive being
+  measured: it died compiling the 4th consecutive on-demand route, and its
+  watchdog then failed recovery twice at a 300-second ceiling while first-hit
+  compiles were measured at 15-54 s per route. Built from a detached worktree at
+  `c3bfc6f` and served with `next start` on a separate port, the same sequential
+  warm answers 200 on 11 of 11 routes in 18-161 ms and the server stays up -
+  `/runtime-regression` improves from 53,880 ms to 17.9 ms. `.next/BUILD_ID` is
+  `LhwzqpkXyePprPbNMSBmo`, verified present before any number was recorded.
+  Measured on that build: WCAG **2.5.8 (AA, 24x24) passes with 0 failures of
+  4,394 controls** (positive control caught on 18 of 18 units), 2.5.5 (AAA,
+  44x44) fails 53.4%, contrast coverage is **100%** (13,488 of 13,488 elements,
+  cross-checked against a 1x1 canvas readback with 0 disagreements) with a worst
+  ratio of 2.87:1, and focus coverage is **67.3%** - so 1,438 Tab-reachable
+  controls remain unmeasured rather than clean. Composite 5.8 -> 5.9, and the
+  report states plainly that this is a measurement gain rather than a product
+  improvement, and which way it will move if the unmeasured remainder is
+  reached. Nothing in `src/` changed, the manifest was not re-recorded, and
+  `livenessContract` stays at `none`: 5 of 18 route x viewport units still
+  refuse under `liveness_unstable_across_runs`, which was traced to the settle
+  detector accepting a pre-data quiet window - the per-surface content assertion
+  agent-settings#691 asks for is still the missing half.
+
+### Fixed
+
+- **Corrected 50 false focus-ring failures and raised cockpit tabs above the
+  repository's focus-contrast floor (2026-08-25, #150, #154)** - the accessibility
+  probe judged a computed `box-shadow` list as one value and rejected the entire
+  list if any component was transparent. Tailwind appends a transparent
+  bookkeeping component to every painted ring, so the ten selected `Board`
+  controls and all forty arrow-only cockpit tabs were reported as having no
+  visible indicator even though `TabsTrigger` has carried a 2px
+  `mc-accent/60` ring since `de22f9a` on 2026-08-02. The corrected #150 count is
+  **8 of 4194 observed focus checks**, all four `/settings` inputs at both
+  viewports; modal and dialog paths remain unmeasured. #154 remains closed
+  because its arrow-key pass reaches all 40 controls, while its original
+  all-40-fail result is withdrawn. The detector now scores comma-separated
+  shadow components independently and requires opaque colour plus conservative
+  paintable geometry. Its authored fixtures use Tailwind's real composite
+  shadow shape and reject both outer and inset opaque `0 0 0 -2px` shadows.
+  Growing the injected focus fixture from two controls to four made the first
+  exact-caller run refuse to report: its scoped accounting leg still required
+  two even though it measured all four (`before 0 -> present 4/4 -> after 0/0`).
+  That contract now requires population 4 and measured 4, so future fixture
+  growth cannot silently weaken the accounting proof.
+  The UI ring moves from 3.4075:1 (`mc-accent/60` over `mc-bg`) to 7.4918:1
+  (full `mc-accent`): the old ring met WCAG 2.4.11's 3:1 non-text minimum, while
+  the new ring clears this repository's stricter 4.5:1 floor.
+
+  This narrow change has an independently reviewed maintainability exception,
+  not a claim that the probe is within policy. Human-authored source grows
+  2,358 to 2,424 lines; `FOCUS_EVIDENCE` grows 144 to 170 lines (decision proxy
+  48 to 51, nesting 6), `injectRovingWidget` grows 78 to 89 (proxy 13, nesting
+  3), and `selfProof` grows 474 to 496 (proxy 70 to 80, nesting 6). The collector
+  must remain self-contained for page serialization and the authored widgets
+  must exercise that exact collector, so splitting this correction alone would
+  weaken the proof contract. Extraction of the collector and fixtures is
+  tracked before any further growth.
+
+  **Recovered proof status (2026-08-26):** the stale port 5391 process tree was
+  stopped and a fresh isolated server returned HTTP 200 for all five cockpits.
+  Issue #157's two flaky axe legs now count only the authored selectors instead
+  of the live page's moving totals. Three deliberate broken inputs each make the
+  caller exit 2 for the intended named reason, and the final restored
+  self-proof passes 18/18. The no-budget exhaustive caller exits 0 with 18/18
+  route/viewport rows complete, no partial surfaces or destroyed samples,
+  4,372/4,376 Tab-reachable controls measured (99.9%), and 40/40 roving
+  controls visible and unobscured. The five stale cockpit records were
+  re-captured at both viewports: 18 caller-required measurements, zero clipping,
+  digest `57c47aa411d855f3`. `surfaces:check` passes 9/9,
+  `test:captured-surfaces` passes 25/25, and the canonical gate/self-test pass
+  9/9 and 38/38. The remaining four `/settings` inputs at two viewports plus
+  the axe/contrast findings stay tracked in #150-#152; they are not hidden by
+  the green evidence-harness result. Full recovery details and local artifact
+  paths are in `docs/a11y-capture-recovery-2026-08-26.md`.
+
+- **Restored the root production build by preserving parsed-viewport narrowing
+  (2026-08-26, #148)** - `record.viewports` is intentionally `unknown` until the
+  manifest validator checks it. TypeScript discarded the property narrowing
+  after an intervening `problems.push(...)`, so the production build compiled
+  and then failed type checking before Runtime Regression could start its
+  browser smoke. The validator now binds the property once to the stable local
+  `capturedViewports` and narrows that value with `Array.isArray`; validation
+  codes and runtime behavior are unchanged. Root `tsc --noEmit`, the 25-case
+  captured-surface suite, and the full Next 16.2.9 production build now pass.
+  The existing hosted Runtime Regression build remains the authority, so no new
+  CI job or typecheck gate was added.
+
+- **The captured-surface gate accepted a stale capture (2026-08-16, #147)** -
+  `docs/captured-surfaces.json` records a `capturedAt.commit` per surface, and nothing
+  ever compared it to the code. `scripts/derive-captured-surfaces.ts` validated that the
+  sha was 40 hex characters and stopped, so a surface could be rewritten after its capture
+  and the gate stayed green: the capture drifted back to unmeasured while still reading as
+  evidence. Confirmed by control first - with a clean tree `npm run surfaces:check` exited
+  **0**, and it exited **0** again after appending a comment to
+  `src/app/settings/page.tsx`, still citing the pre-change capture. **This was already
+  live:** `5b846ce` changed `src/app/globals.css`, which the root layout imports and every
+  surface renders through, yet 8 of the 9 surfaces still cited the pre-change `e50e256`.
+  A capture now carries `sourceDigest`, a 16-hex content fingerprint over the transitive
+  static local-import closure that renders that surface - its page, every `layout`/
+  `template` wrapping it, everything they import through `@/` or a relative path, and
+  `tailwind.config.ts`/`postcss.config.mjs`. The gate recomputes it and fails, naming the
+  surface and the files that moved. It is **content, not ancestry**: a rebase or re-land
+  producing identical files keeps a capture valid, and a rewrite keeping the same sha does
+  not. Line endings are normalised to LF first, because the repo has `core.autocrlf=true`
+  and no `.gitattributes`, so a raw-byte digest would fail on whichever platform did not
+  take the capture. Depth is the design decision, so it is asserted rather than described:
+  a `page.tsx`-only rule would have missed `RuntimeConfigTemplateGallery.tsx`, where the
+  #145 clipping bug actually lived, and a whole-repo hash would invalidate everything on
+  every commit and be routed around within a week. Measured on this repo's own history:
+  the dependency union is 61 of 133 `src/` files, 35% of the last 60 commits touch it, and
+  7% touch a global file that invalidates all nine. Six proofs, both directions: mutating
+  `src/app/settings/page.tsx` fails naming `/settings` alone; mutating the shared
+  `RuntimeConfigTemplateGallery.tsx` fails naming 6 of 9 while `/`, `/n8n-sync-history`
+  and `/runtime-regression` still pass; mutating `globals.css` fails all 9; mutating
+  `scripts/check-runtime-regressions.js` passes; an unreachable capture commit still fails
+  and names the surface, degrading only the file list; and reverting each mutation returns
+  the gate to green. A capture with no `sourceDigest` is rejected outright - it could never
+  be shown to be stale - and the freshness lookup is a required argument, so "nobody
+  checked" cannot be mistaken for "nothing was stale". `npm run surfaces:fingerprint`
+  prints the current digests and deliberately never writes them, so a stale capture cannot
+  be re-greened without editing the same block that holds the date and the method. All
+  nine surfaces were re-probed at `8f72854` on 2026-08-16: 18 measurements, 0 clipped,
+  probe self-proof alive. What this deliberately does **not** cover - npm dependency bumps,
+  runtime/env-dependent content, `src/app/api/**` handlers reached by string URL,
+  `next.config.mjs`, `public/` assets - is documented at the top of
+  `scripts/surface-dependencies.ts`.
+
+- **Closed four fail-open holes in the captured-surface gate (2026-08-13, #144)** -
+  `scripts/derive-captured-surfaces.ts` validated that a manifest *entry* existed, not
+  that a capture *decision* was valid. `CaptureDecision` is a compile-time union;
+  `JSON.parse` returns `any`, so the `as CapturedSurfaceManifest` cast asserted a shape
+  nothing checked. Four mutations of `docs/captured-surfaces.json` each exited **0**
+  against the real repo with the unit suite green: (a) deleting an entry's `capture`
+  field, (b) `capture: "excludedd"` - which also dodged the missing-reason check,
+  because that check string-matched the exact literal `'excluded'` - (c) flipping every
+  cockpit to `excluded` with `reason: "x"`, and (d) `capture: "required"` on a surface
+  nobody had ever captured. A positive control (removing an entry outright) exited 1
+  first, so the holes are not a dead probe. Every check now validates the parsed value
+  at runtime and reports a stable problem `code`, so tests assert the specific reason
+  rather than "something failed". Exclusions need a substantive `reason` (placeholders
+  such as `"x"`/`"TBD"` rejected) plus an `excludedBy` tracking reference; `required`
+  needs a `capturedAt` record naming a full 40-hex commit, an ISO date, the viewport
+  labels covered, and the method used, or an explicit `captureDeferred` carrying a
+  reason and an issue. A manifest that requires nothing now fails as `programme_empty`.
+  The header comment claimed the gate "fails until someone records a capture DECISION"
+  when it failed only until someone recorded an ENTRY; corrected. Re-run against the
+  hardened gate, all four mutations exit 1 with their specific code, the unmutated
+  manifest exits 0, and the resolved pre-push hook
+  (`git rev-parse --git-path hooks/pre-push` -> `.git/hooks/pre-push`, `core.hooksPath`
+  unset) blocks the push with `Push blocked (Node tests failed)`. 13 unit tests pass.
+
+- **`/settings` clips 17 elements at 1440px (2026-08-13, #145)** - found by the first
+  ever capture of a required-but-never-captured surface. Filed, not yet fixed.
+
+### Added
+
+- **Measured the six required surfaces nobody had ever captured (2026-08-13, #144)** -
+  all 9 entries in `docs/captured-surfaces.json` were marked `capture: "required"` but
+  only 3 had ever been captured, and the gate scored `required` + never-captured as
+  passing. `npm run surfaces:probe` (`scripts/probe-surface-clipping.mjs`) now drives
+  its route list from the manifest, so the probe cannot drift from the gate, and all 9
+  surfaces carry a `capturedAt` record at both declared viewports. The probe measures
+  **element-level** clipping and never document scroll: `globals.css` clamps
+  `html, body` with `max-width: 100vw; overflow-x: hidden`, so an overflowing page
+  reports zero document scroll and any probe reading `documentElement`/`body`
+  `scrollWidth` is defeated by construction. Proven rather than assumed - injecting a
+  1200px element into a 390px viewport moved `clippedElements` 0 -> 1 while
+  `docOverflow` stayed 0px - and the probe exits 2 instead of reporting zeroes if the
+  injection fails to move the count. Result at `e50e256`: 17 of 18 measurements clean;
+  `/settings` clean at 390px but **17 clipped elements at 1440px**, rooted in the
+  `RuntimeConfigTemplateGallery` env-diagnostic badges (#145). A prior report calling
+  `/settings` a *mobile* defect ("body scrollWidth 504 vs 390, 4 clipped at 390px") did
+  **not** reproduce: it measures 0 clipped and `body.scrollWidth` 390 == `clientWidth`
+  390 at HEAD.
+
+- **Adopted the canonical fleet motion primitive (2026-08-13, #142)** -
+  `globals.css` now carries `fleet-motion-primitive` v1.0.0 verbatim from
+  `agent-settings shared/assets/motion-primitive/motion.css`: four duration tokens,
+  three easing tokens, and the two-layer `prefers-reduced-motion` contract. Nothing
+  was re-derived; the app previously had **no motion tokens at all** and exactly one
+  `motion-reduce:` utility in all of `src/`, against 50 animated and 481 transitioned
+  elements on a single measured route. The tokens live on `:root` rather than in an
+  `@theme` block because this app is Tailwind 3.4 - `@theme` is the v4 variant of the
+  primitive and would be inert here - and `tailwind.config.ts` maps them to named
+  `duration-fast` / `ease-standard` utilities so they are consumable rather than
+  declared-and-unreferenced. Layer B of the contract is what makes the adoption a
+  paste instead of a rewrite: it reaches the 481 call sites still using Tailwind's
+  hardcoded `transition`, so those can migrate to tokens incrementally. Durations
+  collapse to `0.01ms`, never `0`, because CSS Transitions Level 1 requires a
+  non-zero combined duration before a transition is created at all - at `0s`
+  `transitionend` never fires. Proven with the primitive's own recipe
+  (`Test-ReducedMotionCollapse.ps1`), which reported `fail`/`tokens-missing` before
+  this change and `pass` after.
+
+- **Captured-surface list derived from the app's real routes (2026-08-13, #142)** -
+  `docs/captured-surfaces.json` now records a capture decision for every route the
+  app serves, and `scripts/derive-captured-surfaces.ts` derives that list from the
+  App Router tree (`src/app/**/page.tsx`) plus the existing workspace registry
+  (`GITHUB_PROJECT_WORKSPACE_MAPPINGS`) and fails when the two disagree. Wired into
+  `npm test` as `test:captured-surfaces`. The surface list used by the UI/UX scoring
+  programme had been a hand-maintained claim: `/workspace/frontend-revenue` shipped
+  in `690a5fb` and never entered it, so the cockpit was scored without ever being
+  looked at. On its first run the new gate found a second never-listed cockpit,
+  `/workspace/memsys`. A newly added route now fails the check until someone records
+  `capture: "required"`, or `"excluded"` with a reason.
+
+### Fixed
+
+- **Settings header reflows at phone widths (2026-08-13, #142)** -
+  Found by measuring every derived route at 390px rather than only the route the
+  issue named. The `/settings` header put its title group and its action group in one
+  non-wrapping `justify-between` row: 504px of content in a 342px content box, 114px
+  clipped with no scroller and no ellipsis. The row now wraps, so the actions drop to
+  their own line. Same class of defect as the cockpit reflow below, on a route that
+  fix did not touch - and the only route in the app still clipping at 390px.
+- **Workspace cockpits reflow at phone widths (2026-08-13, #142)** -
+  Below `lg` the board row stacked its two fixed-width rails (`w-64` + `w-80` =
+  576px) beside the board inside a 390px viewport, which crushed `MissionQueue` to a
+  0px content box: 1636px of board sat inside a 24px flex child, and the board was
+  unreachable on a phone. The rails are now full-width bounded-height sections that
+  return to side rails from `lg` up, the board carries `min-w-0`, and the header and
+  queue toolbar shrink and wrap instead of clipping mid-word. The `agents` and
+  `activity` sections got the same treatment. This is a WCAG 1.4.10 (Reflow) fix and
+  it applies to every `/workspace/[slug]` cockpit, not only Frontend Revenue.
+- **Cockpit headings have a role of their own (2026-08-13, #142)** -
+  The cockpit rendered no `h1` at all outside its not-found state, so there was no
+  top-level heading to carry hierarchy. The workspace name is now the route's `h1`,
+  and `h1`-`h6` pick up an explicit weight and tracking role in `globals.css`. The
+  role is expressed on the axes the already-chosen typeface provides - JetBrains Mono
+  is loaded by `next/font/google` as a variable font across the 100-800 weight axis -
+  rather than by introducing a second family, which would be a new typeface decision
+  for the operator to make rather than an engineering fix.
+
+- **Frontend Revenue cockpit workspace bound to GitHub Project #15 (2026-08-12, #140)** -
+  Migration `021` seeds a `frontend-revenue` workspace mapped to
+  `iMelki` project `#15` (Frontend Revenue Program 2026), the largest active
+  project that had no local cockpit. The mapping is declared in
+  `GITHUB_PROJECT_WORKSPACE_MAPPINGS` alongside its siblings and starts with
+  `github_project_auto_refresh = 0`, matching the Asimtop precedent: a manual
+  **Sync now** has to prove the mapping before any scheduled cadence.
+  A new persistence test fails if a declared mapping is ever missing from - or
+  drifts from - its migration seed, which closes the gap that let the code
+  constant and the database disagree; the two partial-database migration tests
+  in `tests/factory-webhooks.test.ts` now isolate themselves from every later
+  migration rather than only from `020`. Verified against the live project: 266
+  items scanned, 231 imported, 35 skipped (4 closed, the rest drafts/PRs), and
+  the board at `/workspace/frontend-revenue` renders 231 real tasks across
+  `content-factory`, `landing-page`, `mission-control-kanban`, `asimtop-landing`
+  and 8 further repositories. No new UI component was written - the existing
+  workspace board, banner, and dashboard cards render the workspace unchanged.
+
+### Changed
+
+- **Pinned bridge host compatibility to the reviewed Paperclip dev tip
+  (2026-08-12, #47/#135)** - The installable bridge now requires clean owned
+  Paperclip commit `aeff5ddaf25e861f2bbff5d5840be417866cae3a` and keeps the
+  exact-SHA gate fail-closed when additive file attestations are present.
+  Focused migration validation covers that exact host; installed signed
+  ping/dispatch/receipt acceptance remains separately gated.
 
 - **Migrated all six modal overlays onto the owned dialog primitives (2026-08-11, #139)** -
   `AgentModal`, `TaskModal`, `GitHubImportModal`, and the create-workspace form

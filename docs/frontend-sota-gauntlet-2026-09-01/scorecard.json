@@ -1,0 +1,23 @@
+{
+  "app": "mission-control-kanban",
+  "round": "first production frontend-sota-gauntlet 2026-09-01",
+  "scale": "frontend-sota-gauntlet 7x0-3 /21",
+  "host": "http://127.0.0.1:3121",
+  "serverMode": "production",
+  "servedSha": "74f671740019e26a540405bcfe52f1e6a83d900e",
+  "servedBuildId": "S8HgxCEJWRAGRBloUGmn1",
+  "notThisRow": "docs/frontend-sota-gauntlet-2026-08-31 was next-dev :3021 and is not this score",
+  "awwwards": null,
+  "areas": {
+    "visualDirection": 2,
+    "uxClarity": 2,
+    "motionInteractivity": 2,
+    "technicalQuality": 2,
+    "responsiveness": 2,
+    "verification": 2,
+    "complexityFit": 2
+  },
+  "total": 14,
+  "band": "usable prototype; below 19",
+  "print": "2/2/2/2/2/2/2"
+}

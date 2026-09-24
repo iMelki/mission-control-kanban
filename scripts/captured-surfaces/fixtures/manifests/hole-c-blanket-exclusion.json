@@ -1,0 +1,34 @@
+{
+  "route": null,
+  "expect_summary": "HOLE (c): excluding every surface empties the scoring programme",
+  "expect_codes": [
+    "programme_empty"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/",
+        "capture": "excluded",
+        "reason": "x"
+      },
+      {
+        "route": "/settings",
+        "capture": "excluded",
+        "reason": "x"
+      }
+    ]
+  }
+}

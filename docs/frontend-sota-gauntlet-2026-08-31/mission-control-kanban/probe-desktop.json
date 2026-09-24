@@ -1,0 +1,1786 @@
+{
+  "phase": "desktop",
+  "base": "http://127.0.0.1:3021",
+  "capturedAt": "2026-08-31T17:02:54.603Z",
+  "runMode": "next dev --webpack (dev server; run mode stated per fleet rule)",
+  "commit": "ac94d73820c82fbaf697271d54c85330881385a6",
+  "units": [
+    {
+      "route": "/",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/",
+      "gotoMs": 1086,
+      "settle": {
+        "settled": true,
+        "ms": 2023,
+        "textLength": 40
+      },
+      "nav": {
+        "ttfb": 976,
+        "dcl": 1082,
+        "load": 0,
+        "transferSize": 3640
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 29,
+          "clipped": 2,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "P",
+              "cls": "sr-only",
+              "sw": 173,
+              "cw": 1,
+              "text": "Loading workspaces"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 2,
+          "resolvedElements": 2,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 1,
+          "failingDecisions": 0,
+          "minRatio": 12.26,
+          "failures": []
+        },
+        "targets": {
+          "visibleControls": 0,
+          "under24": 0,
+          "under44": 0,
+          "under24Samples": [],
+          "under44Samples": []
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 40,
+        "h1": [],
+        "headingCount": 0,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 0,
+        "tabs": 0,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "home-desktop.png"
+    },
+    {
+      "route": "/n8n-sync-history",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/n8n-sync-history",
+      "gotoMs": 392,
+      "settle": {
+        "settled": true,
+        "ms": 2377,
+        "textLength": 324
+      },
+      "nav": {
+        "ttfb": 266,
+        "dcl": 388,
+        "load": 2264,
+        "transferSize": 5280
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 75,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 23,
+          "resolvedElements": 23,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 7,
+          "failingDecisions": 1,
+          "minRatio": 4.05,
+          "failures": [
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 4,
+          "under24": 1,
+          "under44": 4,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "mb-3 inline-flex items-center gap-2 text-sm text-mc-text-sec",
+              "w": 175,
+              "h": 20,
+              "text": "Back to workspaces",
+              "display": "inline-flex",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 166,
+              "h": 28,
+              "text": "All Workspaces"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "A",
+              "w": 175,
+              "h": 20,
+              "text": "Back to workspaces"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 109,
+              "h": 38,
+              "text": "Refresh"
+            }
+          ]
+        },
+        "animations": {
+          "running": 1,
+          "detail": [
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            }
+          ],
+          "infinite": 1
+        },
+        "textLength": 324,
+        "h1": [
+          {
+            "text": "n8n MCK Sync History",
+            "fontSize": "24px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 0,
+        "tabs": 0,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "n8n-sync-history-desktop.png"
+    },
+    {
+      "route": "/runtime-regression",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/runtime-regression",
+      "gotoMs": 12613,
+      "settle": {
+        "settled": true,
+        "ms": 2043,
+        "textLength": 673
+      },
+      "nav": {
+        "ttfb": 12514,
+        "dcl": 12603,
+        "load": 14143,
+        "transferSize": 5004
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 54,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 16,
+          "resolvedElements": 16,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 8,
+          "failingDecisions": 0,
+          "minRatio": 5.32,
+          "failures": []
+        },
+        "targets": {
+          "visibleControls": 1,
+          "under24": 0,
+          "under44": 1,
+          "under24Samples": [],
+          "under44Samples": [
+            {
+              "tag": "BUTTON",
+              "w": 109,
+              "h": 38,
+              "text": "Refresh"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 673,
+        "h1": [
+          {
+            "text": "Runtime Regression Evidence",
+            "fontSize": "30px"
+          }
+        ],
+        "headingCount": 2,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 0,
+        "tabs": 0,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "runtime-regression-desktop.png"
+    },
+    {
+      "route": "/settings",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/settings",
+      "gotoMs": 7447,
+      "settle": {
+        "settled": true,
+        "ms": 2063,
+        "textLength": 3173
+      },
+      "nav": {
+        "ttfb": 7325,
+        "dcl": 7446,
+        "load": 0,
+        "transferSize": 7974
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 256,
+          "clipped": 6,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            },
+            {
+              "tag": "SPAN",
+              "cls": "sr-only",
+              "sw": 120,
+              "cw": 1,
+              "text": "Sort state: none"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 97,
+          "resolvedElements": 97,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 13,
+          "failingDecisions": 0,
+          "minRatio": 4.95,
+          "failures": []
+        },
+        "targets": {
+          "visibleControls": 31,
+          "under24": 5,
+          "under44": 31,
+          "under24Samples": [
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 60,
+              "h": 16,
+              "text": "DeliverySort state: none",
+              "display": "inline-flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 38,
+              "h": 16,
+              "text": "EventSort state: none",
+              "display": "inline-flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 45,
+              "h": 16,
+              "text": "StatusSort state: none",
+              "display": "inline-flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 60,
+              "h": 16,
+              "text": "ReceivedSort state: none",
+              "display": "inline-flex",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "inline-flex items-center gap-1 text-left uppercase tracking-",
+              "w": 45,
+              "h": 16,
+              "text": "ReasonSort state: none",
+              "display": "inline-flex",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "BUTTON",
+              "w": 86,
+              "h": 40,
+              "text": "← Back"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 221,
+              "h": 42,
+              "text": "Reset to Defaults"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 171,
+              "h": 40,
+              "text": "Save Changes"
+            },
+            {
+              "tag": "INPUT",
+              "w": 798,
+              "h": 42,
+              "text": ""
+            },
+            {
+              "tag": "INPUT",
+              "w": 798,
+              "h": 42,
+              "text": ""
+            },
+            {
+              "tag": "INPUT",
+              "w": 798,
+              "h": 42,
+              "text": ""
+            },
+            {
+              "tag": "INPUT",
+              "w": 798,
+              "h": 42,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 210,
+              "h": 38,
+              "text": "Refresh runtime ops"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 152,
+              "h": 38,
+              "text": "Dry-run cleanup"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 159,
+              "h": 38,
+              "text": "Apply cleanup"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 3173,
+        "h1": [
+          {
+            "text": "Settings",
+            "fontSize": "24px"
+          }
+        ],
+        "headingCount": 9,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 0,
+        "tabs": 0,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "settings-desktop.png"
+    },
+    {
+      "route": "/workspace/assistants",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/assistants",
+      "gotoMs": 2900,
+      "settle": {
+        "settled": true,
+        "ms": 3858,
+        "textLength": 964
+      },
+      "nav": {
+        "ttfb": 2761,
+        "dcl": 2898,
+        "load": 4244,
+        "transferSize": 7749
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 233,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 69,
+          "resolvedElements": 69,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 21,
+          "failingDecisions": 1,
+          "minRatio": 4.05,
+          "failures": [
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 24,
+          "under24": 1,
+          "under44": 24,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 74,
+              "h": 24,
+              "text": "working"
+            }
+          ]
+        },
+        "animations": {
+          "running": 2,
+          "detail": [
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            },
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            }
+          ],
+          "infinite": 2
+        },
+        "textLength": 964,
+        "h1": [
+          {
+            "text": "assistants Workspace",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_assistants-desktop.png"
+    },
+    {
+      "route": "/workspace/memsys",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/memsys",
+      "gotoMs": 678,
+      "settle": {
+        "settled": true,
+        "ms": 7089,
+        "textLength": 44544
+      },
+      "nav": {
+        "ttfb": 548,
+        "dcl": 675,
+        "load": 1478,
+        "transferSize": 7745
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 5450,
+          "clipped": 11,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 211,
+              "cw": 168,
+              "text": "/api/operations/qmd/status returns 500 on every load: Railwa"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 179,
+              "cw": 168,
+              "text": "system status: review-queue guard reads raw memsys_router.he"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 171,
+              "cw": 168,
+              "text": "Bug: web-console drops backend failure state — Hindsight fai"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 260,
+              "cw": 168,
+              "text": "Invoke-MemSysDependencyHealthReview.ps1 is non-functional: @"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 268,
+              "cw": 168,
+              "text": "Bug: New-HindsightUpgradeRuntimeConfig.ps1 fails closed on a"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 227,
+              "cw": 168,
+              "text": "Bug: MEMSYS_MEMPALACE_INSTANCE_ID never injected at launch —"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 292,
+              "cw": 168,
+              "text": "Split BootstrapSourceConfigurationPlan.tsx (4,197 lines) int"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 276,
+              "cw": 168,
+              "text": "bootstrap.py's classify_text/clustering/relations all hand-r"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 195,
+              "cw": 168,
+              "text": "Review or discard 4 orphan scripts rescued from a 2026-08-16"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 187,
+              "cw": 168,
+              "text": "Pre-push gate blocks ALL commits to dev: scratch/test_latenc"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 1177,
+          "resolvedElements": 1177,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 33,
+          "failingDecisions": 3,
+          "minRatio": 2.87,
+          "failures": [
+            {
+              "fg": [
+                92.19999999999999,
+                99.6,
+                108.4
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 2.87,
+              "pass": false,
+              "count": 184,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "text-[10px] text-mc-text-secondary/60",
+                "text": "4 days ago",
+                "fontSize": 10,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                103.9,
+                111.69999999999999,
+                120.8
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 3.43,
+              "pass": false,
+              "count": 2,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "",
+                "text": "n8n sync: waiting for first scheduled run",
+                "fontSize": 14,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 395,
+          "under24": 3,
+          "under44": 211,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Sync now"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            }
+          ]
+        },
+        "animations": {
+          "running": 2,
+          "detail": [
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            },
+            {
+              "kind": "CSSAnimation",
+              "name": "spin",
+              "duration": 1000,
+              "iterations": "Infinity",
+              "target": "svg.[object SVGAnimatedString]"
+            }
+          ],
+          "infinite": 2
+        },
+        "textLength": 44544,
+        "h1": [
+          {
+            "text": "MemSys",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_memsys-desktop.png"
+    },
+    {
+      "route": "/workspace/content-factory",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/content-factory",
+      "gotoMs": 780,
+      "settle": {
+        "settled": true,
+        "ms": 8448,
+        "textLength": 6099
+      },
+      "nav": {
+        "ttfb": 653,
+        "dcl": 779,
+        "load": 1540,
+        "transferSize": 7755
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 1047,
+          "clipped": 2,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 195,
+              "cw": 168,
+              "text": "Flaky test: source-artifact.service.spec.ts OCR-import asser"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 250,
+          "resolvedElements": 250,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 35,
+          "failingDecisions": 2,
+          "minRatio": 2.87,
+          "failures": [
+            {
+              "fg": [
+                92.19999999999999,
+                99.6,
+                108.4
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 2.87,
+              "pass": false,
+              "count": 21,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "text-[10px] text-mc-text-secondary/60",
+                "text": "18 days ago",
+                "fontSize": 10,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 71,
+          "under24": 3,
+          "under44": 48,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 6099,
+        "h1": [
+          {
+            "text": "Content Factory",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_content-factory-desktop.png"
+    },
+    {
+      "route": "/workspace/asimtop",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/asimtop",
+      "gotoMs": 414,
+      "settle": {
+        "settled": true,
+        "ms": 5580,
+        "textLength": 7388
+      },
+      "nav": {
+        "ttfb": 284,
+        "dcl": 410,
+        "load": 1329,
+        "transferSize": 7745
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 1392,
+          "clipped": 1,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 293,
+          "resolvedElements": 293,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 33,
+          "failingDecisions": 2,
+          "minRatio": 2.87,
+          "failures": [
+            {
+              "fg": [
+                92.19999999999999,
+                99.6,
+                108.4
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 2.87,
+              "pass": false,
+              "count": 18,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "text-[10px] text-mc-text-secondary/60",
+                "text": "27 days ago",
+                "fontSize": 10,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 63,
+          "under24": 3,
+          "under44": 44,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 7388,
+        "h1": [
+          {
+            "text": "Asimtop",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_asimtop-desktop.png"
+    },
+    {
+      "route": "/workspace/frontend-revenue",
+      "viewport": "desktop",
+      "httpStatus": 200,
+      "finalUrl": "http://127.0.0.1:3021/workspace/frontend-revenue",
+      "gotoMs": 213,
+      "settle": {
+        "settled": true,
+        "ms": 4692,
+        "textLength": 58702
+      },
+      "nav": {
+        "ttfb": 102,
+        "dcl": 212,
+        "load": 1094,
+        "transferSize": 7757
+      },
+      "audit": {
+        "docOverflow": 0,
+        "docOverflowControl": {
+          "delta": 1160,
+          "proven": true
+        },
+        "clipping": {
+          "totalScanned": 7215,
+          "clipped": 2,
+          "clippedSamples": [
+            {
+              "tag": "A",
+              "cls": "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 foc",
+              "sw": 192,
+              "cw": 1,
+              "text": "Skip to main content"
+            },
+            {
+              "tag": "H4",
+              "cls": "text-sm font-medium leading-snug line-clamp-2 mb-3",
+              "sw": 244,
+              "cw": 168,
+              "text": "[P24-002] Move approved Hero/Projects/Capabilities/CTA piece"
+            }
+          ],
+          "positiveControlCaught": true,
+          "negativeControlExcluded": true
+        },
+        "contrastSentinels": {
+          "validParsed": true,
+          "invalidFailedClosed": true
+        },
+        "contrast": {
+          "enumeratedTextElements": 1563,
+          "resolvedElements": 1563,
+          "unresolvedElements": 0,
+          "coveragePct": 100,
+          "distinctDecisions": 32,
+          "failingDecisions": 2,
+          "minRatio": 2.87,
+          "failures": [
+            {
+              "fg": [
+                92.19999999999999,
+                99.6,
+                108.4
+              ],
+              "bg": [
+                22,
+                27,
+                34
+              ],
+              "large": false,
+              "ratio": 2.87,
+              "pass": false,
+              "count": 231,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "text-[10px] text-mc-text-secondary/60",
+                "text": "19 days ago",
+                "fontSize": 10,
+                "fontWeight": 400
+              }
+            },
+            {
+              "fg": [
+                248,
+                81,
+                73
+              ],
+              "bg": [
+                67.2,
+                37.8,
+                41.800000000000004
+              ],
+              "large": false,
+              "ratio": 4.05,
+              "pass": false,
+              "count": 1,
+              "sample": {
+                "tag": "SPAN",
+                "cls": "hidden sm:inline",
+                "text": "OFFLINE",
+                "fontSize": 14,
+                "fontWeight": 500
+              }
+            }
+          ]
+        },
+        "targets": {
+          "visibleControls": 489,
+          "under24": 3,
+          "under44": 257,
+          "under24Samples": [
+            {
+              "tag": "A",
+              "cls": "flex items-center gap-1 shrink-0 text-mc-text-secondary hove",
+              "w": 36,
+              "h": 16,
+              "text": "",
+              "display": "flex",
+              "inline": false
+            },
+            {
+              "tag": "A",
+              "cls": "text-mc-accent-cyan hover:text-mc-accent",
+              "w": 101,
+              "h": 20,
+              "text": "View history",
+              "display": "block",
+              "inline": false
+            },
+            {
+              "tag": "BUTTON",
+              "cls": "rounded border border-mc-border px-2 py-0.5 text-[11px] hove",
+              "w": 51,
+              "h": 22,
+              "text": "Check",
+              "display": "block",
+              "inline": false
+            }
+          ],
+          "under44Samples": [
+            {
+              "tag": "A",
+              "w": 36,
+              "h": 16,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 36,
+              "h": 36,
+              "text": ""
+            },
+            {
+              "tag": "BUTTON",
+              "w": 92,
+              "h": 34,
+              "text": "Board"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 100,
+              "h": 34,
+              "text": "Agents"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Dispatch"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Settings"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 117,
+              "h": 34,
+              "text": "Activity"
+            },
+            {
+              "tag": "A",
+              "w": 101,
+              "h": 20,
+              "text": "View history"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 24,
+              "h": 24,
+              "text": "Collapse agents sidebar"
+            },
+            {
+              "tag": "BUTTON",
+              "w": 46,
+              "h": 24,
+              "text": "all"
+            }
+          ]
+        },
+        "animations": {
+          "running": 0,
+          "detail": [],
+          "infinite": 0
+        },
+        "textLength": 58702,
+        "h1": [
+          {
+            "text": "Frontend Revenue",
+            "fontSize": "16px"
+          }
+        ],
+        "headingCount": 1,
+        "bodyFont": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Fira Code\", ui-monospace, monospace",
+        "bodyFontSize": "16px",
+        "bodyBg": "rgb(13, 17, 23)",
+        "skipLink": true,
+        "tablists": 1,
+        "tabs": 5,
+        "title": "Mission Control"
+      },
+      "consoleErrors": [],
+      "consoleErrorCount": 0,
+      "consoleWarningCount": 0,
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "workspace_frontend-revenue-desktop.png"
+    }
+  ]
+}

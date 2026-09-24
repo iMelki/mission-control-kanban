@@ -1,12 +1,488 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-08-10
+Last updated: 2026-09-17
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
+
+- [#173 - Fail closed when production capture receives HTTP error pages](https://github.com/iMelki/mission-control-kanban/issues/173)
+  - Review of PR #170 reproduced HTTP 500 yielding `production_ok` and
+    `scoreable:true`; the clipping probe could likewise call a failed route
+    clean solely because the error page had zero clipped elements.
+  - The preflight and each probe route now require successful HTTP responses;
+    500/404 negative tests and HTTP 200 controls cover the shared guard.
+    Keep promotion held until the repaired head passes hosted CI and full
+    independent review. The previous capture records were not re-measured by
+    this source fix. See `docs/production-capture.md`.
+
+- [#152 - the workspace cockpit announced a five-tab widget that controls nothing; now navigation](https://github.com/iMelki/mission-control-kanban/issues/152)
+  - **Landed 2026-09-07.** `role="tablist"` + five `role="tab"` with **zero**
+    `role="tabpanel"`, inside `<nav aria-label="Workspace sections">`. All five
+    `aria-controls` values were dangling; axe fails only the *selected* one
+    because its `aria-controls` preCheck exempts `aria-selected="false"`
+    (axe-core 4.11.1, `axe.js:26516-26522`). So one critical node, five broken
+    promises.
+  - The previously published cause and remedy were both wrong: `TabsContent`
+    has **zero consumers** (two lines in `src/components/ui/tabs.tsx`, its own
+    definition and export), so `forceMount` had nothing to force. Verified again
+    on `origin/dev` before acting.
+  - Operator chose the **navigation** reading. `WorkspaceSectionTabs` now renders
+    five plain `<button>`s in a `<ul>` inside the existing `nav`, current one
+    marked `aria-current="true"`. `ui/tabs.tsx` keeps the shadcn primitive and
+    gains the contract comment that would have prevented this.
+  - Proof, production `127.0.0.1:3121`, `/workspace/frontend-revenue`, desktop:
+    BEFORE BUILD_ID `02QxqHc7qVm-Y9tCVxnmM` tablist 1 / tab 5 / tabpanel 0 /
+    dangling 5, axe `aria-valid-attr-value` 1 node. AFTER BUILD_ID
+    `2dkzBFp0faELAfaxibj0J` tablist 0 / tab 0 / dangling 0, rule absent. The
+    other three rules are byte-identical either side (`link-name` 1,
+    `nested-interactive` 231, `scrollable-region-focusable` 1), so the change is
+    scoped. A positive control ran in BOTH scans and moved the count each time
+    (1->2->1 before, 0->1->0 after), so the AFTER zero is a measured zero.
+  - **Resume line / not done:** the five `/workspace/*` captured surfaces are now
+    stale (`recorded 3eaa0d2de234e9e6 -> current fec8007fc3fc23e4`) and
+    `npm run surfaces:check` exits 1. Re-record them from a production serve:
+    see `docs/production-capture.md`, then `npm run surfaces:probe`. Also still
+    open on #152: `link-name` (1 attribute, `Header.tsx`),
+    `scrollable-region-focusable` (3 components), `nested-interactive`
+    (`MissionQueue.tsx:480`, 1 component).
+  - Instrument limit: `prefers-reduced-motion` (WCAG 2.3.3 / the 2.2.2 pause
+    control) is **not measurable** by this probe and was not scored either way.
+  - **2026-09-14 rescue review (draft PR, branch
+    `rescue/mck-a11y-20260830-review-20260914`).** Six commits from an unpushed
+    2026-08-30 clone were compared hunk-by-hunk against `origin/dev`. Re-applied
+    only what dev never landed: `link-name` (`Header.tsx` back link
+    `aria-label`), `scrollable-region-focusable` (`MissionQueue.tsx:333` board
+    scroller and `LiveFeed.tsx:179` as focusable `role="region"`),
+    `nested-interactive` (`MissionQueue.tsx:480` split into sibling open and
+    reorder buttons; `smoke-runtime-ui.js` selector follows), the #150 settings
+    inputs (new `ui/input.tsx` with a `focus-visible` ring), and a `role="group"`
+    under the env-diagnostics label. Deliberately NOT re-applied: the
+    `TabsContent` restructure (superseded by the navigation decision above), the
+    `/60` ring and probe parser (`c9598b6`), the OFFLINE/timestamp/n8n contrast
+    pairs (`5dff835`, `e3de15d`), the n8n table region (`25d0b2c`), and a
+    `DataTable` `tabIndex` (the 2026-09-07 correction says the sort-header
+    buttons plausibly satisfy the rule). Proof so far is source-level only:
+    eslint, `tsc --noEmit`, preflight, and the node suites pass; the seven
+    surfaces that render these files are stale until the production re-probe
+    of `docs/production-capture.md`, and the `nested-interactive` /
+    `scrollable-region-focusable` / `link-name` counts have not been re-measured.
+    CI on the branch is green, including `runtime-regression`, which reaches the
+    task cards through the new `li [data-task-open]` selector.
+  - **[#169](https://github.com/iMelki/mission-control-kanban/issues/169), found
+    by that CI run:** `scripts/smoke-runtime-ui.js` still looked the section
+    controls up as `role="tab"` after the navigation change above, so the
+    runtime UI smoke has timed out on every `dev` push since 2026-09-07 (runs
+    34723572329, 34799619361). Fix carried on the same branch; it should land on
+    `dev` on its own if the a11y PR stalls.
+
+- [#166 - cockpit loads can stick in a false pre-data board and present it as settled](https://github.com/iMelki/mission-control-kanban/issues/166)
+  - 2026-08-31 gauntlet: ~3/13 cockpit loads painted "Showing 0/0", "No events
+    yet", "No token detected · 0/3 lanes ready", and header ONLINE as settled
+    fact. No console errors, no retry.
+  - **2026-09-01 Wave 2:** pending vs empty-after-load split, loading shell,
+    GitHub null-as-checking, SSE no longer writes the OpenClaw badge, 10s
+    fetch budget, `data-workspace-ready` only when the board is ready.
+    Regression: `npm run test:cockpit-load-state`. Live 13/13 on a production
+    side-serve (not :3021) with `stuckCount` 0.
+  - **2026-09-18 PR #170 review repair:** the budget now remains active while
+    a successful response body is parsed, not only until headers arrive. The
+    `fetch-budget` regression fixture proves a body that never completes
+    rejects at the deadline, and an already-aborted caller signal never starts
+    the fetch.
+
+- [#164 - the capture harness cannot survive its own subject: the dev server dies under on-demand compile](https://github.com/iMelki/mission-control-kanban/issues/164)
+  - `next dev` first-hit compiles measured at 15-54 s per route; the process
+    exited while compiling the 4th consecutive one. The LocalNext watchdog then
+    failed recovery twice at a **300-second ceiling**, and one post-boot attempt
+    failed with "root was not found" because the repo volume was not mounted yet.
+  - Removed at the source, not worked around: `next build` + `next start` from a
+    detached worktree answers 200 on 11 of 11 routes in 18-161 ms and stays up.
+    Evidence and the reproduce steps: `docs/production-capture-2026-08-26.md`.
+  - **Harness harden 2026-08-27:** `scripts/assert-production-capture-target.mjs`
+    plus both surface probes refuse port 3021 *without fetching it*, require
+    `MCK_BASE_URL` and a production BUILD_ID, and refuse next-dev HTML. Operator
+    path: `docs/production-capture.md`. Not a gauntlet score.
+  - Still needed for a surviving scored capture: serve from a detached worktree
+    (`next build` / `next start` on 3121), then re-run the probes. The
+    `capturedViewports` narrowing that blocked `next build` is now on `dev`.
+
+- [#165 - two served workspace routes are invisible to both captured-surface gates](https://github.com/iMelki/mission-control-kanban/issues/165)
+  - `/workspace/default` and `/workspace/mck-sync-test-assistants` both answer
+    200, both are linked from the dashboard, and neither is in the manifest.
+    Both gates derive from committed source; **neither reads the workspaces
+    table**, so nothing raises. `mck-sync-test-assistants` ships from migration
+    011, so this is not test residue.
+  - The config `$comment` also names the wrong gate; proven with controls.
+  - **Do not "fix" this by adding the slugs to the config** - that greens the
+    gate and deletes the only signal.
+
+- [#150 - focus indicators: 8 settings inputs have no visible ring; cockpit tabs are being hardened above the repository floor](https://github.com/iMelki/mission-control-kanban/issues/150)
+  - First ever keyboard/focus/contrast/axe measurement landed:
+    `scripts/probe-surface-a11y.mjs` plus `docs/a11y-baseline-2026-08-24.md`.
+  - **The "58 of 208" figures were measured over 4.9% of the app** and were
+    restated on 2026-08-25 (#156), but that restatement also needs correction.
+    Its 18-of-4194 result includes 10 false negatives from the cockpit `Board`
+    control. Rescoring the same observations leaves **8 of 4194**, the four
+    `/settings` inputs that share one className at both viewports. The old
+    `208/208 focus unobscured` is also **withdrawn** entirely: it measured the
+    probe's scroll state, not the app (#155).
+  - The 10 selected `Board` controls and all **40 of 40** arrow-only cockpit
+    tabs already carried `focus-visible:ring-2 focus-visible:ring-mc-accent/60`.
+    Source history dates that class to `de22f9a` on 2026-08-02. The detector
+    rejected the real ring because Tailwind's computed `box-shadow` list also
+    contains a transparent bookkeeping component.
+  - The `/60` ring measures 3.4075:1 over `mc-bg`: above WCAG 2.4.11's 3:1
+    non-text minimum but below this repository's chosen 4.5:1 floor. The staged
+    UI change lifts it to full `mc-accent`, 7.4918:1. That hardens an existing
+    ring; it does not add a previously absent cockpit indicator.
+  - The eight settings-input failures remain open. Modal and dialog call sites
+    are **unmeasured, not clean** because the probe does not open them.
+  - **2026-09-05 rebase onto origin/dev:** the five cockpit clipping records
+    were re-probed on production `127.0.0.1:3121` (BUILD_ID
+    `zjCB9QIMpCkNMgTzqIZuh`) after the tab ring change. All five are 0 clipped
+    at both viewports and now share sourceDigest `3eaa0d2de234e9e6` over 58
+    files. The staleness gate is green again.
+
+- a11y probe follow-ups, opened 2026-08-24 and worked 2026-08-25:
+  - [#154](https://github.com/iMelki/mission-control-kanban/issues/154) roving
+    `tabindex="-1"` children never focus-audited - **implemented**: a separate
+    arrow-key pass reaches all 40 (`rovingEnumeratedNotAudited: 0`). The claim
+    that every one lacked a visible indicator is **withdrawn**: all 40 had a
+    visible `/60` ring, and the whole-list shadow parser produced false
+    negatives. #154 remains closed for reachability.
+  - [#155](https://github.com/iMelki/mission-control-kanban/issues/155) 960
+    controls off-viewport at mobile - **not a UI defect**: a probe artifact,
+    refuted with three controls over 157 failures. Occlusion is now measured on
+    the control's visible rect and the detector has self-proof legs for the
+    first time.
+  - [#156](https://github.com/iMelki/mission-control-kanban/issues/156) restate
+    #150 - **superseded**, because its 18-of-4194 restatement includes 10
+    selected-tab false negatives and treats the 40 roving false negatives as
+    additional missing indicators.
+  - [#157](https://github.com/iMelki/mission-control-kanban/issues/157) two
+    self-proof legs compare whole-page axe node counts and fail closed about
+    half the time; a full sweep needed 4 attempts. **Fix proven on the
+    2026-08-26 recovery branch:** authored targets now prove `0 -> 1 -> 0`,
+    three deliberate mutations exit 2 for their named reasons, and the restored
+    exhaustive caller exits 0 with 18/18 rows complete. Open until the feature
+    PR lands.
+  - [#159](https://github.com/iMelki/mission-control-kanban/issues/159) the
+    coverage reporter scores a surface that rendered ZERO controls as `full` at
+    100%, and ignores its own `unaccounted` invariant (observed at `-1`). The
+    "99.9% coverage" headline is not reproducible: 99.9% / 92.7% / 88.7% on the
+    same surface, same unmodified code, one session. **Open.**
+    The no-budget recovery completed without an empty or partial row, but that
+    successful sample does not repair the zero-population acceptance bug.
+  - **2026-09-07 instrument lane: zero-population acceptance FIXED and pushed
+    (`a8aa3122`).** Reproduced first: the published input (population 0) returned
+    `coveragePct 100 / status full / unaccounted -1 / countedAtFullCoverage true`
+    from the `origin/dev` expressions verbatim. The short circuit was hand-rolled
+    at **four** sites, not the two in the issue - per-surface (1021), roving
+    (1381), and both app-wide aggregates (2332, 2356); fixing only the named two
+    would have left an empty sweep reporting 100% app-wide. Extracted
+    `scripts/lib/coverage-denominator.mjs` (`classifyCoverage` ->
+    `full|partial|empty|invalid` with `coveragePct: null`, plus
+    `assertDenominator` for the "scored N of M, M>0" class), migrated all four,
+    added a comment-stripping ratchet with its own positive control, and wired
+    `test:coverage-denominator` into `npm test`. Negative proof: 15 tests,
+    13 pass / 2 fail before (both naming the probe), 15/15 after; controls
+    unchanged (26/26 full, 981/1058 partial, rounding 99.9/67.3/33.3).
+    Prior art cited in the module: axe-core `inapplicable`, Lighthouse
+    `notApplicable`; pa11y is a null result and cannot tell empty from clean.
+    **Still open:** `unaccounted !== 0` is surfaced per surface but not yet
+    refused at the banner/exit level, and the population-stability reporting
+    this issue also asks for is untouched.
+  - [#160](https://github.com/iMelki/mission-control-kanban/issues/160) extract the serialized focus
+    collector and its authored self-proof fixture contract before the probe
+    grows again. The 2026-08-26 independent review approved the seven-line
+    #157 recovery exception (`selfProof` 483 -> 490 nonblank lines; decision
+    proxy 77 -> 81; nesting unchanged at 6) and requires capture, pure leg
+    evaluation, and cleanup to be decomposed by 2026-09-15 and before the next
+    feature growth.
+  - [#161](https://github.com/iMelki/mission-control-kanban/issues/161) complete
+    authoritative hosted-canary coverage for the three workflow gates. The
+    changed a11y caller and both direct verification scripts have exact
+    broken/restored proof. The six legacy paths now also have bounded local
+    caller-command evidence with zero exclusions; the workflow entries state
+    their limits explicitly. The #148 correction now restores the local
+    production-mode runtime caller. The hosted Ubuntu production-mode negative
+    canary, hosted Gitleaks action, and full CI job matrix still lack deliberate
+    current red/green canaries.
+
+- [#151 - Three colour pairs below WCAG AA, worst 2.87:1](https://github.com/iMelki/mission-control-kanban/issues/151)
+  - 10px timestamps using `text-mc-text-secondary/60` (2.87:1), the n8n status
+    line (3.43:1), and the `OFFLINE` badge (4.04:1). Contrast is computed from
+    computed style, not from hand-authored annotations.
+  - **2026-09-01:** timestamp class landed at the token/class level
+    (`text-mc-text-muted` solid `#8b949e`, sRGB >=4.5:1 on the real card and
+    column backdrops). **2026-09-01 leftover:** n8n default line dropped
+    `/70` (`text-mc-text-secondary` solid, fixture 5.62:1). OFFLINE badge
+    fill is `bg-mc-bg` (live 5.65:1 on `:3123`). Source no longer contains
+    the 3.43 / 4.04 classes.
+  - **2026-09-07 lane-3 verification: landed in source, still unproven.** The
+    three failing classes are confirmed absent from `src/` -
+    `text-mc-text-secondary/60` and `text-mc-text-secondary/70` both return no
+    matches, and `text-mc-text-muted` is live at
+    `src/components/MissionQueue.tsx:587`. But the contrast probe has NOT been
+    re-run since the 2026-09-01 change, so `contrastFailed === 0` is a source
+    grep, not a measurement. The last real run
+    (`artifacts/surface-a11y/a11y-report.json`, untracked, finished
+    2026-08-24T17:37:58Z) still reads `contrastFailed` 15 of 553 checked,
+    `contrastMinimumRatio` 2.87. Closing this needs the detached-worktree
+    production re-probe of `docs/production-capture.md`, not `:3021` (#164).
+
+- [#152 - 45 axe WCAG violations including one critical](https://github.com/iMelki/mission-control-kanban/issues/152)
+  - `nested-interactive` (692 nodes, workspace task cards), `color-contrast`,
+    `scrollable-region-focusable` (tables with no keyboard scroll access),
+    `link-name` (icon-only header link), and critical `aria-valid-attr-value`
+    (Radix Tabs `aria-controls` pointing at an unmounted panel).
+  - Smallest first: `link-name` and `scrollable-region-focusable` are one
+    attribute each.
+  - **2026-09-07 lane-3 triage: 6 components, not 46 violations.** Counted by
+    rule and then back to the source site, from
+    `artifacts/surface-a11y/a11y-report.json` (untracked; run finished
+    2026-08-24T17:37:58Z; axe-core 4.11.1; 18 route x viewport results over 9
+    surfaces). That run reads **46** violation results / **756** violating
+    nodes; the "45" in the issue body is the earlier run of the same day.
+    Mapping: `nested-interactive` 713 nodes -> **1** component
+    (`src/components/MissionQueue.tsx:480`, the only `role="button"` in
+    `src/`); `scrollable-region-focusable` 11 nodes -> **3** elements
+    (`src/components/MissionQueue.tsx:333` the horizontal column scroller,
+    `src/components/LiveFeed.tsx:179`, and the pre-`25d0b2c` hand-rolled n8n
+    table at `src/app/n8n-sync-history/page.tsx:167`);
+    `aria-valid-attr-value` 10 nodes -> **1**
+    (`src/components/workspace/WorkspaceSectionTabs.tsx` via
+    `src/components/ui/tabs.tsx`); `link-name` 10 nodes -> **1**
+    (`src/components/Header.tsx:70-77`); `color-contrast` 12 nodes -> the three
+    colour decisions of #151, fixed in source 2026-09-01, not re-measured.
+  - **The 692/713 figure is one component times the task table.** It is the
+    node count of the single `nested-interactive` rule - not 692 findings, and
+    not an incomplete/needs-review count. Per route: 231 on
+    `/workspace/frontend-revenue`, 173 on `/workspace/memsys`, 21 on
+    `/workspace/content-factory`, 18 on `/workspace/asimtop`, at both
+    viewports. Every node is the same
+    `<div role="button" tabindex="0" class="group w-full bg-mc-bg-secondary ...">`
+    from one JSX site. There is **no `no-*` rule anywhere in the report**:
+    `grep -o '"id":"no-[a-z-]*"'` returns no matches, with a positive control
+    on the same file in the same run (`grep -c 'nested-interactive'` -> 14).
+  - **The published root cause of the CRITICAL is wrong; corrected here.**
+    `forceMount` would change nothing, because `TabsContent` is never rendered
+    anywhere in this app: `grep -rn "TabsContent" src/` returns only its own
+    definition and export in `src/components/ui/tabs.tsx`, and the sole
+    consumer (`WorkspaceSectionTabs.tsx:6`) imports `Tabs, TabsList,
+    TabsTrigger` only. Independently, axe-core 4.11.1 already exempts the
+    unmounted-inactive-panel case in the bundled rule
+    (`node_modules/axe-core/axe.js:26516`): a dangling `aria-controls` is
+    checked only when the element is not `aria-selected="false"` /
+    `aria-expanded="false"` and has no truthy `aria-haspopup`. That is why
+    `nodeCount` is 1 per route and not 5 - Radix marks the four inactive
+    triggers `aria-selected="false"` and they are exempt, so the node that
+    fails is the **active** trigger, whose panel is supposed to exist. Real
+    defect: a `role="tablist"` with five `role="tab"` buttons and **zero**
+    `role="tabpanel"` elements, inside `<nav aria-label="Workspace sections">`.
+    The WAI-ARIA APG Tabs pattern requires the pairing - "Each element with
+    role `tab` has the property `aria-controls` referring to its associated
+    `tabpanel` element" (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/, read
+    2026-09-07) - and WAI-ARIA 1.2 8.6.1 ID Reference Error Processing makes an
+    unresolved IDREF invalid
+    (https://www.w3.org/TR/wai-aria-1.2/#aria-controls, read 2026-09-07).
+  - **The repair is an operator/IA call, left open per rubric 2.9.** (A)
+    complete the widget: lift `Tabs.Root` into
+    `src/app/workspace/[slug]/page.tsx` and render the five section bodies
+    (`page.tsx:552-583`, inside `<main id="main-content">`) as `TabsContent` -
+    but `role="tabpanel"` displaces the `main` landmark, the settings panel at
+    `page.tsx:472` sits outside `<main>` and would be orphaned from its panel,
+    and the flex layout depends on the current nesting. (B) drop the false
+    widget: the wrapper already declares `<nav aria-label="Workspace
+    sections">`, so make the five controls plain buttons carrying
+    `aria-current`; two files, no layout change, removes `role=tab`,
+    `role=tablist`, `aria-controls` and `aria-selected` outright - but the
+    roving-tabindex arrow model becomes five Tab stops, which is ground
+    #150/#154 already adjudicated. Lane 3 recommends **(B)**, because
+    `TabsContent` was never written (nobody intended panels) and a `tablist`
+    inside a `nav` landmark is a category error either way. Lane 3 did not
+    make the call.
+  - **Nothing was landed in `src/` by lane 3, deliberately.** Every fix above
+    moves `sourceDigest` and invalidates 6 captured surfaces, and re-proof
+    needs the detached-worktree production serve of
+    `docs/production-capture.md` (#164) - the probes refuse `:3021` without
+    fetching it. Landing a one-attribute fix without that serve would leave
+    the captured-surfaces gate red for the reporter lane working #157/#159.
+  - **2026-09-07 correction to the line above, same lane.** My first
+    `scrollable-region-focusable` mapping was wrong on two of three entries: I
+    matched class strings without checking the combinator the report actually
+    recorded. `grep -rn "lg:border-t-0" src/` returns exactly one line
+    (`LiveFeed.tsx:88`), which pins both `.lg\:border-t-0 > ...` targets to
+    `LiveFeed.tsx:179` - they are one element rendered two ways by axe's
+    selector generator, not two. The `.overflow-x-auto` targets on the
+    workspace routes are `MissionQueue.tsx:333`, not `DataTable`.
+    **`src/components/AgentsSidebar.tsx:315` and `src/components/MissionQueue.tsx:392`
+    are NOT defects and must not be "fixed"** - both contain focusable content,
+    which is the rule's own second remedy ("the element either has to be
+    focusable itself, or contain a focusable element within it",
+    https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable, read
+    2026-09-07); adding `tabIndex={0}` would insert a redundant tab stop in
+    front of a list of controls. `ui/DataTable.tsx:368` renders its sort
+    headers as real `<button>`s inside `<th>`, so the shared primitive
+    plausibly already satisfies the rule by that same remedy, and `25d0b2c`
+    swapped the n8n table onto it after the run - plausibly, not proven.
+    Currently open: **4 files, 5 defects** - `MissionQueue.tsx` twice
+    (`nested-interactive` at `:480`, `scrollable-region-focusable` at `:333`),
+    `LiveFeed.tsx:179`, `Header.tsx:70-77`, and the critical in
+    `WorkspaceSectionTabs.tsx` / `ui/tabs.tsx`.
+
+- [#153 - Bind a11y evidence to the captured-surfaces staleness gate](https://github.com/iMelki/mission-control-kanban/issues/153)
+  - Deliberate decision: a11y evidence rides the **existing**
+    `capturedAt.sourceDigest` rather than a second mechanism. Not yet wired,
+    so today's baseline is point-in-time, not enforced.
+  - Also carries the `a11y:probe` / `a11y:selfproof` npm scripts, deferred
+    because `package.json` had another in-flight change in the working tree.
+  - Should land after the `scripts/captured-surfaces/` canonical migration
+    settles, so the check is not written twice.
+
+- [#142 - Frontend Revenue cockpit reflow and heading role](https://github.com/iMelki/mission-control-kanban/issues/142)
+  - Reflow and heading-role fixes are landed and browser-proven; the derivable
+    captured-surface gate (`docs/captured-surfaces.json`,
+    `scripts/derive-captured-surfaces.ts`, `npm run test:captured-surfaces`) is
+    wired into `npm test`.
+  - **Open, operator decision:** the issue's acceptance criterion asks for a
+    computed `font-family` on `h1` that differs from body. The app has chosen
+    exactly one typeface (JetBrains Mono, loaded as a variable font by
+    `next/font/google`). Satisfying that criterion literally means adopting a
+    second family, which is a typeface decision rather than an engineering fix.
+    Shipped instead: a weight and tracking heading role on the existing family,
+    per the issue's own stated alternative. Adopting a display family remains
+    available if the operator wants it.
+  - Resolved by #144: `/workspace/memsys` and the other five never-captured
+    required surfaces are now measured and carry `capturedAt` records.
+
+- [#144 - Captured-surface gate is fail-open](https://github.com/iMelki/mission-control-kanban/issues/144)
+  - Landed: runtime validation of the parsed manifest closes all four holes
+    (missing `capture`, misspelled value, blanket `excluded` with a placeholder
+    reason, and `required` + never-captured). Each has a negative fixture
+    asserting its specific problem `code`, and each was re-run against the real
+    repo to confirm it exits 1.
+  - Wired on the free local layer only: `npm test` -> `test:captured-surfaces`
+    plus `surfaces:check`, reached by `.git/hooks/pre-push` via git-toolkit
+    `pre-push-quality.ps1`. No CI job was added. Reachability confirmed with
+    `git rev-parse --git-path hooks/pre-push` (`core.hooksPath` unset).
+  - Landed in `a9a274c` on `origin/dev`; closed. Duplicate report #146 was
+    self-closed by its author.
+  - Open follow-up, tracked as #147: a `capturedAt` record can go stale
+    silently. The gate checks that a capture happened, not that it happened at a
+    commit that still reflects the surface. A staleness ratchet (re-capture
+    required when a surface's own source changes after `capturedAt.commit`) is
+    the next step, and belongs in the same free pre-push layer.
+
+- [#147 - Captured-surface gate accepts a stale capture](https://github.com/iMelki/mission-control-kanban/issues/147)
+  - Follow-up to #144 and the known remaining hole in it. `capturedAt` is never
+    invalidated, so a surface can drift back to unmeasured while the gate stays
+    green - the original #142 failure shape, one level up.
+  - Confirmed by control before fixing: with the tree clean `surfaces:check`
+    exited 0; appending a comment to `src/app/settings/page.tsx` and re-running
+    it exited 0 again, still citing the pre-change `capturedAt`. The same held
+    for `src/components/RuntimeOpsSettings.tsx`.
+  - It was already live, not hypothetical. `5b846ce` changed
+    `src/app/globals.css`, which the root layout imports and every surface
+    renders through, yet 8 of the 9 surfaces still cited the pre-change
+    `e50e256` and the gate stayed green.
+  - Landed: `capturedAt.sourceDigest`, a 16-hex content fingerprint over the
+    transitive static local-import closure that renders each surface, resolved
+    by `scripts/surface-dependencies.ts` and recomputed by the gate. Content,
+    not ancestry, so a rebase or re-land producing identical files keeps a
+    capture valid. Deliberately NOT a whole-repo hash: 35% of the last 60
+    commits touch the dependency union (61 of 133 `src/` files), 7% touch a
+    global file that invalidates all nine.
+  - Known blind spots, documented at the top of
+    `scripts/surface-dependencies.ts`: npm dependency bumps
+    (`package-lock.json` is excluded on purpose), runtime/env-dependent content,
+    `src/app/api/**` handlers reached by string URL, `next.config.mjs`, and
+    `public/` assets.
+  - All nine surfaces re-probed at `8f72854` on 2026-08-16 against the running
+    dev server: 18 measurements, 0 clipped, probe self-proof alive (injection
+    moved clipped 0 -> 1 while document overflow stayed 0).
+  - **Fresh production re-probe 2026-09-17:** root `tsconfig.json` excludes the
+    ignored `tmp/` workspace after `npm run build` proved that a nested
+    Paperclip fixture otherwise enters the root TypeScript glob. Production
+    `next start` on `127.0.0.1:3121` passed preflight with BUILD_ID
+    `ObV3-lrSx_aEb83vcxjs1`; the probe self-proof passed and all 18 route /
+    viewport rows returned HTTP 200 with 0 clipped surfaces. The seven stale
+    records were refreshed at commit `15d3acfd19f6a2ebb22da0798ee9be1d749ad0dc`
+    with current source digests. Evidence is retained under
+    `artifacts/doctor-mesh-capture-20260917/` and tracked in #131.
+  - Wired on the same free local layer as #144: `npm test` ->
+    `test:captured-surfaces` plus `surfaces:check`, reached by
+    `.git/hooks/pre-push`. No CI job added.
+
+- [#131 - React Doctor exact-artifact and production capture boundary](https://github.com/iMelki/mission-control-kanban/issues/131)
+  - **PR #170 follow-up (2026-09-18):** CI installs the lockfile-pinned
+    `react-doctor@0.9.12` artifact and supplies its absolute Linux workspace
+    binary path to the fail-closed wrapper. The wrapper also supports the exact
+    JavaScript entry point through Node on Windows, where npm's `.cmd` shim is
+    not spawnable with `shell: false`. Targeted contracts, TypeScript, lint, the
+    staged warning-level diagnostic, and the CI-equivalent pre-commit run pass.
+    The production capture refresh measured all 18 declared route/viewport
+    pairs from detached build `oKnH3V6PBCE48rvB25JHc` at commit `75f1a42`:
+    every response was HTTP 200 with zero clipping, and the probe's injected
+    overflow control moved clipped elements from 0 to 1.
+  - **Review P2 repair (2026-09-18):** the original fetch budget ended after
+    headers, leaving JSON-body stalls unbounded. `fetchWithBudget` now retains
+    the deadline through `json()` consumption and short-circuits already
+    aborted callers; releasing a non-OK response now also aborts and cancels
+    its unread body. Focused fixtures cover all three paths. Fresh detached
+    build `nUsHVMOg36oyCuHqsHQ5n` at `57b335e` re-measured all 18 declared
+    route/viewport pairs: HTTP 200 throughout, zero clipping, and the injected
+    overflow control moved 0->1.
+  - The 2026-09-17 publication gate exposed a lint-scope defect: generated
+    `.tmp/private-index-commit` worktrees and existing CommonJS helper scripts
+    were included by `eslint .`, yielding 19 `no-require-imports` errors
+    unrelated to authored TypeScript. The config now ignores `.tmp/**` and
+    `scripts/**/*.cjs`; rerun the focused lint and full push gate before
+    publication.
+
+- [#148 - Root type errors are ungated: no `typecheck` script, and `tsc --noEmit` is already failing](https://github.com/iMelki/mission-control-kanban/issues/148)
+  - Found while working #147, pre-existing and NOT introduced by it:
+    `npx tsc --noEmit` at the repo root reports
+    `scripts/derive-captured-surfaces.ts ... TS18046: 'record.viewports' is of
+    type 'unknown'`. Proven pre-existing by restoring the HEAD version of that
+    file and re-running `tsc` - the same error appears at its old line number.
+  - **Fix proven on PR #162:** bind the unknown property once to
+    `capturedViewports`, then narrow that stable local with `Array.isArray`
+    before both the unknown-label and uncovered-label checks. Runtime behavior
+    is unchanged; the existing viewport contract still passes 25/25.
+  - Root `tsc --noEmit --incremental false` and `npm run build` now exit 0. No
+    new metered job was added: the existing Runtime Regression workflow already
+    calls the production build, and its first PR #162 run reproduced the exact
+    line-426 failure before this correction. Keep open until the replacement
+    hosted run reaches the browser smoke and the PR lands.
+
+- [#163 - Decompose captured-manifest validator before substantive future growth](https://github.com/iMelki/mission-control-kanban/issues/163)
+  - `validateManifestShape` is now 178 physical / 168 nonblank lines with a
+    decision proxy of 33 and maximum decision nesting of 3. Independent review
+    approved #148's one-line stable-narrowing boundary, but requires cohesive
+    pure checks by 2026-09-30 and before substantive validator growth.
+
+- [#145 - /settings clips 17 elements at 1440px](https://github.com/iMelki/mission-control-kanban/issues/145)
+  - Live shipped defect, found by the first ever capture of `/settings`. Rooted
+    in `RuntimeConfigTemplateGallery.tsx:61`: an env-diagnostic badge is a single
+    unbreakable token wider than its grid column, with no `min-w-0`, no
+    `break-all`, and no ellipsis. Desktop-only; 390px measures clean.
+  - Not fixed. Invisible to page-level probes because `globals.css` clamps
+    `html, body` with `max-width: 100vw; overflow-x: hidden`.
+
+- [#141 - Scheduled n8n sync carries a hardcoded workspace list](https://github.com/iMelki/mission-control-kanban/issues/141)
+  - Follow-up from #140. Every recorded run in `n8n_sync_runs.workspaces` is
+    `["assistants","memsys","content-factory","asimtop"]`, and it includes
+    `asimtop` despite `github_project_auto_refresh = 0`, so the list is
+    n8n-side and is not derived from the `workspaces` table.
+  - `frontend-revenue` therefore refreshes only through the manual **Sync now**
+    control until the workflow is changed inside the n8n instance.
+  - Recommended: have the workflow read project-backed workspaces from
+    `GET /api/workspaces` and gate inclusion on `github_project_auto_refresh`,
+    so a new workspace joins the cadence by existing rather than by hand-edit.
 
 - [#136 - Make bridge contracts v2-authoritative and byte-safe](https://github.com/iMelki/mission-control-kanban/issues/136)
   - Bounded byte-safety/redaction slice completed on 2026-08-08: diagnostic
@@ -68,8 +544,20 @@ the local operator entrypoint; historical task notes remain in
       ([comment](https://github.com/iMelki/mission-control-kanban/pull/137#discussion_r3744190626)).
 
 
+- [#172 - Fix Paperclip bridge migration CI startup readiness race](https://github.com/iMelki/mission-control-kanban/issues/172)
+  - The 2026-09-18 PR #170 Paperclip bridge job passed typecheck and 42 tests,
+    then failed `createdb` after socket-based `pg_isready` reported ready.
+    [Investigation and acceptance gate](docs/preflight/records/2026-09-24-paperclip-migration-startup-race.md).
+  - The harness now probes the final server's TCP listener. Keep this issue open
+    until the new PR head passes the hosted migration check; local Docker was
+    not used. This blocks PR #170 merge, not current production use.
+
 - [#47 - Build the signed MCK ↔ Paperclip software-factory bridge](https://github.com/iMelki/mission-control-kanban/issues/47)
-  - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`; the canonical checkout is now non-bare, clean, unlocked, and aligned with `origin/dev` at `625cec7e1e92972523e43516bb0a2bea50f0b774`.
+  - Status: implementation PR #119 merged into `dev` on 2026-08-04 at merge
+    commit `246cd82ad95a23347bf50087f8ed5299bdc63a89`. PR #137 follow-ups are
+    present on remote `dev` at `893918e95e98dc61147c8cea1483d2757a8d9255`;
+    issue #46 is closed with natural Runtime Regression and cleanup receipts,
+    so it is no longer a scheduler gate for this bridge.
   - Local implementation now provides opt-in dispatch v2 with a
     pending-before-send attempt, stable attempt/delivery/correlation/revision
     IDs, raw-body HMAC, replay conflict detection, lifecycle v2 callbacks, and
@@ -99,9 +587,21 @@ the local operator entrypoint; historical task notes remain in
     do not replace the canonical checkout unless topology regresses.
   - Host compatibility is now fail-closed on the exact `testedCommit` even
     when a partial `testedFiles` attestation is present; the mismatch case is
-    covered by `tests/host-compatibility.spec.ts`. The current host remains
-    intentionally blocked until an owner-approved SHA from a clean, reviewed
-    checkout matches the package metadata.
+    covered by `tests/host-compatibility.spec.ts`. The package metadata and
+    focused migration proof now match clean, owned Paperclip `dev` commit
+    `aeff5ddaf25e861f2bbff5d5840be417866cae3a`. This clears the source
+    compatibility gate only. Live acceptance remains blocked by Paperclip's
+    unmerged reproducible-lock review, unintegrated Job Object custody for both
+    local launch paths, absent governed signing-secret bindings and configured
+    webhook agents, stopped local services, plugin installation, signed health
+    ping, one real dispatch, and the reconciled end-to-end receipt.
+  - Post-runtime UI acceptance: add a `Factory custody & signed-bridge
+    readiness` section only after the runtime gates clear. Reuse MCK's existing
+    Radix/TanStack/Card composition and `ActionReviewDialog` with zero new
+    packages; show secret-safe booleans and freshness, link to
+    `/runtime-regression`, and route consequential actions through the review
+    dialog. Require desktop/mobile, keyboard, axe, RTL, and reduced-motion
+    proof before acceptance.
 
 - [#38 - Post-runtime-ops MCK UX, automation, and regression workstream](https://github.com/iMelki/mission-control-kanban/issues/38)
   - Status: active on 2026-07-01.
@@ -123,6 +623,26 @@ the local operator entrypoint; historical task notes remain in
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 
 ## Recently Completed
+
+- [#140 - Cockpit misses GitHub Project #15 (Frontend Revenue Program)](https://github.com/iMelki/mission-control-kanban/issues/140)
+  - Decision: project #15 belongs in MCK. Migration `021`
+    (`add_frontend_revenue_project_workspace`) seeds the `frontend-revenue`
+    workspace through the sanctioned `008`/`012` path, and the mapping is
+    declared in `GITHUB_PROJECT_WORKSPACE_MAPPINGS`.
+  - Auto-refresh starts off (Asimtop precedent) so the scheduled n8n cadence
+    only picks the workspace up after an operator flips the flag. The n8n
+    workflow keeps its own slug list inside the n8n instance, so adding it
+    there stays a separate operator-approved change.
+  - Proof: dry-run and applied sync both report 266 scanned / 231 imported /
+    35 skipped / 0 errors against `iMelki` project #15;
+    `/workspace/frontend-revenue` renders 231 tasks; `_migrations` records
+    `021` applied.
+  - A new persistence regression test fails when a declared workspace mapping
+    is missing from - or drifts from - its migration seed, and the two
+    partial-database migration tests in `tests/factory-webhooks.test.ts` now
+    isolate themselves from every later migration instead of only `020`.
+  - Empty-legacy-project cleanup (nine 0-item projects) stays out of scope and
+    unswept, as recommended in the issue.
 
 - [#138 - Upgrade GitHub Actions to native Node 24 runtimes](https://github.com/iMelki/mission-control-kanban/issues/138)
   - Replaced every direct Node-20-backed `actions/checkout@v4`,
@@ -324,6 +844,21 @@ the local operator entrypoint; historical task notes remain in
     Awwwards rubric. Full report: `docs/uiux-awwwards-report-2026-08-09.md`.
     Scores are code-inspection estimates pending a Frontend Proof Bundle.
     Fleet rollup: iMelki/agent-settings#586.
+  - **Not gauntlet-scored (2026-08-27).** The original audit was code-only.
+    Later browser rounds either measured a dying `next dev` (#164) or a
+    production build that still refused 5 of 18 units and wrote no
+    frontend-sota scorecard. Capture probes now refuse 3021. See
+    `docs/production-capture.md`.
+  - **2026-08-28 closeout:** still **unscored**. Do not GET or steal
+    `3021`. Production `next start` on `3121` only; no worktree. Note:
+    `S:\source\CCAI\Assistants\agent-settings\shared\catalog\frontend-sota-fleet-uiux-closeout-2026-08-28.md`.
+  - **2026-09-01 first production gauntlet: 14/21** on `127.0.0.1:3121`
+    `next start`, SHA `74f671740019e26a540405bcfe52f1e6a83d900e`,
+    BUILD_ID `S8HgxCEJWRAGRBloUGmn1`. Receipt:
+    `docs/frontend-sota-gauntlet-2026-09-01/scorecard.md`. The
+    2026-08-31 14/21 card was `next dev` on `:3021` and is not this row.
+    This SHA predates Wave 2 (`5dff835`). Goal stays open. Wave 3 not
+    started. Do not close this issue.
   - DONE 2026-08-11 — dialog semantics: all six hand-rolled `fixed inset-0`
     overlays moved onto primitives this repo already owned. `AgentModal`,
     `TaskModal`, `GitHubImportModal`, and `WorkspaceDashboard`'s
@@ -346,7 +881,16 @@ the local operator entrypoint; historical task notes remain in
     `role="dialog"`, `aria-labelledby` bound to the title, focus inside the
     dialog, Escape closes, desktop and mobile screenshots captured, no
     non-whitelisted console errors.
-  - Still open from the report: semantic tone tokens and the 156 raw
-    emerald/amber/rose usages, the bespoke n8n-sync-history table, next/font
-    loading, the two-accent CTA in `MissionQueue`, and
-    `prefers-reduced-motion` coverage.
+  - Still open from the report: the rest of the 156 raw emerald/amber/rose
+    usages, the bespoke n8n-sync-history table, and a11y follow-ups
+    #150 / #151 / #152. next/font (JetBrains Mono), heading role, reduced
+    motion, one-accent board CTAs, skip link, and instant sidebar width
+    are landed; see the 2026-08-27 note below.
+  - **UI lift 2026-08-27 (not gauntlet-scored).** One-accent CTAs
+    (`New Task` filled `mc-accent`, `Import GitHub` outline), skip link
+    (WCAG 2.4.1), instant sidebar width toggle, `mc-success`/`mc-warn`/
+    `mc-danger` on the worst pill maps, dashboard skeleton instead of a
+    spinner wall. Reduced-motion contract was already in `globals.css`.
+    JetBrains Mono remains the only typeface. Evidence:
+    `docs/uiux-awwwards-lift-2026-08-27.md`. Composite **UNMEASURED / 5.7
+    carried** — no production-build capture this pass.

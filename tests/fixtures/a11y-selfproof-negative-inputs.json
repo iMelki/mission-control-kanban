@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "gate": "scripts/probe-surface-a11y.mjs --self-proof",
+  "callerCommand": "node scripts/probe-surface-a11y.mjs --self-proof <output-directory>",
+  "cases": [
+    {
+      "id": "authored-axe-target-renamed",
+      "target": "scripts/probe-surface-a11y.mjs",
+      "find": "<p id=\"__sp_contrast\"",
+      "replace": "<p id=\"__sp_wrong_contrast\"",
+      "expectedExit": 2,
+      "expectedOutput": [
+        "DEAD  axe NAMES each injected node under its own rule (not just a new rule id)",
+        "authored color-contrast target 0 -> 0"
+      ]
+    },
+    {
+      "id": "whole-shadow-transparent-regex",
+      "target": "scripts/probe-surface-a11y.mjs",
+      "find": "const shadowVisible = (shadow) => {",
+      "replaceDescription": "Replace the component parser with the old whole-string test: shadow !== 'none' && shadow !== '' && !/rgba\\([^)]*,\\s*0\\s*\\)/.test(shadow).",
+      "expectedExit": 2,
+      "expectedOutput": [
+        "DEAD  ROVING: an identical widget with intact rings reports 2/2 measured and ZERO failures"
+      ]
+    },
+    {
+      "id": "shadow-color-without-geometry",
+      "target": "scripts/probe-surface-a11y.mjs",
+      "find": "return Math.max(Math.abs(offsetX), Math.abs(offsetY)) + Math.max(0, blur) + spread > 0;",
+      "replace": "return true;",
+      "expectedExit": 2,
+      "expectedOutput": [
+        "DEAD  opaque outer and inset shadows contracted behind the control are NOT scored as visible"
+      ]
+    }
+  ]
+}

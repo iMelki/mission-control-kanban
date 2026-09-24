@@ -1,0 +1,44 @@
+{
+  "route": "/settings",
+  "expect_summary": "a capture with no named method cannot be reproduced, so it is not evidence",
+  "expect_codes": [
+    "capture_record_invalid"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "required",
+        "capturedAt": {
+          "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+          "date": "2026-08-13",
+          "viewports": [
+            "mobile",
+            "desktop"
+          ],
+          "method": "",
+          "liveness": {
+            "httpStatus": 200,
+            "finalPath": "/settings",
+            "elementCount": 1600,
+            "textLength": 4820,
+            "skeletonMarkers": 0
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+# The Doctor genome schema mirror is compared by SHA-256 against the canonical
+# projects-ops document (tests/doctor-genome.test.mjs). Line-ending translation
+# would change those bytes, so this one path is pinned to LF in the worktree.
+docs/schemas/doctor-genome.v1.json eol=lf

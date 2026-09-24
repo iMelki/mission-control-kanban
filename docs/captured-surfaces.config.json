@@ -1,0 +1,12 @@
+{
+  "$comment": "Derivation config for the canonical Gap-2 gate (scripts/captured-surfaces/derive-captured-surfaces.mjs). The repo's own scripts/derive-captured-surfaces.ts reads the same expansion from GITHUB_PROJECT_WORKSPACE_MAPPINGS in src/lib/github-project-sync.ts; this file exists because the canonical gate is deliberately repo-agnostic and imports nothing from src/lib. Keep the two in step: a workspace added to the registry and not to this file makes the canonical gate raise route_missing_from_manifest, which is the intended direction of failure.",
+  "dynamicExpansions": {
+    "/workspace/[slug]": [
+      "assistants",
+      "memsys",
+      "content-factory",
+      "asimtop",
+      "frontend-revenue"
+    ]
+  }
+}

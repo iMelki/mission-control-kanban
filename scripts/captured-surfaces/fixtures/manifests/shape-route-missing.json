@@ -1,0 +1,16 @@
+{
+  "route": null,
+  "expect_summary": "an entry with no route is not a surface",
+  "expect_codes": [
+    "liveness_contract_undeclared",
+    "route_invalid",
+    "programme_empty"
+  ],
+  "manifest": {
+    "surfaces": [
+      {
+        "capture": "required"
+      }
+    ]
+  }
+}

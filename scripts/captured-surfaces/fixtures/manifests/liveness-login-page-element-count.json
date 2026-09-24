@@ -1,0 +1,44 @@
+{
+  "route": "/settings",
+  "expect_summary": "NEW: the ~78-element login page this fleet captured 26 times is under the floor",
+  "expect_codes": [
+    "liveness_element_count"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "required",
+        "capturedAt": {
+          "commit": "e50e2565631b00c25dd524bfd337f5cf1f635d06",
+          "date": "2026-08-13",
+          "viewports": [
+            "mobile",
+            "desktop"
+          ],
+          "method": "probe-captured-surfaces.mjs (element-level clipping + liveness)",
+          "liveness": {
+            "httpStatus": 200,
+            "finalPath": "/settings",
+            "elementCount": 78,
+            "textLength": 4820,
+            "skeletonMarkers": 0
+          }
+        }
+      }
+    ]
+  }
+}

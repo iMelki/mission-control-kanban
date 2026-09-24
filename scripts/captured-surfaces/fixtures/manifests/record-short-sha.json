@@ -1,0 +1,44 @@
+{
+  "route": "/settings",
+  "expect_summary": "a short sha is ambiguous and cannot be checked against a remote",
+  "expect_codes": [
+    "capture_record_invalid"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "required",
+        "capturedAt": {
+          "commit": "e50e256",
+          "date": "2026-08-13",
+          "viewports": [
+            "mobile",
+            "desktop"
+          ],
+          "method": "probe-captured-surfaces.mjs (element-level clipping + liveness)",
+          "liveness": {
+            "httpStatus": 200,
+            "finalPath": "/settings",
+            "elementCount": 1600,
+            "textLength": 4820,
+            "skeletonMarkers": 0
+          }
+        }
+      }
+    ]
+  }
+}

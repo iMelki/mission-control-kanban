@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "integrations/paperclip-bridge"
+    "integrations/paperclip-bridge",
+    "tmp"
   ]
 }

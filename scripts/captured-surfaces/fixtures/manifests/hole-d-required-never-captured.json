@@ -1,0 +1,28 @@
+{
+  "route": "/settings",
+  "expect_summary": "HOLE (d): required on a surface nobody ever captured is a NON-passing state",
+  "expect_codes": [
+    "required_never_captured"
+  ],
+  "manifest": {
+    "livenessContract": "v1",
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "surfaces": [
+      {
+        "route": "/settings",
+        "capture": "required"
+      }
+    ]
+  }
+}

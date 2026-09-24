@@ -301,7 +301,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
             type="button"
             onClick={() => void runWriteback(true)}
             disabled={isRefreshingTask || isRunning !== null}
-            className="inline-flex items-center gap-2 rounded bg-mc-accent-cyan px-3 py-2 text-sm font-medium text-mc-bg hover:bg-mc-accent-cyan/90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded border border-mc-accent/70 px-3 py-2 text-sm font-medium text-mc-accent hover:bg-mc-accent/10 disabled:opacity-50"
           >
             {isRunning === 'dry_run' ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
             Dry Run

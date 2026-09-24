@@ -1,0 +1,21 @@
+{
+  "$comment": [
+    "Repo-health enforcement declaration. Read by git-toolkit's",
+    "hooks/Invoke-RepoHealthAuditGate.ps1, which runs hooks/Invoke-RepoHealthAudit.ps1",
+    "against this repo at pre-push (stage [6/6] of pre-push-quality.ps1).",
+    "",
+    "Without this file the gate is REPORT-ONLY: it prints findings and exits 0.",
+    "With it, any check whose status is `fail` and whose id is not listed in",
+    "acceptedFailures BLOCKS the push. Warnings never block.",
+    "",
+    "Every acceptedFailures entry needs a non-empty `reason`; the gate blocks on a",
+    "reason-less entry, on a malformed file, and on this file being untracked, so a",
+    "baseline cannot decay into a rubber stamp.",
+    "",
+    "See git-toolkit docs/repo-health-audit-gate.md."
+  ],
+  "version": 1,
+  "declaredAt": "2026-08-25",
+  "note": "Measured at 35a91e1 on 2026-08-25: 31 checks, 28 pass, 3 warn, 0 fail — the cleanest grade in the fleet alongside paperclip. The empty acceptedFailures below is the honest state, not a placeholder: nothing is being tolerated, so any new failing check blocks.",
+  "acceptedFailures": {}
+}
