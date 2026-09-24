@@ -8,6 +8,20 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
+- [#171 - Upgrade Next.js to a patched 16.3.x release](https://github.com/iMelki/mission-control-kanban/issues/171)
+  - The focused security candidate pins `next` and `eslint-config-next` to
+    16.3.6. Local Webpack production build, standalone typecheck, production
+    capture preflight, and 18 clipping measurements pass. The production audit
+    falls from six findings (one critical, three high, two moderate) to two
+    moderate findings. Full hosted PR checks and review remain pending; see
+    [upgrade evidence](docs/preflight/records/2026-09-24-nextjs-16-3-6-upgrade.md).
+
+- [#175 - Turbopack production build compatibility](https://github.com/iMelki/mission-control-kanban/issues/175)
+  - The optional direct Turbopack build fails at the webpack-config guard and,
+    with an explicit Turbopack flag, at a bridge `.js`-to-`.ts` import. The
+    Webpack production build succeeds. Do not call the non-blocking CI inventory
+    a passing Turbopack build; investigate separately from #171.
+
 - [#152 - the workspace cockpit announced a five-tab widget that controls nothing; now navigation](https://github.com/iMelki/mission-control-kanban/issues/152)
   - **Landed 2026-09-07.** `role="tablist"` + five `role="tab"` with **zero**
     `role="tabpanel"`, inside `<nav aria-label="Workspace sections">`. All five
