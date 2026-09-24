@@ -2,17 +2,18 @@
 
 ## Plain-English Summary
 
-The `validate-migrations.mjs` script can run its `createdb` command between the
-PostgreSQL image's temporary initialization server stopping and its final server
-starting. The observed hosted test failed before any migration ran. This blocks
-PR #170's green-check gate. Current use is not blocked: no installed bridge or
-production database is affected. We will not run local Docker or merge a PR
-with a red required check.
+Before the fix, `validate-migrations.mjs` could run its `createdb` command
+between the PostgreSQL image's temporary initialization server stopping and
+its final server starting. The hosted test failed before any migration ran.
+The TCP-readiness fix subsequently passed hosted migration checks, and PR #170
+merged with green checks; see [Final Outcome](#final-outcome). Current use was
+not blocked: no installed bridge or production database was affected. No local
+Docker was run, and no red required check was merged.
 
-## Current State
+## Initial Failure (before fix)
 
-- PR [#170](https://github.com/iMelki/mission-control-kanban/pull/170) at
-  `6a65beddca98bec21a187c975bcd22eeb1b596db` has one failed check:
+- PR [#170](https://github.com/iMelki/mission-control-kanban/pull/170) at its
+  earlier head `6a65beddca98bec21a187c975bcd22eeb1b596db` had one failed check:
   [Paperclip bridge job](https://github.com/iMelki/mission-control-kanban/actions/runs/35299840970/job/105459948340).
 - The bridge typecheck and 42 tests passed. `npm run test:migrations` then failed
   at its first `createdb`: the Unix socket no longer existed.
@@ -24,15 +25,16 @@ with a red required check.
   lifecycle-ready signal. This explanation is an inference from the image
   lifecycle and the job log; the hosted rerun is the confirmation gate.
 
-## Fix / Action Status
+## Remediation and Original Gate
 
-- Change the migration harness to probe `127.0.0.1` inside the container.
+- The migration harness was changed to probe `127.0.0.1` inside the container.
   The temporary image server does not listen on TCP, while the final server
   does. Keep the existing bounded 60-attempt wait and fail-closed cleanup.
-- Local syntax and bridge tests can run without Docker. The migration scenario
-  must run in hosted CI; no local Docker operation is part of this repair.
-- Do not merge PR #170 until the fresh required checks pass and review is
-  complete. Live Paperclip installation and dispatch remain separate #47 gates.
+- Local syntax and bridge tests ran without Docker. The migration scenarios
+  ran in hosted CI; no local Docker operation was part of this repair.
+- The original merge gate required fresh passing checks and completed review.
+  Both conditions were met before PR #170 merged. Live Paperclip installation
+  and dispatch remain separate #47 gates.
 
 ## Acceptance Criteria
 
