@@ -15,11 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `next` and `eslint-config-next` to 16.3.6 with a refreshed lockfile. The
   local production audit drops from six findings (one critical, three high,
   two moderate) to two moderate findings. Local Webpack build, typecheck, and
-  18 production clipping measurements pass. Superior review, hosted PR checks,
-  and post-merge checks passed before PR #176 merged at
-  `67d045bafe02a9dded874307f65f4237d4050c20`. The remaining moderate
-  findings are tracked in #177; the optional direct Turbopack build remains
-  separately tracked in #175 and is not claimed green.
+  18 production clipping measurements pass. Superior review and hosted PR
+  checks passed before PR #176 merged at
+  `67d045bafe02a9dded874307f65f4237d4050c20`; post-merge checks then
+  passed. The remaining moderate findings are tracked in #177; the optional
+  direct Turbopack build remains tracked in #175 and is not claimed green.
 
 
 - **Reject HTTP error pages during production capture (2026-09-24, #173,
