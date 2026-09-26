@@ -38,6 +38,8 @@ next-env.d.ts
 
 # database (SQLite)
 *.db
+# local `npm run db:backup` output
+*.db.backup
 *.db-journal
 *.db-shm
 *.db-wal

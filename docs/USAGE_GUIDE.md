@@ -1,4 +1,6 @@
-# Mission Control - "What Now?" Guide
+# Mission Control - "What Now?" Guide (historical: Railway, do not run)
+
+> **Historical, do not run (2026-09-26).** This guide describes the retired Railway deployment of Mission Control and the OpenClaw Gateway. Railway is disabled under the local-only policy and comes back only if Captain explicitly re-enables it. Mission Control runs locally now; see `docs/FIRST_RUN_OPERATOR_GUIDE.md` for the current setup. The root `railway.json` is kept for reference only.
 
 You have successfully deployed **Mission Control** (The Brain) to Railway. Now you need to connect **OpenClaw** (The Hands) to actually execute tasks.
 
