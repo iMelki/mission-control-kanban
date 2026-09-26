@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`.env.example` now uses the canonical MCK port 3021 (2026-09-26)** -
+  `PORT` and the sample `MISSION_CONTROL_URL` still said legacy `3002`, which
+  the agent-settings port registry keeps as manual-fallback evidence only.
+  `tests/env-example-port.test.mjs` pins the example to 3021 and to the
+  `dev:n8n` port and factory base URL, so the three cannot drift apart again.
+
 - **Stop the Runtime Regression server aborting in SQLite GC (2026-09-26)** -
   Upgrade `better-sqlite3` from 11.x to 13.0.3 (Node-API). The 11.x
   `node::ObjectWrap` destructor aborts Node 24 with
