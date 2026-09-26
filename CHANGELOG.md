@@ -11,13 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Stop the Runtime Regression server aborting in SQLite GC (2026-09-26)** -
+  Upgrade `better-sqlite3` from 11.x to 13.0.3 (Node-API). The 11.x
+  `node::ObjectWrap` destructor aborts Node 24 with
+  `RemoveEnvironmentCleanupHook ... (env) != nullptr` when a dropped prepared
+  statement is finalized by a GC that V8 runs from a task, with no JS context
+  entered. That killed the standalone server mid-smoke and failed
+  runtime-regression intermittently after the Next.js 16.3.6 upgrade.
+  `tests/sqlite-gc-finalizer.test.mjs` reproduces the abort on 11.x and passes
+  on 13.x. `scripts/prepare-factory-workspace.mjs` now accepts the bundled
+  prebuild as a ready binding.
+
 - **Upgrade the pinned Next.js security baseline (2026-09-24, #171)** - Pin
   `next` and `eslint-config-next` to 16.3.6 with a refreshed lockfile. The
   local production audit drops from six findings (one critical, three high,
   two moderate) to two moderate findings. Local Webpack build, typecheck, and
-  18 production clipping measurements pass; hosted PR validation and review
-  remain pending. The optional Turbopack production build is separately
-  tracked in #175 and is not claimed green.
+  18 production clipping measurements pass. An independent advisory code review
+  and hosted PR checks passed before PR #176 merged at
+  `67d045bafe02a9dded874307f65f4237d4050c20`; post-merge checks then
+  passed. The merge lacked separately consulted operator land approval; see
+  [agent-settings #1249](https://github.com/iMelki/agent-settings/issues/1249).
+  The remaining moderate findings are tracked in #177; the optional
+  direct Turbopack build remains tracked in #175 and is not claimed green.
 
 
 - **Reject HTTP error pages during production capture (2026-09-24, #173,

@@ -8,19 +8,16 @@ the local operator entrypoint; historical task notes remain in
 
 ## Active
 
-- [#171 - Upgrade Next.js to a patched 16.3.x release](https://github.com/iMelki/mission-control-kanban/issues/171)
-  - The focused security candidate pins `next` and `eslint-config-next` to
-    16.3.6. Local Webpack production build, standalone typecheck, production
-    capture preflight, and 18 clipping measurements pass. The production audit
-    falls from six findings (one critical, three high, two moderate) to two
-    moderate findings. Full hosted PR checks and review remain pending; see
-    [upgrade evidence](docs/preflight/records/2026-09-24-nextjs-16-3-6-upgrade.md).
-
 - [#175 - Turbopack production build compatibility](https://github.com/iMelki/mission-control-kanban/issues/175)
   - The optional direct Turbopack build fails at the webpack-config guard and,
     with an explicit Turbopack flag, at a bridge `.js`-to-`.ts` import. The
     Webpack production build succeeds. Do not call the non-blocking CI inventory
     a passing Turbopack build; investigate separately from #171.
+
+- [#177 - Clear two residual moderate production audit findings](https://github.com/iMelki/mission-control-kanban/issues/177)
+  - After #171, `uuid@11.1.0` and transitive
+    `baseline-browser-mapping@2.10.40` remain in the production audit.
+    Patched versions exist; assess compatible updates in a separate PR.
 
 - [#152 - the workspace cockpit announced a five-tab widget that controls nothing; now navigation](https://github.com/iMelki/mission-control-kanban/issues/152)
   - **Landed 2026-09-07.** `role="tablist"` + five `role="tab"` with **zero**
@@ -619,6 +616,17 @@ the local operator entrypoint; historical task notes remain in
   - Research basis: local MCK primitives, Component Marketplace, MemSys/Paperclip UI patterns, shadcn/ReUI/TanStack/Radix dashboard/form/table patterns, Tremor/Recharts chart guidance, React Flow/Dagre dependency graph guidance, GitHub Actions artifact REST API guidance, GitHub Security Lab `workflow_run` cautions, and Next.js output-file-tracing guidance.
 
 ## Recently Completed
+
+- [#171 - Upgrade Next.js to patched 16.3.6](https://github.com/iMelki/mission-control-kanban/issues/171)
+  - Closed after PR #176 merged at
+    `67d045bafe02a9dded874307f65f4237d4050c20`. Local Webpack build,
+    typecheck, tests, lint, and 18 production clipping measurements passed;
+    advisory code review, PR checks, and post-merge checks passed. The merge
+    lacked separately consulted operator land approval, tracked in
+    [agent-settings #1249](https://github.com/iMelki/agent-settings/issues/1249).
+    The production audit fell from six findings to two moderate findings,
+    tracked in #177; direct Turbopack build compatibility remains open in #175.
+    See the [upgrade record](docs/preflight/records/2026-09-24-nextjs-16-3-6-upgrade.md).
 
 - [#173 - Fail closed when production capture receives HTTP error pages](https://github.com/iMelki/mission-control-kanban/issues/173)
   - Closed after the shared HTTP-success guard, 404/500 negative tests, HTTP
