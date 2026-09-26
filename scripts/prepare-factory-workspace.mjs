@@ -26,9 +26,20 @@ function expectedMarker() {
   };
 }
 
+// better-sqlite3 >= 13 ships Node-API prebuilds inside the package
+// (prebuilds/<platform>-<arch>.node); a source build lands in build/Release.
+function hasSqliteBinding() {
+  const packageRoot = resolve(repositoryRoot, 'node_modules', 'better-sqlite3');
+  const targets = process.platform === 'linux'
+    ? [`linux-${process.arch}`, `linuxmusl-${process.arch}`]
+    : [`${process.platform}-${process.arch}`];
+  return targets.some((target) => existsSync(resolve(packageRoot, 'prebuilds', `${target}.node`)))
+    || existsSync(resolve(packageRoot, 'build', 'Release', 'better_sqlite3.node'));
+}
+
 function hasReadyDependencies() {
   return existsSync(resolve(repositoryRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx'))
-    && existsSync(resolve(repositoryRoot, 'node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node'))
+    && hasSqliteBinding()
     && existsSync(resolve(pluginRoot, 'node_modules', '@paperclipai', 'plugin-sdk'))
     && existsSync(resolve(pluginRoot, 'node_modules', '@paperclipai', 'shared'));
 }
