@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Hide the SQLite GC regression child on Windows (2026-09-27, #179)** -
+  The `spawnSync` test child now sets `windowsHide: true`, matching the repo's
+  existing unattended child-process pattern. This changes only test process
+  presentation, not the native-addon fix or runtime cleanup semantics.
+
 - **`.env.example` now uses the canonical MCK port 3021 (2026-09-26)** -
   `PORT` and the sample `MISSION_CONTROL_URL` still said legacy `3002`, which
   the agent-settings port registry keeps as manual-fallback evidence only.

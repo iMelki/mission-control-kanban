@@ -1,12 +1,20 @@
 # Mission Control Kanban Open Tasks
 
-Last updated: 2026-09-24
+Last updated: 2026-09-27
 
 GitHub issues are the canonical task records for this repo. This root index is
 the local operator entrypoint; historical task notes remain in
 `docs/OPEN_TASKS.md`.
 
 ## Active
+
+- [#179 - Verify the SQLite GC crash fix and close its incident record](https://github.com/iMelki/mission-control-kanban/issues/179)
+  - PR #180's Node-API upgrade is merged and exact-head runtime cleanup passed.
+    Keep the incident open until designated superior acceptance is recorded;
+    the two unverified deletions in old failed jobs remain unknown. The
+    Windows regression-test child now uses `windowsHide: true` to follow the
+    unattended-process policy. Review its focused test and dependency-version
+    evidence before deciding closure.
 
 - [#175 - Turbopack production build compatibility](https://github.com/iMelki/mission-control-kanban/issues/175)
   - The optional direct Turbopack build fails at the webpack-config guard and,
