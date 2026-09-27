@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Route-level regression tests for every receipt identity field (2026-09-27)** -
+  The completion webhook route binds a completed receipt to its persisted
+  dispatch attempt, but only the base SHA and changed-path scope had route
+  tests. `tests/factory-webhooks.test.ts` now also rejects a wrong envelope id,
+  repository slug, correlation id, and task revision with 409. Each case was
+  shown to fail when its check in `lifecycleRejection` is removed. This closes
+  the #136 route question without a two-phase restructure, because the route
+  already enforces all five fields.
+
 - **Hide the SQLite GC regression child on Windows (2026-09-27, #179)** -
   The `spawnSync` test child now sets `windowsHide: true`, matching the repo's
   existing unattended child-process pattern. This changes only test process
