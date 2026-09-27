@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Route-level regression tests for every receipt identity field (2026-09-27)** -
+  The completion webhook route binds a completed receipt to its persisted
+  dispatch attempt, but only the base SHA and changed-path scope had route
+  tests. `tests/factory-webhooks.test.ts` now also rejects a wrong envelope id,
+  repository slug, correlation id, and task revision with 409. Each case was
+  shown to fail when its check in `lifecycleRejection` is removed. This closes
+  the #136 route question without a two-phase restructure, because the route
+  already enforces all five fields.
+
+- **Hide the SQLite GC regression child on Windows (2026-09-27, #179)** -
+  The `spawnSync` test child now sets `windowsHide: true`, matching the repo's
+  existing unattended child-process pattern. This changes only test process
+  presentation, not the native-addon fix or runtime cleanup semantics.
+
+- **`.env.example` now uses the canonical MCK port 3021 (2026-09-26)** -
+  `PORT` and the sample `MISSION_CONTROL_URL` still said legacy `3002`, which
+  the agent-settings port registry keeps as manual-fallback evidence only.
+  `tests/env-example-port.test.mjs` pins the example to 3021 and to the
+  `dev:n8n` port and factory base URL, so the three cannot drift apart again.
+
 - **Stop the Runtime Regression server aborting in SQLite GC (2026-09-26)** -
   Upgrade `better-sqlite3` from 11.x to 13.0.3 (Node-API). The 11.x
   `node::ObjectWrap` destructor aborts Node 24 with

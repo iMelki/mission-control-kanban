@@ -38,6 +38,7 @@ test('dropped prepared statements survive GC finalized outside a JS context', ()
     cwd: process.cwd(),
     encoding: 'utf8',
     timeout: 120_000,
+    windowsHide: true,
   });
 
   assert.equal(result.signal, null, `child was killed by ${result.signal}\n${result.stderr}`);

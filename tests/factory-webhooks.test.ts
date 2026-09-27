@@ -1351,6 +1351,35 @@ test('lifecycle v2 advances started, testing, review, and receipt-proven complet
   });
   assert.equal(wrongBase.status, 409);
   assert.equal((await wrongBase.json()).reason, 'receipt_repository_mismatch');
+  // The route, not validateCallback, binds the receipt to the persisted
+  // attempt (#136). Every identity field must reject at the route; wrongBase
+  // above covers the base SHA.
+  const wrongEnvelope = await sendLifecycle('completed', revision, 'lifecycle-wrong-envelope', {
+    receipt: { ...receipt, envelopeId: 'factory:attempt-someone-else' },
+  });
+  assert.equal(wrongEnvelope.status, 409);
+  assert.equal((await wrongEnvelope.json()).reason, 'receipt_repository_mismatch');
+  const wrongSlug = await sendLifecycle('completed', revision, 'lifecycle-wrong-slug', {
+    receipt: {
+      ...receipt,
+      repository: { ...receipt.repository, slug: 'iMelki/some-other-repo' },
+    },
+  });
+  assert.equal(wrongSlug.status, 409);
+  assert.equal((await wrongSlug.json()).reason, 'receipt_repository_mismatch');
+  const otherCorrelation = 'mck:default:task-someone-else';
+  const wrongCorrelation = await sendLifecycle('completed', revision, 'lifecycle-wrong-correlation', {
+    correlation_id: otherCorrelation,
+    receipt: { ...receipt, correlationId: otherCorrelation },
+  });
+  assert.equal(wrongCorrelation.status, 409);
+  assert.equal((await wrongCorrelation.json()).reason, 'correlation_mismatch');
+  const otherRevision = 'e'.repeat(64);
+  const wrongRevision = await sendLifecycle('completed', otherRevision, 'lifecycle-wrong-revision', {
+    receipt: { ...receipt, taskRevisionSha256: `sha256:${otherRevision}` },
+  });
+  assert.equal(wrongRevision.status, 409);
+  assert.equal((await wrongRevision.json()).reason, 'task_revision_mismatch');
   const zeroTests = await sendLifecycle('completed', revision, 'lifecycle-zero-tests', {
     receipt: { ...receipt, tests: { total: 0, passed: 0, failed: 0, skipped: 0 } },
   });
