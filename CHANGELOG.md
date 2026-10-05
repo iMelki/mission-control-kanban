@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Commit the Next.js agent-rules block in `AGENTS.md` (2026-10-05, #187)** -
+  Next.js 16.3 `next dev` writes a managed `<!-- BEGIN:nextjs-agent-rules -->`
+  block into `AGENTS.md` whenever it detects an AI coding agent and the block
+  is missing or stale. That left the live checkout's tracked `AGENTS.md`
+  modified after every start, so the next governed start was refused with
+  `tracked-source-changes`. The block is now committed exactly as Next.js
+  16.3.6 writes it (the same bytes as the live checkout's diff), as
+  content-factory and command-center already do, so a start leaves
+  `git status --porcelain` empty. `tests/agents-md-next-rules.test.mjs` asks the
+  installed Next.js (`hasCurrentAgentRules`) whether `next dev` would rewrite
+  the file, so a Next.js upgrade that changes the block text fails `npm test`
+  in its own pull request instead of at the next live start.
+
 - **Route-level regression tests for every receipt identity field (2026-09-27)** -
   The completion webhook route binds a completed receipt to its persisted
   dispatch attempt, but only the base SHA and changed-path scope had route
