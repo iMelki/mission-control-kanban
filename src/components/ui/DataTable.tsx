@@ -365,7 +365,15 @@ export function DataTable<T extends { id?: string }>({
         </div>
       ) : null}
       <div className="overflow-hidden rounded-lg border border-mc-border bg-mc-bg-secondary">
-        <div className="overflow-x-auto">
+        {/* A keyboard user must be able to scroll a wide table (axe
+            scrollable-region-focusable, mck#152): measured failing at 375px on
+            /n8n-sync-history even with sortable header buttons inside. */}
+        <div
+          role="region"
+          tabIndex={0}
+          aria-label={caption || 'Data table'}
+          className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent"
+        >
           <table className="min-w-full text-sm">
             {caption ? <caption className="sr-only">{caption}</caption> : null}
             <thead className="bg-mc-bg-tertiary text-xs uppercase tracking-wide text-mc-text-secondary">

@@ -498,7 +498,7 @@ function TaskCard({ task, onClick, isDragging, isOverlay, dragAttributes, dragLi
           aria-label={`Reorder task ${task.title}`}
           className="flex w-full cursor-grab items-center justify-center border-b border-mc-border/30 py-1.5 opacity-0 transition-opacity hover:bg-mc-bg-tertiary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100"
         >
-          <GripVertical className="size-4 text-mc-text-secondary/50" />
+          <GripVertical className="size-4 text-mc-text-secondary" />
         </button>
       ) : (
         <div aria-hidden="true" className="flex items-center justify-center border-b border-mc-border/30 py-1.5">

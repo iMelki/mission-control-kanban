@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Last measured a11y leftovers: DataTable scroll region and drag-handle icon
+  contrast (2026-10-13, #151, #150, #152)** - A production serve of `dev`
+  (`56f4042`) was measured at 1280px and 375px with light and dark colour-scheme
+  emulation (the app has one dark theme, so both render the same). The three
+  #151 text pairs, the four #150 `/settings` input rings, and the #152
+  `link-name` / `nested-interactive` / tabs findings were already fixed and now
+  have measured evidence. Two defects were still present. axe
+  `scrollable-region-focusable` fired on the shared `DataTable` horizontal
+  scroller at 375px on `/n8n-sync-history`, so that wrapper is now a named,
+  focusable `role="region"` with the same `focus-visible` ring as the live feed.
+  The task-card reorder handle drew its only visual cue, the grip icon, at
+  `text-mc-text-secondary/50`, which is below 3:1 on the card and on its hover
+  fill (WCAG 1.4.11). It now uses the solid token. `tests/contrast-tokens.test.ts`
+  and `tests/accessibility-remediation-contract.test.mjs` fail on the old source
+  and pass on the new.
+
 - **Commit the Next.js agent-rules block in `AGENTS.md` (2026-10-05, #187)** -
   Next.js 16.3 `next dev` writes a managed `<!-- BEGIN:nextjs-agent-rules -->`
   block into `AGENTS.md` whenever it detects an AI coding agent and the block

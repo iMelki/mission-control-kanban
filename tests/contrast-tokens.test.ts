@@ -121,3 +121,62 @@ test('src no longer uses the leftover n8n /70 or OFFLINE /20 pairs', () => {
   assert.match(header, /bg-mc-bg border-mc-accent-red text-mc-accent-red/);
   assert.match(css, /\.status-offline[^{]*\{[^}]*bg-mc-bg/);
 });
+
+// mck#151 non-text leftover (WCAG 2.2 SC 1.4.11, 3:1). The task-card reorder
+// handle is a real button whose only visual identifier is the GripVertical
+// icon. `text-mc-text-secondary/50` composites below 3:1 on the card and on
+// the handle's own hover fill, so the control is not perceivable once shown.
+const HANDLE_BACKDROPS = [
+  ['mc-bg-secondary (task card)', TOKENS.bgSecondary],
+  ['mc-bg-tertiary (handle hover)', TOKENS.bgTertiary],
+] as const;
+
+test('the old drag-handle icon /50 composite is the sub-3:1 fixture this gate refuses', () => {
+  const fg = parseHexColor(TOKENS.textSecondary);
+  for (const [name, hex] of HANDLE_BACKDROPS) {
+    const bg = parseHexColor(hex);
+    const ratio = contrastRatioRounded(compositeOver(fg, 0.5, bg), bg);
+    assert.ok(ratio < 3, `${name}: old /50 icon must stay a failing fixture, got ${ratio}:1`);
+  }
+});
+
+test('the drag-handle icon token is >=3:1 on the card and on its hover fill', () => {
+  const fg = parseHexColor(TOKENS.textSecondary);
+  for (const [name, hex] of HANDLE_BACKDROPS) {
+    const ratio = contrastRatioRounded(fg, parseHexColor(hex));
+    assert.ok(ratio >= 3, `${name} against the handle icon is ${ratio}:1, need >=3`);
+  }
+});
+
+test('the focusable drag handle no longer fades its icon with /50', () => {
+  const queue = readFileSync(path.join(repoRoot, 'src', 'components', 'MissionQueue.tsx'), 'utf8');
+  const start = queue.indexOf('data-task-drag-handle');
+  assert.ok(start > 0, 'TaskCard still renders the data-task-drag-handle button');
+  const handle = queue.slice(start, queue.indexOf('</button>', start));
+  assert.match(handle, /<GripVertical className="size-4 text-mc-text-secondary"/);
+  assert.doesNotMatch(handle, /text-mc-text-secondary\/\d+/);
+});
+
+// mck#150 regression ratchet (WCAG 2.2 SC 2.4.7 / 2.4.13 / 1.4.11): the shared
+// Input focus ring is mc-accent at full alpha, and it must stay >=3:1 against
+// every backdrop the /settings fields sit on. A faded ring (/40, /50) fails.
+const ACCENT = '#58a6ff';
+
+test('the Input focus ring colour is >=3:1 on every settings backdrop', () => {
+  const ring = parseHexColor(ACCENT);
+  for (const hex of [TOKENS.bg, TOKENS.bgSecondary, TOKENS.bgTertiary]) {
+    const ratio = contrastRatioRounded(ring, parseHexColor(hex));
+    assert.ok(ratio >= 3, `ring ${ACCENT} on ${hex} is ${ratio}:1, need >=3`);
+  }
+  const faded = compositeOver(ring, 0.4, parseHexColor(TOKENS.bgTertiary));
+  assert.ok(
+    contrastRatioRounded(faded, parseHexColor(TOKENS.bgTertiary)) < 3,
+    'a /40 ring must stay a failing fixture or this check is dead',
+  );
+  const input = readFileSync(path.join(repoRoot, 'src', 'components', 'ui', 'input.tsx'), 'utf8');
+  assert.match(input, /focus-visible:ring-mc-accent(?![/\w-])/);
+  assert.match(
+    readFileSync(path.join(repoRoot, 'tailwind.config.ts'), 'utf8'),
+    /'mc-accent':\s*'#58a6ff'/,
+  );
+});

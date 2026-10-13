@@ -84,3 +84,19 @@ test('the runtime UI smoke locates cards by the new open button, not the removed
   assert.doesNotMatch(smoke, /getByRole\('tab'/);
   assert.equal([...smoke.matchAll(/workspaceNav\.getByRole\('button'/g)].length, 3);
 });
+
+test('#152 scrollable-region-focusable: the shared DataTable scroller is a named, focusable region', () => {
+  // Measured 2026-10-13 on a production serve of origin/dev 56f4042: axe
+  // scrollable-region-focusable fired on /n8n-sync-history at 375px on the
+  // DataTable `.overflow-x-auto` wrapper (both colour schemes). The sort-header
+  // buttons did not satisfy the rule's second remedy there.
+  const table = source('src/components/ui/DataTable.tsx');
+  const start = table.indexOf('className="overflow-x-auto');
+  assert.ok(start > 0, 'DataTable keeps its horizontal scroll container');
+  const opening = table.slice(table.lastIndexOf('<div', start), table.indexOf('>', start) + 1);
+  assert.match(opening, /role="region"/);
+  assert.match(opening, /tabIndex=\{0\}/);
+  assert.match(opening, /aria-label=\{/);
+  assert.match(opening, /focus-visible:ring-2/);
+  assert.match(opening, /focus-visible:ring-mc-accent/);
+});
