@@ -1,0 +1,1301 @@
+{
+  "url": "http://127.0.0.1:3021/",
+  "extractedAt": "2026-10-18T14:35:14.172Z",
+  "meta": {
+    "snapshotId": "f48216ed-a8d5-418a-aad4-d8650c707dca",
+    "httpStatus": 200,
+    "dembrandtVersion": "0.39.2",
+    "schemaVersion": "1.19.0",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "context": {
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "deviceScaleFactor": 1,
+      "isMobile": false,
+      "hasTouch": false,
+      "colorScheme": "light",
+      "reducedMotion": "no-preference",
+      "forcedColors": "none",
+      "locale": "en-US",
+      "timezoneId": "America/New_York",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+    },
+    "fontsReady": false,
+    "pendingFonts": [
+      "JetBrains Mono Fallback"
+    ],
+    "requestedUrl": "http://127.0.0.1:3021/",
+    "contentLength": 6674,
+    "flags": {}
+  },
+  "siteName": null,
+  "logo": null,
+  "logoInstances": [],
+  "favicons": [
+    {
+      "type": "icon",
+      "url": "http://127.0.0.1:3021/favicon.svg",
+      "sizes": null,
+      "dataUri": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzBhMGEwZiIvPgogIDxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMwMGZmODgiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjMiLz4KICA8Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSI2IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMGZmODgiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjUiLz4KICA8Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIyIiBmaWxsPSIjMDBmZjg4Ii8+CiAgPGxpbmUgeDE9IjE2IiB5MT0iNiIgeDI9IjE2IiB5Mj0iMjYiIHN0cm9rZT0iIzAwZmY4OCIgc3Ryb2tlLXdpZHRoPSIwLjUiIG9wYWNpdHk9IjAuMyIvPgogIDxsaW5lIHgxPSI2IiB5MT0iMTYiIHgyPSIyNiIgeTI9IjE2IiBzdHJva2U9IiMwMGZmODgiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz4KPC9zdmc+Cg=="
+    }
+  ],
+  "colors": {
+    "semantic": {
+      "secondary": "rgb(13, 17, 23)",
+      "background": "rgb(13, 17, 23)",
+      "text": "rgb(201, 209, 217)",
+      "primary": "rgb(88, 166, 255)"
+    },
+    "semanticEvidence": {
+      "primary": {
+        "decision": "elected",
+        "rule": "neutral-rescue-token",
+        "reason": "near-neutral pick replaced by a declared chromatic token",
+        "tokens": [
+          "--mc-accent"
+        ],
+        "alternates": [
+          {
+            "color": "#c9d1d9",
+            "count": 37,
+            "sources": [
+              "sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "palette": [
+      {
+        "color": "rgb(48, 54, 61)",
+        "normalized": "#30363d",
+        "count": 70,
+        "confidence": "high",
+        "sources": [
+          "border-b",
+          "mb-6",
+          "inline-flex"
+        ],
+        "tokens": [
+          "--mc-border",
+          "--mc-bg-tertiary",
+          "--mc-bg-secondary"
+        ],
+        "lch": "lch(22.249% 5.452 256.508)",
+        "oklch": "oklch(32.9984% 0.01489 252.31)",
+        "role": "accent",
+        "onColor": "#ffffff",
+        "hover": "#3a4149",
+        "variantOf": "primary"
+      },
+      {
+        "color": "rgb(139, 148, 158)",
+        "normalized": "#8b949e",
+        "count": 63,
+        "confidence": "high",
+        "sources": [],
+        "tokens": [
+          "--mc-text-secondary",
+          "--mc-text-muted"
+        ],
+        "lch": "lch(60.823% 6.693 254.521)",
+        "oklch": "oklch(66.2473% 0.01814 250.922)",
+        "role": "accent",
+        "onColor": "#000000",
+        "hover": "#767e86"
+      },
+      {
+        "color": "rgb(201, 209, 217)",
+        "normalized": "#c9d1d9",
+        "count": 37,
+        "confidence": "high",
+        "sources": [
+          "sr-only"
+        ],
+        "tokens": [
+          "--mc-text"
+        ],
+        "lch": "lch(83.395% 5.219 251.422)",
+        "oklch": "oklch(85.6908% 0.01413 247.992)",
+        "role": "neutral",
+        "onColor": "#000000",
+        "hover": "#abb2b8",
+        "variantOf": "primary"
+      },
+      {
+        "color": "rgb(13, 17, 23)",
+        "normalized": "#0d1117",
+        "count": 14,
+        "confidence": "high",
+        "sources": [
+          "flex"
+        ],
+        "tokens": [
+          "--mc-bg"
+        ],
+        "lch": "lch(4.908% 4.235 264.582)",
+        "oklch": "oklch(17.6285% 0.01402 258.357)",
+        "role": "accent",
+        "onColor": "#ffffff",
+        "hover": "#10141c",
+        "variantOf": "primary"
+      },
+      {
+        "color": "rgb(88, 166, 255)",
+        "normalized": "#58a6ff",
+        "count": 1,
+        "confidence": "low",
+        "sources": [
+          "flex"
+        ],
+        "tokens": [
+          "--mc-accent"
+        ],
+        "lch": "lch(66.189% 52.35 266.004)",
+        "oklch": "oklch(71.5252% 0.15181 253.306)",
+        "role": "supporting",
+        "onColor": "#000000",
+        "hover": "#4b8dd9",
+        "variantOf": "primary"
+      },
+      {
+        "color": "rgb(16, 16, 16)",
+        "normalized": "#101010",
+        "count": 1,
+        "confidence": "medium",
+        "sources": [
+          "hover/focus"
+        ]
+      },
+      {
+        "color": "rgb(33, 38, 45)",
+        "normalized": "#21262d",
+        "count": 1,
+        "confidence": "medium",
+        "sources": [
+          "hover/focus"
+        ]
+      }
+    ],
+    "cssVariables": {
+      "--mc-accent-red": {
+        "value": "#f85149",
+        "hex": "#f85149",
+        "lch": "lch(59.151% 76.774 33.408)",
+        "oklch": "oklch(66.5118% 0.20459 26.96)",
+        "scope": "root"
+      },
+      "--mc-bg-tertiary": {
+        "value": "#21262d",
+        "hex": "#21262d",
+        "lch": "lch(14.882% 5.486 261.184)",
+        "oklch": "oklch(26.6643% 0.01496 256.798)",
+        "scope": "root"
+      },
+      "--mc-accent-green": {
+        "value": "#3fb950",
+        "hex": "#3fb950",
+        "lch": "lch(66.803% 66.454 140.634)",
+        "oklch": "oklch(69.5081% 0.18093 145.621)",
+        "scope": "root"
+      },
+      "--mc-text-secondary": {
+        "value": "#8b949e",
+        "hex": "#8b949e",
+        "lch": "lch(60.823% 6.693 254.521)",
+        "oklch": "oklch(66.2473% 0.01814 250.922)",
+        "scope": "root"
+      },
+      "--mc-bg": {
+        "value": "#0d1117",
+        "hex": "#0d1117",
+        "lch": "lch(4.908% 4.235 264.582)",
+        "oklch": "oklch(17.6285% 0.01402 258.357)",
+        "scope": "root"
+      },
+      "--tw-ring-color": {
+        "value": "rgb(59 130 246/0.5)",
+        "hex": "#3b82f6",
+        "lch": "lch(54.617% 66.352 277.59 / 0.5)",
+        "oklch": "oklch(62.3083% 0.18801 259.815 / 0.5)",
+        "scope": "root"
+      },
+      "--mc-accent": {
+        "value": "#58a6ff",
+        "hex": "#58a6ff",
+        "lch": "lch(66.189% 52.35 266.004)",
+        "oklch": "oklch(71.5252% 0.15181 253.306)",
+        "scope": "root"
+      },
+      "--mc-border": {
+        "value": "#30363d",
+        "hex": "#30363d",
+        "lch": "lch(22.249% 5.452 256.508)",
+        "oklch": "oklch(32.9984% 0.01489 252.31)",
+        "scope": "root"
+      },
+      "--mc-accent-pink": {
+        "value": "#db61a2",
+        "hex": "#db61a2",
+        "lch": "lch(58.53% 54.812 348.53)",
+        "oklch": "oklch(66.2045% 0.16803 349.524)",
+        "scope": "root"
+      },
+      "--mc-bg-secondary": {
+        "value": "#161b22",
+        "hex": "#161b22",
+        "lch": "lch(9.491% 5.719 261.897)",
+        "oklch": "oklch(22.0223% 0.0157 256.816)",
+        "scope": "root"
+      },
+      "--mc-text-muted": {
+        "value": "#8b949e",
+        "hex": "#8b949e",
+        "lch": "lch(60.823% 6.693 254.521)",
+        "oklch": "oklch(66.2473% 0.01814 250.922)",
+        "scope": "root"
+      },
+      "--mc-accent-cyan": {
+        "value": "#39d353",
+        "hex": "#39d353",
+        "lch": "lch(74.908% 78.317 140.358)",
+        "oklch": "oklch(76.188% 0.21212 145.617)",
+        "scope": "root"
+      },
+      "--mc-warn": {
+        "value": "#d29922",
+        "hex": "#d29922",
+        "lch": "lch(67.482% 66.399 76.997)",
+        "oklch": "oklch(71.9551% 0.14014 79.915)",
+        "scope": "root"
+      },
+      "--mc-text": {
+        "value": "#c9d1d9",
+        "hex": "#c9d1d9",
+        "lch": "lch(83.395% 5.219 251.422)",
+        "oklch": "oklch(85.6908% 0.01413 247.992)",
+        "scope": "root"
+      },
+      "--mc-accent-yellow": {
+        "value": "#d29922",
+        "hex": "#d29922",
+        "lch": "lch(67.482% 66.399 76.997)",
+        "oklch": "oklch(71.9551% 0.14014 79.915)",
+        "scope": "root"
+      },
+      "--mc-accent-purple": {
+        "value": "#a371f7",
+        "hex": "#a371f7",
+        "lch": "lch(57.679% 73.588 304.087)",
+        "oklch": "oklch(66.0577% 0.19349 298.138)",
+        "scope": "root"
+      }
+    },
+    "detected": [
+      {
+        "color": "rgb(48, 54, 61)",
+        "normalized": "#30363d",
+        "count": 70,
+        "usageFrac": 0.30837004405286345,
+        "areaFrac": 0,
+        "confidence": "high",
+        "sources": [
+          "border-b",
+          "mb-6",
+          "inline-flex",
+          "border-2"
+        ],
+        "isToken": true
+      },
+      {
+        "color": "rgb(139, 148, 158)",
+        "normalized": "#8b949e",
+        "count": 63,
+        "usageFrac": 0.2775330396475771,
+        "areaFrac": 0,
+        "confidence": "high",
+        "sources": [],
+        "isToken": true
+      },
+      {
+        "color": "rgb(201, 209, 217)",
+        "normalized": "#c9d1d9",
+        "count": 37,
+        "usageFrac": 0.16299559471365638,
+        "areaFrac": 0,
+        "confidence": "high",
+        "sources": [
+          "sr-only"
+        ],
+        "isToken": true
+      },
+      {
+        "color": "rgb(33, 38, 45)",
+        "normalized": "#21262d",
+        "count": 21,
+        "usageFrac": 0.09251101321585903,
+        "areaFrac": 0.003414543220469789,
+        "confidence": "high",
+        "sources": [],
+        "isToken": true
+      },
+      {
+        "color": "rgb(13, 17, 23)",
+        "normalized": "#0d1117",
+        "count": 14,
+        "usageFrac": 0.06167400881057269,
+        "areaFrac": 0.8238958008674452,
+        "confidence": "high",
+        "sources": [
+          "flex"
+        ],
+        "isToken": true
+      },
+      {
+        "color": "rgb(22, 27, 34)",
+        "normalized": "#161b22",
+        "count": 9,
+        "usageFrac": 0.039647577092511016,
+        "areaFrac": 0.17169834285386215,
+        "confidence": "high",
+        "sources": [
+          "border-b",
+          "mb-6"
+        ],
+        "isToken": true
+      },
+      {
+        "color": "rgb(209, 250, 229)",
+        "normalized": "#d1fae5",
+        "count": 4,
+        "usageFrac": 0.01762114537444934,
+        "areaFrac": 0,
+        "confidence": "low",
+        "sources": [],
+        "isToken": false
+      },
+      {
+        "color": "rgba(52, 211, 153, 0.3)",
+        "normalized": "#34d399",
+        "count": 2,
+        "usageFrac": 0.00881057268722467,
+        "areaFrac": 0,
+        "confidence": "low",
+        "sources": [],
+        "isToken": false
+      },
+      {
+        "color": "rgb(255, 228, 230)",
+        "normalized": "#ffe4e6",
+        "count": 2,
+        "usageFrac": 0.00881057268722467,
+        "areaFrac": 0,
+        "confidence": "low",
+        "sources": [],
+        "isToken": false
+      },
+      {
+        "color": "rgb(254, 243, 199)",
+        "normalized": "#fef3c7",
+        "count": 2,
+        "usageFrac": 0.00881057268722467,
+        "areaFrac": 0,
+        "confidence": "low",
+        "sources": [],
+        "isToken": false
+      },
+      {
+        "color": "rgb(88, 166, 255)",
+        "normalized": "#58a6ff",
+        "count": 1,
+        "usageFrac": 0.004405286343612335,
+        "areaFrac": 0.000991313058222886,
+        "confidence": "high",
+        "sources": [
+          "flex"
+        ],
+        "isToken": true
+      },
+      {
+        "color": "rgba(251, 113, 133, 0.3)",
+        "normalized": "#fb7185",
+        "count": 1,
+        "usageFrac": 0.004405286343612335,
+        "areaFrac": 0,
+        "confidence": "low",
+        "sources": [],
+        "isToken": false
+      },
+      {
+        "color": "rgba(251, 191, 36, 0.3)",
+        "normalized": "#fbbf24",
+        "count": 1,
+        "usageFrac": 0.004405286343612335,
+        "areaFrac": 0,
+        "confidence": "low",
+        "sources": [],
+        "isToken": false
+      }
+    ],
+    "occurrences": [
+      {
+        "hex": "#30363d",
+        "paints": "border",
+        "slot": null,
+        "count": 70,
+        "area": 0,
+        "cssVar": "--mc-border",
+        "state": null
+      },
+      {
+        "hex": "#8b949e",
+        "paints": "text",
+        "slot": null,
+        "count": 63,
+        "area": 0,
+        "cssVar": "--mc-text-secondary",
+        "state": null
+      },
+      {
+        "hex": "#c9d1d9",
+        "paints": "text",
+        "slot": null,
+        "count": 37,
+        "area": 0,
+        "cssVar": "--mc-text",
+        "state": null
+      },
+      {
+        "hex": "#21262d",
+        "paints": "fill",
+        "slot": null,
+        "count": 21,
+        "area": 24912,
+        "cssVar": "--mc-bg-tertiary",
+        "state": null
+      },
+      {
+        "hex": "#0d1117",
+        "paints": "fill",
+        "slot": null,
+        "count": 13,
+        "area": 6011044,
+        "cssVar": "--mc-bg",
+        "state": null
+      },
+      {
+        "hex": "#161b22",
+        "paints": "fill",
+        "slot": null,
+        "count": 9,
+        "area": 1252690,
+        "cssVar": "--mc-bg-secondary",
+        "state": null
+      },
+      {
+        "hex": "#d1fae5",
+        "paints": "text",
+        "slot": null,
+        "count": 4,
+        "area": 0,
+        "cssVar": null,
+        "state": null
+      },
+      {
+        "hex": "#34d399",
+        "paints": "border",
+        "slot": null,
+        "count": 2,
+        "area": 0,
+        "cssVar": null,
+        "state": null
+      },
+      {
+        "hex": "#fef3c7",
+        "paints": "text",
+        "slot": null,
+        "count": 2,
+        "area": 0,
+        "cssVar": null,
+        "state": null
+      },
+      {
+        "hex": "#ffe4e6",
+        "paints": "text",
+        "slot": null,
+        "count": 2,
+        "area": 0,
+        "cssVar": null,
+        "state": null
+      },
+      {
+        "hex": "#0d1117",
+        "paints": "text",
+        "slot": null,
+        "count": 1,
+        "area": 0,
+        "cssVar": "--mc-bg",
+        "state": null
+      },
+      {
+        "hex": "#58a6ff",
+        "paints": "fill",
+        "slot": null,
+        "count": 1,
+        "area": 7233,
+        "cssVar": "--mc-accent",
+        "state": null
+      },
+      {
+        "hex": "#fb7185",
+        "paints": "border",
+        "slot": null,
+        "count": 1,
+        "area": 0,
+        "cssVar": null,
+        "state": null
+      },
+      {
+        "hex": "#fbbf24",
+        "paints": "border",
+        "slot": null,
+        "count": 1,
+        "area": 0,
+        "cssVar": null,
+        "state": null
+      }
+    ]
+  },
+  "typography": {
+    "styles": [
+      {
+        "context": "text",
+        "count": 7,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "30px (1.88rem)",
+        "weight": 400,
+        "lineHeight": "1.20",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "count": 1,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "24px (1.50rem)",
+        "weight": 400,
+        "lineHeight": "1.33",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-2",
+        "count": 1,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "24px (1.50rem)",
+        "weight": 700,
+        "lineHeight": "1.33",
+        "spacing": "-0.48px",
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "count": 1,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "20px (1.25rem)",
+        "weight": 700,
+        "lineHeight": "1.40",
+        "spacing": "-0.4px",
+        "transform": null
+      },
+      {
+        "context": "heading-2",
+        "count": 1,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "18px (1.13rem)",
+        "weight": 600,
+        "lineHeight": "1.56",
+        "spacing": "-0.36px",
+        "transform": null
+      },
+      {
+        "context": "heading-3",
+        "count": 7,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "18px (1.13rem)",
+        "weight": 600,
+        "lineHeight": "1.56",
+        "spacing": "-0.36px",
+        "transform": null
+      },
+      {
+        "context": "body",
+        "count": 22,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "count": 25,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "ui",
+        "count": 1,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "16px (1.00rem)",
+        "weight": 500,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "ui",
+        "count": 1,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "count": 1,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "16px (1.00rem)",
+        "weight": 500,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "count": 2,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "14px (0.88rem)",
+        "weight": 600,
+        "lineHeight": "1.43",
+        "spacing": null,
+        "transform": "uppercase"
+      },
+      {
+        "context": "heading-4",
+        "count": 12,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "14px (0.88rem)",
+        "weight": 600,
+        "lineHeight": "1.43",
+        "spacing": "-0.28px",
+        "transform": null
+      },
+      {
+        "context": "body",
+        "count": 28,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "14px (0.88rem)",
+        "weight": 400,
+        "lineHeight": "1.43",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "count": 20,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "12px (0.75rem)",
+        "weight": 400,
+        "lineHeight": "1.33",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-3",
+        "count": 4,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "12px (0.75rem)",
+        "weight": 600,
+        "lineHeight": "1.33",
+        "spacing": "-0.24px",
+        "transform": "uppercase"
+      },
+      {
+        "context": "caption",
+        "count": 6,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "12px (0.75rem)",
+        "weight": 500,
+        "lineHeight": "1.33",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "count": 36,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "11px (0.69rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "count": 12,
+        "family": "JetBrains Mono",
+        "fallbacks": "JetBrains Mono Fallback, Fira Code, ui-monospace",
+        "size": "11px (0.69rem)",
+        "weight": 500,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      }
+    ],
+    "sources": {
+      "googleFonts": [],
+      "adobeFonts": false,
+      "variableFonts": false,
+      "customFonts": [
+        "JetBrains Mono"
+      ],
+      "fontDisplay": "swap",
+      "urls": [
+        "http://127.0.0.1:3021/_next/static/media/0aa834ed78bf6d07-s.woff2",
+        "http://127.0.0.1:3021/_next/static/media/67957d42bae0796d-s.woff2",
+        "http://127.0.0.1:3021/_next/static/media/886030b0b59bc5a7-s.woff2",
+        "http://127.0.0.1:3021/_next/static/media/939c4f875ee75fbb-s.woff2",
+        "http://127.0.0.1:3021/_next/static/media/bb3ef058b751a6ad-s.p.woff2",
+        "http://127.0.0.1:3021/_next/static/media/f911b923c6adde36-s.woff2"
+      ],
+      "selfHostedFonts": [
+        "bb3ef058b751a6ad-s.p.woff2"
+      ]
+    }
+  },
+  "spacing": {
+    "scaleType": "4px",
+    "commonValues": [
+      {
+        "px": "2px",
+        "display": "2px",
+        "rem": "0.13rem",
+        "count": 24,
+        "numericValue": 2
+      },
+      {
+        "px": "4px",
+        "display": "4px",
+        "rem": "0.25rem",
+        "count": 43,
+        "numericValue": 4
+      },
+      {
+        "px": "6px",
+        "display": "6px",
+        "rem": "0.38rem",
+        "count": 24,
+        "numericValue": 6
+      },
+      {
+        "px": "8px",
+        "display": "8px",
+        "rem": "0.50rem",
+        "count": 25,
+        "numericValue": 8
+      },
+      {
+        "px": "12px",
+        "display": "12px",
+        "rem": "0.75rem",
+        "count": 1,
+        "numericValue": 12
+      },
+      {
+        "px": "16px",
+        "display": "16px",
+        "rem": "1.00rem",
+        "count": 24,
+        "numericValue": 16
+      },
+      {
+        "px": "24px",
+        "display": "24px",
+        "rem": "1.50rem",
+        "count": 17,
+        "numericValue": 24
+      },
+      {
+        "px": "32px",
+        "display": "32px",
+        "rem": "2.00rem",
+        "count": 3,
+        "numericValue": 32
+      }
+    ]
+  },
+  "borderRadius": {
+    "values": [
+      {
+        "value": "4px",
+        "count": 36,
+        "elements": [
+          "div",
+          "span",
+          "Open MCK Assistants details",
+          "Open MCK Assistants",
+          "Open Mission Control"
+        ],
+        "confidence": "high",
+        "numericValue": 4
+      },
+      {
+        "value": "6px",
+        "count": 12,
+        "elements": [
+          "span"
+        ],
+        "confidence": "high",
+        "numericValue": 6
+      },
+      {
+        "value": "8px",
+        "count": 5,
+        "elements": [
+          "button",
+          "article"
+        ],
+        "confidence": "medium",
+        "numericValue": 8
+      },
+      {
+        "value": "12px",
+        "count": 8,
+        "elements": [
+          "div",
+          "button"
+        ],
+        "confidence": "medium",
+        "numericValue": 12
+      },
+      {
+        "value": "9999px",
+        "count": 1,
+        "elements": [
+          "div"
+        ],
+        "confidence": "low",
+        "numericValue": 9999
+      }
+    ]
+  },
+  "borders": {
+    "combinations": [
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgb(48, 54, 61)",
+        "count": 49,
+        "elements": [
+          "div",
+          "article",
+          "span",
+          "a"
+        ],
+        "confidence": "high"
+      },
+      {
+        "width": "1px 0px 0px",
+        "style": "solid",
+        "color": "rgb(48, 54, 61)",
+        "count": 8,
+        "elements": [
+          "div"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgba(48, 54, 61, 0.7)",
+        "count": 6,
+        "elements": [
+          "div"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "width": "0px 0px 1px",
+        "style": "solid",
+        "color": "rgb(48, 54, 61)",
+        "count": 5,
+        "elements": [
+          "header",
+          "h3"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgba(52, 211, 153, 0.3)",
+        "count": 2,
+        "elements": [
+          "span"
+        ],
+        "confidence": "low"
+      },
+      {
+        "width": "1px 0px",
+        "style": "solid",
+        "color": "rgb(48, 54, 61)",
+        "count": 1,
+        "elements": [
+          "section"
+        ],
+        "confidence": "low"
+      },
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgba(251, 113, 133, 0.3)",
+        "count": 1,
+        "elements": [
+          "span"
+        ],
+        "confidence": "low"
+      },
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgba(251, 191, 36, 0.3)",
+        "count": 1,
+        "elements": [
+          "span"
+        ],
+        "confidence": "low"
+      },
+      {
+        "width": "2px",
+        "style": "dashed",
+        "color": "rgb(48, 54, 61)",
+        "count": 1,
+        "elements": [
+          "button"
+        ],
+        "confidence": "low"
+      }
+    ]
+  },
+  "shadows": [],
+  "gradients": [],
+  "motion": {
+    "durations": [
+      {
+        "value": "0.15s",
+        "ms": 150,
+        "count": 34
+      }
+    ],
+    "easings": [
+      {
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "type": "custom",
+        "count": 34
+      }
+    ],
+    "animations": [],
+    "contexts": {
+      "button": {
+        "count": 1,
+        "durations": [
+          "0.15s"
+        ],
+        "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "easingType": "custom",
+        "props": [
+          "color",
+          "background-color",
+          "border-color",
+          "text-decoration-color"
+        ]
+      }
+    },
+    "interactiveDeltas": [
+      {
+        "tag": "button",
+        "text": "New Workspace",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgb(88, 166, 255)",
+            "to": "rgba(88, 166, 255, 0.9)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          },
+          "color": {
+            "from": "rgb(139, 148, 158)",
+            "to": "rgb(201, 209, 217)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          },
+          "color": {
+            "from": "rgb(139, 148, 158)",
+            "to": "rgb(201, 209, 217)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          },
+          "color": {
+            "from": "rgb(139, 148, 158)",
+            "to": "rgb(201, 209, 217)"
+          }
+        }
+      },
+      {
+        "tag": "a",
+        "text": "",
+        "pattern": "color-shift",
+        "delta": {
+          "background": {
+            "from": "rgba(0, 0, 0, 0)",
+            "to": "rgb(33, 38, 45)"
+          }
+        }
+      }
+    ]
+  },
+  "components": {
+    "buttons": [
+      {
+        "states": {
+          "default": {
+            "backgroundColor": "rgb(88, 166, 255)",
+            "color": "rgb(13, 17, 23)",
+            "padding": "8px 16px",
+            "borderRadius": "8px",
+            "border": "0px solid rgb(229, 231, 235)",
+            "fontSize": "16px",
+            "fontWeight": "500"
+          }
+        },
+        "fontWeight": "500",
+        "fontSize": "16px",
+        "text": "New Workspace",
+        "confidence": "high"
+      }
+    ],
+    "inputs": {
+      "text": [],
+      "checkbox": [],
+      "radio": [],
+      "select": []
+    },
+    "links": [
+      {
+        "color": "rgb(201, 209, 217)",
+        "textDecoration": "none",
+        "fontWeight": "400",
+        "states": {
+          "default": {
+            "color": "rgb(201, 209, 217)",
+            "textDecoration": "none"
+          },
+          "hover": null
+        }
+      },
+      {
+        "color": "rgb(139, 148, 158)",
+        "textDecoration": "none",
+        "fontWeight": "400",
+        "states": {
+          "default": {
+            "color": "rgb(139, 148, 158)",
+            "textDecoration": "none"
+          },
+          "hover": null
+        }
+      }
+    ],
+    "badges": {
+      "all": [],
+      "byVariant": {
+        "error": [],
+        "warning": [],
+        "success": [],
+        "info": [],
+        "neutral": []
+      }
+    }
+  },
+  "breakpoints": [
+    {
+      "px": "640px"
+    },
+    {
+      "px": "768px"
+    },
+    {
+      "px": "1024px"
+    },
+    {
+      "px": "1280px"
+    },
+    {
+      "px": "1536px"
+    }
+  ],
+  "iconSystem": [
+    {
+      "name": "Lucide",
+      "type": "svg"
+    }
+  ],
+  "frameworks": [
+    {
+      "name": "React",
+      "confidence": "high",
+      "evidence": "DOM property __reactFiber$, window.renderer:react-dom",
+      "category": "js-framework",
+      "version": "19.3.0-canary",
+      "coverage": 1
+    },
+    {
+      "name": "Next.js",
+      "confidence": "high",
+      "evidence": "window.next 16.3.6, window.__next_f",
+      "category": "meta-framework",
+      "version": "16.3.6"
+    },
+    {
+      "name": "Tailwind CSS",
+      "confidence": "high",
+      "evidence": "banner tailwindcss v3.4.19, CSS variables --tw-*",
+      "category": "css-framework",
+      "version": "3.4.19"
+    }
+  ]
+}
