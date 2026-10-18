@@ -33,21 +33,21 @@ interface DispatchTimelineProps {
 function statusTone(status: DispatchAttempt['status']) {
   switch (status) {
     case 'success':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
+      return 'border-mc-success/30 bg-mc-success/10 text-mc-text';
     case 'failed':
     case 'timeout':
-      return 'border-rose-500/30 bg-rose-500/10 text-rose-200';
+      return 'border-mc-danger/30 bg-mc-danger/10 text-mc-text';
     case 'retrying':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+      return 'border-mc-warn/30 bg-mc-warn/10 text-mc-text';
     default:
       return 'border-mc-border bg-mc-bg text-mc-text-secondary';
   }
 }
 
 function StatusIcon({ status }: { status: DispatchAttempt['status'] }) {
-  if (status === 'success') return <CheckCircle2 className="size-4 text-emerald-300" />;
-  if (status === 'failed' || status === 'timeout') return <AlertTriangle className="size-4 text-rose-300" />;
-  if (status === 'retrying') return <RefreshCcw className="size-4 text-amber-300" />;
+  if (status === 'success') return <CheckCircle2 className="size-4 text-mc-success" />;
+  if (status === 'failed' || status === 'timeout') return <AlertTriangle className="size-4 text-mc-danger" />;
+  if (status === 'retrying') return <RefreshCcw className="size-4 text-mc-warn" />;
   return <Clock3 className="size-4 text-mc-text-secondary" />;
 }
 
@@ -118,7 +118,7 @@ export function DispatchTimeline({ taskId }: DispatchTimelineProps) {
     <Panel>
       <PanelHeader className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <RadioTower className="size-4 text-mc-accent" />
+          <RadioTower className="size-4 text-mc-text-secondary" />
           <div>
             <h3 className="text-sm font-semibold">Dispatch timeline</h3>
             <p className="text-xs text-mc-text-secondary">Adapter outcome history for this task.</p>
@@ -155,7 +155,7 @@ export function DispatchTimeline({ taskId }: DispatchTimelineProps) {
       </PanelHeader>
       <PanelBody className="space-y-2">
         {retryState === 'error' && (
-          <div className="rounded border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+          <div className="rounded border border-mc-danger/30 bg-mc-danger/10 px-3 py-2 text-xs text-mc-text">
             Retry failed. Check webhook config and the latest attempt message.
           </div>
         )}
@@ -176,7 +176,7 @@ export function DispatchTimeline({ taskId }: DispatchTimelineProps) {
                   {attempt.http_status && <span className="text-xs text-mc-text-secondary">HTTP {attempt.http_status}</span>}
                 </div>
                 <p className="mt-1 text-sm text-mc-text">{attempt.message}</p>
-                {attempt.error_message && <p className="mt-1 text-xs text-rose-200">{attempt.error_message}</p>}
+                {attempt.error_message && <p className="mt-1 text-xs text-mc-text">{attempt.error_message}</p>}
                 {attempt.webhook_url && <p className="mt-1 truncate text-xs text-mc-text-secondary">{attempt.webhook_url}</p>}
                 {(attempt.lifecycle_status || attempt.correlation_id || attempt.receipt_id) && (
                   <div className="mt-2 grid gap-1 rounded border border-mc-border/60 bg-mc-bg-secondary/40 p-2 text-[11px] text-mc-text-secondary">

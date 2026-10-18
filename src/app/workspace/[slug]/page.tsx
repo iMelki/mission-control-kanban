@@ -432,13 +432,13 @@ export default function WorkspacePage() {
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <main id="main-content" tabIndex={-1} className="text-center outline-none">
           <SearchX aria-hidden="true" className="w-14 h-14 mx-auto mb-4 text-mc-text-secondary" />
-          <h1 className="text-2xl font-bold mb-2">Workspace Not Found</h1>
+          <h1 className="mb-2">Workspace Not Found</h1>
           <p className="text-mc-text-secondary mb-6">
             The workspace &ldquo;{slug}&rdquo; doesn&apos;t exist.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-mc-accent text-mc-accent-ink rounded-lg font-medium hover:bg-mc-accent/90"
           >
             <ChevronLeft className="w-4 h-4" />
             Back to Dashboard
@@ -488,49 +488,55 @@ export default function WorkspacePage() {
       {workspace.github_project_owner && workspace.github_project_number && (
         <div className="border-b border-mc-border bg-mc-bg-secondary px-4 py-2">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-col gap-1 text-sm text-mc-text-secondary">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-col gap-1 text-sm text-mc-text-secondary">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {githubSyncState.state === 'syncing' ? (
-                  <Loader2 className="size-4 animate-spin text-mc-accent-cyan" />
+                  <Loader2 className="size-4 animate-spin text-mc-text-secondary" />
                 ) : githubSyncState.state === 'error' ? (
-                  <AlertTriangle className="size-4 text-rose-300" />
+                  <AlertTriangle className="size-4 text-mc-danger" />
                 ) : githubSyncState.state === 'success' ? (
-                  <CheckCircle2 className="size-4 text-emerald-300" />
+                  <CheckCircle2 className="size-4 text-mc-success" />
                 ) : (
-                  <RefreshCw className="size-4 text-mc-accent-cyan" />
+                  <RefreshCw className="size-4 text-mc-text-secondary" />
                 )}
                 <span>
                   GitHub Project #{workspace.github_project_number}
                   {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
                 </span>
                 {githubSyncState.message && (
-                  <span className={githubSyncState.state === 'error' ? 'text-rose-200' : 'text-mc-text-secondary'}>
+                  // Real sync failures carry the whole `gh api graphql` command line as one
+                  // unbroken string; it must wrap and clamp instead of widening the cockpit
+                  // past a 390px viewport. The full text stays available as the title.
+                  <span
+                    title={githubSyncState.message}
+                    className={`min-w-0 basis-full line-clamp-3 [overflow-wrap:anywhere] ${githubSyncState.state === 'error' ? 'text-mc-text' : 'text-mc-text-secondary'}`}
+                  >
                     {githubSyncState.message}
                   </span>
                 )}
               </div>
               {githubSyncState.statusNotes && githubSyncState.statusNotes.length > 0 && (
-                <div className="flex items-start gap-2 text-amber-200">
-                  <AlertTriangle className="size-4 mt-0.5 shrink-0" />
-                  <div className="space-y-0.5">
+                <div className="flex min-w-0 items-start gap-2 text-mc-text">
+                  <AlertTriangle className="size-4 mt-0.5 shrink-0 text-mc-warn" />
+                  <div className="min-w-0 space-y-0.5 [overflow-wrap:anywhere]">
                     <span className="block">GitHub/MCK status reconciliation is visible for this sync.</span>
                     {githubSyncState.statusNotes.map((note: string) => (
-                      <span key={note} className="block text-xs text-amber-100/90">{note}</span>
+                      <span key={note} className="block text-xs text-mc-text">{note}</span>
                     ))}
                   </div>
                 </div>
               )}
               <div className={n8nSyncPresentation?.state === 'error'
-                ? 'flex flex-wrap items-center gap-2 text-rose-200'
+                ? 'flex flex-wrap items-center gap-2 text-mc-text'
                 : n8nSyncPresentation?.state === 'warning'
-                  ? 'flex flex-wrap items-center gap-2 text-amber-200'
+                  ? 'flex flex-wrap items-center gap-2 text-mc-text'
                   : 'flex flex-wrap items-center gap-2 text-mc-text-secondary'}>
                 {n8nSyncPresentation?.state === 'error' ? (
-                  <AlertTriangle className="size-4 shrink-0" />
+                  <AlertTriangle className="size-4 shrink-0 text-mc-danger" />
                 ) : n8nSyncPresentation?.state === 'warning' ? (
-                  <AlertTriangle className="size-4 shrink-0 text-amber-300" />
+                  <AlertTriangle className="size-4 shrink-0 text-mc-warn" />
                 ) : n8nSyncPresentation ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
+                  <CheckCircle2 className="size-4 shrink-0 text-mc-success" />
                 ) : (
                   <RefreshCw className="size-4 shrink-0" />
                 )}
@@ -540,11 +546,11 @@ export default function WorkspacePage() {
                 <span>
                   Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - {formatSyncCadence(latestN8nSync)}
                 </span>
-                <Link href="/n8n-sync-history" className="text-mc-accent-cyan hover:text-mc-accent">
+                <Link href="/n8n-sync-history" className="text-mc-text underline decoration-mc-text-secondary/60 underline-offset-2 hover:decoration-mc-text">
                   View history
                 </Link>
                 {latestN8nSync?.alert_message && n8nSyncPresentation?.showMessage && (
-                  <span>{latestN8nSync.alert_message}</span>
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{latestN8nSync.alert_message}</span>
                 )}
               </div>
             </div>

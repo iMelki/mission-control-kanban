@@ -9,7 +9,12 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Mission Control',
+  // Per-route titles (#189 scoring: 9 of 9 routes shared one title). Each route
+  // segment sets its own `title`; the home route falls back to the default.
+  title: {
+    default: 'Workspaces · Mission Control',
+    template: '%s · Mission Control',
+  },
   description: 'AI Agent Orchestration Dashboard',
   icons: {
     icon: '/favicon.svg',
@@ -26,7 +31,7 @@ export default function RootLayout({
       <body className="bg-mc-bg text-mc-text min-h-screen">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-mc-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-mc-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-mc-text"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-mc-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-mc-accent-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-mc-text"
         >
           Skip to main content
         </a>

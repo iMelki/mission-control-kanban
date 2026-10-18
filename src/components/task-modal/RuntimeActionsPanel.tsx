@@ -26,7 +26,7 @@ export function RuntimeActionsPanel({
         </ActionButton>
       </div>
       {dispatchDryRunError && (
-        <div role="alert" className="rounded border border-mc-accent-red/40 bg-mc-accent-red/10 p-3 text-xs">
+        <div role="alert" className="rounded border border-mc-danger/40 bg-mc-danger/10 p-3 text-xs">
           <span className="block font-semibold text-mc-text">Dispatch dry-run failed</span>
           <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-mc-bg p-3">{JSON.stringify(dispatchDryRunError, null, 2)}</pre>
         </div>

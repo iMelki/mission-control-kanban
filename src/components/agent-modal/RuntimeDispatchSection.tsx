@@ -102,7 +102,7 @@ export function RuntimeDispatchSection({
   return (
     <section className="rounded-lg border border-mc-border bg-mc-bg/60 p-3 space-y-3">
       <div className="flex items-start gap-2">
-        <RadioTower className="w-4 h-4 text-mc-accent mt-0.5" />
+        <RadioTower className="w-4 h-4 text-mc-text-secondary mt-0.5" />
         <div>
           <h3 className="text-sm font-semibold">Runtime & dispatch</h3>
           <p className="text-xs text-mc-text-secondary">
@@ -164,12 +164,12 @@ export function RuntimeDispatchSection({
         onCopy={(configJson) => copyTemplate(configJson)}
       />
       {copyState !== 'idle' && (
-        <div className={`rounded border px-3 py-2 text-xs ${copyState === 'copied' ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100' : 'border-rose-400/30 bg-rose-500/10 text-rose-100'}`}>
+        <div className={`rounded border px-3 py-2 text-xs ${copyState === 'copied' ? 'border-mc-success/30 bg-mc-success/10 text-mc-text' : 'border-mc-danger/30 bg-mc-danger/10 text-mc-text'}`}>
           {copyState === 'copied' ? 'Template copied to clipboard.' : 'Could not copy template.'}
         </div>
       )}
 
-      <div className="rounded border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+      <div className="rounded border border-mc-warn/30 bg-mc-warn/10 px-3 py-2 text-xs text-mc-text">
         {dispatchDisabledReason}
       </div>
 
@@ -190,7 +190,7 @@ export function RuntimeDispatchSection({
             </button>
           </div>
           {validation && (
-            <div className={`rounded border px-3 py-2 ${validation.ok ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100' : 'border-rose-400/30 bg-rose-500/10 text-rose-100'}`}>
+            <div className={`rounded border px-3 py-2 ${validation.ok ? 'border-mc-success/30 bg-mc-success/10 text-mc-text' : 'border-mc-danger/30 bg-mc-danger/10 text-mc-text'}`}>
               {validation.ok ? <CheckCircle2 className="mr-1 inline size-3" /> : <ShieldAlert className="mr-1 inline size-3" />}
               {String(validation.message || validation.reason || (validation.ok ? 'Validation passed.' : 'Validation failed.'))}
             </div>

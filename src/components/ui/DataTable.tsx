@@ -351,7 +351,7 @@ export function DataTable<T extends { id?: string }>({
                       onClick={() => void handleBulkAction(action)}
                       className={`rounded border px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${
                         action.variant === 'danger'
-                          ? 'border-rose-400/40 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20'
+                          ? 'border-mc-danger/40 bg-mc-danger/10 text-mc-text hover:bg-mc-danger/20'
                           : 'border-mc-border hover:bg-mc-bg-tertiary'
                       }`}
                     >
