@@ -9,9 +9,9 @@ fit together in this workspace.
 
 - MCK web app: `http://127.0.0.1:3021`
 - OpenClaw gateway: `ws://127.0.0.1:28789`
-- OpenClaw config: `C:\Users\Milky\.openclaw\openclaw.json`
+- OpenClaw config: `%USERPROFILE%\.openclaw\openclaw.json`
 - OpenClaw session store:
-  `C:\Users\Milky\.openclaw\agents\main\sessions\sessions.json`
+  `%USERPROFILE%\.openclaw\agents\main\sessions\sessions.json`
 
 At the time of writing, MCK is connected to the local OpenClaw gateway and the
 gateway is advertising two live sessions for the default `main` agent.
@@ -262,8 +262,8 @@ Practical ways to access it are:
 
 - through MCK’s OpenClaw-backed UI and API routes
 - through the local OpenClaw CLI
-- by inspecting `C:\Users\Milky\.openclaw\openclaw.json`
-- by inspecting session files under `C:\Users\Milky\.openclaw\agents\`
+- by inspecting `%USERPROFILE%\.openclaw\openclaw.json`
+- by inspecting session files under `%USERPROFILE%\.openclaw\agents\`
 
 In this workspace, the active default agent is `main`. A second configured
 agent, `railway-manager-claw-dev`, exists but is currently idle.

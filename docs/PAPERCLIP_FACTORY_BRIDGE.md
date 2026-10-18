@@ -82,7 +82,7 @@ does not create a Paperclip issue.
 ## Build and install the plugin
 
 ```powershell
-Set-Location 'S:\source\CCAI\Assistants\tools\mission-control-kanban\integrations\paperclip-bridge'
+Set-Location '<workspace-root>\tools\mission-control-kanban\integrations\paperclip-bridge'
 npm ci --ignore-scripts
 npm run typecheck
 npm test
