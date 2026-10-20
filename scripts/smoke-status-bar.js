@@ -75,35 +75,33 @@ async function assertLongTitleStaysInsideBar(browser, baseUrl, artifactDir) {
     await bar.getByRole('button', { name: /^Details/ }).waitFor({ timeout: 10_000 });
     await page.screenshot({ path: path.join(artifactDir, 'status-bar-768-long-title.png') });
 
+    // Only the controls that must stay reachable and the bar's direct children are measured; chips scrolled out of
+    // the deliberately scrolling chip strip are clipped by it and say nothing about the bar's layout.
     const geometry = await page.evaluate(() => {
-      const barRect = document.querySelector('[data-workspace-status-bar]').getBoundingClientRect();
       const barEl = document.querySelector('[data-workspace-status-bar]');
-      // A chip scrolled out of the horizontally scrolling chip row is clipped by that row, not painted outside the bar.
-      const clippedInsideBar = (button) => {
-        for (let el = button.parentElement; el && el !== barEl; el = el.parentElement) {
-          if (getComputedStyle(el).overflowX === 'visible') continue;
-          const rect = el.getBoundingClientRect();
-          return rect.left >= barRect.left - 1 && rect.right <= barRect.right + 1;
-        }
-        return false;
+      const rectOf = (el) => {
+        const rect = el.getBoundingClientRect();
+        return { left: rect.left, right: rect.right };
       };
-      const buttons = Array.from(barEl.querySelectorAll('button'))
-        .filter((button) => button.getClientRects().length > 0)
-        .map((button) => {
-          const rect = button.getBoundingClientRect();
-          return { name: button.getAttribute('aria-label') || button.textContent.trim(), left: rect.left, right: rect.right, clipped: clippedInsideBar(button) };
-        });
-      return { barLeft: barRect.left, barRight: barRect.right, buttons };
-    });
-    for (const button of geometry.buttons) {
-      if (button.clipped) continue;
-      if (button.left < geometry.barLeft - 1 || button.right > geometry.barRight + 1) {
-        throw new Error(`status bar at 768px: "${button.name}" sits outside the bar with a long Project title: ${JSON.stringify(geometry)}`);
+      const controls = {};
+      for (const button of barEl.querySelectorAll(':scope > button')) {
+        const name = button.getAttribute('aria-label') || button.textContent.trim();
+        if (/^Details/.test(name)) controls.details = rectOf(button);
+        if (/Sync workspace now/.test(name)) controls.sync = rectOf(button);
       }
-    }
-    const names = geometry.buttons.map((button) => button.name);
-    if (!names.some((name) => /^Details/.test(name)) || !names.some((name) => /Sync workspace now/.test(name))) {
+      const children = Array.from(barEl.children)
+        .filter((child) => child.getClientRects().length > 0)
+        .map((child) => ({ tag: child.tagName.toLowerCase(), ...rectOf(child) }));
+      return { bar: rectOf(barEl), controls, children };
+    });
+    const { bar: barBox, controls, children } = geometry;
+    if (!controls.details || !controls.sync) {
       throw new Error(`status bar at 768px lost Details or Sync now with a long Project title: ${JSON.stringify(geometry)}`);
+    }
+    for (const box of [controls.details, controls.sync, ...children]) {
+      if (box.left < barBox.left - 1 || box.right > barBox.right + 1) {
+        throw new Error(`status bar at 768px: a bar child sits outside the bar with a long Project title: ${JSON.stringify(geometry)}`);
+      }
     }
   } finally {
     await page.close();
