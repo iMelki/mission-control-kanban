@@ -37,8 +37,6 @@ import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes'
 import type { AgentRuntimeType, Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
-import { GitHubConnectionStatus } from './GitHubConnectionStatus';
-import { GitHubReadinessCard } from './GitHubReadinessCard';
 import { DependencyBadges } from './DependencyBadges';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -149,7 +147,6 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   };
 
   const visibleTasks = tasks.filter(matchesRuntimeFilter);
-  const blockedInboxTasks = visibleTasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0);
   const getTasksByStatus = (status: TaskStatus) =>
     visibleTasks.filter((task) => task.status === status);
 
@@ -244,14 +241,33 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     // min-w-0 lets the board shrink inside the lg row instead of being crushed to a
     // 0px content box; the mobile min-height keeps the stacked board usable (#142).
     <div className="flex-1 min-w-0 min-h-[60vh] lg:min-h-0 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="p-3 border-b border-mc-border flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      {/* Header: title, count and actions on one row; the runtime filter joins it on wide screens and drops under it otherwise. */}
+      <div className="px-3 py-2 border-b border-mc-border flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex items-center gap-2 mr-auto">
           <ChevronRight className="size-4 text-mc-text-secondary" />
           <span className="text-sm font-medium uppercase tracking-wider">Mission Queue</span>
+          <span className="text-xs text-mc-text-secondary" role="status">
+            {presentBoardCount(boardLoadStatus, visibleTasks.length, tasks.length).text}
+          </span>
+        </div>
+        <div role="group" aria-label="Runtime filter" className="order-last flex basis-full flex-wrap items-center gap-1.5 2xl:order-none 2xl:basis-auto">
+          {RUNTIME_FILTERS.map((filterOption) => (
+            <button
+              key={filterOption.id}
+              type="button"
+              aria-pressed={runtimeFilter === filterOption.id}
+              onClick={() => dispatchUi({ type: 'set_runtime_filter', filter: filterOption.id })}
+              className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                runtimeFilter === filterOption.id
+                  ? 'border-mc-accent bg-mc-accent/20 text-mc-accent'
+                  : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
+              }`}
+            >
+              {filterOption.label}
+            </button>
+          ))}
         </div>
         <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <GitHubConnectionStatus />
           <button
             type="button"
             onClick={() => dispatchUi({ type: 'open_github_import_modal' })}
@@ -270,45 +286,6 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           </button>
         </div>
       </div>
-
-      <GitHubReadinessCard />
-
-      <div className="mx-3 mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-mc-border/60 bg-mc-bg-secondary/60 px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-mc-text-secondary">Runtime filter</span>
-        {RUNTIME_FILTERS.map((filterOption) => (
-          <button
-            key={filterOption.id}
-            type="button"
-            onClick={() => dispatchUi({ type: 'set_runtime_filter', filter: filterOption.id })}
-            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-              runtimeFilter === filterOption.id
-                ? 'border-mc-accent bg-mc-accent/20 text-mc-accent'
-                : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
-            }`}
-          >
-            {filterOption.label}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-mc-text-secondary" role="status">
-          {presentBoardCount(boardLoadStatus, visibleTasks.length, tasks.length).text}
-        </span>
-      </div>
-
-      {blockedInboxTasks.length > 0 && (
-        <div className="mx-3 mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="size-4 mt-0.5 text-amber-300" />
-            <div>
-              <p className="font-medium">Inbox is acting as a safety gate for imported GitHub work.</p>
-              <p className="mt-1 text-xs text-amber-100/90">
-                {blockedInboxTasks.length} task{blockedInboxTasks.length === 1 ? '' : 's'} cannot move into
-                active columns yet because the dispatch contract is incomplete. Open the card and fill
-                allowed file scope, acceptance criteria, test requirements, impact, and rollback details.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {dropError && (
         <div className="mx-3 mt-3 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
