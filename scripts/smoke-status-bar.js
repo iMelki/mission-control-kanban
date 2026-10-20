@@ -58,6 +58,8 @@ async function assertLongTitleStaysInsideBar(browser, baseUrl, artifactDir) {
   const page = await browser.newPage({ viewport: { width: 768, height: 900 } });
   try {
     await page.route(`**/api/workspaces/${PROJECT_SLUG}/github-sync`, (route) => route.fulfill({ json: { ...RECONCILIATION_ONLY, details: [] } }));
+    // Settled diagnostics render the Check button, the widest trailing control in the chip row.
+    await page.route('**/api/github/diagnostics', (route) => route.fulfill({ json: { status: 'limited', message: 'smoke diagnostics' } }));
     await page.route(new RegExp(`/api/workspaces/${PROJECT_SLUG}(\\?.*)?$`), async (route) => {
       if (route.request().method() !== 'GET') return route.continue();
       const response = await route.fetch();
@@ -75,15 +77,26 @@ async function assertLongTitleStaysInsideBar(browser, baseUrl, artifactDir) {
 
     const geometry = await page.evaluate(() => {
       const barRect = document.querySelector('[data-workspace-status-bar]').getBoundingClientRect();
-      const buttons = Array.from(document.querySelectorAll('[data-workspace-status-bar] button'))
+      const barEl = document.querySelector('[data-workspace-status-bar]');
+      // A chip scrolled out of the horizontally scrolling chip row is clipped by that row, not painted outside the bar.
+      const clippedInsideBar = (button) => {
+        for (let el = button.parentElement; el && el !== barEl; el = el.parentElement) {
+          if (getComputedStyle(el).overflowX === 'visible') continue;
+          const rect = el.getBoundingClientRect();
+          return rect.left >= barRect.left - 1 && rect.right <= barRect.right + 1;
+        }
+        return false;
+      };
+      const buttons = Array.from(barEl.querySelectorAll('button'))
         .filter((button) => button.getClientRects().length > 0)
         .map((button) => {
           const rect = button.getBoundingClientRect();
-          return { name: button.getAttribute('aria-label') || button.textContent.trim(), left: rect.left, right: rect.right };
+          return { name: button.getAttribute('aria-label') || button.textContent.trim(), left: rect.left, right: rect.right, clipped: clippedInsideBar(button) };
         });
       return { barLeft: barRect.left, barRight: barRect.right, buttons };
     });
     for (const button of geometry.buttons) {
+      if (button.clipped) continue;
       if (button.left < geometry.barLeft - 1 || button.right > geometry.barRight + 1) {
         throw new Error(`status bar at 768px: "${button.name}" sits outside the bar with a long Project title: ${JSON.stringify(geometry)}`);
       }
