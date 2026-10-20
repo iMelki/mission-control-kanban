@@ -20,7 +20,7 @@ import { fetchWithBudget } from '@/lib/fetch-budget';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
-import { extractGitHubSyncStatusNotes, formatSyncCount } from '@/lib/workspace-sync-summary';
+import { extractGitHubSyncNoteGroups, formatSyncCount } from '@/lib/workspace-sync-summary';
 import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
 
 type WorkspacePageState = {
@@ -134,7 +134,7 @@ export default function WorkspacePage() {
       setGitHubSyncState({
         state: 'success',
         message: `Workspace sync complete: ${imported} imported, ${updated} updated, ${moved} moved.${statusSuffix}`,
-        statusNotes: extractGitHubSyncStatusNotes(syncPayload),
+        noteGroups: extractGitHubSyncNoteGroups(syncPayload),
         counts: { imported, updated, moved, statusReconciled, driftWarnings },
       });
     } catch (error) {

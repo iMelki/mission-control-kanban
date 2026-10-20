@@ -43,7 +43,7 @@
     "test:task-dependencies": "node --import tsx --test tests/task-dependencies.test.ts",
     "test:fetch-budget": "node --import tsx --test tests/fetch-budget.test.ts",
     "test:cockpit-load-state": "node --import tsx --test tests/cockpit-load-state.test.ts",
-    "test:workspace-sync-summary": "node --import tsx --test tests/workspace-sync-summary.test.ts",
+    "test:workspace-sync-summary": "node --import tsx --test tests/workspace-sync-summary.test.ts tests/workspace-status-bar.test.ts",
     "test:contrast-tokens": "node --import tsx --test tests/contrast-tokens.test.ts",
     "smoke:runtime-ui": "node scripts/smoke-runtime-ui.js",
     "check:runtime-regressions": "node scripts/check-runtime-regressions.js",

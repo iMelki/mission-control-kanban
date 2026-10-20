@@ -35,25 +35,63 @@ export function formatReconciliationSuffix(summary: Record<string, unknown>): st
   return `, ${statusReconciled} status reconciled, ${driftWarnings} upstream drift warning${driftWarnings === 1 ? '' : 's'}`;
 }
 
-export function extractGitHubSyncStatusNotes(payload: Record<string, unknown>): string[] {
+export type GitHubSyncNoteGroups = {
+  /** Unresolved disagreements: GitHub and MCK still differ and a person has to pick a side. */
+  drift: string[];
+  /** Status moves MCK already made to match GitHub; informational, nothing left to resolve. */
+  reconciled: string[];
+};
+
+const MAX_NOTES_PER_GROUP = 3;
+
+export function extractGitHubSyncNoteGroups(payload: Record<string, unknown>): GitHubSyncNoteGroups {
   const details = Array.isArray(payload.details) ? payload.details : [];
-  const notes: string[] = [];
+  const groups: GitHubSyncNoteGroups = { drift: [], reconciled: [] };
 
   for (const detail of details) {
     if (!detail || typeof detail !== 'object') continue;
     const detailRecord = detail as Record<string, unknown>;
-    if (detailRecord.action !== 'status_reconcile' && detailRecord.action !== 'drift') continue;
+    const group = detailRecord.action === 'drift'
+      ? groups.drift
+      : detailRecord.action === 'status_reconcile'
+        ? groups.reconciled
+        : null;
+    if (!group || group.length >= MAX_NOTES_PER_GROUP) continue;
 
     const issue = typeof detailRecord.issue === 'string' ? `${detailRecord.issue}: ` : '';
     const reason = typeof detailRecord.reason === 'string'
       ? detailRecord.reason
       : String(detailRecord.action);
-    notes.push(`${issue}${reason}`);
-
-    if (notes.length === 3) break;
+    group.push(`${issue}${reason}`);
   }
 
-  return notes;
+  return groups;
+}
+
+export type SyncSummaryChip = {
+  kind: 'unlinked' | 'idle' | 'syncing' | 'error' | 'attention' | 'ok';
+  label: string;
+};
+
+/**
+ * The single chip the status line shows below `md`. A workspace that has never
+ * synced in this tab is "Not synced yet", never "Synced": a green check before the
+ * first sync would claim a result nobody has produced.
+ */
+export function presentSyncSummaryChip(input: {
+  hasProject: boolean;
+  syncState: 'idle' | 'syncing' | 'success' | 'error';
+  attention: number;
+}): SyncSummaryChip {
+  const toReview = `${input.attention} to review`;
+  if (!input.hasProject) {
+    return input.attention > 0 ? { kind: 'attention', label: toReview } : { kind: 'unlinked', label: 'GitHub status' };
+  }
+  if (input.syncState === 'error') return { kind: 'error', label: 'Sync failed' };
+  if (input.syncState === 'syncing') return { kind: 'syncing', label: 'Syncing…' };
+  if (input.attention > 0) return { kind: 'attention', label: toReview };
+  if (input.syncState === 'idle') return { kind: 'idle', label: 'Not synced yet' };
+  return { kind: 'ok', label: 'Synced' };
 }
 
 /** Daily "HH:MM" times the n8n schedule recorded with its last run. */

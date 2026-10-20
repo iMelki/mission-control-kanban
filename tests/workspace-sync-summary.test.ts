@@ -12,7 +12,12 @@ import {
   longestScheduleGapHours,
   presentMckN8nSyncFreshness,
 } from '../src/lib/n8n-sync-freshness';
-import { explainSyncNote, readN8nScheduleTimes } from '../src/lib/workspace-sync-summary';
+import {
+  explainSyncNote,
+  extractGitHubSyncNoteGroups,
+  presentSyncSummaryChip,
+  readN8nScheduleTimes,
+} from '../src/lib/workspace-sync-summary';
 import type { MckN8nSyncRun } from '../src/lib/types';
 
 const NOW = new Date('2026-10-20T05:30:00.000Z');
@@ -92,4 +97,46 @@ test('the Blocked drift note says nothing is broken; unknown notes get no gloss'
     /Nothing is wrong/,
   );
   assert.equal(explainSyncNote('x/y#1: would move local status from inbox to review: reason'), undefined);
+});
+
+test('a payload with only reconciliation moves reports no drift', () => {
+  const groups = extractGitHubSyncNoteGroups({
+    details: [
+      { action: 'status_reconcile', issue: 'x/y#1', reason: 'moved local status from inbox to done' },
+      { action: 'status_reconcile', issue: 'x/y#2', reason: 'moved local status from review to done' },
+    ],
+  });
+  assert.deepEqual(groups.drift, []);
+  assert.equal(groups.reconciled.length, 2);
+});
+
+test('drift and reconciliation notes are grouped apart and each group stops at three', () => {
+  const details = [
+    ...Array.from({ length: 5 }, (_, index) => ({ action: 'drift', issue: `x/y#${index}`, reason: 'still open' })),
+    ...Array.from({ length: 4 }, (_, index) => ({ action: 'status_reconcile', reason: `moved ${index}` })),
+    { action: 'imported', reason: 'ignored' },
+  ];
+  const groups = extractGitHubSyncNoteGroups({ details });
+  assert.equal(groups.drift.length, 3);
+  assert.equal(groups.reconciled.length, 3);
+  assert.equal(groups.drift[0], 'x/y#0: still open');
+  assert.equal(groups.reconciled[0], 'moved 0');
+  assert.deepEqual(extractGitHubSyncNoteGroups({}), { drift: [], reconciled: [] });
+});
+
+test('the mobile chip never says "Synced" before a sync has run', () => {
+  assert.deepEqual(presentSyncSummaryChip({ hasProject: true, syncState: 'idle', attention: 0 }), { kind: 'idle', label: 'Not synced yet' });
+  assert.deepEqual(presentSyncSummaryChip({ hasProject: true, syncState: 'success', attention: 0 }), { kind: 'ok', label: 'Synced' });
+});
+
+test('the mobile chip puts failures and warnings ahead of the sync state', () => {
+  assert.equal(presentSyncSummaryChip({ hasProject: true, syncState: 'error', attention: 2 }).label, 'Sync failed');
+  assert.equal(presentSyncSummaryChip({ hasProject: true, syncState: 'syncing', attention: 1 }).label, 'Syncing…');
+  assert.equal(presentSyncSummaryChip({ hasProject: true, syncState: 'success', attention: 2 }).label, '2 to review');
+  assert.equal(presentSyncSummaryChip({ hasProject: true, syncState: 'idle', attention: 1 }).label, '1 to review');
+});
+
+test('a workspace without a Project gets a neutral chip, or the review count', () => {
+  assert.deepEqual(presentSyncSummaryChip({ hasProject: false, syncState: 'idle', attention: 0 }), { kind: 'unlinked', label: 'GitHub status' });
+  assert.equal(presentSyncSummaryChip({ hasProject: false, syncState: 'idle', attention: 1 }).label, '1 to review');
 });
