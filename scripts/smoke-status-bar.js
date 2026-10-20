@@ -85,6 +85,7 @@ async function assertLongTitleStaysInsideBar(browser, baseUrl, artifactDir) {
       };
       const controls = {};
       for (const button of barEl.querySelectorAll(':scope > button')) {
+        if (button.getClientRects().length === 0 || button.getBoundingClientRect().width === 0) continue;
         const name = button.getAttribute('aria-label') || button.textContent.trim();
         if (/^Details/.test(name)) controls.details = rectOf(button);
         if (/Sync workspace now/.test(name)) controls.sync = rectOf(button);
