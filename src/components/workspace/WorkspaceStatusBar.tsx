@@ -281,14 +281,18 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
         data-workspace-status-bar
         className="flex h-10 items-center gap-2 border-b border-mc-border bg-mc-bg-secondary px-4"
       >
-        <span className="hidden shrink-0 items-center gap-2 text-xs text-mc-text-secondary md:inline-flex">
+        {/* Bounded and truncating: a long Project title must never push Details and Sync now off the bar. */}
+        <span
+          className="hidden min-w-0 max-w-[40%] items-center gap-2 text-xs text-mc-text-secondary md:inline-flex"
+          title={hasProject ? `GitHub Project #${workspace.github_project_number}${workspace.github_project_title ? ` ${workspace.github_project_title}` : ''}` : undefined}
+        >
           {hasProject ? (
             <>
-              GitHub Project #{workspace.github_project_number}
-              {workspace.github_project_title ? <span className="text-mc-text">{workspace.github_project_title}</span> : null}
+              <span className="shrink-0">GitHub Project #{workspace.github_project_number}</span>
+              {workspace.github_project_title ? <span className="truncate text-mc-text">{workspace.github_project_title}</span> : null}
             </>
           ) : (
-            'No GitHub Project linked'
+            <span className="truncate">No GitHub Project linked</span>
           )}
         </span>
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden md:hidden">
