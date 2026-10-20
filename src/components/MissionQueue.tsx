@@ -251,6 +251,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           </span>
         </div>
         <div role="group" aria-label="Runtime filter" className="order-last flex basis-full flex-wrap items-center gap-1.5 2xl:order-none 2xl:basis-auto">
+          <span className="mr-1 text-xs uppercase tracking-wider text-mc-text-secondary">Runtime filter</span>
           {RUNTIME_FILTERS.map((filterOption) => (
             <button
               key={filterOption.id}
