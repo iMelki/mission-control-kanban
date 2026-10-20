@@ -80,6 +80,7 @@ function StatusChip({
   children,
   section,
   onOpen,
+  className,
 }: {
   tone: Tone;
   icon: ComponentType<{ className?: string }>;
@@ -87,6 +88,7 @@ function StatusChip({
   children: React.ReactNode;
   section: DrawerSection;
   onOpen: (section: DrawerSection) => void;
+  className?: string;
 }) {
   return (
     <button
@@ -96,11 +98,76 @@ function StatusChip({
         'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors duration-fast',
         'hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent',
         TONE_CLASSES[tone],
+        className,
       )}
     >
-      <Icon className={cn('size-3.5', spin && 'animate-spin')} />
-      {children}
+      <Icon className={cn('size-3.5 shrink-0', spin && 'animate-spin')} />
+      <span className="truncate">{children}</span>
     </button>
+  );
+}
+
+export function SyncNotesBody({
+  driftWarnings,
+  driftNotes,
+  reconciledNotes,
+  statusReconciled,
+  counts,
+}: {
+  driftWarnings: number;
+  driftNotes: string[];
+  reconciledNotes: string[];
+  statusReconciled: number;
+  counts?: GitHubSyncState['counts'];
+}) {
+  return (
+    <>
+        {driftWarnings === 0 && reconciledNotes.length === 0 && statusReconciled === 0 ? (
+          <p>No status reconciliation or drift notes in the last sync.</p>
+        ) : null}
+        {driftWarnings > 0 ? (
+          <>
+            <p className="text-mc-text">GitHub and MCK disagree on {driftWarnings} item{driftWarnings === 1 ? '' : 's'}.</p>
+            <ul className="space-y-3">
+              {driftNotes.map((note) => {
+                const gloss = explainSyncNote(note);
+                return (
+                  <li key={note} className="rounded border border-mc-warn/30 bg-mc-warn/5 p-3">
+                    <p className="text-mc-text">{note}</p>
+                    {gloss ? <p className="mt-1.5 text-xs">{gloss}</p> : null}
+                  </li>
+                );
+              })}
+            </ul>
+            {driftWarnings > driftNotes.length ? (
+              <p className="text-xs">Showing the first {driftNotes.length} of {driftWarnings}.</p>
+            ) : null}
+          </>
+        ) : null}
+        {statusReconciled > 0 || reconciledNotes.length > 0 ? (
+          <>
+            <p className="text-mc-text">
+              MCK moved {statusReconciled || reconciledNotes.length} card{(statusReconciled || reconciledNotes.length) === 1 ? '' : 's'} to match GitHub. Nothing to resolve.
+            </p>
+            <ul className="space-y-2">
+              {reconciledNotes.map((note) => (
+                <li key={note} className="rounded border border-mc-border bg-mc-bg-tertiary/30 p-3">
+                  <p className="text-mc-text">{note}</p>
+                </li>
+              ))}
+            </ul>
+            {statusReconciled > reconciledNotes.length ? (
+              <p className="text-xs">Showing the first {reconciledNotes.length} of {statusReconciled}.</p>
+            ) : null}
+          </>
+        ) : null}
+        {counts ? (
+          <p className="text-xs">
+            {counts.statusReconciled} status reconciled, {counts.driftWarnings} upstream drift warning
+            {counts.driftWarnings === 1 ? '' : 's'} in this sync.
+          </p>
+        ) : null}
+    </>
   );
 }
 
@@ -224,13 +291,14 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
             'No GitHub Project linked'
           )}
         </span>
-        <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden md:hidden">
           <StatusChip
             tone={summaryChipStyle.tone}
             icon={summaryChipStyle.icon}
             spin={summaryChip.kind === 'syncing'}
             section={mobileSection}
             onOpen={openAt}
+            className="min-w-0 shrink"
           >
             {summaryChip.label}
           </StatusChip>
@@ -294,7 +362,7 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
             className="inline-flex shrink-0 items-center gap-1.5 rounded border border-mc-border px-2.5 py-1 text-xs hover:bg-mc-bg-tertiary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
           >
             {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-            Sync now
+            <span className="hidden sm:inline">Sync now</span>
           </button>
         ) : null}
       </div>
@@ -344,51 +412,13 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
             </DrawerBlock>
 
             <DrawerBlock id="notes" active={section === 'notes'} title="Status notes from this sync" tone={driftWarnings > 0 ? 'warn' : 'muted'}>
-              {driftWarnings === 0 && reconciledNotes.length === 0 && statusReconciled === 0 ? (
-                <p>No status reconciliation or drift notes in the last sync.</p>
-              ) : null}
-              {driftWarnings > 0 ? (
-                <>
-                  <p className="text-mc-text">GitHub and MCK disagree on {driftWarnings} item{driftWarnings === 1 ? '' : 's'}.</p>
-                  <ul className="space-y-3">
-                    {driftNotes.map((note) => {
-                      const gloss = explainSyncNote(note);
-                      return (
-                        <li key={note} className="rounded border border-mc-warn/30 bg-mc-warn/5 p-3">
-                          <p className="text-mc-text">{note}</p>
-                          {gloss ? <p className="mt-1.5 text-xs">{gloss}</p> : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {driftWarnings > driftNotes.length ? (
-                    <p className="text-xs">Showing the first {driftNotes.length} of {driftWarnings}.</p>
-                  ) : null}
-                </>
-              ) : null}
-              {statusReconciled > 0 || reconciledNotes.length > 0 ? (
-                <>
-                  <p className="text-mc-text">
-                    MCK moved {statusReconciled || reconciledNotes.length} card{(statusReconciled || reconciledNotes.length) === 1 ? '' : 's'} to match GitHub. Nothing to resolve.
-                  </p>
-                  <ul className="space-y-2">
-                    {reconciledNotes.map((note) => (
-                      <li key={note} className="rounded border border-mc-border bg-mc-bg-tertiary/30 p-3">
-                        <p className="text-mc-text">{note}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  {statusReconciled > reconciledNotes.length ? (
-                    <p className="text-xs">Showing the first {reconciledNotes.length} of {statusReconciled}.</p>
-                  ) : null}
-                </>
-              ) : null}
-              {githubSync.counts ? (
-                <p className="text-xs">
-                  {githubSync.counts.statusReconciled} status reconciled, {githubSync.counts.driftWarnings} upstream drift warning
-                  {githubSync.counts.driftWarnings === 1 ? '' : 's'} in this sync.
-                </p>
-              ) : null}
+              <SyncNotesBody
+                driftWarnings={driftWarnings}
+                driftNotes={driftNotes}
+                reconciledNotes={reconciledNotes}
+                statusReconciled={statusReconciled}
+                counts={githubSync.counts}
+              />
             </DrawerBlock>
 
             <DrawerBlock id="n8n" active={section === 'n8n'} title="n8n scheduled sync" tone={n8nTone === 'ok' || n8nTone === 'muted' ? 'muted' : n8nTone}>
