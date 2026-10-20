@@ -206,22 +206,6 @@ h6 {
   animation: slide-in var(--duration-slow) var(--ease-out);
 }
 
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* The status drawer slides in from its edge: same `slow` step as slide-in. */
-.animate-slide-in-right {
-  animation: slide-in-right var(--duration-slow) var(--ease-out);
-}
-
 /* Glow effect for online status */
 .online-glow {
   box-shadow: 0 0 10px var(--mc-accent-green), 0 0 20px var(--mc-accent-green);

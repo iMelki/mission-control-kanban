@@ -14,7 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { formatAgeHours, presentMckN8nSyncFreshness, presentMckN8nSyncRun } from '@/lib/n8n-sync-presentation';
+import { formatAgeHours, presentMckN8nSyncFreshness } from '@/lib/n8n-sync-freshness';
+import { presentMckN8nSyncRun } from '@/lib/n8n-sync-presentation';
 import { cn } from '@/lib/utils';
 import {
   explainSyncNote,
@@ -142,6 +143,10 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
     ? `${formatSyncCount(n8nSummary.scanned_items)} scanned, ${formatSyncCount(n8nSummary.updated)} updated, ${formatSyncCount(n8nSummary.errors)} errors${formatReconciliationSuffix(n8nSummary)}`
     : 'no recorded runs yet';
 
+  // Workspaces without a linked Project (the default workspace) have nothing to sync, but the
+  // GitHub connection, import/write-back readiness and the Inbox gate still apply to them.
+  const hasProject = Boolean(workspace.github_project_owner && workspace.github_project_number);
+  const defaultSection: DrawerSection = hasProject ? 'github' : 'readiness';
   const syncing = githubSync.state === 'syncing';
   const driftWarnings = githubSync.counts?.driftWarnings ?? 0;
   const notes = githubSync.statusNotes ?? [];
@@ -151,11 +156,22 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
     setOpen(true);
   };
 
-  // Scroll after the drawer has mounted its content, so a chip lands on its own block.
+  // Runs once the drawer has mounted its content: slide it in from its edge (skipped under
+  // reduced motion) and land a chip on its own block.
   const scrollToSection = useCallback((node: HTMLDivElement | null) => {
-    if (!node || section === 'github') return;
+    if (!node) return;
+    if (!node.dataset.slid) {
+      node.dataset.slid = 'true';
+      if (!node.ownerDocument.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        node.animate?.(
+          [{ opacity: 0, transform: 'translateX(24px)' }, { opacity: 1, transform: 'translateX(0)' }],
+          { duration: 300, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+        );
+      }
+    }
+    if (section === defaultSection) return;
     node.ownerDocument.getElementById(`workspace-status-${section}`)?.scrollIntoView({ block: 'start' });
-  }, [section]);
+  }, [section, defaultSection]);
 
   const n8nTone: Tone = n8nStale || n8nRun?.state === 'warning' ? 'warn' : n8nRun?.state === 'error' ? 'danger' : n8nRun ? 'ok' : 'muted';
   const n8nChip = n8nStale
@@ -164,7 +180,15 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
       ? `n8n ${n8nRun.label.toLowerCase()}`
       : 'n8n · no runs yet';
 
-  const attention = [githubSync.state === 'error', driftWarnings > 0, n8nTone === 'warn' || n8nTone === 'danger', gatedInboxCount > 0].filter(Boolean).length;
+  const attention = [
+    hasProject && githubSync.state === 'error',
+    hasProject && driftWarnings > 0,
+    hasProject && (n8nTone === 'warn' || n8nTone === 'danger'),
+    gatedInboxCount > 0,
+  ].filter(Boolean).length;
+  const mobileSection: DrawerSection = !hasProject
+    ? gatedInboxCount > 0 ? 'gate' : 'readiness'
+    : githubSync.state === 'error' ? 'github' : driftWarnings > 0 ? 'notes' : n8nTone === 'warn' || n8nTone === 'danger' ? 'n8n' : gatedInboxCount > 0 ? 'gate' : 'github';
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -175,45 +199,57 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
         className="flex h-10 items-center gap-2 border-b border-mc-border bg-mc-bg-secondary px-4"
       >
         <span className="hidden shrink-0 items-center gap-2 text-xs text-mc-text-secondary md:inline-flex">
-          GitHub Project #{workspace.github_project_number}
-          {workspace.github_project_title ? <span className="text-mc-text">{workspace.github_project_title}</span> : null}
+          {hasProject ? (
+            <>
+              GitHub Project #{workspace.github_project_number}
+              {workspace.github_project_title ? <span className="text-mc-text">{workspace.github_project_title}</span> : null}
+            </>
+          ) : (
+            'No GitHub Project linked'
+          )}
         </span>
         <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
           <StatusChip
-            tone={githubSync.state === 'error' ? 'danger' : attention > 0 ? 'warn' : syncing ? 'muted' : 'ok'}
-            icon={syncing ? Loader2 : attention > 0 || githubSync.state === 'error' ? AlertTriangle : CheckCircle2}
-            spin={syncing}
-            section={githubSync.state === 'error' ? 'github' : driftWarnings > 0 ? 'notes' : n8nTone === 'warn' || n8nTone === 'danger' ? 'n8n' : gatedInboxCount > 0 ? 'gate' : 'github'}
+            tone={hasProject && githubSync.state === 'error' ? 'danger' : attention > 0 ? 'warn' : hasProject && syncing ? 'muted' : hasProject ? 'ok' : 'muted'}
+            icon={hasProject && syncing ? Loader2 : attention > 0 || (hasProject && githubSync.state === 'error') ? AlertTriangle : hasProject ? CheckCircle2 : Info}
+            spin={hasProject && syncing}
+            section={mobileSection}
             onOpen={openAt}
           >
-            {syncing ? 'Syncing…' : githubSync.state === 'error' ? 'Sync failed' : attention > 0 ? `${attention} to review` : 'Synced'}
+            {!hasProject
+              ? attention > 0 ? `${attention} to review` : 'GitHub status'
+              : syncing ? 'Syncing…' : githubSync.state === 'error' ? 'Sync failed' : attention > 0 ? `${attention} to review` : 'Synced'}
           </StatusChip>
         </div>
         <div className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] md:flex">
-          {githubSync.state === 'error' ? (
-            <StatusChip tone="danger" icon={AlertTriangle} section="github" onOpen={openAt}>Sync failed</StatusChip>
-          ) : syncing ? (
-            <StatusChip tone="muted" icon={Loader2} spin section="github" onOpen={openAt}>Syncing…</StatusChip>
-          ) : githubSync.state === 'success' ? (
-            <StatusChip tone="ok" icon={CheckCircle2} section="github" onOpen={openAt}>
-              Synced · {githubSync.counts?.updated ?? 0} updated
-            </StatusChip>
-          ) : (
-            <StatusChip tone="muted" icon={RefreshCw} section="github" onOpen={openAt}>Not synced yet</StatusChip>
-          )}
-          {driftWarnings > 0 ? (
-            <StatusChip tone="warn" icon={AlertTriangle} section="notes" onOpen={openAt}>
-              {driftWarnings} drift
-            </StatusChip>
+          {hasProject ? (
+            <>
+              {githubSync.state === 'error' ? (
+                <StatusChip tone="danger" icon={AlertTriangle} section="github" onOpen={openAt}>Sync failed</StatusChip>
+              ) : syncing ? (
+                <StatusChip tone="muted" icon={Loader2} spin section="github" onOpen={openAt}>Syncing…</StatusChip>
+              ) : githubSync.state === 'success' ? (
+                <StatusChip tone="ok" icon={CheckCircle2} section="github" onOpen={openAt}>
+                  Synced · {githubSync.counts?.updated ?? 0} updated
+                </StatusChip>
+              ) : (
+                <StatusChip tone="muted" icon={RefreshCw} section="github" onOpen={openAt}>Not synced yet</StatusChip>
+              )}
+              {driftWarnings > 0 ? (
+                <StatusChip tone="warn" icon={AlertTriangle} section="notes" onOpen={openAt}>
+                  {driftWarnings} drift
+                </StatusChip>
+              ) : null}
+              <StatusChip
+                tone={n8nTone}
+                icon={n8nTone === 'ok' ? CheckCircle2 : n8nTone === 'muted' ? RefreshCw : AlertTriangle}
+                section="n8n"
+                onOpen={openAt}
+              >
+                {n8nChip}
+              </StatusChip>
+            </>
           ) : null}
-          <StatusChip
-            tone={n8nTone}
-            icon={n8nTone === 'ok' ? CheckCircle2 : n8nTone === 'muted' ? RefreshCw : AlertTriangle}
-            section="n8n"
-            onOpen={openAt}
-          >
-            {n8nChip}
-          </StatusChip>
           {gatedInboxCount > 0 ? (
             <StatusChip tone="warn" icon={AlertTriangle} section="gate" onOpen={openAt}>
               {gatedInboxCount} gated in Inbox
@@ -227,30 +263,32 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
         <DialogTrigger asChild>
           <button
             type="button"
-            onClick={() => setSection('github')}
+            onClick={() => setSection(defaultSection)}
             className="inline-flex shrink-0 items-center gap-1 rounded border border-mc-border px-2.5 py-1 text-xs text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
           >
             Details
             <ChevronRight className="size-3.5" />
           </button>
         </DialogTrigger>
-        <button
-          type="button"
-          onClick={onSyncNow}
-          disabled={syncing}
-          aria-label="Sync workspace now from GitHub Project"
-          title="Sync workspace now from GitHub Project"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded border border-mc-border px-2.5 py-1 text-xs hover:bg-mc-bg-tertiary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
-        >
-          {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-          Sync now
-        </button>
+        {hasProject ? (
+          <button
+            type="button"
+            onClick={onSyncNow}
+            disabled={syncing}
+            aria-label="Sync workspace now from GitHub Project"
+            title="Sync workspace now from GitHub Project"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded border border-mc-border px-2.5 py-1 text-xs hover:bg-mc-bg-tertiary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent"
+          >
+            {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+            Sync now
+          </button>
+        ) : null}
       </div>
 
       <DialogContent
         ref={scrollToSection}
         showCloseButton={false}
-        className="left-auto right-0 top-0 h-[100dvh] max-w-[34rem] translate-x-0 translate-y-0 content-start gap-0 overflow-y-auto rounded-none border-y-0 border-r-0 p-0 animate-slide-in-right"
+        className="left-auto right-0 top-0 h-[100dvh] max-w-[34rem] translate-x-0 translate-y-0 content-start gap-0 overflow-y-auto rounded-none border-y-0 border-r-0 p-0"
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-mc-border bg-mc-bg-secondary px-5 py-4">
           <div>
@@ -267,80 +305,84 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
           </DialogClose>
         </div>
 
-        <DrawerBlock id="github" active={section === 'github'} title="GitHub Project source">
-          <p>
-            GitHub Project #{workspace.github_project_number}
-            {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
-          </p>
-          {githubSync.message ? (
-            <p className={githubSync.state === 'error' ? 'text-mc-danger' : undefined} role="status">{githubSync.message}</p>
-          ) : (
-            <p>No sync has run in this tab yet.</p>
-          )}
-          {workspace.github_project_url ? (
-            <a
-              href={workspace.github_project_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-mc-accent hover:underline"
-            >
-              Open the Project on GitHub <ExternalLink className="size-3" />
-            </a>
-          ) : null}
-        </DrawerBlock>
-
-        <DrawerBlock id="notes" active={section === 'notes'} title="Status notes from this sync" tone={notes.length > 0 ? 'warn' : 'muted'}>
-          {notes.length === 0 ? (
-            <p>No status reconciliation or drift notes in the last sync.</p>
-          ) : (
-            <>
-              <p className="text-mc-text">GitHub and MCK disagree on {driftWarnings || notes.length} item{(driftWarnings || notes.length) === 1 ? '' : 's'}.</p>
-              <ul className="space-y-3">
-                {notes.map((note) => {
-                  const gloss = explainSyncNote(note);
-                  return (
-                    <li key={note} className="rounded border border-mc-warn/30 bg-mc-warn/5 p-3">
-                      <p className="text-mc-text">{note}</p>
-                      {gloss ? <p className="mt-1.5 text-xs">{gloss}</p> : null}
-                    </li>
-                  );
-                })}
-              </ul>
-              {driftWarnings > notes.length ? (
-                <p className="text-xs">Showing the first {notes.length} of {driftWarnings}.</p>
+        {hasProject ? (
+          <>
+            <DrawerBlock id="github" active={section === 'github'} title="GitHub Project source">
+              <p>
+                GitHub Project #{workspace.github_project_number}
+                {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
+              </p>
+              {githubSync.message ? (
+                <p className={githubSync.state === 'error' ? 'text-mc-danger' : undefined} role="status">{githubSync.message}</p>
+              ) : (
+                <p>No sync has run in this tab yet.</p>
+              )}
+              {workspace.github_project_url ? (
+                <a
+                  href={workspace.github_project_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-mc-accent hover:underline"
+                >
+                  Open the Project on GitHub <ExternalLink className="size-3" />
+                </a>
               ) : null}
-            </>
-          )}
-          {githubSync.counts ? (
-            <p className="text-xs">
-              {githubSync.counts.statusReconciled} status reconciled, {githubSync.counts.driftWarnings} upstream drift warning
-              {githubSync.counts.driftWarnings === 1 ? '' : 's'} in this sync.
-            </p>
-          ) : null}
-        </DrawerBlock>
+            </DrawerBlock>
 
-        <DrawerBlock id="n8n" active={section === 'n8n'} title="n8n scheduled sync" tone={n8nTone === 'ok' || n8nTone === 'muted' ? 'muted' : n8nTone}>
-          <p className="text-mc-text">
-            n8n sync: {n8nRun?.label ?? 'waiting for first scheduled run'}
-          </p>
-          <p>
-            Last run {formatSyncTimestamp(latest?.received_at)}
-            {n8nAge ? ` (${n8nAge} ago)` : ''} · {n8nCounts} · {formatSyncCadence(latest)}
-          </p>
-          {n8nStale ? (
-            <p className="flex items-start gap-2 rounded border border-mc-warn/30 bg-mc-warn/5 p-3 text-xs text-mc-text">
-              <Info className="mt-0.5 size-3.5 shrink-0 text-mc-warn" />
-              <span>
-                No run has reported for {n8nAge}, and the schedule should report within {freshness.staleAfterHours} hours. The
-                figures above describe that old run across all workspaces, not this sync.
-              </span>
-            </p>
-          ) : null}
-          {latest?.alert_message && n8nRun?.showMessage ? <p>{latest.alert_message}</p> : null}
-          <Link href="/n8n-sync-history" className="inline-block text-mc-accent hover:underline">
-            View history
-          </Link>
-        </DrawerBlock>
+            <DrawerBlock id="notes" active={section === 'notes'} title="Status notes from this sync" tone={notes.length > 0 ? 'warn' : 'muted'}>
+              {notes.length === 0 ? (
+                <p>No status reconciliation or drift notes in the last sync.</p>
+              ) : (
+                <>
+                  <p className="text-mc-text">GitHub and MCK disagree on {driftWarnings || notes.length} item{(driftWarnings || notes.length) === 1 ? '' : 's'}.</p>
+                  <ul className="space-y-3">
+                    {notes.map((note) => {
+                      const gloss = explainSyncNote(note);
+                      return (
+                        <li key={note} className="rounded border border-mc-warn/30 bg-mc-warn/5 p-3">
+                          <p className="text-mc-text">{note}</p>
+                          {gloss ? <p className="mt-1.5 text-xs">{gloss}</p> : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {driftWarnings > notes.length ? (
+                    <p className="text-xs">Showing the first {notes.length} of {driftWarnings}.</p>
+                  ) : null}
+                </>
+              )}
+              {githubSync.counts ? (
+                <p className="text-xs">
+                  {githubSync.counts.statusReconciled} status reconciled, {githubSync.counts.driftWarnings} upstream drift warning
+                  {githubSync.counts.driftWarnings === 1 ? '' : 's'} in this sync.
+                </p>
+              ) : null}
+            </DrawerBlock>
+
+            <DrawerBlock id="n8n" active={section === 'n8n'} title="n8n scheduled sync" tone={n8nTone === 'ok' || n8nTone === 'muted' ? 'muted' : n8nTone}>
+              <p className="text-mc-text">
+                n8n sync: {n8nRun?.label ?? 'waiting for first scheduled run'}
+              </p>
+              <p>
+                Last run {formatSyncTimestamp(latest?.received_at)}
+                {n8nAge ? ` (${n8nAge} ago)` : ''} · {n8nCounts} · {formatSyncCadence(latest)}
+              </p>
+              {n8nStale ? (
+                <p className="flex items-start gap-2 rounded border border-mc-warn/30 bg-mc-warn/5 p-3 text-xs text-mc-text">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-mc-warn" />
+                  <span>
+                    No run has reported for {n8nAge}, and the schedule should report within {freshness.staleAfterHours} hours. The
+                    figures above describe that old run across all workspaces, not this sync.
+                  </span>
+                </p>
+              ) : null}
+              {latest?.alert_message && n8nRun?.showMessage ? <p>{latest.alert_message}</p> : null}
+              <Link href="/n8n-sync-history" className="inline-block text-mc-accent hover:underline">
+                View history
+              </Link>
+            </DrawerBlock>
+          </>
+        ) : null}
 
         {gatedInboxCount > 0 ? (
           <DrawerBlock id="gate" active={section === 'gate'} title="Inbox is a safety gate" tone="warn">

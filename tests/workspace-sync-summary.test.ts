@@ -11,7 +11,7 @@ import {
   formatAgeHours,
   longestScheduleGapHours,
   presentMckN8nSyncFreshness,
-} from '../src/lib/n8n-sync-presentation';
+} from '../src/lib/n8n-sync-freshness';
 import { explainSyncNote, readN8nScheduleTimes } from '../src/lib/workspace-sync-summary';
 import type { MckN8nSyncRun } from '../src/lib/types';
 

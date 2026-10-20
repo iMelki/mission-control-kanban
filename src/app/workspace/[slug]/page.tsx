@@ -406,15 +406,13 @@ export default function WorkspacePage() {
       )}
       {section === 'settings' && <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />}
 
-      {workspace.github_project_owner && workspace.github_project_number && (
-        <WorkspaceStatusBar
-          workspace={workspace}
-          githubSync={githubSyncState}
-          n8nSync={n8nSyncStatus}
-          gatedInboxCount={gatedInboxCount}
-          onSyncNow={() => void runGitHubProjectSync(workspace, 'manual')}
-        />
-      )}
+      <WorkspaceStatusBar
+        workspace={workspace}
+        githubSync={githubSyncState}
+        n8nSync={n8nSyncStatus}
+        gatedInboxCount={gatedInboxCount}
+        onSyncNow={() => void runGitHubProjectSync(workspace, 'manual')}
+      />
 
       <main id="main-content" tabIndex={-1} className="flex flex-1 min-h-0 flex-col overflow-hidden outline-none">
         {section === 'board' && (
