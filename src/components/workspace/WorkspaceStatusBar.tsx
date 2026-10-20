@@ -123,7 +123,7 @@ function DrawerBlock({
       aria-labelledby={`workspace-status-${id}-title`}
       data-active={active ? 'true' : undefined}
       className={cn(
-        'scroll-mt-20 border-b border-mc-border px-5 py-4 text-sm text-mc-text-secondary',
+        'scroll-mt-20 border-b border-mc-border px-5 py-4 text-sm text-mc-text-secondary break-words',
         active && 'bg-mc-bg-tertiary/30',
       )}
     >
@@ -302,7 +302,7 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
       <DialogContent
         ref={scrollToSection}
         showCloseButton={false}
-        className="left-auto right-0 top-0 h-[100dvh] max-w-[34rem] translate-x-0 translate-y-0 content-start gap-0 overflow-y-auto rounded-none border-y-0 border-r-0 p-0"
+        className="left-auto right-0 top-0 h-[100dvh] max-w-[34rem] translate-x-0 translate-y-0 grid-cols-[minmax(0,1fr)] content-start gap-0 overflow-y-auto rounded-none border-y-0 border-r-0 p-0"
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-mc-border bg-mc-bg-secondary px-5 py-4">
           <div>
@@ -428,7 +428,7 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
 
         <DrawerBlock id="readiness" active={section === 'readiness'} title="GitHub import and write-back">
           {/* The card carries its own mx-3 mt-3 for the board column; cancel them inside the drawer. */}
-          <div className="-mx-3 -mt-3">
+          <div className="-mx-3 -mt-3 [overflow-wrap:anywhere] [&_button]:whitespace-nowrap [&_button]:[overflow-wrap:normal]">
             <GitHubReadinessCard />
           </div>
         </DrawerBlock>
