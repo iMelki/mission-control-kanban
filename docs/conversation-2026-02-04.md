@@ -88,7 +88,7 @@ Major debugging and feature session that resulted in v1.0.0 release.
 
 ## Test Task Completed
 
-**Task:** "Find a valentines day gift for my wife"
+**Task:** "Find a Valentine's Day gift idea"
 **Agent:** Luxe Scout
 **Deliverable:** Valentine's Gift Guide HTML page
-**URL:** http://192.168.0.205:8080/valentines-gift-guide.html
+**URL:** http://<lan-host>:8080/valentines-gift-guide.html

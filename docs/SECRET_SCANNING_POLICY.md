@@ -33,11 +33,11 @@ upload, inspect, or paste the backup into an issue or log.
 ## Verification
 
 ```powershell
-pwsh -File S:\source\CCAI\Assistants\tools\git-toolkit\secrets\Test-ScanningOnlyCanary.ps1 `
-  -RepoPath S:\source\CCAI\Assistants\tools\mission-control-kanban -Json
+pwsh -File <workspace-root>\tools\git-toolkit\secrets\Test-ScanningOnlyCanary.ps1 `
+  -RepoPath <workspace-root>\tools\mission-control-kanban -Json
 
-pwsh -File S:\source\CCAI\Assistants\tools\git-toolkit\hooks\Invoke-RepoHealthAudit.ps1 `
-  -RepoPath S:\source\CCAI\Assistants\tools\mission-control-kanban -Json
+pwsh -File <workspace-root>\tools\git-toolkit\hooks\Invoke-RepoHealthAudit.ps1 `
+  -RepoPath <workspace-root>\tools\mission-control-kanban -Json
 ```
 
 The canary must report that the generated positive fixture was blocked, the

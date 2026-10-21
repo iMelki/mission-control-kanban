@@ -113,7 +113,7 @@ function dispatchV2(): MckDispatchV2 {
       },
     },
     repository: {
-      path: "S:/source/CCAI/Assistants/tools/mission-control-kanban",
+      path: "D:/workspace/assistants/tools/mission-control-kanban",
       slug: "iMelki/mission-control-kanban",
       originRemote: "git@github.com:iMelki/mission-control-kanban.git",
       branch: "dev" as const,
@@ -185,7 +185,7 @@ function dispatchV2(): MckDispatchV2 {
     callbacks: { lifecycle: "http://127.0.0.1:3021/api/webhooks/agent-completion" },
     callback_urls: { lifecycle: "http://127.0.0.1:3021/api/webhooks/agent-completion" },
     mission_control_url: "http://127.0.0.1:3021",
-    output_directory: "S:/source/CCAI/Assistants/tools/mission-control-kanban",
+    output_directory: "D:/workspace/assistants/tools/mission-control-kanban",
     prompt_markdown: "# Work",
     issued_at: issuedAt,
     factory_contract: {
