@@ -56,7 +56,7 @@ function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsPrimitiv
         'hover:bg-mc-bg-tertiary hover:text-mc-text',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent',
         'disabled:pointer-events-none disabled:opacity-50',
-        'data-[state=active]:border-mc-accent data-[state=active]:bg-mc-accent/10 data-[state=active]:text-mc-accent',
+        'data-[state=active]:border-mc-text-secondary/60 data-[state=active]:bg-mc-bg-tertiary data-[state=active]:text-mc-text',
         className,
       )}
       {...props}

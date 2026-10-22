@@ -24,15 +24,17 @@ test('#150: settings fields reuse the shared Input focus contract', () => {
   assert.match(input, /focus-visible:ring-2 focus-visible:ring-mc-accent/);
   assert.match(input, /transition-colors/);
   assert.doesNotMatch(input, /transition-\[[^\]]*box-shadow/);
-  assert.match(input, /aria-\[invalid=true\]:border-mc-accent-red/);
+  // Direction B renamed the hue token: invalid is the danger tone.
+  assert.match(input, /aria-\[invalid=true\]:border-mc-danger/);
   assert.equal([...settings.matchAll(/<Input\b/g)].length, 4);
   // The old shared className suppressed the outline with no replacement ring.
   assert.doesNotMatch(settings, /focus:outline-none/);
 });
 
 test('#152 nested-interactive / #150 lead: task cards expose sibling open and reorder buttons', () => {
-  const queue = source('src/components/MissionQueue.tsx');
-  const taskCard = queue.slice(queue.indexOf('function TaskCard('));
+  // The card moved to an owned primitive (#48, studio direction B).
+  const cardSource = source('src/components/board/task-card.tsx');
+  const taskCard = cardSource.slice(cardSource.indexOf('export function TaskCard('));
 
   assert.match(taskCard, /data-task-card/);
   assert.match(taskCard, /data-task-drag-handle/);

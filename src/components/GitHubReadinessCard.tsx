@@ -13,13 +13,13 @@ import {
 function stateClassName(state: ReadinessState): string {
   switch (state) {
     case 'ready':
-      return 'border-mc-success/30 bg-mc-success/10 text-mc-success';
+      return 'border-mc-success/40 bg-mc-bg text-mc-success';
     case 'limited':
-      return 'border-mc-warn/30 bg-mc-warn/10 text-mc-warn';
+      return 'border-mc-warn/40 bg-mc-bg text-mc-warn';
     case 'pending':
-      return 'border-mc-border bg-mc-bg-tertiary/40 text-mc-text-secondary';
+      return 'border-mc-border bg-mc-bg text-mc-text-secondary';
     default:
-      return 'border-mc-danger/30 bg-mc-danger/10 text-mc-danger';
+      return 'border-mc-danger/40 bg-mc-bg text-mc-danger';
   }
 }
 
@@ -73,20 +73,23 @@ export function GitHubReadinessCard() {
 
   return (
     <div
-      className="mx-3 mt-3 rounded-xl border border-mc-border bg-mc-bg-secondary/70 p-3 text-sm text-mc-text-secondary"
+      className="mx-3 mt-3 min-w-0 rounded-lg bg-mc-bg-secondary p-3 text-sm text-mc-text-secondary"
       data-readiness-phase={presented.phase}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-start gap-2">
-          <Github className="mt-0.5 size-5 text-mc-accent-cyan" />
-          <div>
+        {/* min-w-0 + overflow-wrap: a long unbroken probe error (real `gh` output)
+            used to size this flex item to its text and push the board past a 390px
+            viewport. It only shows with real diagnostics data. */}
+        <div className="flex min-w-0 items-start gap-2">
+          <Github className="mt-0.5 size-5 shrink-0 text-mc-text-secondary" />
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <div className="font-semibold text-mc-text">GitHub import/write-back readiness</div>
             <p className="mt-1 text-xs" role="status">
               {presented.summary}
             </p>
             <p className="mt-1 text-xs">{presented.detail}</p>
             {diagnostics?.project_probe_error ? (
-              <p className="mt-1 text-xs text-amber-200">{diagnostics.project_probe_error}</p>
+              <p className="mt-1 text-xs text-mc-text">{diagnostics.project_probe_error}</p>
             ) : null}
           </div>
         </div>
@@ -107,7 +110,7 @@ export function GitHubReadinessCard() {
               <StateIcon state={row.state} />
               {row.label}
             </div>
-            <p className="mt-1 text-xs opacity-90">{row.message}</p>
+            <p className="mt-1 text-xs text-mc-text-secondary [overflow-wrap:anywhere]">{row.message}</p>
           </div>
         ))}
       </div>

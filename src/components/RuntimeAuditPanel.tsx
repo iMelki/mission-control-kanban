@@ -33,8 +33,8 @@ interface AuditPayload {
 const columns: DataTableColumn<AuditAgent>[] = [
   { key: 'agent', header: 'Agent', render: (row) => <div><div className="font-medium">{row.name}</div><div className="text-xs text-mc-text-secondary">{row.workspace_id} · {row.role}</div></div> },
   { key: 'runtime', header: 'Runtime', render: (row) => <span className="rounded border border-mc-border px-2 py-1 text-xs">{row.runtime_type}</span> },
-  { key: 'dispatch', header: 'Dispatch', render: (row) => row.dispatch_enabled ? <span className="text-emerald-300">enabled</span> : <span className="text-mc-text-secondary">manual/off</span> },
-  { key: 'reason', header: 'Why', render: (row) => <span className={row.dispatch_blocked ? 'text-amber-100' : 'text-mc-text-secondary'}>{row.reason}</span> },
+  { key: 'dispatch', header: 'Dispatch', render: (row) => row.dispatch_enabled ? <span className="text-mc-success">enabled</span> : <span className="text-mc-text-secondary">manual/off</span> },
+  { key: 'reason', header: 'Why', render: (row) => <span className={row.dispatch_blocked ? 'text-mc-text' : 'text-mc-text-secondary'}>{row.reason}</span> },
   { key: 'action', header: 'Recommended action', render: (row) => <span className="text-xs text-mc-text-secondary">{row.recommended_action}</span> },
 ];
 
@@ -83,12 +83,12 @@ export function RuntimeAuditPanel() {
     <section className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-semibold"><Wrench className="size-5 text-mc-accent" />Runtime audit & migration</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold"><Wrench className="size-5 text-mc-text-secondary" />Runtime audit & migration</h2>
           <p className="text-sm text-mc-text-secondary">Preview existing agents, normalize unsafe runtime states, and test webhook signature config without sending a real task payload.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void previewMigration(false)} className="rounded border border-mc-border px-3 py-1.5 text-sm hover:bg-mc-bg-tertiary">Preview migration</button>
-          <button type="button" onClick={() => void previewMigration(true)} className="rounded border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-100 hover:bg-amber-500/20">Apply safe normalize</button>
+          <button type="button" onClick={() => void previewMigration(true)} className="rounded border border-mc-warn/40 bg-mc-warn/10 px-3 py-1.5 text-sm text-mc-text hover:bg-mc-warn/20">Apply safe normalize</button>
           <button type="button" onClick={() => void testFirstWebhook()} className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-1.5 text-sm hover:bg-mc-bg-tertiary"><PlayCircle className="size-4" /> Test first webhook</button>
         </div>
       </div>
@@ -100,7 +100,7 @@ export function RuntimeAuditPanel() {
           </div>
         ))}
       </div>
-      {migration && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm"><ShieldAlert className="mr-2 inline size-4 text-amber-300" />Migration result: {JSON.stringify(migration)}</div>}
+      {migration && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm"><ShieldAlert className="mr-2 inline size-4 text-mc-warn" />Migration result: {JSON.stringify(migration)}</div>}
       {payload?.migration_history && payload.migration_history.length > 0 && (
         <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm">
           <div className="mb-2 font-semibold">Recent runtime migration audit history</div>
@@ -117,7 +117,7 @@ export function RuntimeAuditPanel() {
           </div>
         </div>
       )}
-      {healthTest && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm"><CheckCircle2 className="mr-2 inline size-4 text-mc-accent" />Webhook test: {JSON.stringify(healthTest)}</div>}
+      {healthTest && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm"><CheckCircle2 className="mr-2 inline size-4 text-mc-text-secondary" />Webhook test: {JSON.stringify(healthTest)}</div>}
       {loading ? <div className="text-sm text-mc-text-secondary">Loading runtime audit…</div> : (
         <DataTable
           columns={columns}
