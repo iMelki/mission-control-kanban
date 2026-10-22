@@ -75,17 +75,17 @@
     {
       "route": "/settings",
       "capture": "required",
-      "note": "Global settings. The first ever capture (2026-08-13, e50e256) found 17 clipped elements at 1440px (0 at 390px) in the RuntimeConfigTemplateGallery env-diagnostic badges; #145. Fixed in d677d1cd2221369e0ba4b52047b7e7315a8a221a (min-w-0 + break-all on the badge). This surface's badge content is env-dependent (it renders whatever MCK_* vars resolve on the measuring host), so the fix was additionally checked against synthetic env names of 27/60/120/240 chars: 0px badge-row overflow at every length with the fix, and 46/244/604/1324px with the two classes removed. That env-dependence is a known blind spot of sourceDigest, which covers source only. The 2026-08-13 capture of this surface was superseded by the #145 fix; re-probed at 8f72854 on 2026-08-16 alongside the other eight: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2).",
+      "note": "Global settings. The first ever capture (2026-08-13, e50e256) found 17 clipped elements at 1440px (0 at 390px) in the RuntimeConfigTemplateGallery env-diagnostic badges; #145. Fixed in d677d1cd2221369e0ba4b52047b7e7315a8a221a (min-w-0 + break-all on the badge). This surface's badge content is env-dependent (it renders whatever MCK_* vars resolve on the measuring host), so the fix was additionally checked against synthetic env names of 27/60/120/240 chars: 0px badge-row overflow at every length with the fix, and 46/244/604/1324px with the two classes removed. That env-dependence is a known blind spot of sourceDigest, which covers source only. The 2026-08-13 capture of this surface was superseded by the #145 fix; re-probed at 8f72854 on 2026-08-16 alongside the other eight: 0 clipped elements at both viewports. Re-probed at f0459f6 on 2026-08-31 after 8a56829 changed src/app/globals.css, src/app/layout.tsx, tailwind.config.ts and cockpit CTA components, staling all nine captures: 0 clipped elements at both viewports (production build xBERhwVHE6A2fJOvttGds on 127.0.0.1:3121). Re-probed at e3de15d on 2026-09-01 after Wave 2 (#166 cockpit load + #151 muted timestamp) staled all nine captures: 0 clipped elements at both viewports (production build crFugjhxjk7cE1Ztoh-3N on 127.0.0.1:3122). Re-probed after Wave 2 leftover #151 n8n/OFFLINE token classes on 2026-09-01: 0 clipped elements at both viewports (production build FV4GCSEWeFK9di_tmIKhO on 127.0.0.1:3123 from reused tmp/mck-prod-wave2). Re-probed at ac548f1 on 2026-10-22 after the Evolve variant (#194) left one 12px clip at 390px (the Projects Path input, scrollWidth 302 vs clientWidth 290): the settings cards now use p-4 below sm, 0 clipped elements at both viewports (production build 4bINrmYzctA31-LDBBdMG on 127.0.0.1:3141).",
       "capturedAt": {
-        "commit": "15d3acfd19f6a2ebb22da0798ee9be1d749ad0dc",
-        "date": "2026-09-17",
+        "commit": "ac548f1baa18ae99440e72ea84c766267831a6c7",
+        "date": "2026-10-22",
         "viewports": [
           "mobile",
           "desktop"
         ],
-        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports; self-proof injection moved clipped 0->1 while document overflow stayed 0; production build ObV3-lrSx_aEb83vcxjs1 on 127.0.0.1:3121)",
-        "sourceDigest": "a3e8daf1bb35186b",
-        "sourceFileCount": 17
+        "method": "scripts/probe-surface-clipping.mjs (element-level clipping; 0 clipped at both viewports, 18 measurements; self-proof injection moved clipped 0->1; production build 4bINrmYzctA31-LDBBdMG via next start on 127.0.0.1:3141 from the capture commit tree)",
+        "sourceDigest": "0059c4a8da538b7a",
+        "sourceFileCount": 18
       }
     },
     {
