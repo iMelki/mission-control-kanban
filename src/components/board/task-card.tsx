@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { READINESS_LABELS, REVIEW_MODE_LABELS, RISK_LEVEL_LABELS } from '@/lib/dispatch-contract';
 import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import type { Task } from '@/lib/types';
+import { railToneFor, type RailTone } from './task-status';
 
 /**
  * Owned board card primitive (mission-control-kanban#48, studio direction B).
@@ -21,8 +22,6 @@ import type { Task } from '@/lib/types';
  * the brief "ink drying" cross-fade after a move.
  */
 
-export type RailTone = 'neutral' | 'active' | 'needs-you' | 'warn' | 'done';
-
 const RAIL_CLASS: Record<RailTone, string> = {
   neutral: 'bg-mc-text-secondary',
   active: 'bg-mc-text',
@@ -30,30 +29,6 @@ const RAIL_CLASS: Record<RailTone, string> = {
   warn: 'bg-mc-warn',
   done: 'bg-mc-success',
 };
-
-export function isDispatchBlockedInbox(task: Task): boolean {
-  return task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0;
-}
-
-/** Review work and dispatch-blocked Inbox work wait on Captain. */
-export function needsCaptain(task: Task): boolean {
-  return task.status === 'review' || isDispatchBlockedInbox(task);
-}
-
-export function railToneFor(task: Task): RailTone {
-  if (isDispatchBlockedInbox(task)) return 'warn';
-  switch (task.status) {
-    case 'review':
-      return 'needs-you';
-    case 'done':
-      return 'done';
-    case 'in_progress':
-    case 'testing':
-      return 'active';
-    default:
-      return 'neutral';
-  }
-}
 
 type PillTone = 'ready' | 'warn' | 'risk' | 'neutral';
 
