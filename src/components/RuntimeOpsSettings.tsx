@@ -255,7 +255,7 @@ export function RuntimeOpsSettings() {
   }, [callbacks, health]);
 
   return (
-    <section className="mb-8 space-y-6 rounded-lg border border-mc-border bg-mc-bg-secondary p-6">
+    <section className="mb-8 space-y-6 rounded-lg border border-mc-border bg-mc-bg-secondary p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="mb-2 flex items-center gap-2">
