@@ -228,4 +228,4 @@ Question: Which direction for Mission Control Kanban?
 
 ## Captain's pick
 
-- Direction: · Date: · Card: · Notes:
+- Direction: B Evolve · Date: 2026-10-22 · Card: decided by Ilan by voice, relayed via Chief · Notes: work proceeds from #194 (yellow).
