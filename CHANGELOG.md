@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Static, backend-free demo build and the Direction B "Evolve" look (2026-10-22, #196, stacked on #194)** -
+  `npm run build:demo` (sets `NEXT_PUBLIC_DEMO_MODE=1`) exports a static site
+  to `out-demo/` that runs in the browser on fictional fixtures (6 agents, 22
+  tasks) behind a "Demo with sample data" banner. API routes are left out of
+  that build, `/api` calls are answered from fixtures, and operator-only
+  panels show "Not available in the demo". A normal `npm run build` contains
+  none of the demo code or fixtures. Caveat: `build:demo` also writes its
+  build into `.next/`, so run `npm run build` again before `next start` in a
+  checkout where the demo was built. The Evolve pass adds warm graphite
+  tokens with one yellow accent, extracts `BoardLane` and `TaskCard` from
+  `MissionQueue` (closes #48) with a "Needs you" filter chip, and sweeps raw
+  palette literals to `mc-*` tokens. Merged with dev's #197 status bar: the
+  runtime filter and board count live in the board header, GitHub status and
+  the Inbox gate live in the status bar. All nine captured surfaces were
+  re-probed at the merge commit.
+
 ### Fixed
 
 - **Commit the Next.js agent-rules block in `AGENTS.md` (2026-10-05, #187)** -
