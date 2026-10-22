@@ -35,8 +35,6 @@ import { resolveAgentRuntime } from '@/lib/agent-runtimes';
 import type { AgentRuntimeType, Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
-import { GitHubConnectionStatus } from './GitHubConnectionStatus';
-import { GitHubReadinessCard } from './GitHubReadinessCard';
 
 interface MissionQueueProps {
   workspaceId?: string;
@@ -165,7 +163,6 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const runtimeTasks = tasks.filter(matchesRuntimeFilter);
   const needsYouCount = runtimeTasks.filter(needsCaptain).length;
   const visibleTasks = needsYouOnly ? runtimeTasks.filter(needsCaptain) : runtimeTasks;
-  const blockedInboxTasks = visibleTasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0);
   const getTasksByStatus = (status: TaskStatus) =>
     visibleTasks.filter((task) => task.status === status);
 
@@ -320,8 +317,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     // tall. The board region carries its own mobile height instead (lanes scroll inside it).
     <div className="flex-1 min-w-0 lg:min-h-0 flex flex-col lg:overflow-hidden">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-mc-border p-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-mc-border p-3">
+        <div className="mr-auto flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-mc-text">Mission Queue</h2>
           {/* The "needs Captain" answer in one glance: Review plus dispatch-blocked
               Inbox. One of the accent's four uses; pressing it filters the board. */}
@@ -345,9 +342,29 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             <span>{needsYouCount}</span>
             <span className="sr-only">{needsYouOnly ? ', showing only these' : ', press to show only these'}</span>
           </button>
+          <span className="text-xs text-mc-text-secondary" role="status">
+            {presentBoardCount(boardLoadStatus, visibleTasks.length, tasks.length).text}
+          </span>
+        </div>
+        <div role="group" aria-label="Runtime filter" className="order-last flex basis-full flex-wrap items-center gap-1.5 2xl:order-none 2xl:basis-auto">
+          <span className="mr-1 text-xs uppercase tracking-wider text-mc-text-secondary">Runtime filter</span>
+          {RUNTIME_FILTERS.map((filterOption) => (
+            <button
+              key={filterOption.id}
+              type="button"
+              aria-pressed={runtimeFilter === filterOption.id}
+              onClick={() => dispatchUi({ type: 'set_runtime_filter', filter: filterOption.id })}
+              className={`rounded-full border px-2.5 py-0.5 text-xs ${
+                runtimeFilter === filterOption.id
+                  ? 'border-mc-text-secondary/60 bg-mc-bg-tertiary text-mc-text'
+                  : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
+              }`}
+            >
+              {filterOption.label}
+            </button>
+          ))}
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <GitHubConnectionStatus />
           <button
             type="button"
             onClick={() => dispatchUi({ type: 'open_github_import_modal' })}
@@ -366,46 +383,6 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           </button>
         </div>
       </div>
-
-      <GitHubReadinessCard />
-
-      <div className="mx-3 mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-mc-bg-secondary px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-mc-text-secondary">Runtime filter</span>
-        {RUNTIME_FILTERS.map((filterOption) => (
-          <button
-            key={filterOption.id}
-            type="button"
-            aria-pressed={runtimeFilter === filterOption.id}
-            onClick={() => dispatchUi({ type: 'set_runtime_filter', filter: filterOption.id })}
-            className={`rounded-full border px-3 py-1 text-xs ${
-              runtimeFilter === filterOption.id
-                ? 'border-mc-text-secondary/60 bg-mc-bg-tertiary text-mc-text'
-                : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
-            }`}
-          >
-            {filterOption.label}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-mc-text-secondary" role="status">
-          {presentBoardCount(boardLoadStatus, visibleTasks.length, tasks.length).text}
-        </span>
-      </div>
-
-      {blockedInboxTasks.length > 0 && (
-        <div className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-warn/50">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="size-4 mt-0.5 text-mc-warn" />
-            <div>
-              <p className="font-medium">Inbox is acting as a safety gate for imported GitHub work.</p>
-              <p className="mt-1 text-xs text-mc-text">
-                {blockedInboxTasks.length} task{blockedInboxTasks.length === 1 ? '' : 's'} cannot move into
-                active columns yet because the dispatch contract is incomplete. Open the card and fill
-                allowed file scope, acceptance criteria, test requirements, impact, and rollback details.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {dropError && (
         <div role="alert" className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60">
