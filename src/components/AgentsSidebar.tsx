@@ -175,7 +175,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
             {connectError && (
               <div
                 role="alert"
-                className="m-2 flex items-start gap-2 rounded border border-mc-accent-red/40 bg-mc-accent-red/10 p-2 text-xs text-mc-text"
+                className="m-2 flex items-start gap-2 rounded border border-mc-danger/40 bg-mc-danger/10 p-2 text-xs text-mc-text"
               >
                 <p className="m-0 flex-1">
                   Failed to connect {connectError.agentName} to OpenClaw: {connectError.message}
@@ -254,7 +254,7 @@ function AgentsCollapsedRail({
       </span>
       {activeSubAgents > 0 && (
         <span
-          className="rounded bg-green-500/20 px-2 py-0.5 text-xs font-bold text-green-400"
+          className="rounded bg-mc-success/20 px-2 py-0.5 text-xs font-bold text-mc-success"
           title={`${activeSubAgents} active sub-agents`}
         >
           {activeSubAgents}
@@ -367,7 +367,7 @@ function getRuntimeHealth(agent: Agent, openclawSession?: OpenClawSession | null
       ? { label: 'OpenClaw ready', className: 'bg-mc-success/10 text-mc-success border-mc-success/30' }
       : { label: 'OpenClaw link?', className: 'bg-mc-warn/10 text-mc-warn border-mc-warn/30' };
   }
-  return { label: 'Webhook ready', className: 'bg-mc-accent/10 text-mc-accent border-mc-accent/30' };
+  return { label: 'Webhook ready', className: 'bg-mc-bg text-mc-success border-mc-success/40' };
 }
 
 function AgentsPanelHeader({
@@ -406,11 +406,11 @@ function AgentsPanelHeader({
         </button>
       </div>
       {activeSubAgents > 0 && (
-        <div className="mb-3 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+        <div className="mb-3 px-3 py-2 bg-mc-success/10 border border-mc-success/20 rounded-lg">
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-green-400">●</span>
+            <span className="text-mc-success">●</span>
             <span className="text-mc-text">Active Sub-Agents:</span>
-            <span className="font-bold text-green-400">{activeSubAgents}</span>
+            <span className="font-bold text-mc-success">{activeSubAgents}</span>
           </div>
         </div>
       )}
@@ -423,7 +423,7 @@ function AgentsPanelHeader({
             onClick={() => onFilterChange(tab)}
             className={`px-3 py-1 text-xs rounded uppercase ${
               filter === tab
-                ? 'bg-mc-accent text-mc-bg font-medium'
+                ? 'bg-mc-bg-tertiary text-mc-text font-medium ring-1 ring-inset ring-mc-text-secondary/60'
                 : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
             }`}
           >
@@ -446,9 +446,9 @@ function RuntimeAuditSummary({ agents }: { agents: Agent[] }) {
       </div>
       <div className="grid grid-cols-2 gap-1 text-[10px]">
         <span className="rounded border border-mc-border/50 px-2 py-1 text-mc-text-secondary">Manual {counts.manual}</span>
-        <span className="rounded border border-emerald-500/30 px-2 py-1 text-emerald-300">OpenClaw {counts.openclaw}</span>
-        <span className="rounded border border-cyan-500/30 px-2 py-1 text-cyan-300">Webhook {counts.webhook}</span>
-        <span className="rounded border border-amber-500/30 px-2 py-1 text-amber-300">Off {counts.dispatch_off}</span>
+        <span className="rounded border border-mc-success/30 px-2 py-1 text-mc-success">OpenClaw {counts.openclaw}</span>
+        <span className="rounded border border-mc-border px-2 py-1 text-mc-text">Webhook {counts.webhook}</span>
+        <span className="rounded border border-mc-warn/30 px-2 py-1 text-mc-warn">Off {counts.dispatch_off}</span>
       </div>
     </div>
   );
@@ -482,13 +482,13 @@ function AgentRow({
         <div className="text-2xl relative">
           <EntityEmoji emoji={agent.avatar_emoji} hidden />
           {openclawSession && (
-            <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-mc-bg-secondary" />
+            <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-mc-success rounded-full border-2 border-mc-bg-secondary" />
           )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm truncate">{agent.name}</span>
-            {!!agent.is_master && <span className="text-xs text-mc-accent-yellow">★</span>}
+            {!!agent.is_master && <span className="text-xs text-mc-warn">★</span>}
           </div>
           <div className="text-xs text-mc-text-secondary truncate">{agent.role}</div>
           <div className="mt-1 flex flex-wrap gap-1">
@@ -500,7 +500,7 @@ function AgentRow({
             </span>
           </div>
           {runtime.reason && (
-            <div className="mt-1 rounded border border-amber-400/20 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-100">
+            <div className="mt-1 rounded border border-mc-warn/20 bg-mc-warn/10 px-2 py-1 text-[10px] text-mc-text">
               Why off: {runtime.reason}
             </div>
           )}
@@ -517,7 +517,7 @@ function AgentRow({
             disabled={isConnecting}
             className={`w-full flex items-center justify-center gap-2 px-2 py-1 rounded text-xs transition-colors ${
               openclawSession
-                ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                ? 'bg-mc-success/20 text-mc-success hover:bg-mc-success/30'
                 : 'bg-mc-bg text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
             }`}
           >

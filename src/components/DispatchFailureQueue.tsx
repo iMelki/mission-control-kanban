@@ -53,7 +53,7 @@ const columns: DataTableColumn<FailureRow>[] = [
     header: 'Runtime',
     accessor: (row) => row.runtime_type,
     searchValue: (row) => `${row.runtime_type} ${row.status}`,
-    render: (row) => <span className="rounded border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">{row.runtime_type} / {row.status}</span>,
+    render: (row) => <span className="rounded border border-mc-danger/30 bg-mc-danger/10 px-2 py-1 text-xs text-mc-text">{row.runtime_type} / {row.status}</span>,
   },
   {
     key: 'agent',
@@ -199,7 +199,7 @@ export function DispatchFailureQueue({ workspaceId }: { workspaceId?: string }) 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <AlertTriangle className="size-5 text-rose-300" />
+            <AlertTriangle className="size-5 text-mc-danger" />
             Global dispatch failure queue
           </h2>
           <p className="text-sm text-mc-text-secondary">Failed and timed-out dispatch attempts across tasks, with redacted endpoint evidence.</p>
@@ -208,7 +208,7 @@ export function DispatchFailureQueue({ workspaceId }: { workspaceId?: string }) 
           <RefreshCw className="size-4" /> Refresh
         </button>
       </div>
-      {error && <div className="rounded border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-100">{error}</div>}
+      {error && <div className="rounded border border-mc-danger/30 bg-mc-danger/10 p-3 text-sm text-mc-text">{error}</div>}
       {actionMessage && <div className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm text-mc-text-secondary">{actionMessage}</div>}
       {loading ? (
         <div className="rounded border border-mc-border p-4 text-sm text-mc-text-secondary">Loading dispatch failures…</div>
