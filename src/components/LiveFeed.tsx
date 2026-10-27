@@ -209,7 +209,7 @@ function EventItem({ event }: { event: Event }) {
       <div className="flex items-start gap-2">
         {getEventIcon(event.type)}
         <div className="flex-1 min-w-0">
-          <p className={`text-sm ${isTaskEvent ? 'text-mc-text-secondary' : 'text-mc-text'}`}>
+          <p className={`text-sm break-words ${isTaskEvent ? 'text-mc-text-secondary' : 'text-mc-text'}`}>
             {event.message}
           </p>
           <div className="flex items-center gap-1 mt-1 text-xs text-mc-text-secondary">
