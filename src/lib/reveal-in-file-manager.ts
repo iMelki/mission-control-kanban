@@ -16,6 +16,8 @@ export interface RevealCommand {
   file: string;
   args: string[];
   options: ExecFileOptions;
+  /** Nonzero exit codes that still mean the file manager opened. */
+  successExitCodes: number[];
 }
 
 export type RevealRunner = (file: string, args: readonly string[], options: ExecFileOptions) => Promise<void>;
@@ -37,7 +39,7 @@ export const revealOpener: { platform: NodeJS.Platform; run: RevealRunner } = {
 /** Build the opener command for `absolutePath` on `platform`. No shell is involved. */
 export function buildRevealCommand(platform: NodeJS.Platform, absolutePath: string): RevealCommand {
   if (platform === 'darwin') {
-    return { file: 'open', args: ['-R', absolutePath], options: {} };
+    return { file: 'open', args: ['-R', absolutePath], options: {}, successExitCodes: [] };
   }
 
   if (platform === 'win32') {
@@ -53,14 +55,24 @@ export function buildRevealCommand(platform: NodeJS.Platform, absolutePath: stri
       file: 'explorer.exe',
       args: [`/select,"${absolutePath}"`],
       options: { windowsVerbatimArguments: true },
+      // explorer.exe exits with 1 even after it opened the window.
+      successExitCodes: [1],
     };
   }
 
   // Linux and other Unix: open the containing folder.
-  return { file: 'xdg-open', args: [path.dirname(absolutePath)], options: {} };
+  return { file: 'xdg-open', args: [path.dirname(absolutePath)], options: {}, successExitCodes: [] };
 }
 
 export async function revealInFileManager(absolutePath: string): Promise<void> {
-  const { file, args, options } = buildRevealCommand(revealOpener.platform, absolutePath);
-  await revealOpener.run(file, args, options);
+  const { file, args, options, successExitCodes } = buildRevealCommand(revealOpener.platform, absolutePath);
+  try {
+    await revealOpener.run(file, args, options);
+  } catch (error) {
+    // execFile reports a nonzero exit as an error whose `code` is the exit code
+    // (a number); spawn failures such as ENOENT carry a string code instead.
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === 'number' && successExitCodes.includes(code)) return;
+    throw error;
+  }
 }

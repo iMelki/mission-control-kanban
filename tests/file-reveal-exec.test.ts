@@ -270,6 +270,46 @@ test('reveal: opener failure is reported as 500', async () => {
   assert.deepEqual(await response.json(), { error: 'Failed to reveal file' });
 });
 
+function exitError(code: number | string) {
+  return Object.assign(new Error(`Command failed with ${code}`), { code });
+}
+
+test('reveal (win32): explorer.exe exit code 1 still counts as success', async () => {
+  opener.revealOpener.platform = 'win32';
+  opener.revealOpener.run = async () => {
+    throw exitError(1);
+  };
+  const response = await reveal(revealRequest(path.join(base, 'ok.txt')));
+  assert.equal(response.status, 200);
+});
+
+test('reveal: other failures are still 500 (win32 exit 2, win32 ENOENT, linux exit 1)', async () => {
+  for (const [platform, code] of [['win32', 2], ['win32', 'ENOENT'], ['linux', 1], ['darwin', 1]] as const) {
+    opener.revealOpener.platform = platform;
+    opener.revealOpener.run = async () => {
+      throw exitError(code);
+    };
+    const response = await reveal(revealRequest(path.join(base, 'ok.txt')));
+    assert.equal(response.status, 500, `${platform} ${code}`);
+  }
+});
+
+test('reveal (win32): a real execFile exit 1 is accepted, a real exit 2 is not', async () => {
+  // Real execFile, with `node` exiting in place of explorer.exe, proves the
+  // error's `code` is the numeric exit code the success check relies on.
+  opener.revealOpener.platform = 'win32';
+  for (const [exitCode, status] of [[1, 200], [2, 500]] as const) {
+    opener.revealOpener.run = (_file, _args, options) =>
+      new Promise((resolve, reject) => {
+        execFile(process.execPath, ['-e', `process.exit(${exitCode})`], { ...options, cwd: cwdDir }, (error) =>
+          error ? reject(error) : resolve(),
+        );
+      });
+    const response = await reveal(revealRequest(path.join(base, 'ok.txt')));
+    assert.equal(response.status, status, `exit ${exitCode}`);
+  }
+});
+
 test('buildRevealCommand never asks for a shell', () => {
   const target = path.join(base, '$(id) `id` ; && | >', '$(id) `id` ; && | > x.txt');
   for (const platform of ['linux', 'darwin', 'win32', 'freebsd'] as const) {
