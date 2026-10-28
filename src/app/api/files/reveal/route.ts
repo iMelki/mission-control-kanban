@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'fs';
 import path from 'path';
+import { resolvePathWithinBases } from '@/lib/path-containment';
 
 const execAsync = promisify(exec);
 
@@ -29,11 +29,12 @@ export async function POST(request: NextRequest) {
     ].filter(Boolean) as string[];
 
     const normalizedPath = path.normalize(expandedPath);
-    const isAllowed = allowedPaths.some(allowed =>
-      normalizedPath.startsWith(path.normalize(allowed))
-    );
 
-    if (!isAllowed) {
+    // Containment is checked on real paths with `base + path.sep`, so sibling-prefix
+    // paths and symlinks escaping the allowed directories are rejected.
+    const contained = await resolvePathWithinBases(normalizedPath, allowedPaths);
+
+    if (!contained.ok && contained.reason === 'outside-base') {
       console.warn(`[FILE] Blocked access to: ${filePath}`);
       return NextResponse.json(
         { error: 'Path not in allowed directories' },
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if file/directory exists
-    if (!existsSync(normalizedPath)) {
+    if (!contained.ok) {
       return NextResponse.json(
         { error: 'File or directory not found', path: normalizedPath },
         { status: 404 }
