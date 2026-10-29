@@ -215,7 +215,7 @@ export function LocalControlPanel() {
                         rel={surface.href.startsWith('http') ? 'noreferrer' : undefined}
                         aria-label={`Open ${surface.name}`}
                         title={`Open ${surface.name}`}
-                        className="inline-flex size-8 items-center justify-center rounded border border-mc-border text-mc-text hover:border-mc-text-secondary/60/60 hover:bg-mc-bg-tertiary"
+                        className="inline-flex size-8 items-center justify-center rounded border border-mc-border text-mc-text hover:border-mc-text-secondary/60 hover:bg-mc-bg-tertiary"
                       >
                         <ArrowUpRight className="size-3.5" />
                       </a>
