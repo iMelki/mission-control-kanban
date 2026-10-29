@@ -41,11 +41,11 @@ function buildInitialHealth(): HealthBySurface {
 function healthClasses(state: LocalControlHealthState): string {
   switch (state) {
     case 'ok':
-      return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100';
+      return 'border-mc-success/30 bg-mc-success/10 text-mc-text';
     case 'limited':
-      return 'border-amber-400/30 bg-amber-500/10 text-amber-100';
+      return 'border-mc-warn/30 bg-mc-warn/10 text-mc-text';
     case 'attention':
-      return 'border-rose-400/30 bg-rose-500/10 text-rose-100';
+      return 'border-mc-danger/30 bg-mc-danger/10 text-mc-text';
     default:
       return 'border-mc-border bg-mc-bg-tertiary text-mc-text-secondary';
   }
@@ -154,13 +154,13 @@ export function LocalControlPanel() {
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold uppercase text-mc-text-secondary">
-            <Activity className="size-4 text-mc-accent-cyan" />
+            <Activity className="size-4 text-mc-text-secondary" />
             Local Control
           </div>
           <h2 className="mt-1 text-lg font-semibold text-mc-text">Workspace surfaces and health</h2>
         </div>
         <div className="flex items-center gap-2 rounded border border-mc-border bg-mc-bg px-3 py-2 text-xs text-mc-text-secondary">
-          {refreshing ? <Loader2 className="size-3.5 animate-spin text-mc-accent-cyan" /> : <CheckCircle2 className="size-3.5 text-emerald-300" />}
+          {refreshing ? <Loader2 className="size-3.5 animate-spin text-mc-text-secondary" /> : <CheckCircle2 className="size-3.5 text-mc-success" />}
           {refreshing ? 'Checking diagnostics' : 'Diagnostics refreshed'}
         </div>
       </div>
@@ -182,7 +182,7 @@ export function LocalControlPanel() {
                   >
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="rounded-md border border-mc-border bg-mc-bg-tertiary p-1 text-mc-accent-cyan">
+                        <span className="rounded-md border border-mc-border bg-mc-bg-tertiary p-1 text-mc-text-secondary">
                           <SurfaceIcon surface={surface} />
                         </span>
                         <h4 className="truncate text-sm font-semibold text-mc-text">{surface.name}</h4>
@@ -215,7 +215,7 @@ export function LocalControlPanel() {
                         rel={surface.href.startsWith('http') ? 'noreferrer' : undefined}
                         aria-label={`Open ${surface.name}`}
                         title={`Open ${surface.name}`}
-                        className="inline-flex size-8 items-center justify-center rounded border border-mc-border text-mc-text hover:border-mc-accent/60 hover:bg-mc-bg-tertiary"
+                        className="inline-flex size-8 items-center justify-center rounded border border-mc-border text-mc-text hover:border-mc-text-secondary/60 hover:bg-mc-bg-tertiary"
                       >
                         <ArrowUpRight className="size-3.5" />
                       </a>

@@ -55,7 +55,7 @@ jobs:
 
   runtime-regression:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 28
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -74,8 +74,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
       - name: Install Playwright system dependencies
-        timeout-minutes: 8
-        run: npx playwright install-deps chromium
+        timeout-minutes: 14
+        run: |
+          # The Azure Ubuntu mirror sometimes crawls (53 kB/s on run 39789884476: 25.9 MB took 8m05s and the
+          # old single 8-minute step timed out). Bound each try, and retry: apt keeps fully downloaded .deb
+          # files, so every retry resumes where the last one stopped instead of starting over.
+          for attempt in 1 2 3; do
+            timeout 240 npx playwright install-deps chromium && exit 0
+            echo "install-deps attempt ${attempt} did not finish; retrying"
+            sleep $((attempt * 10))
+          done
+          exit 1
       - name: Install Playwright Chromium
         timeout-minutes: 8
         run: |

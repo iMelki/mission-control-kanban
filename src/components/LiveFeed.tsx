@@ -167,7 +167,7 @@ function LiveFeedExpandedPanel({
               onClick={() => onFilterChange(tab)}
               className={`px-3 py-1 text-xs rounded uppercase ${
                 filter === tab
-                  ? 'bg-mc-accent text-mc-bg font-medium'
+                  ? 'bg-mc-bg-tertiary text-mc-text font-medium ring-1 ring-inset ring-mc-text-secondary/60'
                   : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
               }`}
             >
@@ -202,14 +202,14 @@ function EventItem({ event }: { event: Event }) {
     <div
       className={`p-2 rounded border-l-2 animate-slide-in ${
         isHighlight
-          ? 'bg-mc-bg-tertiary border-mc-accent-pink'
+          ? 'bg-mc-bg-tertiary border-mc-text-secondary'
           : 'bg-transparent border-transparent hover:bg-mc-bg-tertiary'
       }`}
     >
       <div className="flex items-start gap-2">
         {getEventIcon(event.type)}
         <div className="flex-1 min-w-0">
-          <p className={`text-sm ${isTaskEvent ? 'text-mc-accent-pink' : 'text-mc-text'}`}>
+          <p className={`text-sm break-words ${isTaskEvent ? 'text-mc-text-secondary' : 'text-mc-text'}`}>
             {event.message}
           </p>
           <div className="flex items-center gap-1 mt-1 text-xs text-mc-text-secondary">

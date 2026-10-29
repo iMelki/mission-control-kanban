@@ -57,7 +57,7 @@ export function Header({ workspace }: HeaderProps) {
       {/* Left: Logo & Title */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
         <div className="flex items-center gap-2 shrink-0">
-          <Zap className="w-5 h-5 text-mc-accent-cyan" />
+          <Zap aria-hidden="true" className="w-5 h-5 text-mc-text" />
           {/* The wordmark is redundant with the workspace title at phone widths (#142). */}
           <span className="hidden sm:inline font-semibold text-mc-text uppercase tracking-wider text-sm">
             Mission Control
@@ -70,7 +70,7 @@ export function Header({ workspace }: HeaderProps) {
             <Link
               href="/"
               aria-label="Back to all workspaces"
-              className="flex items-center gap-1 shrink-0 text-mc-text-secondary hover:text-mc-accent transition-colors"
+              className="flex items-center gap-1 shrink-0 text-mc-text-secondary hover:text-mc-text transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               <LayoutGrid className="w-4 h-4" />
@@ -82,7 +82,7 @@ export function Header({ workspace }: HeaderProps) {
                 The cockpit had no h1 at all before #142; the workspace name is the
                 page title, so it carries the heading role for this route.
               */}
-              <h1 className="text-heading text-base truncate">{workspace.name}</h1>
+              <h1 className="truncate">{workspace.name}</h1>
             </div>
           </div>
         ) : (
@@ -101,11 +101,11 @@ export function Header({ workspace }: HeaderProps) {
         <div className="hidden xl:flex items-center gap-4">
           <RuntimeHealthBadges />
           <div className="text-center">
-            <div className="text-2xl font-bold text-mc-accent-cyan">{activeAgents}</div>
+            <div className="text-xl font-bold tabular-nums text-mc-text">{activeAgents}</div>
             <div className="text-xs text-mc-text-secondary uppercase">Agents Active</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-mc-accent-purple">{tasksInQueue}</div>
+            <div className="text-xl font-bold tabular-nums text-mc-text">{tasksInQueue}</div>
             <div className="text-xs text-mc-text-secondary uppercase">Tasks in Queue</div>
           </div>
         </div>
@@ -133,8 +133,8 @@ export function Header({ workspace }: HeaderProps) {
             connectionStatus === 'pending'
               ? 'bg-mc-bg-tertiary border-mc-border text-mc-text-secondary'
               : connectionStatus === 'online'
-                ? 'bg-mc-accent-green/20 border-mc-accent-green text-mc-accent-green'
-                : 'bg-mc-bg border-mc-accent-red text-mc-accent-red'
+                ? 'bg-mc-success/20 border-mc-success text-mc-success'
+                : 'bg-mc-bg border-mc-danger text-mc-danger'
           }`}
         >
           <span
@@ -143,8 +143,8 @@ export function Header({ workspace }: HeaderProps) {
               connectionStatus === 'pending'
                 ? 'bg-mc-text-secondary'
                 : connectionStatus === 'online'
-                  ? 'bg-mc-accent-green animate-pulse'
-                  : 'bg-mc-accent-red'
+                  ? 'bg-mc-success animate-pulse'
+                  : 'bg-mc-danger'
             }`}
           />
           <span className="hidden sm:inline">{connection.label}</span>

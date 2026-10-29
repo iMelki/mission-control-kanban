@@ -358,13 +358,13 @@ export default function WorkspacePage() {
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <main id="main-content" tabIndex={-1} className="text-center outline-none">
           <SearchX aria-hidden="true" className="w-14 h-14 mx-auto mb-4 text-mc-text-secondary" />
-          <h1 className="text-2xl font-bold mb-2">Workspace Not Found</h1>
+          <h1 className="mb-2">Workspace Not Found</h1>
           <p className="text-mc-text-secondary mb-6">
             The workspace &ldquo;{slug}&rdquo; doesn&apos;t exist.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-mc-accent text-mc-accent-ink rounded-lg font-medium hover:bg-mc-accent/90"
           >
             <ChevronLeft className="w-4 h-4" />
             Back to Dashboard

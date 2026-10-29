@@ -75,7 +75,7 @@ export function WorkspaceSectionTabs({ section, onSectionChange }: { section: Wo
                   'hover:bg-mc-bg-tertiary hover:text-mc-text',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent',
                   'disabled:pointer-events-none disabled:opacity-50',
-                  isCurrent && 'border-mc-accent bg-mc-accent/10 text-mc-accent',
+                  isCurrent && 'border-mc-text-secondary/60 bg-mc-bg-tertiary text-mc-text',
                 )}
               >
                 <Icon className="size-4" />
