@@ -1,15 +1,13 @@
 /**
  * File Reveal API
- * Opens a file's location in Finder (macOS) or Explorer (Windows)
+ * Opens a file's location in Finder (macOS), Explorer (Windows), or the
+ * default file manager (Linux, via xdg-open on the containing folder)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
 import { resolvePathWithinBases } from '@/lib/path-containment';
-
-const execAsync = promisify(exec);
+import { revealInFileManager } from '@/lib/reveal-in-file-manager';
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,20 +48,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Open in Finder (macOS) - reveal the file
-    const platform = process.platform;
-    let command: string;
-
-    if (platform === 'darwin') {
-      command = `open -R "${normalizedPath}"`;
-    } else if (platform === 'win32') {
-      command = `explorer /select,"${normalizedPath}"`;
-    } else {
-      // Linux - open containing folder
-      command = `xdg-open "${path.dirname(normalizedPath)}"`;
-    }
-
-    await execAsync(command);
+    // Reveal the contained real path. The opener is run with an argv array and
+    // no shell, so metacharacters in the path are never interpreted.
+    await revealInFileManager(contained.realPath);
 
     console.log(`[FILE] Revealed: ${normalizedPath}`);
     return NextResponse.json({ success: true, path: normalizedPath });
