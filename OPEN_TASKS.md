@@ -875,7 +875,7 @@ the local operator entrypoint; historical task notes remain in
     `docs/production-capture.md`.
   - **2026-08-28 closeout:** still **unscored**. Do not GET or steal
     `3021`. Production `next start` on `3121` only; no worktree. Note:
-    `S:\source\CCAI\Assistants\agent-settings\shared\catalog\frontend-sota-fleet-uiux-closeout-2026-08-28.md`.
+    `<workspace-root>\agent-settings\shared\catalog\frontend-sota-fleet-uiux-closeout-2026-08-28.md`.
   - **2026-09-01 first production gauntlet: 14/21** on `127.0.0.1:3121`
     `next start`, SHA `74f671740019e26a540405bcfe52f1e6a83d900e`,
     BUILD_ID `S8HgxCEJWRAGRBloUGmn1`. Receipt:

@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 
 process.env.MISSION_CONTROL_URL = 'http://127.0.0.1:3021';
-process.env.PROJECTS_PATH = 'S:/source/CCAI/Assistants/projects';
+process.env.PROJECTS_PATH = 'D:/workspace/assistants/projects';
 process.env.MCK_TEST_WEBHOOK_TOKEN = 'test-token';
 process.env.MCK_WEBHOOK_SIGNATURE_SECRET = 'test-signature-secret';
 
