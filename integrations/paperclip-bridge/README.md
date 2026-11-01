@@ -117,7 +117,7 @@ Build first, then install the absolute local path:
 
 ```powershell
 $body = @{
-  packageName = 'S:\source\CCAI\Assistants\tools\mission-control-kanban\integrations\paperclip-bridge'
+  packageName = '<workspace-root>\tools\mission-control-kanban\integrations\paperclip-bridge'
   isLocalPath = $true
 } | ConvertTo-Json
 
