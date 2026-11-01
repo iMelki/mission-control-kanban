@@ -8,6 +8,7 @@ import {
   evaluateDrift,
   exitCodeFor,
   formatMarkdown,
+  parseDembrandtResult,
   routeSlug,
 } from '../scripts/lib/design-drift.mjs';
 
@@ -100,4 +101,37 @@ test('the Markdown report lists each route and the drifted tokens', () => {
   assert.match(markdown, /\| `\/settings` \| drift \| 25 \| 1 \| 0 \| 0 \|/);
   assert.match(markdown, /color changed: semantic\.primary \(#58a6ff -> #ff00ff\)/);
   assert.match(markdown, /--update-baseline/);
+});
+
+test('parseDembrandtResult rejects Dembrandt error JSON even with exit 0 or 1', () => {
+  const stdout = JSON.stringify({ error: 'navigation failed' });
+  for (const code of [0, 1, 2]) {
+    for (const compare of [false, true]) {
+      const result = parseDembrandtResult({ code, stdout }, { compare });
+      assert.equal(result.extract, undefined);
+      assert.match(result.error, /navigation failed/);
+    }
+  }
+});
+
+test('parseDembrandtResult accepts exit 0 extraction and exit 1 only with a valid drift report', () => {
+  const extract = { colors: [] };
+  assert.deepEqual(parseDembrandtResult({ code: 0, stdout: JSON.stringify(extract) }).extract, extract);
+
+  const drifted = { colors: [], drift: report(40, { status: 'drift' }) };
+  assert.deepEqual(parseDembrandtResult({ code: 1, stdout: JSON.stringify(drifted) }, { compare: true }).extract, drifted);
+  assert.ok(parseDembrandtResult({ code: 1, stdout: JSON.stringify(drifted) }, { compare: false }).error);
+
+  const inconclusive = { drift: { inconclusive: true } };
+  assert.ok(parseDembrandtResult({ code: 1, stdout: JSON.stringify(inconclusive) }, { compare: true }).extract);
+
+  assert.ok(parseDembrandtResult({ code: 1, stdout: JSON.stringify({ colors: [] }) }, { compare: true }).error);
+  assert.ok(parseDembrandtResult({ code: 0, stdout: JSON.stringify({ colors: [] }) }, { compare: true }).error);
+  assert.ok(parseDembrandtResult({ code: 2, stdout: JSON.stringify(drifted) }, { compare: true }).error);
+});
+
+test('parseDembrandtResult rejects non-JSON and non-object payloads', () => {
+  assert.match(parseDembrandtResult({ code: 1, stdout: 'boom', stderr: 'bad\nworse' }).error, /without JSON output: bad worse/);
+  assert.ok(parseDembrandtResult({ code: 0, stdout: '[]' }).error);
+  assert.ok(parseDembrandtResult({ code: 0, stdout: 'null' }).error);
 });

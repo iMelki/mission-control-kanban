@@ -37,6 +37,38 @@ export function routeSlug(route) {
 }
 
 /**
+ * Validate one Dembrandt run before it is trusted as an extraction. Dembrandt
+ * can print a valid JSON error object and exit nonzero, so parsing alone is not
+ * enough. Exit 0 is accepted; exit 1 is accepted only for a compare run whose
+ * payload is a real drift report (1 is Dembrandt's own drift verdict).
+ * Returns { extract } or { error }.
+ */
+export function parseDembrandtResult({ code, stdout, stderr = '' }, { compare = false } = {}) {
+  const tail = () => String(stderr || stdout || '').trim().split('\n').slice(-3).join(' ');
+  let payload;
+  try {
+    payload = JSON.parse(stdout);
+  } catch {
+    return { error: `dembrandt exited ${code} without JSON output: ${tail()}` };
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { error: `dembrandt exited ${code} with a non-object JSON payload` };
+  }
+  if (payload.error) {
+    const message = typeof payload.error === 'string' ? payload.error : JSON.stringify(payload.error);
+    return { error: `dembrandt reported an error (exit ${code}): ${message}` };
+  }
+  const drift = payload.drift;
+  const validDrift = Boolean(drift) && typeof drift === 'object' && (drift.inconclusive === true || Number.isFinite(Number(drift.score)));
+  if (code === 0) {
+    if (compare && !validDrift) return { error: 'dembrandt output has no valid drift report' };
+    return { extract: payload };
+  }
+  if (code === 1 && compare && validDrift) return { extract: payload };
+  return { error: `dembrandt exited ${code} without a valid result: ${tail()}` };
+}
+
+/**
  * Classify one route. `drift` is Dembrandt's report, or null when the route
  * could not be compared (`error` explains why).
  */

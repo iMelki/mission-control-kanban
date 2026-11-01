@@ -28,6 +28,7 @@ import {
   evaluateDrift,
   exitCodeFor,
   formatMarkdown,
+  parseDembrandtResult,
   routeSlug,
 } from './lib/design-drift.mjs';
 
@@ -160,7 +161,13 @@ async function launchBrowser() {
     args: [`--remote-debugging-port=${cdpPort}`, '--no-sandbox'],
   });
   const endpoint = `http://127.0.0.1:${cdpPort}`;
-  await waitFor(async () => (await fetch(`${endpoint}/json/version`).catch(() => null))?.ok === true, 15_000, 'Chromium CDP endpoint');
+  try {
+    await waitFor(async () => (await fetch(`${endpoint}/json/version`).catch(() => null))?.ok === true, 15_000, 'Chromium CDP endpoint');
+  } catch (error) {
+    // The caller never receives the Browser if we throw, so close it here or its child keeps the process alive.
+    await browser.close().catch(() => {});
+    throw error;
+  }
   return { browser, endpoint };
 }
 
@@ -173,12 +180,7 @@ async function extractRoute(route, cdpEndpoint, baselineFile) {
     env: { BROWSER_CDP_ENDPOINT: cdpEndpoint, DEMBRANDT_NO_HINTS: '1', npm_config_omit: 'optional', NO_COLOR: '1' },
   });
   // Exit 1 is Dembrandt's own drift verdict; we apply our threshold to the score instead.
-  try {
-    return { extract: JSON.parse(result.stdout) };
-  } catch {
-    const detail = (result.stderr || result.stdout).trim().split('\n').slice(-3).join(' ');
-    return { error: `dembrandt exited ${result.code} without JSON output: ${detail}` };
-  }
+  return parseDembrandtResult(result, { compare: Boolean(baselineFile) });
 }
 
 async function main() {
