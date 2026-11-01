@@ -91,4 +91,4 @@ Major debugging and feature session that resulted in v1.0.0 release.
 **Task:** "Find a Valentine's Day gift idea"
 **Agent:** Luxe Scout
 **Deliverable:** Valentine's Gift Guide HTML page
-**URL:** http://<lan-host>:8080/valentines-gift-guide.html
+**URL:** `http://<lan-host>:8080/valentines-gift-guide.html`
