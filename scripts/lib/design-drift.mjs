@@ -40,7 +40,8 @@ export function routeSlug(route) {
  * Validate one Dembrandt run before it is trusted as an extraction. Dembrandt
  * can print a valid JSON error object and exit nonzero, so parsing alone is not
  * enough. Exit 0 is accepted; exit 1 is accepted only for a compare run whose
- * payload is a real drift report (1 is Dembrandt's own drift verdict).
+ * payload is a real drift report (1 is Dembrandt's own drift verdict); exit 2
+ * only when that report is inconclusive.
  * Returns { extract } or { error }.
  */
 export function parseDembrandtResult({ code, stdout, stderr = '' }, { compare = false } = {}) {
@@ -65,6 +66,8 @@ export function parseDembrandtResult({ code, stdout, stderr = '' }, { compare = 
     return { extract: payload };
   }
   if (code === 1 && compare && validDrift) return { extract: payload };
+  // Dembrandt exits 2 for an inconclusive compare but still prints the report.
+  if (code === 2 && compare && drift && typeof drift === 'object' && drift.inconclusive === true) return { extract: payload };
   return { error: `dembrandt exited ${code} without a valid result: ${tail()}` };
 }
 
@@ -75,7 +78,7 @@ export function parseDembrandtResult({ code, stdout, stderr = '' }, { compare = 
 export function classifyRoute({ route, drift = null, error = null, baselineMissing = false }, threshold = DEFAULT_THRESHOLD) {
   if (baselineMissing) return { route, status: STATUS.MISSING_BASELINE, score: null, error };
   if (error || !drift) return { route, status: STATUS.ERROR, score: null, error: error || 'no drift report' };
-  if (drift.inconclusive) return { route, status: STATUS.INCONCLUSIVE, score: drift.score ?? null, summary: drift.summary };
+  if (drift.inconclusive) return { route, status: STATUS.INCONCLUSIVE, score: drift.score ?? null, summary: drift.summary, warnings: drift.warnings || [] };
   const score = Number(drift.score);
   if (!Number.isFinite(score)) return { route, status: STATUS.ERROR, score: null, error: 'drift score is not a number' };
   return {

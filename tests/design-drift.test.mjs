@@ -128,6 +128,11 @@ test('parseDembrandtResult accepts exit 0 extraction and exit 1 only with a vali
   assert.ok(parseDembrandtResult({ code: 1, stdout: JSON.stringify({ colors: [] }) }, { compare: true }).error);
   assert.ok(parseDembrandtResult({ code: 0, stdout: JSON.stringify({ colors: [] }) }, { compare: true }).error);
   assert.ok(parseDembrandtResult({ code: 2, stdout: JSON.stringify(drifted) }, { compare: true }).error);
+  const exit2 = JSON.stringify({ drift: { inconclusive: true } });
+  assert.deepEqual(parseDembrandtResult({ code: 2, stdout: exit2 }, { compare: true }).extract, inconclusive);
+  assert.ok(parseDembrandtResult({ code: 2, stdout: exit2 }, { compare: false }).error);
+  assert.ok(parseDembrandtResult({ code: 2, stdout: JSON.stringify({ colors: [] }) }, { compare: true }).error);
+  assert.deepEqual(classifyRoute({ route: '/', drift: { inconclusive: true, warnings: ['w'] } }).warnings, ['w']);
 });
 
 test('parseDembrandtResult rejects non-JSON and non-object payloads', () => {
