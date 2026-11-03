@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Design-token drift check (2026-10-18)** - `npm run design:drift` runs
+  Dembrandt 0.39.2 (pinned, through `npx`) against `/`, `/workspace/default`
+  and `/settings`. It compares the rendered design tokens with the baseline in
+  `docs/design-drift/baseline/` and fails when a route's drift score is above
+  10. Use `--update-baseline` after an intended visual change. Chromium comes
+  from the repo's Playwright install over CDP, so the check downloads no extra
+  browser. A non-blocking `Design drift` job in Runtime Regression runs it on
+  every pull request. See `docs/design-drift.md`.
+
 ### Fixed
 
 - **Commit the Next.js agent-rules block in `AGENTS.md` (2026-10-05, #187)** -
