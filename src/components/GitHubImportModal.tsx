@@ -246,8 +246,8 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
       >
         <DialogHeader className="flex-row items-center justify-between gap-3 p-4 border-b border-mc-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded bg-mc-accent/15">
-              <Github className="size-5 text-mc-accent" />
+            <div className="p-2 rounded bg-mc-bg-tertiary">
+              <Github className="size-5 text-mc-text-secondary" />
             </div>
             <div>
               <DialogTitle>Import GitHub Issue</DialogTitle>
@@ -278,7 +278,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
               type="button"
               onClick={handleLoadIssue}
               disabled={isLoadingSource}
-              className="px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50 active:scale-[0.98]"
+              className="px-4 py-2 bg-mc-accent text-mc-accent-ink rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50 active:scale-[0.98]"
             >
               {isLoadingSource ? 'Loading GitHub...' : 'Load from GitHub'}
             </button>
@@ -289,7 +289,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
             <div>3. Review the preview and blockers before creating the local task.</div>
           </div>
           {error && (
-            <div className="mt-3 flex items-start gap-2 rounded border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+            <div className="mt-3 flex items-start gap-2 rounded border border-mc-danger/25 bg-mc-danger/10 px-3 py-2 text-sm text-mc-text">
               <AlertTriangle className="size-4 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -328,7 +328,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
                 </p>
               )}
               {sourceData.project_read_available === false && (
-                <div className="mt-3 flex items-start gap-2 rounded border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                <div className="mt-3 flex items-start gap-2 rounded border border-mc-warn/25 bg-mc-warn/10 px-3 py-2 text-sm text-mc-text">
                   <AlertTriangle className="mt-0.5 size-4" />
                   <div>
                     <div className="font-medium">GitHub Project fields unavailable</div>
@@ -365,9 +365,9 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
               <div className="rounded-lg border border-mc-border bg-mc-bg p-4">
                 <div className="flex items-center gap-2 mb-3">
                   {preview.dispatch_ready ? (
-                    <CheckCircle2 className="size-4 text-emerald-300" />
+                    <CheckCircle2 className="size-4 text-mc-success" />
                   ) : (
-                    <AlertTriangle className="size-4 text-amber-300" />
+                    <AlertTriangle className="size-4 text-mc-warn" />
                   )}
                   <h3 className="font-medium">Import Preview</h3>
                 </div>
@@ -418,23 +418,23 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-mc-border bg-mc-bg p-4">
                   <h4 className="font-medium mb-2">Import Blockers</h4>
-                  {preview.blockers.length > 0 ? <DispatchList values={preview.blockers} /> : <span className="text-emerald-300 text-sm">No import blockers.</span>}
+                  {preview.blockers.length > 0 ? <DispatchList values={preview.blockers} /> : <span className="text-mc-success text-sm">No import blockers.</span>}
                 </div>
                 <div className="rounded-lg border border-mc-border bg-mc-bg p-4">
                   <h4 className="font-medium mb-2">Dispatch Blockers</h4>
-                  {preview.dispatch_blockers.length > 0 ? <DispatchList values={preview.dispatch_blockers} /> : <span className="text-emerald-300 text-sm">Dispatch contract is ready.</span>}
+                  {preview.dispatch_blockers.length > 0 ? <DispatchList values={preview.dispatch_blockers} /> : <span className="text-mc-success text-sm">Dispatch contract is ready.</span>}
                 </div>
               </div>
 
               {preview.warnings.length > 0 && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
-                  <h4 className="font-medium mb-2 text-amber-200">Warnings</h4>
+                <div className="rounded-lg border border-mc-warn/30 bg-mc-warn/10 p-4">
+                  <h4 className="font-medium mb-2 text-mc-text">Warnings</h4>
                   <DispatchList values={preview.warnings} />
                 </div>
               )}
 
               {preview.existing_task && (
-                <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
+                <div className="rounded-lg border border-mc-danger/30 bg-mc-danger/10 p-4 text-sm text-mc-text">
                   This issue is already imported as task <strong>{preview.existing_task.id}</strong> ({preview.existing_task.title}).
                 </div>
               )}
@@ -455,7 +455,7 @@ export function GitHubImportModal({ onClose, workspaceId }: GitHubImportModalPro
               type="button"
               onClick={handleCreateTask}
               disabled={isCreating || !preview || Boolean(preview.existing_task)}
-              className="px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+              className="px-4 py-2 bg-mc-accent text-mc-accent-ink rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
             >
               {isCreating ? 'Creating...' : 'Create Local Task'}
             </button>

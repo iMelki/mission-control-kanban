@@ -169,7 +169,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
           role={openNotice.tone === 'error' ? 'alert' : 'status'}
           className={`flex items-start gap-2 rounded-lg border p-3 text-sm text-mc-text ${
             openNotice.tone === 'error'
-              ? 'border-mc-accent-red/40 bg-mc-accent-red/10'
+              ? 'border-mc-danger/40 bg-mc-danger/10'
               : 'border-mc-border bg-mc-bg-tertiary'
           }`}
         >
@@ -192,10 +192,10 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
       {deliverables.map((deliverable) => (
         <div
           key={deliverable.id}
-          className="flex gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border hover:border-mc-accent transition-colors"
+          className="flex gap-3 p-3 bg-mc-bg rounded-lg border border-mc-border hover:border-mc-text-secondary/60 transition-colors"
         >
           {/* Icon */}
-          <div className="flex-shrink-0 text-mc-accent">
+          <div className="flex-shrink-0 text-mc-text-secondary">
             {getDeliverableIcon(deliverable.deliverable_type)}
           </div>
 
@@ -208,7 +208,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                   href={deliverable.path}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-medium text-mc-accent hover:text-mc-accent/80 hover:underline flex items-center gap-1.5"
+                  className="font-medium text-mc-text underline decoration-mc-text-secondary/60 underline-offset-2 hover:decoration-mc-text flex items-center gap-1.5"
                 >
                   {deliverable.title}
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -222,7 +222,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                   <button
               type="button"
                     onClick={() => handlePreview(deliverable)}
-                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
+                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary"
                     title="Preview in browser"
                   >
                     <Eye className="w-4 h-4" />
@@ -233,7 +233,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                   <button
               type="button"
                     onClick={() => handleOpen(deliverable)}
-                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent"
+                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary hover:text-mc-text"
                     title={deliverable.deliverable_type === 'url' ? 'Open URL' : 'Reveal in Finder'}
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -256,7 +256,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                   href={deliverable.path}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-accent hover:text-mc-accent/80 font-mono break-all block hover:bg-mc-bg-tertiary/80"
+                  className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-text underline decoration-mc-text-secondary/60 underline-offset-2 font-mono break-all block hover:bg-mc-bg-tertiary/80"
                 >
                   {deliverable.path}
                 </a>

@@ -254,7 +254,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Github className="size-4 text-mc-accent-cyan" />
+            <Github className="size-4 text-mc-text-secondary" />
             <h3 className="text-sm font-semibold">GitHub Write-Back</h3>
           </div>
           <p className="text-xs text-mc-text-secondary">
@@ -301,7 +301,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
             type="button"
             onClick={() => void runWriteback(true)}
             disabled={isRefreshingTask || isRunning !== null}
-            className="inline-flex items-center gap-2 rounded border border-mc-accent/70 px-3 py-2 text-sm font-medium text-mc-accent hover:bg-mc-accent/10 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded border border-mc-text-secondary/60 px-3 py-2 text-sm font-medium text-mc-text hover:bg-mc-bg-tertiary disabled:opacity-50"
           >
             {isRunning === 'dry_run' ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
             Dry Run
@@ -310,7 +310,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
             type="button"
             onClick={() => void runWriteback(false)}
             disabled={isRefreshingTask || isRunning !== null}
-            className="inline-flex items-center gap-2 rounded bg-mc-accent px-3 py-2 text-sm font-medium text-mc-bg hover:bg-mc-accent/90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded bg-mc-accent px-3 py-2 text-sm font-medium text-mc-accent-ink hover:bg-mc-accent/90 disabled:opacity-50"
           >
             {isRunning === 'apply' ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
             Apply
@@ -319,10 +319,10 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
       </div>
 
       {showApplyConfirmation && (
-        <div className="flex flex-col gap-3 rounded border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-sm text-amber-50 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 rounded border border-mc-warn/25 bg-mc-warn/10 px-3 py-3 text-sm text-mc-text md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <p className="font-medium">Apply GitHub write-back now?</p>
-            <p className="text-xs text-amber-100/80">
+            <p className="text-xs text-mc-text">
               This will post the prepared comment to the linked issue and update the allowed GitHub Project fields.
             </p>
           </div>
@@ -339,7 +339,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
               type="button"
               onClick={() => void runWriteback(false, { bypassApplyConfirmation: true })}
               disabled={isRefreshingTask || isRunning !== null}
-              className="inline-flex items-center gap-2 rounded bg-amber-400 px-3 py-2 text-sm font-medium text-mc-bg hover:bg-amber-300 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded bg-mc-warn px-3 py-2 text-sm font-medium text-mc-bg hover:bg-mc-warn/90 disabled:opacity-50"
             >
               <Github className="size-4" />
               Confirm apply
@@ -349,14 +349,14 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
       )}
 
       {error && (
-        <div className="flex items-start gap-2 rounded border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+        <div className="flex items-start gap-2 rounded border border-mc-danger/25 bg-mc-danger/10 px-3 py-2 text-sm text-mc-text">
           <AlertTriangle className="size-4 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
       {task.dispatch_blockers && task.dispatch_blockers.length > 0 && (
-        <div className="rounded border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+        <div className="rounded border border-mc-warn/25 bg-mc-warn/10 px-3 py-2 text-xs text-mc-text">
           The task can still write back to GitHub while blocked, but the blocker list in the comment will stay noisy until the dispatch contract is completed.
         </div>
       )}
@@ -366,9 +366,9 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
           <div className="rounded border border-mc-border/60 bg-mc-bg-secondary/60 p-3 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               {result?.status === 'failed' || latestLog?.status === 'failed' ? (
-                <AlertTriangle className="size-4 text-rose-300" />
+                <AlertTriangle className="size-4 text-mc-danger" />
               ) : (
-                <CheckCircle2 className="size-4 text-emerald-300" />
+                <CheckCircle2 className="size-4 text-mc-success" />
               )}
               Latest prepared payload
             </div>
@@ -386,7 +386,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
                     <div className="text-xs uppercase tracking-wide text-mc-text-secondary">{update.field_name}</div>
                     <div className="text-sm">{update.value}</div>
                     {update.skipped && (
-                      <div className="mt-1 text-xs text-amber-200">{update.reason ?? 'Skipped'}</div>
+                      <div className="mt-1 text-xs text-mc-text">{update.reason ?? 'Skipped'}</div>
                     )}
                   </div>
                 ))}
@@ -399,9 +399,9 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
       )}
 
       {(result?.warnings?.length ?? 0) > 0 && (
-        <div className="rounded border border-amber-500/25 bg-amber-500/10 px-3 py-2">
-          <div className="text-sm font-medium text-amber-200">Warnings</div>
-          <ul className="mt-2 space-y-1 text-xs text-amber-100">
+        <div className="rounded border border-mc-warn/25 bg-mc-warn/10 px-3 py-2">
+          <div className="text-sm font-medium text-mc-text">Warnings</div>
+          <ul className="mt-2 space-y-1 text-xs text-mc-text">
             {result?.warnings?.map((warning) => (
               <li key={warning}>- {warning}</li>
             ))}
@@ -422,7 +422,7 @@ export function GitHubWritebackPanel({ task, onTaskUpdated }: GitHubWritebackPan
                   <span>{formatTimestamp(log.created_at)}</span>
                 </div>
                 {log.error_message && (
-                  <div className="mt-1 text-rose-200">{log.error_message}</div>
+                  <div className="mt-1 text-mc-text">{log.error_message}</div>
                 )}
               </div>
             ))}

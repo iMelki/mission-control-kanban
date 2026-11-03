@@ -17,9 +17,9 @@ interface DiagnosticsPayload {
 }
 
 function diagnosticTone(severity: RuntimeConfigTemplateDiagnostic['severity']) {
-  if (severity === 'ok') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
-  if (severity === 'blocked') return 'border-rose-500/30 bg-rose-500/10 text-rose-200';
-  return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  if (severity === 'ok') return 'border-mc-success/30 bg-mc-success/10 text-mc-text';
+  if (severity === 'blocked') return 'border-mc-danger/30 bg-mc-danger/10 text-mc-text';
+  return 'border-mc-warn/30 bg-mc-warn/10 text-mc-text';
 }
 
 export function RuntimeConfigTemplateGallery({
@@ -47,7 +47,7 @@ export function RuntimeConfigTemplateGallery({
   return (
     <div className="rounded border border-mc-border bg-mc-bg-secondary p-3">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-        <WandSparkles className="size-4 text-mc-accent" /> Runtime config templates
+        <WandSparkles className="size-4 text-mc-text-secondary" /> Runtime config templates
       </div>
       <div className={compact ? 'grid gap-2 sm:grid-cols-2' : 'grid gap-2 sm:grid-cols-2 lg:grid-cols-3'}>
         {RUNTIME_CONFIG_TEMPLATES.map((template) => {
