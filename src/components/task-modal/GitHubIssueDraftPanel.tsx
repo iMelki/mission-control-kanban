@@ -87,7 +87,7 @@ export function GitHubIssueDraftPanel({ taskId, fallbackTitle }: { taskId?: stri
     <section className="rounded border border-mc-border bg-mc-bg-secondary p-3 text-sm" aria-label="GitHub issue draft panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="flex items-center gap-2 text-sm font-semibold"><Github className="size-4 text-mc-accent" />GitHub issue draft</h3>
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><Github className="size-4 text-mc-text-secondary" />GitHub issue draft</h3>
           <p className="mt-1 text-xs text-mc-text-secondary">Generate create/update text first. Live GitHub mutation requires an exact plain-English confirmation phrase.</p>
         </div>
         <button type="button" onClick={() => void loadDraft()} disabled={!taskId || isLoading} className="rounded border border-mc-border px-3 py-1.5 text-xs hover:bg-mc-bg-tertiary disabled:opacity-50">
@@ -95,7 +95,7 @@ export function GitHubIssueDraftPanel({ taskId, fallbackTitle }: { taskId?: stri
         </button>
       </div>
 
-      {error && <div className="mt-3 rounded border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{error}</div>}
+      {error && <div className="mt-3 rounded border border-mc-danger/30 bg-mc-danger/10 px-3 py-2 text-xs text-mc-text">{error}</div>}
 
       {draft && (
         <details open className="mt-3 rounded border border-mc-border bg-mc-bg p-3 text-xs">
@@ -105,20 +105,20 @@ export function GitHubIssueDraftPanel({ taskId, fallbackTitle }: { taskId?: stri
             <div><span className="text-mc-text-secondary">Action:</span> {draftPayload.action || 'create'}</div>
           </div>
           {draft.warnings?.length > 0 && (
-            <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-amber-100">
+            <div className="mt-2 rounded border border-mc-warn/30 bg-mc-warn/10 p-2 text-mc-text">
               <AlertTriangle className="mr-1 inline size-3" /> {draft.warnings.join('; ')}
             </div>
           )}
           <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-mc-bg-secondary p-3">{JSON.stringify(draftPayload, null, 2)}</pre>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" onClick={() => void copyGitHubIssueBody()} className="rounded border border-mc-border px-2 py-1 hover:bg-mc-bg-tertiary">Copy issue title/body</button>
-            <button type="button" onClick={() => setShowConfirm(true)} className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-amber-100 hover:bg-amber-500/20">{actionLabel}</button>
+            <button type="button" onClick={() => setShowConfirm(true)} className="rounded border border-mc-warn/40 bg-mc-warn/10 px-2 py-1 text-mc-text hover:bg-mc-warn/20">{actionLabel}</button>
           </div>
         </details>
       )}
 
       {applyResult?.applied && (
-        <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+        <div className="mt-3 rounded border border-mc-success/30 bg-mc-success/10 px-3 py-2 text-xs text-mc-text">
           <CheckCircle2 className="mr-1 inline size-3" /> Applied to GitHub: <a className="underline" href={applyResult.issue?.html_url} target="_blank" rel="noreferrer">#{applyResult.issue?.number}</a>
         </div>
       )}
