@@ -25,11 +25,19 @@ fs.writeFileSync(path.join(sibling, 'secret.txt'), 'sibling-secret');
 fs.writeFileSync(path.join(sibling, 'page.html'), '<p>sibling-secret</p>');
 fs.writeFileSync(path.join(outside, 'secret.txt'), 'outside-secret');
 fs.writeFileSync(path.join(outside, 'secret.html'), '<p>outside-secret</p>');
+fs.mkdirSync(path.join(base, 'sub'));
 
+// Bugbot on #200 (existence oracle). Extra layout:
+//   projects/escape-dir   -> outside/            directory symlink escaping the base
+//   projects/dangling.txt -> outside/nope.txt    dangling symlink escaping the base
+//   projects/sub-link     -> projects/sub/       directory symlink that stays inside
 let symlinksSupported = true;
 try {
   fs.symlinkSync(path.join(outside, 'secret.txt'), path.join(base, 'escape.txt'));
   fs.symlinkSync(path.join(outside, 'secret.html'), path.join(base, 'escape.html'));
+  fs.symlinkSync(outside, path.join(base, 'escape-dir'), 'dir');
+  fs.symlinkSync(path.join(outside, 'nope.txt'), path.join(base, 'dangling.txt'));
+  fs.symlinkSync(path.join(base, 'sub'), path.join(base, 'sub-link'), 'dir');
 } catch {
   // Windows without Developer Mode / admin cannot create symlinks.
   symlinksSupported = false;
@@ -187,6 +195,78 @@ test('reveal: .. traversal out of the base is denied', async () => {
 test('reveal: symlink inside the base pointing outside is denied', { skip: symlinkSkip }, async () => {
   const response = await reveal(revealRequest(path.join(base, 'escape.txt')));
   assert.equal(response.status, 403);
+});
+
+// --- existence oracle through an escaping symlink (Bugbot on #200) ----------
+// A missing path behind a symlink that leaves the base must get the same 403 as an
+// existing one; otherwise 404-vs-403 tells the caller whether the outside path exists.
+
+test('download: missing child of a directory symlink pointing outside is 403, not 404', { skip: symlinkSkip }, async () => {
+  const missing = await download(downloadRequest({ path: path.join(base, 'escape-dir', 'missing.txt') }));
+  assert.equal(missing.status, 403);
+  const existing = await download(downloadRequest({ path: path.join(base, 'escape-dir', 'secret.txt') }));
+  assert.equal(existing.status, 403);
+  await assertNoLeak(existing);
+});
+
+test('download: missing child of an escaping directory symlink via relativePath is 403', { skip: symlinkSkip }, async () => {
+  const response = await download(downloadRequest({ relativePath: `escape-dir${path.sep}missing.txt`, raw: 'true' }));
+  assert.equal(response.status, 403);
+});
+
+test('download: dangling symlink pointing outside is 403, not 404', { skip: symlinkSkip }, async () => {
+  const response = await download(downloadRequest({ path: path.join(base, 'dangling.txt') }));
+  assert.equal(response.status, 403);
+});
+
+test('preview: missing child of a directory symlink pointing outside is 403, not 404', { skip: symlinkSkip }, async () => {
+  const response = await preview(previewRequest(path.join(base, 'escape-dir', 'missing.html')));
+  assert.equal(response.status, 403);
+});
+
+test('reveal: missing child of a directory symlink pointing outside is 403, not 404', { skip: symlinkSkip }, async () => {
+  const response = await reveal(revealRequest(path.join(base, 'escape-dir', 'missing.txt')));
+  assert.equal(response.status, 403);
+});
+
+test('download: missing paths that stay inside the base are still 404', async () => {
+  for (const target of [
+    path.join(base, 'missing.txt'),
+    path.join(base, 'no-such-dir', 'missing.txt'),
+    path.join(base, 'sub', 'missing.txt'),
+    path.join(base, 'ok.txt', 'child'), // ENOTDIR: a file used as a directory
+  ]) {
+    const response = await download(downloadRequest({ path: target }));
+    assert.equal(response.status, 404, target);
+  }
+});
+
+test('download: missing child of a directory symlink that stays inside the base is 404', { skip: symlinkSkip }, async () => {
+  const response = await download(downloadRequest({ path: path.join(base, 'sub-link', 'missing.txt') }));
+  assert.equal(response.status, 404);
+});
+
+test('resolvePathWithinBases classifies missing targets by their deepest existing ancestor', { skip: symlinkSkip }, async () => {
+  assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, 'escape-dir', 'missing.txt'), [base]), {
+    ok: false,
+    reason: 'outside-base',
+  });
+  assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, 'escape-dir', 'a', 'b'), [base]), {
+    ok: false,
+    reason: 'outside-base',
+  });
+  assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, 'dangling.txt'), [base]), {
+    ok: false,
+    reason: 'outside-base',
+  });
+  assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, 'sub-link', 'missing.txt'), [base]), {
+    ok: false,
+    reason: 'not-found',
+  });
+  assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, 'no-such-dir', 'x'), [base]), {
+    ok: false,
+    reason: 'not-found',
+  });
 });
 
 // --- helper -----------------------------------------------------------------
