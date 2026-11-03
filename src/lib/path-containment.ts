@@ -78,9 +78,15 @@ async function classifyMissingTarget(
     const code = (error as NodeJS.ErrnoException).code;
     if (!isSymlink || (code !== 'ENOENT' && code !== 'ENOTDIR')) return 'outside-base';
     // Dangling symlink: classify by where it points, not by whether that place exists.
+    // The link target is NOT normalized (no path.resolve/join): `dir-link/../x` must go
+    // through dir-link's real target before `..` applies, which only the filesystem does.
+    // The recursive lstat/realpath walk below resolves it component by component.
     let destination: string;
     try {
-      destination = path.resolve(await fs.realpath(path.dirname(probe)), await fs.readlink(probe));
+      const linkTarget = await fs.readlink(probe);
+      destination = path.isAbsolute(linkTarget)
+        ? linkTarget
+        : (await fs.realpath(path.dirname(probe))) + path.sep + linkTarget;
     } catch {
       return 'outside-base';
     }

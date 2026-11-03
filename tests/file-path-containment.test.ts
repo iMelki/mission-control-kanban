@@ -31,6 +31,9 @@ fs.mkdirSync(path.join(base, 'sub'));
 //   projects/escape-dir   -> outside/            directory symlink escaping the base
 //   projects/dangling.txt -> outside/nope.txt    dangling symlink escaping the base
 //   projects/sub-link     -> projects/sub/       directory symlink that stays inside
+// CodeRabbit on #200 (relative dangling links whose target walks through a symlink and ..):
+//   projects/dotdot-out.txt -> escape-dir/../nope.txt  really <root>/nope.txt (outside)
+//   projects/dotdot-in.txt  -> sub-link/../nope.txt    really projects/nope.txt (inside)
 let symlinksSupported = true;
 try {
   fs.symlinkSync(path.join(outside, 'secret.txt'), path.join(base, 'escape.txt'));
@@ -38,6 +41,8 @@ try {
   fs.symlinkSync(outside, path.join(base, 'escape-dir'), 'dir');
   fs.symlinkSync(path.join(outside, 'nope.txt'), path.join(base, 'dangling.txt'));
   fs.symlinkSync(path.join(base, 'sub'), path.join(base, 'sub-link'), 'dir');
+  fs.symlinkSync(['escape-dir', '..', 'nope.txt'].join(path.sep), path.join(base, 'dotdot-out.txt'));
+  fs.symlinkSync(['sub-link', '..', 'nope.txt'].join(path.sep), path.join(base, 'dotdot-in.txt'));
 } catch {
   // Windows without Developer Mode / admin cannot create symlinks.
   symlinksSupported = false;
@@ -217,6 +222,27 @@ test('download: missing child of an escaping directory symlink via relativePath 
 test('download: dangling symlink pointing outside is 403, not 404', { skip: symlinkSkip }, async () => {
   const response = await download(downloadRequest({ path: path.join(base, 'dangling.txt') }));
   assert.equal(response.status, 403);
+});
+
+// CodeRabbit on #200: the link target must not be lexically normalized before its
+// symlinks are followed. escape-dir/.. is <root> (the parent of outside/), not the base.
+test('download: dangling link through an escaping dir symlink and .. is 403, not 404', { skip: symlinkSkip }, async () => {
+  const missing = await download(downloadRequest({ path: path.join(base, 'dotdot-out.txt') }));
+  assert.equal(missing.status, 403);
+  // Same answer once the real outside target exists: no existence oracle.
+  fs.writeFileSync(path.join(root, 'nope.txt'), 'outside-secret');
+  try {
+    const existing = await download(downloadRequest({ path: path.join(base, 'dotdot-out.txt') }));
+    assert.equal(existing.status, 403);
+    await assertNoLeak(existing);
+  } finally {
+    fs.rmSync(path.join(root, 'nope.txt'), { force: true });
+  }
+});
+
+test('download: dangling link through an inside dir symlink and .. stays 404', { skip: symlinkSkip }, async () => {
+  const response = await download(downloadRequest({ path: path.join(base, 'dotdot-in.txt') }));
+  assert.equal(response.status, 404);
 });
 
 test('preview: missing child of a directory symlink pointing outside is 403, not 404', { skip: symlinkSkip }, async () => {
