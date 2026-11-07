@@ -49,6 +49,24 @@ try {
 }
 const symlinkSkip = symlinksSupported ? false : 'symlinks not supported on this host';
 
+// Bugbot on #200 (dangling targets misclassified by prefix). Absolute dangling targets
+// that are inside the base only once symlinks / .. are resolved:
+//   root-alias -> <root>                                symlinked ancestor of the base
+//   projects/alias-in.txt   -> root-alias/projects/missing.txt   really projects/missing.txt
+//   projects/alias-out.txt  -> root-alias/outside/missing.txt    really outside/missing.txt
+//   projects/abs-dotdot-in.txt  -> <base>/sub/../missing.txt         really projects/missing.txt
+//   projects/abs-dotdot-up.txt  -> <root>/outside/../projects/missing.txt  really projects/missing.txt
+//   projects/abs-dotdot-out.txt -> <base>/escape-dir/../nope.txt     really <root>/nope.txt
+const rootAlias = path.join(root, 'root-alias');
+if (symlinksSupported) {
+  fs.symlinkSync(root, rootAlias, 'dir');
+  fs.symlinkSync(path.join(rootAlias, 'projects', 'missing.txt'), path.join(base, 'alias-in.txt'));
+  fs.symlinkSync(path.join(rootAlias, 'outside', 'missing.txt'), path.join(base, 'alias-out.txt'));
+  fs.symlinkSync([base, 'sub', '..', 'missing.txt'].join(path.sep), path.join(base, 'abs-dotdot-in.txt'));
+  fs.symlinkSync([outside, '..', 'projects', 'missing.txt'].join(path.sep), path.join(base, 'abs-dotdot-up.txt'));
+  fs.symlinkSync([base, 'escape-dir', '..', 'nope.txt'].join(path.sep), path.join(base, 'abs-dotdot-out.txt'));
+}
+
 process.env.PROJECTS_PATH = base;
 delete process.env.WORKSPACE_BASE_PATH;
 
@@ -245,6 +263,40 @@ test('download: dangling link through an inside dir symlink and .. stays 404', {
   assert.equal(response.status, 404);
 });
 
+// Bugbot on #200: an absolute dangling target is classified by where it really resolves,
+// not by a string prefix compare against the real base.
+test('download: dangling absolute link spelling the base through a symlinked ancestor is 404', { skip: symlinkSkip }, async () => {
+  const response = await download(downloadRequest({ path: path.join(base, 'alias-in.txt') }));
+  assert.equal(response.status, 404);
+});
+
+test('download: dangling absolute link whose target folds .. back into the base is 404', { skip: symlinkSkip }, async () => {
+  for (const link of ['abs-dotdot-in.txt', 'abs-dotdot-up.txt']) {
+    const response = await download(downloadRequest({ path: path.join(base, link) }));
+    assert.equal(response.status, 404, link);
+  }
+});
+
+test('download: dangling absolute links that really resolve outside stay 403', { skip: symlinkSkip }, async () => {
+  for (const link of ['alias-out.txt', 'abs-dotdot-out.txt']) {
+    const response = await download(downloadRequest({ path: path.join(base, link) }));
+    assert.equal(response.status, 403, link);
+  }
+  // Same answer once the outside targets exist: no existence oracle.
+  fs.writeFileSync(path.join(outside, 'missing.txt'), 'outside-secret');
+  fs.writeFileSync(path.join(root, 'nope.txt'), 'outside-secret');
+  try {
+    for (const link of ['alias-out.txt', 'abs-dotdot-out.txt']) {
+      const response = await download(downloadRequest({ path: path.join(base, link) }));
+      assert.equal(response.status, 403, link);
+      await assertNoLeak(response);
+    }
+  } finally {
+    fs.rmSync(path.join(outside, 'missing.txt'), { force: true });
+    fs.rmSync(path.join(root, 'nope.txt'), { force: true });
+  }
+});
+
 test('preview: missing child of a directory symlink pointing outside is 403, not 404', { skip: symlinkSkip }, async () => {
   const response = await preview(previewRequest(path.join(base, 'escape-dir', 'missing.html')));
   assert.equal(response.status, 403);
@@ -293,6 +345,18 @@ test('resolvePathWithinBases classifies missing targets by their deepest existin
     ok: false,
     reason: 'not-found',
   });
+  for (const link of ['alias-in.txt', 'abs-dotdot-in.txt', 'abs-dotdot-up.txt']) {
+    assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, link), [base]), { ok: false, reason: 'not-found' }, link);
+    // Same answer when the base itself is configured through the symlinked ancestor.
+    assert.deepEqual(
+      await containment.resolvePathWithinBases(path.join(rootAlias, 'projects', link), [path.join(rootAlias, 'projects')]),
+      { ok: false, reason: 'not-found' },
+      link,
+    );
+  }
+  for (const link of ['alias-out.txt', 'abs-dotdot-out.txt', 'dotdot-out.txt']) {
+    assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, link), [base]), { ok: false, reason: 'outside-base' }, link);
+  }
 });
 
 // --- helper -----------------------------------------------------------------

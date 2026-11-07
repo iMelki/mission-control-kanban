@@ -53,7 +53,6 @@ async function classifyMissingTarget(
 ): Promise<'outside-base' | 'not-found'> {
   if (hops > MAX_LINK_HOPS) return 'outside-base';
   const fs = await import('node:fs/promises');
-  const insideARealBase = (candidate: string) => realBases.some((real) => isWithinBase(candidate, real));
 
   // Deepest existing entry. lstat (not stat) so a dangling symlink counts as existing.
   let probe = absoluteTarget;
@@ -80,7 +79,10 @@ async function classifyMissingTarget(
     // Dangling symlink: classify by where it points, not by whether that place exists.
     // The link target is NOT normalized (no path.resolve/join): `dir-link/../x` must go
     // through dir-link's real target before `..` applies, which only the filesystem does.
-    // The recursive lstat/realpath walk below resolves it component by component.
+    // Nor is the raw target string-compared with the real bases: `/alias/base/x` (through
+    // a symlinked ancestor) or `/elsewhere/../base/x` is inside only once resolved. The
+    // recursive call runs the same lstat/realpath walk on the target, so it is judged by
+    // the real path of its deepest existing entry, like any other missing path.
     let destination: string;
     try {
       const linkTarget = await fs.readlink(probe);
@@ -90,10 +92,9 @@ async function classifyMissingTarget(
     } catch {
       return 'outside-base';
     }
-    if (!insideARealBase(destination)) return 'outside-base';
     return classifyMissingTarget(destination, realBases, hops + 1);
   }
-  return insideARealBase(realProbe) ? 'not-found' : 'outside-base';
+  return realBases.some((real) => isWithinBase(realProbe, real)) ? 'not-found' : 'outside-base';
 }
 
 /**

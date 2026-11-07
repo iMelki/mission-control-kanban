@@ -92,7 +92,7 @@ test('manual dispatch returns a copyable prompt and callback URLs without extern
     task: baseTask,
     agent: baseAgent,
     missionControlUrl: 'http://mck.host:3021',
-    projectsPath: 'S:/source/CCAI/Assistants/projects',
+    projectsPath: 'D:/workspace/assistants/projects',
   });
 
   assert.match(prompt, /Mission Control handoff/);
@@ -135,7 +135,7 @@ test('webhook adapter payload is canonical and headers use env indirection for s
     agent,
     'http://mck.host:3021',
     '2026-07-01T00:00:00.000Z',
-    'S:/source/CCAI/Assistants/projects',
+    'D:/workspace/assistants/projects',
   );
 
   assert.equal(payload.event, 'mck.task.dispatch');
