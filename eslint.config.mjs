@@ -5,6 +5,7 @@ const eslintConfig = [
   {
     ignores: [
       '.next/**',
+      'out-demo/**',
       'node_modules/**',
       'integrations/paperclip-bridge/dist/**',
       'integrations/paperclip-bridge/node_modules/**',

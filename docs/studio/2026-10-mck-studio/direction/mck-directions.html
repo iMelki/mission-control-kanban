@@ -1,0 +1,621 @@
+<title>Kanban Board Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --page-bg: #f4f3ef;
+    --page-surface: #ffffff;
+    --page-surface-2: #ecebe6;
+    --page-border: #d8d6cf;
+    --page-text: #1d1f22;
+    --page-muted: #5a5d63;
+    --page-accent: #3a5f8f;
+    --page-chip: #e6e4dd;
+    --shadow: 0 1px 2px rgba(20, 20, 20, 0.06), 0 6px 20px rgba(20, 20, 20, 0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page-bg: #121315;
+      --page-surface: #1a1b1e;
+      --page-surface-2: #222327;
+      --page-border: #33353a;
+      --page-text: #e8e7e3;
+      --page-muted: #a3a29c;
+      --page-accent: #9cb8de;
+      --page-chip: #2a2c30;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page-bg: #121315;
+    --page-surface: #1a1b1e;
+    --page-surface-2: #222327;
+    --page-border: #33353a;
+    --page-text: #e8e7e3;
+    --page-muted: #a3a29c;
+    --page-accent: #9cb8de;
+    --page-chip: #2a2c30;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Direction palettes. The app is dark-first, so the mocks stay dark in both page themes. */
+  .dir-a {
+    --bg: #0d1117; --lane: #161b22; --card: #21262d; --border: #30363d;
+    --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff; --ink: #0d1117;
+    --success: #3fb950; --warn: #d29922; --danger: #f85149;
+    --ui-font: "JetBrains Mono", ui-monospace, monospace;
+    --data-font: "JetBrains Mono", ui-monospace, monospace;
+  }
+  .dir-b {
+    --bg: #111214; --lane: #18191c; --card: #202226; --border: #2e3136;
+    --text: #e6e4df; --muted: #9d9a92; --accent: #e6be5a; --ink: #1a1608;
+    --success: #4cb782; --warn: #e0823d; --danger: #ef6461;
+    --ui-font: "JetBrains Mono", ui-monospace, monospace;
+    --data-font: "JetBrains Mono", ui-monospace, monospace;
+  }
+  .dir-c {
+    --bg: #0f1215; --lane: #151a1f; --card: #1c2229; --border: #2a323b;
+    --text: #dfe6ec; --muted: #93a1ad; --accent: #b8d35a; --ink: #12160a;
+    --success: #5bb98b; --warn: #e3a64a; --danger: #ef6767;
+    --ui-font: "Geist", system-ui, sans-serif;
+    --data-font: "Geist Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-text);
+    font-family: "Geist", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-top: 32px;
+    padding-bottom: 64px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  h1, h2, h3 { line-height: 1.2; letter-spacing: -0.015em; margin: 0; }
+  h1 { font-size: clamp(26px, 5vw, 38px); font-weight: 700; }
+  h2 { font-size: clamp(21px, 3.6vw, 27px); font-weight: 650; }
+  h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--page-muted); margin-bottom: 10px; }
+  p { margin: 0 0 12px; }
+  .lede { color: var(--page-muted); max-width: 70ch; font-size: 16px; margin-top: 10px; }
+  .meta { font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; color: var(--page-muted); }
+  .chip {
+    display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px;
+    background: var(--page-chip); color: var(--page-text); border: 1px solid var(--page-border);
+  }
+  .chip.rec { background: var(--page-text); color: var(--page-bg); border-color: var(--page-text); font-weight: 600; }
+
+  header.top { margin-bottom: 28px; }
+  .questions {
+    display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin: 22px 0 0; padding: 0; list-style: none; counter-reset: q;
+  }
+  .questions li {
+    background: var(--page-surface); border: 1px solid var(--page-border); border-radius: 10px;
+    padding: 12px 14px; font-size: 14px; counter-increment: q;
+  }
+  .questions li::before { content: counter(q); font-family: "Geist Mono", monospace; color: var(--page-muted); margin-right: 8px; }
+
+  nav.jump { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  nav.jump a {
+    color: var(--page-text); text-decoration: none; font-size: 14px; padding: 8px 14px; min-height: 36px;
+    border: 1px solid var(--page-border); border-radius: 8px; background: var(--page-surface);
+    display: inline-flex; align-items: center;
+  }
+  nav.jump a:hover { border-color: var(--page-muted); }
+  a:focus-visible, label:focus-within, .mock-board:focus-visible { outline: 2px solid var(--page-accent); outline-offset: 2px; }
+
+  section.direction {
+    background: var(--page-surface); border: 1px solid var(--page-border); border-radius: 16px;
+    box-shadow: var(--shadow); padding: 22px; margin: 26px 0; scroll-margin-top: 16px;
+  }
+  .dhead { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 6px; }
+  .letter { font-family: "Geist Mono", monospace; font-size: 13px; color: var(--page-muted); }
+  .pitch { color: var(--page-muted); max-width: 72ch; }
+
+  .grid2 { display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr); margin-top: 20px; }
+  @media (min-width: 900px) { .grid2 { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); } }
+  .block { min-width: 0; }
+
+  /* ---------- Mini board mock ---------- */
+  .mock-scroll {
+    overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px;
+    border: 1px solid var(--page-border); margin-top: 16px;
+  }
+  .mock-board {
+    background: var(--bg); color: var(--text); font-family: var(--ui-font);
+    padding: 12px; min-width: 640px; font-size: 12px;
+  }
+  .mock-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .mock-title { font-weight: 700; letter-spacing: -0.01em; font-size: 13px; }
+  .mock-spacer { flex: 1; }
+  .needs {
+    font-family: var(--data-font); font-size: 11px; padding: 3px 8px; border-radius: 999px;
+    border: 1px solid var(--accent); color: var(--accent);
+  }
+  .btn-primary {
+    font-family: var(--ui-font); font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 6px;
+    background: var(--accent); color: var(--ink); border: 0;
+  }
+  .cols { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 8px; }
+  .col { background: var(--lane); border-radius: 8px; padding: 8px; min-height: 180px; }
+  .dir-a .col { border: 1px solid var(--border); border-top: 2px solid var(--border); }
+  .col-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .count { font-family: var(--data-font); background: var(--card); color: var(--muted); border-radius: 4px; padding: 0 6px; }
+  .kcard {
+    background: var(--card); border-radius: 7px; padding: 8px 9px; margin-bottom: 7px; position: relative;
+    transition: transform var(--t, 240ms) cubic-bezier(0.2, 0, 0, 1);
+  }
+  .dir-a .kcard { border: 1px solid var(--border); }
+  .kcard .t { font-size: 11.5px; line-height: 1.35; margin-bottom: 6px; color: var(--text); }
+  .kcard .m { display: flex; justify-content: space-between; color: var(--muted); font-family: var(--data-font); font-size: 10px; }
+  .pill { display: inline-block; font-size: 9.5px; padding: 1px 6px; border-radius: 4px; margin-right: 4px; }
+  .pill.ok { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+  .pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+  .pill.bad { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+
+  /* B: fill-based elevation + status rail */
+  .dir-b .kcard { padding-left: 13px; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 2px 6px rgba(0, 0, 0, 0.35); }
+  .dir-b .kcard::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 3px; background: var(--rail, var(--muted)); }
+  .rail-ok { --rail: var(--success); } .rail-warn { --rail: var(--warn); } .rail-bad { --rail: var(--danger); } .rail-acc { --rail: var(--accent); }
+  .insert { height: 3px; border-radius: 3px; background: var(--accent); margin: 2px 0 9px; transform-origin: left; }
+
+  /* Ghost (drop target) and lifted card */
+  .ghost { border: 1px dashed var(--accent) !important; background: transparent !important; box-shadow: none !important; min-height: 44px; }
+  .ghost::before { display: none; }
+  .lifted { z-index: 2; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5) !important; outline: 1px solid var(--accent); }
+  .dir-a .lifted { transform: translateY(-2px) scale(1.02); }
+  .dir-b .lifted { transform: translateY(-3px) rotate(-1.5deg); }
+
+  /* C: swimlanes */
+  .lanes { display: grid; grid-template-columns: 112px repeat(4, minmax(120px, 1fr)); gap: 6px; }
+  .lh { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 4px; }
+  .agent { display: flex; align-items: center; gap: 6px; padding: 6px; background: var(--lane); border-radius: 7px; font-size: 11px; font-weight: 600; }
+  .avatar { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-family: var(--data-font); font-size: 9px; background: var(--card); color: var(--muted); border: 1px solid var(--border); flex: none; }
+  .avatar.cap { background: var(--accent); color: var(--ink); border-color: var(--accent); }
+  .cell { background: var(--lane); border-radius: 7px; padding: 5px; min-height: 52px; }
+  .cell .kcard { margin-bottom: 5px; padding: 6px 7px; }
+  .cell .kcard:last-child { margin-bottom: 0; }
+  .dir-c .kcard { border: 1px solid transparent; transition: opacity var(--t, 240ms) cubic-bezier(0.2, 0, 0, 1), transform var(--t, 240ms) cubic-bezier(0.2, 0, 0, 1); }
+  .dir-c .kcard.need { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+  .focus-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text); cursor: pointer; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; min-height: 28px; }
+  .focus-toggle input { accent-color: var(--accent); width: 14px; height: 14px; margin: 0; }
+  .mock-board:has(.focus-input:checked) .kcard:not(.need) { opacity: 0.3; }
+  .mock-board:has(.focus-input:checked) .row-cap .agent { outline: 1px solid var(--accent); }
+
+  /* ---------- Swatches ---------- */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+  .sw { border: 1px solid var(--page-border); border-radius: 10px; overflow: hidden; background: var(--page-surface); }
+  .sw .chipc { height: 46px; display: flex; align-items: flex-end; padding: 6px 8px; font-family: "Geist Mono", monospace; font-size: 11px; }
+  .sw .info { padding: 7px 9px 8px; font-size: 12px; }
+  .sw .info b { display: block; font-weight: 600; font-size: 12.5px; }
+  .sw .info span { font-family: "Geist Mono", monospace; color: var(--page-muted); font-size: 11px; }
+  .note { font-size: 12.5px; color: var(--page-muted); margin-top: 8px; }
+
+  /* ---------- Type specimen ---------- */
+  .specimen { border: 1px solid var(--page-border); border-radius: 12px; padding: 14px; background: var(--page-surface-2); }
+  .specimen .big { font-size: 28px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; overflow-wrap: anywhere; }
+  .specimen .body { font-size: 14px; margin-bottom: 8px; }
+  .specimen .data { font-size: 12.5px; color: var(--page-muted); overflow-wrap: anywhere; }
+  .f-jb { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .f-geist { font-family: "Geist", system-ui, sans-serif; }
+  .f-gmono { font-family: "Geist Mono", ui-monospace, monospace; }
+
+  /* ---------- Motion demo ---------- */
+  .motion { margin-top: 14px; border: 1px solid var(--page-border); border-radius: 12px; padding: 14px; }
+  .motion p { font-size: 14px; }
+  .stage { border-radius: 10px; padding: 14px; display: flex; gap: 10px; align-items: center; overflow: hidden; }
+  .stage .slot { flex: 1; min-width: 0; height: 52px; border-radius: 8px; background: var(--lane); position: relative; }
+  .stage .mover {
+    position: absolute; inset: 8px; border-radius: 6px; background: var(--card);
+    border: 1px solid var(--border); font-family: var(--ui-font); font-size: 11px; color: var(--text);
+    display: flex; align-items: center; padding: 0 9px; white-space: nowrap; overflow: hidden;
+  }
+  .rm-text { display: none; font-size: 12.5px; color: var(--page-muted); margin-top: 8px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .dir-a .stage .mover { animation: liftA 3.2s cubic-bezier(0.2, 0, 0, 1) infinite; }
+    .dir-b .stage .mover { animation: liftB 3.6s cubic-bezier(0.2, 0, 0, 1) infinite; }
+    .dir-b .stage .mover::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 3px; animation: ink 3.6s linear infinite; }
+    .dir-c .stage .mover { animation: handoff 3.4s cubic-bezier(0.2, 0, 0, 1) infinite; }
+    .dir-c .stage .chipmove { animation: chip 3.4s cubic-bezier(0.2, 0, 0, 1) infinite; }
+  }
+  @keyframes liftA {
+    0%, 12% { transform: translateX(0) translateY(0) scale(1); box-shadow: none; }
+    22% { transform: translateX(0) translateY(-2px) scale(1.02); box-shadow: 0 10px 22px rgba(0,0,0,.45); }
+    62% { transform: translateX(calc(100% + 26px)) translateY(-2px) scale(1.02); box-shadow: 0 10px 22px rgba(0,0,0,.45); }
+    72%, 100% { transform: translateX(calc(100% + 26px)) translateY(0) scale(1); box-shadow: none; }
+  }
+  @keyframes liftB {
+    0%, 12% { transform: translateX(0) rotate(0); }
+    22% { transform: translateX(0) translateY(-3px) rotate(-1.5deg); }
+    60% { transform: translateX(calc(100% + 26px)) translateY(-3px) rotate(-1.5deg); }
+    70%, 100% { transform: translateX(calc(100% + 26px)) translateY(0) rotate(0); }
+  }
+  @keyframes ink {
+    0%, 66% { background: var(--accent); }
+    80%, 100% { background: var(--success); }
+  }
+  @keyframes handoff {
+    0%, 10% { transform: translateX(0); }
+    55%, 100% { transform: translateX(calc(100% + 26px)); }
+  }
+  @keyframes chip {
+    0%, 55% { transform: translateX(0); opacity: 0; }
+    62% { opacity: 1; transform: translateX(-24px); }
+    76%, 100% { opacity: 1; transform: translateX(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rm-text { display: block; }
+    .stage .mover { transform: translateX(calc(100% + 26px)); }
+    .dir-b .stage .mover::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 3px; background: var(--success); }
+    .kcard, .dir-c .kcard { transition: none; }
+    .dir-a .lifted, .dir-b .lifted { transform: none; }
+  }
+
+  ul.tight { margin: 0; padding-left: 18px; }
+  ul.tight li { margin-bottom: 5px; font-size: 14px; }
+  .refs li { font-size: 13.5px; overflow-wrap: anywhere; }
+  .verify { font-family: "Geist Mono", monospace; font-size: 10.5px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--page-border); color: var(--page-muted); margin-left: 4px; }
+
+  .compare { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .compare th, .compare td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--page-border); vertical-align: top; }
+  .compare th { font-weight: 600; color: var(--page-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .table-scroll { overflow-x: auto; }
+  .recbox { border: 1px solid var(--page-text); border-radius: 14px; padding: 18px; margin-top: 18px; background: var(--page-surface); }
+  footer { color: var(--page-muted); font-size: 12.5px; margin-top: 30px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <p class="meta">Mission Control Kanban · studio pilot 2026-10 · gate G2 prep · subject dev @ 56f4042</p>
+    <h1>Three directions for the board</h1>
+    <p class="lede">The board should answer “what needs me, and who has the rest?” before anything else, and moving a card should feel like handing work over. Today it scores 5.77 of 10 (14 of 21 on the gauntlet), with Delight at 4.0 and six accent hues in use. Captain picks one direction; this page does not.</p>
+    <ul class="questions" aria-label="What each direction must answer">
+      <li>What carries column and status identity, if not seven hues?</li>
+      <li>Where is the one accent spent?</li>
+      <li>What does a move feel like, and what does reduced motion keep?</li>
+      <li>How is “needs Captain” shown?</li>
+    </ul>
+    <nav class="jump" aria-label="Directions">
+      <a href="#dir-a">A · Refine</a>
+      <a href="#dir-b">B · Evolve <span class="chip rec" style="margin-left:8px">recommended</span></a>
+      <a href="#dir-c">C · Rethink</a>
+      <a href="#compare">Compare</a>
+    </nav>
+  </header>
+
+  <!-- ===================== A ===================== -->
+  <section class="direction dir-a" id="dir-a" aria-labelledby="a-title">
+    <div class="dhead">
+      <span class="letter">Direction A</span>
+      <h2 id="a-title">Refine</h2>
+      <span class="chip">keeps type and accent</span>
+    </div>
+    <p class="pitch">Same identity, done properly. JetBrains Mono and the current blue stay; column tops go neutral, statuses become the only other colour, every route gets one heading scale and its own tab title.</p>
+
+    <div class="mock-scroll">
+      <div class="mock-board" role="img" aria-label="Mini board mock for direction A: four neutral columns, one card being dragged into Review">
+        <div class="mock-bar">
+          <span class="mock-title">Mission queue</span>
+          <span class="mock-spacer"></span>
+          <span class="needs">Needs you · 3</span>
+          <span class="btn-primary">New task</span>
+        </div>
+        <div class="cols">
+          <div class="col"><div class="col-head"><span>Inbox</span><span class="count">12</span></div>
+            <div class="kcard"><div class="t">Sync GitHub Project #15 labels</div><div class="m"><span><span class="pill warn">contract</span></span><span>4m</span></div></div>
+            <div class="kcard"><div class="t">Triage webhook retries</div><div class="m"><span><span class="pill bad">blocked</span></span><span>1h</span></div></div>
+          </div>
+          <div class="col"><div class="col-head"><span>Assigned</span><span class="count">5</span></div>
+            <div class="kcard"><div class="t">Draft changelog for 1.0.3</div><div class="m"><span>openclaw</span><span>22m</span></div></div>
+          </div>
+          <div class="col"><div class="col-head"><span>In progress</span><span class="count">4</span></div>
+            <div class="kcard lifted"><div class="t">Fix timeout copy on cockpit (#189)</div><div class="m"><span><span class="pill ok">ready</span></span><span>8m</span></div></div>
+            <div class="kcard"><div class="t">Paperclip bridge lease check</div><div class="m"><span>webhook</span><span>2h</span></div></div>
+          </div>
+          <div class="col"><div class="col-head"><span>Review</span><span class="count">3</span></div>
+            <div class="kcard ghost"></div>
+            <div class="kcard"><div class="t">Contrast pass on settings</div><div class="m"><span><span class="pill ok">tests pass</span></span><span>1d</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="block">
+        <h3>Palette (unchanged hexes, fewer in chrome)</h3>
+        <div class="swatches">
+          <div class="sw"><div class="chipc" style="background:#0d1117;color:#c9d1d9">#0d1117</div><div class="info"><b>bg</b><span>base</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#21262d;color:#c9d1d9">#21262d</div><div class="info"><b>card</b><span>surface 3</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#c9d1d9;color:#0d1117">#c9d1d9</div><div class="info"><b>text</b><span>12.26 : 1 on bg</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#8b949e;color:#0d1117">#8b949e</div><div class="info"><b>muted</b><span>6.15 bg · 4.95 card</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#58a6ff;color:#0d1117">#58a6ff</div><div class="info"><b>accent</b><span>7.49 bg · 6.03 card</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#3fb950;color:#0d1117">#3fb950</div><div class="info"><b>success</b><span>7.45 bg</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#d29922;color:#0d1117">#d29922</div><div class="info"><b>warn</b><span>7.50 bg</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#f85149;color:#0d1117">#f85149</div><div class="info"><b>danger</b><span>5.65 bg · 4.54 card</span></div></div>
+        </div>
+        <p class="note">Accent is HSL 212° at 100% saturation: above the 80% cap in rubric §2.6. A keeps it as is; changing it is Captain’s call.</p>
+      </div>
+      <div class="block">
+        <h3>Type · JetBrains Mono (already chosen, OFL 1.1)</h3>
+        <div class="specimen f-jb">
+          <div class="big">Review · 3 need you</div>
+          <div class="body">Fix timeout copy on cockpit. A timeout reads as a timeout, not as “not found”.</div>
+          <div class="data">#189 · 08m · openclaw · 0123456789</div>
+        </div>
+        <div class="motion">
+          <h3>Motion · lift and land</h3>
+          <p>Pickup: the card rises 2 px, scales to 1.02, shadow fades in. Drop: dnd-kit settles it in 240 ms on the standard curve.</p>
+          <div class="stage" style="background:var(--bg)" aria-hidden="true">
+            <div class="slot"><div class="mover">Fix timeout copy</div></div>
+            <div class="slot"></div>
+          </div>
+          <p class="rm-text">Reduced motion is on: no lift or travel. The card appears in its new column at once and a live region says “Moved Fix timeout copy to Review”.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="block">
+        <h3>References</h3>
+        <ul class="tight refs">
+          <li>linear.app: calm density, one accent <span class="verify">verify</span></li>
+          <li>GitHub Projects board: column header counts <span class="verify">verify</span></li>
+          <li>primer.style: semantic tones kept apart from accent <span class="verify">verify</span></li>
+          <li>jetbrains.com/lp/mono: weights and specimen <span class="verify">verify</span></li>
+          <li>docs.dndkit.com: DragOverlay, dropAnimation, announcements <span class="verify">verify</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Risks</h3>
+        <ul class="tight">
+          <li>Small lift on 1.1 and 1.8; may not reach the 6.5 composite.</li>
+          <li>Accent saturation flag stays open.</li>
+          <li>Still reads as a GitHub dark clone.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== B ===================== -->
+  <section class="direction dir-b" id="dir-b" aria-labelledby="b-title">
+    <div class="dhead">
+      <span class="letter">Direction B</span>
+      <h2 id="b-title">Evolve</h2>
+      <span class="chip">keeps type · new accent proposed</span>
+      <span class="chip rec">recommended</span>
+    </div>
+    <p class="pitch">Keep the voice, change the material. Warm graphite surfaces, cards raised by fill instead of borders, a status rail on each card, and one sticky-note yellow spent only on the primary action, focus, the drop target and “needs you”.</p>
+
+    <div class="mock-scroll">
+      <div class="mock-board" role="img" aria-label="Mini board mock for direction B: warm surfaces, cards with coloured status rails, a yellow insertion bar in Review">
+        <div class="mock-bar">
+          <span class="mock-title">Mission queue</span>
+          <span class="mock-spacer"></span>
+          <span class="needs">Needs you · 3</span>
+          <span class="btn-primary">New task</span>
+        </div>
+        <div class="cols">
+          <div class="col"><div class="col-head"><span>Inbox</span><span class="count">12</span></div>
+            <div class="kcard rail-warn"><div class="t">Sync GitHub Project #15 labels</div><div class="m"><span><span class="pill warn">contract</span></span><span>4m</span></div></div>
+            <div class="kcard rail-bad"><div class="t">Triage webhook retries</div><div class="m"><span><span class="pill bad">blocked</span></span><span>1h</span></div></div>
+          </div>
+          <div class="col"><div class="col-head"><span>Assigned</span><span class="count">5</span></div>
+            <div class="kcard"><div class="t">Draft changelog for 1.0.3</div><div class="m"><span>openclaw</span><span>22m</span></div></div>
+          </div>
+          <div class="col"><div class="col-head"><span>In progress</span><span class="count">4</span></div>
+            <div class="kcard rail-acc lifted"><div class="t">Fix timeout copy on cockpit (#189)</div><div class="m"><span><span class="pill ok">ready</span></span><span>8m</span></div></div>
+            <div class="kcard rail-ok"><div class="t">Paperclip bridge lease check</div><div class="m"><span>webhook</span><span>2h</span></div></div>
+          </div>
+          <div class="col"><div class="col-head"><span>Review</span><span class="count">3</span></div>
+            <div class="insert"></div>
+            <div class="kcard rail-ok"><div class="t">Contrast pass on settings</div><div class="m"><span><span class="pill ok">tests pass</span></span><span>1d</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="block">
+        <h3>Palette (proposed, Captain’s pick)</h3>
+        <div class="swatches">
+          <div class="sw"><div class="chipc" style="background:#111214;color:#e6e4df">#111214</div><div class="info"><b>bg</b><span>warm graphite</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#202226;color:#e6e4df">#202226</div><div class="info"><b>card</b><span>raised by fill</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#e6e4df;color:#111214">#e6e4df</div><div class="info"><b>text</b><span>14.75 bg · 12.54 card</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#9d9a92;color:#111214">#9d9a92</div><div class="info"><b>muted</b><span>6.67 bg · 5.67 card</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#e6be5a;color:#1a1608">#e6be5a</div><div class="info"><b>accent</b><span>10.60 bg · ink 10.22</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#4cb782;color:#111214">#4cb782</div><div class="info"><b>success</b><span>7.50 bg</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#e0823d;color:#111214">#e0823d</div><div class="info"><b>warn (moves to orange)</b><span>6.63 bg</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#ef6461;color:#111214">#ef6461</div><div class="info"><b>danger</b><span>5.95 bg · 5.06 card</span></div></div>
+        </div>
+        <p class="note">Accent HSL 43° / 74% / 63%, under the 80% cap. Not teal (Command Center) and not coral (Mission Control).</p>
+      </div>
+      <div class="block">
+        <h3>Type · JetBrains Mono (already chosen, OFL 1.1)</h3>
+        <div class="specimen f-jb">
+          <div class="big">Inbox · 12 waiting</div>
+          <div class="body">Drag to In progress once the dispatch contract is complete.</div>
+          <div class="data">#192 · 2h · webhook · 0123456789</div>
+        </div>
+        <div class="motion">
+          <h3>Motion · pick up the note</h3>
+          <p>Pickup: the card tilts −1.5° and lifts. The target column shows a yellow insertion bar. On drop, the rail fades from yellow to the new status tone over 360 ms (“ink drying”).</p>
+          <div class="stage" style="background:var(--bg)" aria-hidden="true">
+            <div class="slot"><div class="mover" style="padding-left:14px">Fix timeout copy</div></div>
+            <div class="slot"></div>
+          </div>
+          <p class="rm-text">Reduced motion is on: no tilt, lift or bar growth. The bar and the new rail colour appear at once, and the live region announces the move.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="block">
+        <h3>References</h3>
+        <ul class="tight refs">
+          <li>trello.com: the card as an object you pick up; label rail <span class="verify">verify</span></li>
+          <li>linear.app: elevation by fill, not borders <span class="verify">verify</span></li>
+          <li>height.app: warm neutral board surfaces (shutdown announced 2025; check the site still exists) <span class="verify">verify</span></li>
+          <li>notion.so board view: neutral columns, colour only on properties <span class="verify">verify</span></li>
+          <li>raycast.com: warm dark greys with one bright accent <span class="verify">verify</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Risks</h3>
+        <ul class="tight">
+          <li>The accent is a brand decision only Captain makes.</li>
+          <li>Yellow can read as “warning” unless warn moves to orange everywhere (raw amber literals must go).</li>
+          <li>Borders stay under 3:1, so cards must stay distinct by fill.</li>
+          <li>Touches every route’s chrome, not just the board.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== C ===================== -->
+  <section class="direction dir-c" id="dir-c" aria-labelledby="c-title">
+    <div class="dhead">
+      <span class="letter">Direction C</span>
+      <h2 id="c-title">Rethink</h2>
+      <span class="chip">new board model · Geist · new accent proposed</span>
+    </div>
+    <p class="pitch">A board of people, not columns. One swimlane per agent (plus Captain and Unassigned), four visible groups instead of seven columns, and a focus mode that dims everything that does not need Captain. Dragging across lanes reassigns, behind the dispatch-contract gate.</p>
+
+    <div class="mock-scroll">
+      <div class="mock-board" role="group" aria-label="Mini board mock for direction C: swimlanes by agent with a working focus-mode switch">
+        <div class="mock-bar">
+          <span class="mock-title">Mission queue · by agent</span>
+          <span class="mock-spacer"></span>
+          <label class="focus-toggle"><input type="checkbox" class="focus-input"> Focus mode (f)</label>
+          <span class="needs">Needs you · 3</span>
+          <span class="btn-primary">New task</span>
+        </div>
+        <div class="lanes">
+          <div></div>
+          <div class="lh">Inbox <span class="count">12</span></div>
+          <div class="lh">Doing <span class="count">9</span></div>
+          <div class="lh">Review <span class="count">3</span></div>
+          <div class="lh">Done <span class="count">41</span></div>
+
+          <div class="agent row-cap"><span class="avatar cap">C</span>Captain</div>
+          <div class="cell row-cap"><div class="kcard need"><div class="t">Approve dispatch: Project #15 sync</div><div class="m"><span><span class="pill warn">contract</span></span><span>4m</span></div></div></div>
+          <div class="cell row-cap"></div>
+          <div class="cell row-cap"><div class="kcard need"><div class="t">Contrast pass on settings</div><div class="m"><span><span class="pill ok">tests pass</span></span><span>1d</span></div></div></div>
+          <div class="cell row-cap"></div>
+
+          <div class="agent"><span class="avatar">O</span>OpenClaw</div>
+          <div class="cell"></div>
+          <div class="cell"><div class="kcard"><div class="t">Draft changelog 1.0.3</div><div class="m"><span>assigned</span><span>22m</span></div></div><div class="kcard"><div class="t">Fix timeout copy (#189)</div><div class="m"><span>in progress</span><span>8m</span></div></div></div>
+          <div class="cell"><div class="kcard need"><div class="t">Card primitive (#48)</div><div class="m"><span>review</span><span>3h</span></div></div></div>
+          <div class="cell"><div class="kcard"><div class="t">Skip link</div><div class="m"><span>done</span><span>2d</span></div></div></div>
+
+          <div class="agent"><span class="avatar">W</span>Webhook</div>
+          <div class="cell"><div class="kcard"><div class="t">Retry storm alert</div><div class="m"><span><span class="pill bad">failed</span></span><span>1h</span></div></div></div>
+          <div class="cell"><div class="kcard"><div class="t">Paperclip lease check</div><div class="m"><span>testing</span><span>2h</span></div></div></div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+
+          <div class="agent"><span class="avatar">–</span>Unassigned</div>
+          <div class="cell"><div class="kcard"><div class="t">Triage n8n history gaps</div><div class="m"><span>inbox</span><span>5h</span></div></div></div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="block">
+        <h3>Palette (proposed, Captain’s pick)</h3>
+        <div class="swatches">
+          <div class="sw"><div class="chipc" style="background:#0f1215;color:#dfe6ec">#0f1215</div><div class="info"><b>bg</b><span>cool slate</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#1c2229;color:#dfe6ec">#1c2229</div><div class="info"><b>card</b><span>lane cell</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#dfe6ec;color:#0f1215">#dfe6ec</div><div class="info"><b>text</b><span>14.91 bg · 12.72 card</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#93a1ad;color:#0f1215">#93a1ad</div><div class="info"><b>muted</b><span>7.11 bg · 6.06 card</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#b8d35a;color:#12160a">#b8d35a</div><div class="info"><b>accent</b><span>11.19 bg · ink 10.92</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#5bb98b;color:#0f1215">#5bb98b</div><div class="info"><b>success</b><span>7.84 bg</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#e3a64a;color:#0f1215">#e3a64a</div><div class="info"><b>warn</b><span>8.79 bg</span></div></div>
+          <div class="sw"><div class="chipc" style="background:#ef6767;color:#0f1215">#ef6767</div><div class="info"><b>danger</b><span>6.09 bg · 5.19 card</span></div></div>
+        </div>
+        <p class="note">Accent HSL 73° / 58% / 59%. Success leans teal so lime and green do not merge.</p>
+      </div>
+      <div class="block">
+        <h3>Type · Geist Sans + Geist Mono (proposed, OFL 1.1)</h3>
+        <div class="specimen">
+          <div class="big f-geist">OpenClaw · 2 doing, 1 review</div>
+          <div class="body f-geist">Focus mode shows only what needs Captain: Review, blocked Inbox, failed dispatch.</div>
+          <div class="data f-gmono" style="font-variant-numeric: tabular-nums">#189 · 08m · 2026-10-18 14:02 · 0123456789</div>
+        </div>
+        <p class="note">Geist figures are proportional; tabular-nums goes on :root (typeface ruling §1a). Variant: keep JetBrains Mono for the mono role.</p>
+        <div class="motion">
+          <h3>Motion · hand-off</h3>
+          <p>Dragging into another lane slides that agent’s chip onto the card (FLIP, transform only), so reassignment is visible. Focus mode fades other cards to 0.3 opacity over 240 ms. Try the switch in the mock.</p>
+          <div class="stage" style="background:var(--bg)" aria-hidden="true">
+            <div class="slot"><div class="mover">Fix timeout copy</div></div>
+            <div class="slot" style="display:flex;align-items:center;justify-content:flex-end;padding-right:10px"><span class="avatar chipmove" style="position:relative;z-index:3">W</span></div>
+          </div>
+          <p class="rm-text">Reduced motion is on: no slide. The chip and the dimming change at once, and the live region says “Reassigned Fix timeout copy to Webhook”.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="block">
+        <h3>References</h3>
+        <ul class="tight refs">
+          <li>linear.app: board grouped by assignee, “My issues” <span class="verify">verify</span></li>
+          <li>GitHub Projects board “group by”: rows on the data MCK mirrors <span class="verify">verify</span></li>
+          <li>Jira board swimlanes by assignee: collapse with counts <span class="verify">verify</span></li>
+          <li>plane.so: open-source board with swimlane views <span class="verify">verify</span></li>
+          <li>vercel.com/geist: Geist in dense UI <span class="verify">verify</span></li>
+          <li>businessmap.io: WIP limits per lane <span class="verify">verify</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Risks</h3>
+        <ul class="tight">
+          <li>Largest scope: IA, typeface and accent change at once; likely over 2 weeks.</li>
+          <li>977 cards across lanes need virtualisation.</li>
+          <li>Reassign by drag adds a write path that must respect the dispatch contract and GitHub mirroring.</li>
+          <li>Three operator decisions on one card.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Compare ===================== -->
+  <section class="direction" id="compare" aria-labelledby="cmp-title">
+    <h2 id="cmp-title">Side by side</h2>
+    <div class="table-scroll">
+      <table class="compare">
+        <thead><tr><th scope="col"></th><th scope="col">A · Refine</th><th scope="col">B · Evolve</th><th scope="col">C · Rethink</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Typeface</th><td>JetBrains Mono (kept)</td><td>JetBrains Mono (kept)</td><td>Geist Sans + Mono (new)</td></tr>
+          <tr><th scope="row">Accent</th><td>#58a6ff (kept)</td><td>#e6be5a (new)</td><td>#b8d35a (new)</td></tr>
+          <tr><th scope="row">Board model</th><td>7 columns, neutral</td><td>7 columns, rails + fills</td><td>Agent swimlanes, 4 groups, focus mode</td></tr>
+          <tr><th scope="row">Captain decisions</th><td>0</td><td>1 (accent)</td><td>3 (accent, type, model)</td></tr>
+          <tr><th scope="row">Fits 2 weeks</th><td>Yes</td><td>Yes</td><td>Unlikely</td></tr>
+          <tr><th scope="row">Most lift on</th><td>1.1, 1.7</td><td>1.1, 1.8</td><td>1.3, 1.8</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="recbox">
+      <p><strong>Recommendation, not a pick: B · Evolve.</strong> It answers all four questions, clears both accent flags in rubric §2.6, makes MCK easy to tell apart from Command Center and Mission Control, and puts the signature on the move itself. It needs one decision from Captain, not three. C is the strongest second release.</p>
+      <p class="meta" style="margin:0">Baseline 5.77 composite · 14/21 gauntlet · goal ≥ 6.5 by 2026-11-15 · install and webpack build pass on dev @ 56f4042</p>
+    </div>
+  </section>
+
+  <footer>
+    Contrast ratios are WCAG 2.x relative-luminance ratios for text on the named background. References marked “verify” were not re-visited on 2026-10-18. Fonts: JetBrains Mono and Geist, both SIL OFL 1.1, $0.
+  </footer>
+</div>

@@ -17,8 +17,8 @@ export function DependencyBadges({
 
   const badgeBase = 'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-medium';
   const blockedTone = activeBlockers.length > 0
-    ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
-    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
+    ? 'border-mc-danger/30 bg-mc-danger/10 text-mc-text'
+    : 'border-mc-success/30 bg-mc-success/10 text-mc-text';
 
   return (
     <div className={`flex flex-wrap gap-1.5 ${compact ? '' : 'mb-3'}`} aria-label="Local dependency badges">
@@ -28,7 +28,7 @@ export function DependencyBadges({
         </span>
       )}
       {blocking.length > 0 && (
-        <span className={`${badgeBase} border-amber-500/30 bg-amber-500/10 text-amber-200`}>
+        <span className={`${badgeBase} border-mc-warn/30 bg-mc-warn/10 text-mc-text`}>
           <Link2 className="size-3" /> Blocking {blocking.length}
         </span>
       )}
