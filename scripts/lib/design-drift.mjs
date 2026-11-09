@@ -1,0 +1,179 @@
+/**
+ * Pure helpers for the Dembrandt design-token drift check (scripts/design-drift.mjs).
+ *
+ * Dembrandt renders a route, reads computed styles and, with `--compare`,
+ * returns a drift report per route: a 0-100 `score` (0 = identical), a
+ * `summary` of changed/added/removed tokens and an `inconclusive` flag when
+ * nothing comparable was measured. This module turns one report per route into
+ * a single verdict against OUR threshold, so the gate does not depend on the
+ * CLI's built-in fail threshold and can be unit tested without a browser.
+ */
+
+/**
+ * Environment overrides for the Dembrandt child. DEMBRANDT_KEY is blanked so a
+ * key set in the operator's shell can never make Dembrandt sync extractions of
+ * the checked instance (page text, tokens) to its cloud service. Empty string,
+ * not undefined: the caller spreads these over process.env, so only a defined
+ * value overrides an inherited one.
+ */
+export function dembrandtEnv(cdpEndpoint) {
+  return {
+    BROWSER_CDP_ENDPOINT: cdpEndpoint,
+    DEMBRANDT_KEY: '',
+    DEMBRANDT_NO_HINTS: '1',
+    // omit=optional skips Dembrandt's optional 280 MB ML runtime, which only --ai uses.
+    npm_config_omit: 'optional',
+    NO_COLOR: '1',
+  };
+}
+
+/** Exact Dembrandt release this check runs. Bump deliberately, then re-baseline. */
+export const DEMBRANDT_VERSION = '0.39.2';
+
+/** Same default as Dembrandt's own gate (DEFAULT_DRIFT_CONFIG.failThreshold). */
+export const DEFAULT_THRESHOLD = 10;
+
+/** Key routes: the dashboard, one workspace board and the settings page. */
+export const DEFAULT_ROUTES = ['/', '/workspace/default', '/settings'];
+
+export const STATUS = Object.freeze({
+  STABLE: 'stable',
+  DRIFT: 'drift',
+  INCONCLUSIVE: 'inconclusive',
+  MISSING_BASELINE: 'missing-baseline',
+  ERROR: 'error',
+});
+
+/** A real numeric score only: Number(null), Number('') and Number(false) are all 0, which would pass silently. */
+export function toScore(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return Number.NaN;
+}
+
+/** `/` -> `root`, `/workspace/default` -> `workspace-default`. */
+export function routeSlug(route) {
+  const slug = String(route)
+    .replace(/[?#].*$/, '')
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .toLowerCase();
+  return slug || 'root';
+}
+
+/**
+ * Validate one Dembrandt run before it is trusted as an extraction. Dembrandt
+ * can print a valid JSON error object and exit nonzero, so parsing alone is not
+ * enough. Exit 0 is accepted; exit 1 is accepted only for a compare run whose
+ * payload is a real drift report (1 is Dembrandt's own drift verdict); exit 2
+ * only when that report is inconclusive.
+ * Returns { extract } or { error }.
+ */
+export function parseDembrandtResult({ code, stdout, stderr = '' }, { compare = false } = {}) {
+  const tail = () => String(stderr || stdout || '').trim().split('\n').slice(-3).join(' ');
+  let payload;
+  try {
+    payload = JSON.parse(stdout);
+  } catch {
+    return { error: `dembrandt exited ${code} without JSON output: ${tail()}` };
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { error: `dembrandt exited ${code} with a non-object JSON payload` };
+  }
+  if (payload.error) {
+    const message = typeof payload.error === 'string' ? payload.error : JSON.stringify(payload.error);
+    return { error: `dembrandt reported an error (exit ${code}): ${message}` };
+  }
+  const drift = payload.drift;
+  const validDrift = Boolean(drift) && typeof drift === 'object' && (drift.inconclusive === true || Number.isFinite(toScore(drift.score)));
+  if (code === 0) {
+    if (compare && !validDrift) return { error: 'dembrandt output has no valid drift report' };
+    return { extract: payload };
+  }
+  if (code === 1 && compare && validDrift) return { extract: payload };
+  // Dembrandt exits 2 for an inconclusive compare but still prints the report.
+  if (code === 2 && compare && drift && typeof drift === 'object' && drift.inconclusive === true) return { extract: payload };
+  return { error: `dembrandt exited ${code} without a valid result: ${tail()}` };
+}
+
+/**
+ * Classify one route. `drift` is Dembrandt's report, or null when the route
+ * could not be compared (`error` explains why).
+ */
+export function classifyRoute({ route, drift = null, error = null, baselineMissing = false }, threshold = DEFAULT_THRESHOLD) {
+  if (baselineMissing) return { route, status: STATUS.MISSING_BASELINE, score: null, error };
+  if (error || !drift) return { route, status: STATUS.ERROR, score: null, error: error || 'no drift report' };
+  if (drift.inconclusive) return { route, status: STATUS.INCONCLUSIVE, score: drift.score ?? null, summary: drift.summary, warnings: drift.warnings || [] };
+  const score = toScore(drift.score);
+  if (!Number.isFinite(score)) return { route, status: STATUS.ERROR, score: null, error: 'drift score is not a number' };
+  return {
+    route,
+    status: score > threshold ? STATUS.DRIFT : STATUS.STABLE,
+    score,
+    summary: drift.summary,
+    changes: Array.isArray(drift.changes) ? drift.changes : [],
+    warnings: drift.warnings || [],
+  };
+}
+
+/**
+ * Overall verdict. Only an all-stable run passes: a route that could not be
+ * measured is a failure to evaluate, never a silent pass.
+ */
+export function evaluateDrift(results, threshold = DEFAULT_THRESHOLD) {
+  if (!Number.isFinite(threshold) || threshold < 0) throw new Error(`threshold must be a number >= 0, got ${threshold}`);
+  const routes = results.map((result) => classifyRoute(result, threshold));
+  const count = (status) => routes.filter((route) => route.status === status).length;
+  const ok = routes.length > 0 && routes.every((route) => route.status === STATUS.STABLE);
+  return {
+    ok,
+    threshold,
+    maxScore: routes.reduce((max, route) => (route.score != null && route.score > max ? route.score : max), 0),
+    counts: {
+      stable: count(STATUS.STABLE),
+      drift: count(STATUS.DRIFT),
+      inconclusive: count(STATUS.INCONCLUSIVE),
+      missingBaseline: count(STATUS.MISSING_BASELINE),
+      error: count(STATUS.ERROR),
+    },
+    routes,
+  };
+}
+
+/** Exit codes mirror Dembrandt's: 0 stable, 1 drift, 2 could not evaluate. */
+export function exitCodeFor(verdict) {
+  if (verdict.ok) return 0;
+  if (verdict.routes.some((route) => route.status === STATUS.DRIFT)) return 1;
+  return 2;
+}
+
+/** Short Markdown report for the job summary and the artifact. */
+export function formatMarkdown(verdict, { baseUrl, version = DEMBRANDT_VERSION } = {}) {
+  const lines = [
+    '# Design drift',
+    '',
+    `Dembrandt ${version} against ${baseUrl || 'the running app'}; threshold ${verdict.threshold} (0 = identical, 100 = unrelated).`,
+    '',
+    `**Result: ${verdict.ok ? 'stable' : 'drift or not evaluated'}**`,
+    '',
+    '| Route | Status | Score | Changed | Added | Removed |',
+    '| --- | --- | --- | --- | --- | --- |',
+  ];
+  for (const route of verdict.routes) {
+    const summary = route.summary || {};
+    lines.push(`| \`${route.route}\` | ${route.status} | ${route.score ?? '-'} | ${summary.changed ?? '-'} | ${summary.added ?? '-'} | ${summary.removed ?? '-'} |`);
+  }
+  for (const route of verdict.routes) {
+    if (route.error) lines.push('', `- \`${route.route}\`: ${route.error}`);
+    const changes = route.changes || [];
+    if (route.status !== STATUS.DRIFT || changes.length === 0) continue;
+    lines.push('', `## \`${route.route}\``, '');
+    for (const change of changes.slice(0, 20)) {
+      const values = [change.before, change.after].filter((value) => value != null).join(' -> ');
+      lines.push(`- ${change.category} ${change.kind}: ${change.label}${values ? ` (${values})` : ''}`);
+    }
+    if (changes.length > 20) lines.push(`- ...and ${changes.length - 20} more`);
+  }
+  lines.push('', 'If the change is intended, run `npm run design:drift -- --update-baseline` and commit `docs/design-drift/baseline/`.');
+  return `${lines.join('\n')}\n`;
+}
