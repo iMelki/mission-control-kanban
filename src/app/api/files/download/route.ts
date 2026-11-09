@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
+import { resolvePathWithinBases } from '@/lib/path-containment';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -60,14 +61,8 @@ export async function GET(request: NextRequest) {
 
     if (fullPathParam) {
       // Full path provided - validate it's under PROJECTS_BASE
-      const normalizedPath = path.normalize(fullPathParam);
-      if (!normalizedPath.startsWith(PROJECTS_BASE)) {
-        return NextResponse.json(
-          { error: 'Access denied: path must be within projects directory' },
-          { status: 403 }
-        );
-      }
-      targetPath = normalizedPath;
+      // Full path provided - containment under PROJECTS_BASE is enforced below
+      targetPath = path.normalize(fullPathParam);
     } else if (relativePathParam) {
       // Relative path provided
       const normalizedRelative = path.normalize(relativePathParam);
@@ -85,6 +80,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Resolve the real path and validate it is under PROJECTS_BASE.
+    // Rejects sibling-prefix paths (`<base>-evil/x`) and symlinks that escape the base.
+    const contained = await resolvePathWithinBases(targetPath, [PROJECTS_BASE]);
+    if (!contained.ok) {
+      if (contained.reason === 'not-found') {
+        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      }
+      console.warn(`[SECURITY] File download outside projects directory blocked: ${targetPath}`);
+      return NextResponse.json(
+        { error: 'Access denied: path must be within projects directory' },
+        { status: 403 }
+      );
+    }
+
     // Determine content type
     const ext = path.extname(targetPath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
@@ -94,7 +103,7 @@ export async function GET(request: NextRequest) {
                    contentType === 'application/xml';
 
     // Read file
-    const fileBuffer = await readProjectFile(targetPath);
+    const fileBuffer = await readProjectFile(contained.realPath);
     const textContent = isText ? fileBuffer.toString('utf-8') : null;
 
     console.log(`[FILE DOWNLOAD] Read: ${targetPath} (${fileBuffer.byteLength} bytes)`);

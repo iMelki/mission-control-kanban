@@ -14,7 +14,7 @@ import {
 } from '../integrations/paperclip-bridge/src/contracts';
 
 process.env.MISSION_CONTROL_URL = 'http://127.0.0.1:3021';
-process.env.PROJECTS_PATH = 'S:/source/CCAI/Assistants';
+process.env.PROJECTS_PATH = 'D:/workspace/assistants';
 process.env.MCK_WEBHOOK_SIGNATURE_SECRET = 'factory-dispatch-secret';
 process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET = 'factory-callback-secret';
 const FACTORY_BASE_SHA = execFileSync(
@@ -269,7 +269,7 @@ function validFactoryDispatchPayload() {
       },
     },
     repository: {
-      path: 'S:/source/CCAI/Assistants/tools/mission-control-kanban',
+      path: 'D:/workspace/assistants/tools/mission-control-kanban',
       slug: 'iMelki/mission-control-kanban',
       originRemote: 'git@github.com:iMelki/mission-control-kanban.git',
       branch: 'dev' as const,
@@ -351,7 +351,7 @@ function validFactoryDispatchPayload() {
       lifecycle: 'http://127.0.0.1:3021/api/webhooks/agent-completion',
     },
     mission_control_url: 'http://127.0.0.1:3021',
-    output_directory: 'S:/source/CCAI/Assistants/tools/mission-control-kanban',
+    output_directory: 'D:/workspace/assistants/tools/mission-control-kanban',
     prompt_markdown: '# Work',
     issued_at: issuedAt,
     factory_contract: {
