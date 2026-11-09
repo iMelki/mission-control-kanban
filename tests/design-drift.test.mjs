@@ -246,7 +246,7 @@ test('run() with a timeout resolves and reaps a hung grandchild, like npx over D
   }
 });
 
-for (const mode of ['plain', 'ignoreTerm', 'afterTimeout']) test(`cancelling the launcher (SIGINT) stops a timed run's detached process group (${mode}) (POSIX)`, { skip: process.platform === 'win32' }, async () => {
+for (const mode of ['plain', 'ignoreTerm', 'afterTimeout', 'secondSignal']) test(`cancelling the launcher (SIGINT) stops a timed run's detached process group (${mode}) (POSIX)`, { skip: process.platform === 'win32' }, async () => {
   const { spawn } = await import('node:child_process');
   const { mkdtempSync, readFileSync, rmSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
@@ -269,6 +269,11 @@ for (const mode of ['plain', 'ignoreTerm', 'afterTimeout']) test(`cancelling the
     assert.equal(await isRunning(grandchildPid), true, 'the grandchild started');
     const exited = new Promise((resolve) => launcherProc.once('exit', (code, signal) => resolve({ code, signal })));
     launcherProc.kill('SIGINT'); // the launcher only, as a Ctrl-C to a detached child would behave
+    if (mode === 'secondSignal') {
+      // An impatient second Ctrl-C during the SIGTERM grace wait must still SIGKILL the group.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      launcherProc.kill('SIGINT');
+    }
     const result = await exited;
     assert.equal(result.code, 130);
     for (let waited = 0; (await isRunning(grandchildPid)) && waited < 6000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));

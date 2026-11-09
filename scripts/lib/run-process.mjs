@@ -14,6 +14,7 @@ const isWindows = process.platform === 'win32';
 const activeGroups = new Set();
 const TIMEOUT_GRACE_MS = 5000;
 let cleanupInstalled = false;
+let cancelling = false;
 
 function groupGone(child) {
   try { process.kill(-child.pid, 0); return false; } catch { return true; }
@@ -29,8 +30,8 @@ export function terminateActiveGroups() {
 
 /** Cancellation: SIGTERM every tracked group, give them `graceMs` to leave, then SIGKILL the survivors. */
 export async function cancelActiveGroups({ graceMs = 2000 } = {}) {
+  // Groups stay tracked while we wait, so a second signal or the exit hook can still SIGKILL them.
   const groups = [...activeGroups];
-  activeGroups.clear();
   for (const child of groups) {
     try { process.kill(-child.pid, 'SIGTERM'); } catch { /* group already gone */ }
   }
@@ -42,6 +43,7 @@ export async function cancelActiveGroups({ graceMs = 2000 } = {}) {
     if (groupGone(child)) continue;
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* group already gone */ }
   }
+  for (const child of groups) activeGroups.delete(child);
 }
 
 function installGroupCleanup() {
@@ -49,7 +51,10 @@ function installGroupCleanup() {
   cleanupInstalled = true;
   process.on('exit', terminateActiveGroups);
   for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
-    process.once(signal, () => {
+    process.on(signal, () => {
+      // A second signal while the grace wait is running means "now": SIGKILL everything and leave.
+      if (cancelling) { terminateActiveGroups(); process.exit(code); }
+      cancelling = true;
       cancelActiveGroups().finally(() => process.exit(code));
     });
   }
