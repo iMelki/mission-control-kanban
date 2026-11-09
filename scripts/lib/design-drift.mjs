@@ -44,6 +44,13 @@ export const STATUS = Object.freeze({
   ERROR: 'error',
 });
 
+/** A real numeric score only: Number(null), Number('') and Number(false) are all 0, which would pass silently. */
+export function toScore(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return Number.NaN;
+}
+
 /** `/` -> `root`, `/workspace/default` -> `workspace-default`. */
 export function routeSlug(route) {
   const slug = String(route)
@@ -78,7 +85,7 @@ export function parseDembrandtResult({ code, stdout, stderr = '' }, { compare = 
     return { error: `dembrandt reported an error (exit ${code}): ${message}` };
   }
   const drift = payload.drift;
-  const validDrift = Boolean(drift) && typeof drift === 'object' && (drift.inconclusive === true || Number.isFinite(Number(drift.score)));
+  const validDrift = Boolean(drift) && typeof drift === 'object' && (drift.inconclusive === true || Number.isFinite(toScore(drift.score)));
   if (code === 0) {
     if (compare && !validDrift) return { error: 'dembrandt output has no valid drift report' };
     return { extract: payload };
@@ -97,7 +104,7 @@ export function classifyRoute({ route, drift = null, error = null, baselineMissi
   if (baselineMissing) return { route, status: STATUS.MISSING_BASELINE, score: null, error };
   if (error || !drift) return { route, status: STATUS.ERROR, score: null, error: error || 'no drift report' };
   if (drift.inconclusive) return { route, status: STATUS.INCONCLUSIVE, score: drift.score ?? null, summary: drift.summary, warnings: drift.warnings || [] };
-  const score = Number(drift.score);
+  const score = toScore(drift.score);
   if (!Number.isFinite(score)) return { route, status: STATUS.ERROR, score: null, error: 'drift score is not a number' };
   return {
     route,

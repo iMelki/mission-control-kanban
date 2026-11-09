@@ -53,7 +53,13 @@ const { values: args } = parseArgs({
 });
 
 const port = Number(process.env.DESIGN_DRIFT_PORT || 3021);
-const baseUrl = (args['base-url'] || process.env.MCK_SMOKE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');
+// --start serves its own isolated app on `port`, so it must be the target: an inherited
+// MCK_SMOKE_URL or --base-url would compare pages the throwaway server does not back.
+if (args.start && args['base-url']) {
+  console.error('design:drift: --start and --base-url are mutually exclusive');
+  process.exit(2);
+}
+const baseUrl = (args.start ? `http://127.0.0.1:${port}` : args['base-url'] || process.env.MCK_SMOKE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');
 const threshold = Number(args.threshold);
 const routes = args.routes.split(',').map((route) => route.trim()).filter(Boolean);
 const reportDir = path.resolve(args['report-dir']);

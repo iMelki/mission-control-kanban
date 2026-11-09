@@ -11,6 +11,7 @@ import {
   formatMarkdown,
   parseDembrandtResult,
   routeSlug,
+  toScore,
 } from '../scripts/lib/design-drift.mjs';
 
 const report = (score, extra = {}) => ({
@@ -149,4 +150,14 @@ test('dembrandtEnv blanks DEMBRANDT_KEY so an operator key never syncs a checked
   // Spread over an inherited environment, the blank value must win.
   const merged = { ...{ DEMBRANDT_KEY: 'operator-secret' }, ...env };
   assert.equal(merged.DEMBRANDT_KEY, '');
+});
+
+test('a null, empty or boolean drift score is never a pass', () => {
+  for (const score of [null, '', '  ', false, undefined]) {
+    assert.ok(Number.isNaN(toScore(score)), String(score));
+    assert.ok(parseDembrandtResult({ code: 0, stdout: JSON.stringify({ drift: { score } }) }, { compare: true }).error, String(score));
+    assert.equal(evaluateDrift([{ route: '/', drift: report(score) }]).ok, false, String(score));
+  }
+  assert.equal(toScore(0), 0);
+  assert.equal(toScore('12'), 12);
 });
