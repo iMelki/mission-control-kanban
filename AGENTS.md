@@ -2,7 +2,7 @@
 
 ## Scope
 
-This repo is a Next.js Mission Control / OpenClaw kanban application. Treat it as a product repo under `S:\source\CCAI\Assistants\tools`.
+This repo is a Next.js Mission Control / OpenClaw kanban application. Treat it as a product repo under `<workspace-root>\tools`.
 
 ## Branch And PR Policy
 
