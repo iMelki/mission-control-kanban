@@ -12,6 +12,7 @@ const isWindows = process.platform === 'win32';
 // longer reaches them. Track those groups and stop them when the launcher exits
 // or is signalled, otherwise a cancelled run leaves a hung Dembrandt behind.
 const activeGroups = new Set();
+const TIMEOUT_GRACE_MS = 5000;
 let cleanupInstalled = false;
 
 function groupGone(child) {
@@ -75,6 +76,7 @@ export function run(command, commandArgs, { env = {}, capture = false, timeoutMs
     let stdout = '';
     let stderr = '';
     let settled = false;
+    let timedOut = false;
     if (child.pid && timeoutMs > 0 && !isWindows) {
       activeGroups.add(child);
       installGroupCleanup();
@@ -83,12 +85,19 @@ export function run(command, commandArgs, { env = {}, capture = false, timeoutMs
       if (settled) return;
       settled = true;
       guard.clear();
-      activeGroups.delete(child);
+      // After a timeout the group stays tracked until its SIGKILL escalation has run, so a cancel
+      // or exit during that grace period still reaches a descendant that ignored SIGTERM.
+      if (!timedOut) activeGroups.delete(child);
       resolve(result);
     };
     const guard = armTimeout(child, timeoutMs, (hung) => {
       if (isWindows) stopProcessTree(hung);
-      else killProcessGroup(hung);
+      else {
+        timedOut = true;
+        killProcessGroup(hung, { graceMs: TIMEOUT_GRACE_MS });
+        // Untrack only once the SIGKILL escalation (graceMs) has fired.
+        setTimeout(() => activeGroups.delete(child), TIMEOUT_GRACE_MS + 500).unref();
+      }
       // Do not wait for `close`: a surviving descendant can keep the pipes open indefinitely.
       finish({ code: 1, stdout: '', stderr: `${stderr} timed out after ${timeoutMs / 1000}s`.trim() });
     });

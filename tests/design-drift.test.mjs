@@ -246,19 +246,20 @@ test('run() with a timeout resolves and reaps a hung grandchild, like npx over D
   }
 });
 
-for (const ignoreTerm of [false, true]) test(`cancelling the launcher (SIGINT) stops a timed run's detached process group${ignoreTerm ? ' even when it ignores SIGTERM' : ''} (POSIX)`, { skip: process.platform === 'win32' }, async () => {
+for (const mode of ['plain', 'ignoreTerm', 'afterTimeout']) test(`cancelling the launcher (SIGINT) stops a timed run's detached process group (${mode}) (POSIX)`, { skip: process.platform === 'win32' }, async () => {
   const { spawn } = await import('node:child_process');
   const { mkdtempSync, readFileSync, rmSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const dir = mkdtempSync(join(tmpdir(), 'dd-sigint-'));
   const pidFile = join(dir, 'grandchild.pid');
+  const ignoreTerm = mode !== 'plain';
   const trap = ignoreTerm ? "process.on('SIGTERM', () => {}); " : '';
   const grandchild = `${trap}require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`;
   const parent = `${trap}require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { stdio: 'inherit' }); setInterval(() => {}, 1000)`;
   const runUrl = new URL('../scripts/lib/run-process.mjs', import.meta.url).href;
   // A stand-in launcher: starts a long timed run, so cancelling it is the only way the tree can stop.
-  const launcher = `import(${JSON.stringify(runUrl)}).then(({ run }) => { run(process.execPath, ['-e', ${JSON.stringify(parent)}], { capture: true, timeoutMs: 600000 }); console.log('ready'); });`;
+  const launcher = `import(${JSON.stringify(runUrl)}).then(({ run }) => { const p = run(process.execPath, ['-e', ${JSON.stringify(parent)}], { capture: true, timeoutMs: ${mode === 'afterTimeout' ? 1500 : 600000} }); ${mode === 'afterTimeout' ? "p.then(() => console.log('ready'))" : "console.log('ready')"}; });`;
   const launcherProc = spawn(process.execPath, ['-e', launcher], { stdio: ['ignore', 'pipe', 'inherit'] });
   let grandchildPid;
   try {
