@@ -14,9 +14,33 @@ const isWindows = process.platform === 'win32';
 const activeGroups = new Set();
 let cleanupInstalled = false;
 
+function groupGone(child) {
+  try { process.kill(-child.pid, 0); return false; } catch { return true; }
+}
+
+/** Synchronous last resort (the 'exit' hook cannot wait): SIGKILL whatever is still tracked. */
 export function terminateActiveGroups() {
-  for (const child of activeGroups) killProcessGroup(child, { graceMs: 2000 });
+  for (const child of activeGroups) {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { /* group already gone */ }
+  }
   activeGroups.clear();
+}
+
+/** Cancellation: SIGTERM every tracked group, give them `graceMs` to leave, then SIGKILL the survivors. */
+export async function cancelActiveGroups({ graceMs = 2000 } = {}) {
+  const groups = [...activeGroups];
+  activeGroups.clear();
+  for (const child of groups) {
+    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* group already gone */ }
+  }
+  const deadline = Date.now() + graceMs;
+  while (groups.some((child) => !groupGone(child)) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  for (const child of groups) {
+    if (groupGone(child)) continue;
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { /* group already gone */ }
+  }
 }
 
 function installGroupCleanup() {
@@ -25,8 +49,7 @@ function installGroupCleanup() {
   process.on('exit', terminateActiveGroups);
   for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
     process.once(signal, () => {
-      terminateActiveGroups();
-      process.exit(code);
+      cancelActiveGroups().finally(() => process.exit(code));
     });
   }
 }

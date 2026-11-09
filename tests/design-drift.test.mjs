@@ -246,17 +246,17 @@ test('run() with a timeout resolves and reaps a hung grandchild, like npx over D
   }
 });
 
-test('cancelling the launcher (SIGINT) stops a timed run\'s detached process group (POSIX)', { skip: process.platform === 'win32' }, async () => {
+for (const ignoreTerm of [false, true]) test(`cancelling the launcher (SIGINT) stops a timed run's detached process group${ignoreTerm ? ' even when it ignores SIGTERM' : ''} (POSIX)`, { skip: process.platform === 'win32' }, async () => {
   const { spawn } = await import('node:child_process');
   const { mkdtempSync, readFileSync, rmSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
-  const { pathToFileURL } = await import('node:url');
   const dir = mkdtempSync(join(tmpdir(), 'dd-sigint-'));
   const pidFile = join(dir, 'grandchild.pid');
-  const grandchild = `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`;
-  const parent = `require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { stdio: 'inherit' }); setInterval(() => {}, 1000)`;
-  const runUrl = pathToFileURL(new URL('../scripts/lib/run-process.mjs', import.meta.url).pathname).href;
+  const trap = ignoreTerm ? "process.on('SIGTERM', () => {}); " : '';
+  const grandchild = `${trap}require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`;
+  const parent = `${trap}require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { stdio: 'inherit' }); setInterval(() => {}, 1000)`;
+  const runUrl = new URL('../scripts/lib/run-process.mjs', import.meta.url).href;
   // A stand-in launcher: starts a long timed run, so cancelling it is the only way the tree can stop.
   const launcher = `import(${JSON.stringify(runUrl)}).then(({ run }) => { run(process.execPath, ['-e', ${JSON.stringify(parent)}], { capture: true, timeoutMs: 600000 }); console.log('ready'); });`;
   const launcherProc = spawn(process.execPath, ['-e', launcher], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -270,7 +270,7 @@ test('cancelling the launcher (SIGINT) stops a timed run\'s detached process gro
     launcherProc.kill('SIGINT'); // the launcher only, as a Ctrl-C to a detached child would behave
     const result = await exited;
     assert.equal(result.code, 130);
-    for (let waited = 0; (await isRunning(grandchildPid)) && waited < 5000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+    for (let waited = 0; (await isRunning(grandchildPid)) && waited < 6000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
     assert.equal(await isRunning(grandchildPid), false, 'the detached group was stopped on cancel');
   } finally {
     if (grandchildPid && (await isRunning(grandchildPid))) process.kill(grandchildPid, 'SIGKILL');
