@@ -11,10 +11,12 @@ import {
   formatMarkdown,
   parseDembrandtResult,
   armTimeout,
+  killProcessGroup,
   parseThreshold,
   routeSlug,
   toScore,
 } from '../scripts/lib/design-drift.mjs';
+import { run } from '../scripts/lib/run-process.mjs';
 
 const report = (score, extra = {}) => ({
   score,
@@ -185,4 +187,52 @@ test('armTimeout stops a hung child once, and clear() disarms it', async () => {
   assert.equal(quick.expired(), false);
 
   assert.equal(armTimeout('child', 0, () => stopped.push('x')).expired(), false);
+});
+
+test('killProcessGroup stops a hung descendant, not just the child (POSIX)', { skip: process.platform === 'win32' }, async () => {
+  const { spawn } = await import('node:child_process');
+  // The child spawns a grandchild that ignores nothing but outlives a child-only kill.
+  const child = spawn(process.execPath, ['-e', "require('child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});console.log('up');setInterval(()=>{},1000)"], {
+    detached: true,
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  await new Promise((resolve) => child.stdout.once('data', resolve));
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const closed = new Promise((resolve) => child.once('close', resolve));
+  killProcessGroup(child, { graceMs: 1000 });
+  const winner = await Promise.race([closed.then(() => 'closed'), new Promise((resolve) => setTimeout(() => resolve('hung'), 4000))]);
+  assert.equal(winner, 'closed', 'close fires only once the whole group is gone');
+  const groupAlive = () => { try { process.kill(-child.pid, 0); return true; } catch { return false; } };
+  for (let waited = 0; groupAlive() && waited < 3000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(groupAlive(), false, 'the process group no longer exists');
+});
+
+test('run() with a timeout resolves and reaps a hung grandchild, like npx over Dembrandt (POSIX)', { skip: process.platform === 'win32' }, async () => {
+  const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'dd-run-'));
+  const pidFile = join(dir, 'grandchild.pid');
+  // Parent (npx stand-in) spawns a grandchild (Dembrandt stand-in) that shares the captured pipes and hangs.
+  const grandchild = `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`;
+  const parent = `require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { stdio: 'inherit' }); setInterval(() => {}, 1000)`;
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  let grandchildPid;
+  try {
+    const started = Date.now();
+    const result = await Promise.race([
+      run(process.execPath, ['-e', parent], { capture: true, timeoutMs: 700 }),
+      new Promise((resolve) => setTimeout(() => resolve('hung'), 8000)),
+    ]);
+    assert.notEqual(result, 'hung', 'run() must resolve instead of waiting on the grandchild');
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /timed out after 0\.7s/);
+    assert.ok(Date.now() - started < 6000);
+    grandchildPid = Number(readFileSync(pidFile, 'utf8'));
+    for (let waited = 0; alive(grandchildPid) && waited < 4000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(alive(grandchildPid), false, 'the grandchild is gone');
+  } finally {
+    if (grandchildPid && alive(grandchildPid)) process.kill(grandchildPid, 'SIGKILL');
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

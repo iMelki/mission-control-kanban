@@ -71,6 +71,19 @@ export function armTimeout(child, ms, stop) {
   return { clear: () => clearTimeout(timer), expired: () => fired };
 }
 
+/**
+ * Stop a POSIX child AND its descendants: SIGTERM the whole process group, then
+ * SIGKILL it after `graceMs` for anything that ignores SIGTERM. The child must
+ * have been spawned with `detached: true` so it leads its own group; killing
+ * only the child leaves `npx`'s Dembrandt grandchild holding the stdio pipes.
+ */
+export function killProcessGroup(child, { graceMs = 5000, kill = process.kill } = {}) {
+  if (!child?.pid) return;
+  const signal = (sig) => { try { kill(-child.pid, sig); } catch { /* group already gone */ } };
+  signal('SIGTERM');
+  setTimeout(() => signal('SIGKILL'), graceMs).unref();
+}
+
 /** `/` -> `root`, `/workspace/default` -> `workspace-default`. */
 export function routeSlug(route) {
   const slug = String(route)

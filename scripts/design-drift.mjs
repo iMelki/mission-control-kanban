@@ -15,7 +15,6 @@
  * DESIGN_DRIFT_CHROMIUM_PATH) and is handed to Dembrandt over CDP, so the check
  * never downloads a second browser. See docs/design-drift.md.
  */
-import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { createRequire } from 'node:module';
@@ -26,7 +25,6 @@ import {
   DEFAULT_THRESHOLD,
   DEMBRANDT_TIMEOUT_MS,
   DEMBRANDT_VERSION,
-  armTimeout,
   dembrandtEnv,
   evaluateDrift,
   exitCodeFor,
@@ -35,12 +33,12 @@ import {
   parseThreshold,
   routeSlug,
 } from './lib/design-drift.mjs';
+import { run, spawnCommand, stopProcessTree } from './lib/run-process.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const { getRuntimeRegressionServerPlan } = require('./runtime-regression-server.js');
 
-const isWindows = process.platform === 'win32';
 const baselineDir = path.resolve('docs/design-drift/baseline');
 
 const { values: args } = parseArgs({
@@ -66,46 +64,6 @@ const baseUrl = (args.start ? `http://127.0.0.1:${port}` : args['base-url'] || p
 const threshold = parseThreshold(args.threshold);
 const routes = args.routes.split(',').map((route) => route.trim()).filter(Boolean);
 const reportDir = path.resolve(args['report-dir']);
-
-function spawnCommand(command, commandArgs, options) {
-  if (!isWindows) return spawn(command, commandArgs, { shell: false, ...options });
-  const shim = command === 'npm' || command === 'npx' ? `${command}.cmd` : command;
-  return spawn(process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe', ['/d', '/s', '/c', shim, ...commandArgs], {
-    shell: false,
-    windowsHide: true,
-    ...options,
-  });
-}
-
-function run(command, commandArgs, { env = {}, capture = false, timeoutMs = 0 } = {}) {
-  return new Promise((resolve) => {
-    const child = spawnCommand(command, commandArgs, {
-      stdio: ['ignore', capture ? 'pipe' : 'inherit', capture ? 'pipe' : 'inherit'],
-      env: { ...process.env, ...env },
-    });
-    let stdout = '';
-    let stderr = '';
-    const guard = armTimeout(child, timeoutMs, stopProcessTree);
-    child.stdout?.on('data', (chunk) => { stdout += chunk; });
-    child.stderr?.on('data', (chunk) => { stderr += chunk; });
-    child.on('error', (error) => { guard.clear(); resolve({ code: 1, stdout, stderr: `${stderr}${error.message}` }); });
-    child.on('close', (code) => {
-      guard.clear();
-      // A killed child reports a signal exit; make the timeout explicit so the route is an error.
-      if (guard.expired()) resolve({ code: 1, stdout: '', stderr: `${stderr} timed out after ${timeoutMs / 1000}s`.trim() });
-      else resolve({ code, stdout, stderr });
-    });
-  });
-}
-
-function stopProcessTree(child) {
-  if (!child?.pid || child.exitCode !== null) return;
-  if (isWindows) {
-    spawnSync('C:\\Windows\\System32\\taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
-  } else {
-    child.kill('SIGTERM');
-  }
-}
 
 function isPortOpen(host, targetPort) {
   return new Promise((resolve) => {
