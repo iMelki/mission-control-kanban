@@ -51,6 +51,26 @@ export function toScore(value) {
   return Number.NaN;
 }
 
+/** Dembrandt gets this long per route before its process tree is stopped and the route is an error. */
+export const DEMBRANDT_TIMEOUT_MS = 180_000;
+
+/** Parse --threshold. Empty or whitespace-only is NaN (Number('') is 0, which would silently mean "any drift fails"). */
+export function parseThreshold(value) {
+  const text = String(value ?? '').trim();
+  return text === '' ? Number.NaN : Number(text);
+}
+
+/**
+ * Stop a hung child after `ms`. `stop(child)` is called once on expiry. Returns
+ * { clear, expired }: clear() on exit, expired() tells whether the timer fired.
+ */
+export function armTimeout(child, ms, stop) {
+  let fired = false;
+  const timer = ms > 0 ? setTimeout(() => { fired = true; stop(child); }, ms) : null;
+  timer?.unref?.();
+  return { clear: () => clearTimeout(timer), expired: () => fired };
+}
+
 /** `/` -> `root`, `/workspace/default` -> `workspace-default`. */
 export function routeSlug(route) {
   const slug = String(route)

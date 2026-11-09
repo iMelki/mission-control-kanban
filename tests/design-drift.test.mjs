@@ -10,6 +10,8 @@ import {
   exitCodeFor,
   formatMarkdown,
   parseDembrandtResult,
+  armTimeout,
+  parseThreshold,
   routeSlug,
   toScore,
 } from '../scripts/lib/design-drift.mjs';
@@ -160,4 +162,27 @@ test('a null, empty or boolean drift score is never a pass', () => {
   }
   assert.equal(toScore(0), 0);
   assert.equal(toScore('12'), 12);
+});
+
+test('an empty or blank --threshold is rejected, a number is kept', () => {
+  for (const value of ['', '   ', undefined, null]) assert.ok(Number.isNaN(parseThreshold(value)), String(value));
+  assert.equal(parseThreshold('10'), 10);
+  assert.equal(parseThreshold(' 0 '), 0);
+  assert.throws(() => evaluateDrift([], parseThreshold('')));
+});
+
+test('armTimeout stops a hung child once, and clear() disarms it', async () => {
+  const stopped = [];
+  const hung = armTimeout('child', 5, (child) => stopped.push(child));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.deepEqual(stopped, ['child']);
+  assert.equal(hung.expired(), true);
+
+  const quick = armTimeout('child', 5, (child) => stopped.push(child));
+  quick.clear();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(stopped.length, 1);
+  assert.equal(quick.expired(), false);
+
+  assert.equal(armTimeout('child', 0, () => stopped.push('x')).expired(), false);
 });

@@ -24,12 +24,15 @@ import { parseArgs } from 'node:util';
 import {
   DEFAULT_ROUTES,
   DEFAULT_THRESHOLD,
+  DEMBRANDT_TIMEOUT_MS,
   DEMBRANDT_VERSION,
+  armTimeout,
   dembrandtEnv,
   evaluateDrift,
   exitCodeFor,
   formatMarkdown,
   parseDembrandtResult,
+  parseThreshold,
   routeSlug,
 } from './lib/design-drift.mjs';
 
@@ -60,7 +63,7 @@ if (args.start && args['base-url']) {
   process.exit(2);
 }
 const baseUrl = (args.start ? `http://127.0.0.1:${port}` : args['base-url'] || process.env.MCK_SMOKE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');
-const threshold = Number(args.threshold);
+const threshold = parseThreshold(args.threshold);
 const routes = args.routes.split(',').map((route) => route.trim()).filter(Boolean);
 const reportDir = path.resolve(args['report-dir']);
 
@@ -74,7 +77,7 @@ function spawnCommand(command, commandArgs, options) {
   });
 }
 
-function run(command, commandArgs, { env = {}, capture = false } = {}) {
+function run(command, commandArgs, { env = {}, capture = false, timeoutMs = 0 } = {}) {
   return new Promise((resolve) => {
     const child = spawnCommand(command, commandArgs, {
       stdio: ['ignore', capture ? 'pipe' : 'inherit', capture ? 'pipe' : 'inherit'],
@@ -82,10 +85,16 @@ function run(command, commandArgs, { env = {}, capture = false } = {}) {
     });
     let stdout = '';
     let stderr = '';
+    const guard = armTimeout(child, timeoutMs, stopProcessTree);
     child.stdout?.on('data', (chunk) => { stdout += chunk; });
     child.stderr?.on('data', (chunk) => { stderr += chunk; });
-    child.on('error', (error) => resolve({ code: 1, stdout, stderr: `${stderr}${error.message}` }));
-    child.on('close', (code) => resolve({ code, stdout, stderr }));
+    child.on('error', (error) => { guard.clear(); resolve({ code: 1, stdout, stderr: `${stderr}${error.message}` }); });
+    child.on('close', (code) => {
+      guard.clear();
+      // A killed child reports a signal exit; make the timeout explicit so the route is an error.
+      if (guard.expired()) resolve({ code: 1, stdout: '', stderr: `${stderr} timed out after ${timeoutMs / 1000}s`.trim() });
+      else resolve({ code, stdout, stderr });
+    });
   });
 }
 
@@ -183,6 +192,7 @@ async function extractRoute(route, cdpEndpoint, baselineFile) {
   if (baselineFile) dembrandtArgs.push('--compare', baselineFile);
   const result = await run('npx', dembrandtArgs, {
     capture: true,
+    timeoutMs: DEMBRANDT_TIMEOUT_MS,
     env: dembrandtEnv(cdpEndpoint),
   });
   // Exit 1 is Dembrandt's own drift verdict; we apply our threshold to the score instead.
