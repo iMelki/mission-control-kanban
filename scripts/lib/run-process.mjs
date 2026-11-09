@@ -8,6 +8,29 @@ import { armTimeout, killProcessGroup } from './design-drift.mjs';
 
 const isWindows = process.platform === 'win32';
 
+// Timed runs on POSIX lead their own process group, so the terminal's Ctrl-C no
+// longer reaches them. Track those groups and stop them when the launcher exits
+// or is signalled, otherwise a cancelled run leaves a hung Dembrandt behind.
+const activeGroups = new Set();
+let cleanupInstalled = false;
+
+export function terminateActiveGroups() {
+  for (const child of activeGroups) killProcessGroup(child, { graceMs: 2000 });
+  activeGroups.clear();
+}
+
+function installGroupCleanup() {
+  if (cleanupInstalled) return;
+  cleanupInstalled = true;
+  process.on('exit', terminateActiveGroups);
+  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
+    process.once(signal, () => {
+      terminateActiveGroups();
+      process.exit(code);
+    });
+  }
+}
+
 export function spawnCommand(command, commandArgs, options) {
   if (!isWindows) return spawn(command, commandArgs, { shell: false, ...options });
   const shim = command === 'npm' || command === 'npx' ? `${command}.cmd` : command;
@@ -29,10 +52,15 @@ export function run(command, commandArgs, { env = {}, capture = false, timeoutMs
     let stdout = '';
     let stderr = '';
     let settled = false;
+    if (child.pid && timeoutMs > 0 && !isWindows) {
+      activeGroups.add(child);
+      installGroupCleanup();
+    }
     const finish = (result) => {
       if (settled) return;
       settled = true;
       guard.clear();
+      activeGroups.delete(child);
       resolve(result);
     };
     const guard = armTimeout(child, timeoutMs, (hung) => {
