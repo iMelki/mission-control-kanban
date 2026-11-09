@@ -5,6 +5,7 @@ import {
   DEFAULT_THRESHOLD,
   STATUS,
   classifyRoute,
+  dembrandtEnv,
   evaluateDrift,
   exitCodeFor,
   formatMarkdown,
@@ -139,4 +140,13 @@ test('parseDembrandtResult rejects non-JSON and non-object payloads', () => {
   assert.match(parseDembrandtResult({ code: 1, stdout: 'boom', stderr: 'bad\nworse' }).error, /without JSON output: bad worse/);
   assert.ok(parseDembrandtResult({ code: 0, stdout: '[]' }).error);
   assert.ok(parseDembrandtResult({ code: 0, stdout: 'null' }).error);
+});
+
+test('dembrandtEnv blanks DEMBRANDT_KEY so an operator key never syncs a checked page', () => {
+  const env = dembrandtEnv('http://127.0.0.1:9222');
+  assert.equal(env.DEMBRANDT_KEY, '');
+  assert.equal(env.BROWSER_CDP_ENDPOINT, 'http://127.0.0.1:9222');
+  // Spread over an inherited environment, the blank value must win.
+  const merged = { ...{ DEMBRANDT_KEY: 'operator-secret' }, ...env };
+  assert.equal(merged.DEMBRANDT_KEY, '');
 });

@@ -9,6 +9,24 @@
  * CLI's built-in fail threshold and can be unit tested without a browser.
  */
 
+/**
+ * Environment overrides for the Dembrandt child. DEMBRANDT_KEY is blanked so a
+ * key set in the operator's shell can never make Dembrandt sync extractions of
+ * the checked instance (page text, tokens) to its cloud service. Empty string,
+ * not undefined: the caller spreads these over process.env, so only a defined
+ * value overrides an inherited one.
+ */
+export function dembrandtEnv(cdpEndpoint) {
+  return {
+    BROWSER_CDP_ENDPOINT: cdpEndpoint,
+    DEMBRANDT_KEY: '',
+    DEMBRANDT_NO_HINTS: '1',
+    // omit=optional skips Dembrandt's optional 280 MB ML runtime, which only --ai uses.
+    npm_config_omit: 'optional',
+    NO_COLOR: '1',
+  };
+}
+
 /** Exact Dembrandt release this check runs. Bump deliberately, then re-baseline. */
 export const DEMBRANDT_VERSION = '0.39.2';
 

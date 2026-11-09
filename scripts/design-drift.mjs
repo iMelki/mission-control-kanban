@@ -25,6 +25,7 @@ import {
   DEFAULT_ROUTES,
   DEFAULT_THRESHOLD,
   DEMBRANDT_VERSION,
+  dembrandtEnv,
   evaluateDrift,
   exitCodeFor,
   formatMarkdown,
@@ -176,8 +177,7 @@ async function extractRoute(route, cdpEndpoint, baselineFile) {
   if (baselineFile) dembrandtArgs.push('--compare', baselineFile);
   const result = await run('npx', dembrandtArgs, {
     capture: true,
-    // omit=optional skips Dembrandt's optional 280 MB ML runtime, which only --ai uses.
-    env: { BROWSER_CDP_ENDPOINT: cdpEndpoint, DEMBRANDT_NO_HINTS: '1', npm_config_omit: 'optional', NO_COLOR: '1' },
+    env: dembrandtEnv(cdpEndpoint),
   });
   // Exit 1 is Dembrandt's own drift verdict; we apply our threshold to the score instead.
   return parseDembrandtResult(result, { compare: Boolean(baselineFile) });
