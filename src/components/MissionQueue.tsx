@@ -343,7 +343,15 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             <Hand aria-hidden="true" className="size-3.5" />
             <span>Needs you</span>
             <span aria-hidden="true">·</span>
-            <span>{needsYouCount}</span>
+            {/* Before the board settles the count is unknown, not zero (same rule as presentBoardCount). */}
+            {boardLoadStatus === 'ready' ? (
+              <span>{needsYouCount}</span>
+            ) : (
+              <span>
+                <span aria-hidden="true">–</span>
+                <span className="sr-only">{boardLoadStatus === 'pending' ? 'loading' : 'unavailable'}</span>
+              </span>
+            )}
             <span className="sr-only">{needsYouOnly ? ', showing only these' : ', press to show only these'}</span>
           </button>
         </div>

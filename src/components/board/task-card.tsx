@@ -31,8 +31,13 @@ const RAIL_CLASS: Record<RailTone, string> = {
   done: 'bg-mc-success',
 };
 
+/**
+ * Only GitHub-sourced work is held by the dispatch contract (moveTask and the PATCH
+ * route gate on github_source). Local tasks also carry dispatch_blockers from the API,
+ * but nothing blocks them, so they must not count as waiting on Captain.
+ */
 export function isDispatchBlockedInbox(task: Task): boolean {
-  return task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0;
+  return Boolean(task.github_source) && task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0;
 }
 
 /** Review work and dispatch-blocked Inbox work wait on Captain. */
