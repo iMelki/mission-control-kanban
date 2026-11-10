@@ -146,6 +146,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [overStatus, setOverStatus] = useState<TaskStatus | null>(null);
   const [inkTask, setInkTask] = useState<{ id: string; key: number } | null>(null);
   const inkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The settled result of a move, spoken once the server has answered (dnd-kit's own
+  // region only speaks at drop time, before the PATCH returns).
+  const [moveAnnouncement, setMoveAnnouncement] = useState('');
   const reducedMotion = usePrefersReducedMotion();
 
   const sensors = useSensors(
@@ -160,7 +163,10 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     return runtime.requested_type === runtimeFilter || runtime.effective_type === runtimeFilter;
   };
 
-  const runtimeTasks = tasks.filter(matchesRuntimeFilter);
+  // SSE broadcasts every workspace's task events and the store inserts them as they
+  // arrive, so scope the board (and its "Needs you" count) to this workspace.
+  const workspaceTasks = workspaceId ? tasks.filter((task) => task.workspace_id === workspaceId) : tasks;
+  const runtimeTasks = workspaceTasks.filter(matchesRuntimeFilter);
   const needsYouCount = runtimeTasks.filter(needsCaptain).length;
   const visibleTasks = needsYouOnly ? runtimeTasks.filter(needsCaptain) : runtimeTasks;
   const getTasksByStatus = (status: TaskStatus) =>
@@ -191,7 +197,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       if (task && target && isGatedByDispatchContract(task, target)) {
         return `${task.title} cannot move to ${lane} yet: the dispatch contract is incomplete.`;
       }
-      return `Moved ${taskTitle(active.id)} to ${lane}.`;
+      // Not confirmed yet: moveTask announces the result once the PATCH answers.
+      return `Moving ${taskTitle(active.id)} to ${lane}.`;
     },
     onDragCancel: ({ active }) => `Move cancelled. ${taskTitle(active.id)} stayed where it was.`,
   };
@@ -221,8 +228,11 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     && requiresDispatchContractBeforeWorkStarts(targetStatus)
     && !validateDispatchMetadata(task.dispatch_metadata).canDispatch;
 
+  const laneName = (status: TaskStatus) => COLUMN_LABELS.get(status) ?? status;
+
   const moveTask = async (task: Task, targetStatus: TaskStatus) => {
     if (task.status === targetStatus) return;
+    setMoveAnnouncement('');
 
     dispatchUi({ type: 'set_drop_error', error: null });
 
@@ -258,6 +268,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       if (res.ok) {
         // The ink cross-fade marks a settled move, so it waits for the server to accept it.
         markInkDrying(task.id);
+        setMoveAnnouncement(`Moved ${task.title} to ${laneName(targetStatus)}.`);
         addEvent({
           id: crypto.randomUUID(),
           type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
@@ -269,6 +280,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         const data = await res.json().catch(() => ({}));
         dispatchUi({ type: 'set_drop_error', error: data.error || 'Failed to move task' });
         updateTaskStatus(task.id, task.status);
+        setMoveAnnouncement(`${task.title} was not moved. It stayed in ${laneName(task.status)}.`);
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
@@ -278,6 +290,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       });
       // Revert on error
       updateTaskStatus(task.id, task.status);
+      setMoveAnnouncement(`${task.title} was not moved. It stayed in ${laneName(task.status)}.`);
     }
   };
 
@@ -322,7 +335,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         <div className="mr-auto flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-mc-text">Mission Queue</h2>
           <span className="text-xs text-mc-text-secondary" role="status">
-            {presentBoardCount(boardLoadStatus, visibleTasks.length, tasks.length).text}
+            {presentBoardCount(boardLoadStatus, visibleTasks.length, workspaceTasks.length).text}
           </span>
           {/* The "needs Captain" answer in one glance: Review plus dispatch-blocked
               Inbox. One of the accent's four uses; pressing it filters the board. */}
@@ -392,6 +405,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           </button>
         </div>
       </div>
+
+      <p role="status" aria-live="polite" className="sr-only">{moveAnnouncement}</p>
 
       {dropError && (
         <div role="alert" className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60">

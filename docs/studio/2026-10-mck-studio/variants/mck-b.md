@@ -61,9 +61,13 @@ picks. Spec: `../direction.md` § Direction B, with `../brief.md` and
     0.01 ms).
   - The drop animation is turned off from JS (`usePrefersReducedMotion`),
     because the stylesheet cannot reach WAAPI.
-  - The live region still says "Moved <title> to Review." If the dispatch
-    contract refuses the move, the live region says so instead of claiming the
-    move. The drop-error banner is now `role="alert"`.
+  - The live region still announces the move. At the drop it says "Moving
+    <title> to Review.", and once the server accepts the PATCH a second polite
+    region says "Moved <title> to Review." If the server refuses the move or the
+    request fails, it says the card stayed in its lane. If the dispatch contract
+    refuses the move at the drop, the live region says so instead of claiming
+    the move. The drop-error banner is now `role="alert"`. (Updated 2026-11-10
+    after review: the old drop-time "Moved" could contradict a rejected PATCH.)
 - **Per-route `document.title`.** Root template `%s · Mission Control`. Route
   layouts set "Settings", "n8n sync history", "Runtime regression", and
   "<workspace name> board". A slug with no row in the database gets
@@ -151,7 +155,7 @@ which scrolls on purpose and is keyboard-focusable.
 | First-load JS `/workspace/[slug]` | 253.6 KB gz vs 252.7 KB on origin/dev (+0.9 KB, +0.36%; budget +10%). This method decodes the URL-encoded `%5Bslug%5D` page chunk. The 212 KB figure in `baseline.md` appears to have missed that chunk. |
 | 390 px overflow, 11 route states (home, board, 4 workspace sections, project board, settings, n8n history, runtime regression, not-found) | scrollWidth = innerWidth on all 11 at 390 and at 1440 |
 | axe-core 4.10.2 (WCAG 2.0, 2.1 and 2.2 A/AA tags), all 11 route states at 390 px | 0 violations |
-| Drag, motion allowed | overlay transform `rotate(-1.5deg) translateY(-2px)`; insertion bar 240 ms; rail ink 360 ms; live region "Moved … to Review." |
+| Drag, motion allowed | overlay transform `rotate(-1.5deg) translateY(-2px)`; insertion bar 240 ms; rail ink 360 ms; live region "Moved … to Review." (now spoken after the PATCH succeeds) |
 | Drag, `prefers-reduced-motion: reduce` | overlay transform `none`; bar and ink 0.01 ms; live region still announces; a gated move says "cannot move … yet" |
 
 The screenshots are not in this repo. They are in
