@@ -246,7 +246,6 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
     // Optimistic update
     updateTaskStatus(task.id, targetStatus);
-    markInkDrying(task.id);
 
     // Persist to API
     try {
@@ -257,6 +256,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       });
 
       if (res.ok) {
+        // The ink cross-fade marks a settled move, so it waits for the server to accept it.
+        markInkDrying(task.id);
         addEvent({
           id: crypto.randomUUID(),
           type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
