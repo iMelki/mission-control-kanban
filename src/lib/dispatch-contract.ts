@@ -182,6 +182,61 @@ export function parseDispatchMetadata(raw: unknown): DispatchMetadata | undefine
   return normalizeDispatchMetadata(raw);
 }
 
+function isNonEmptyDispatchValue(value: unknown): boolean {
+  if (value == null) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => isNonEmptyDispatchValue(item));
+  }
+
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).some((item) => isNonEmptyDispatchValue(item));
+  }
+
+  return true;
+}
+
+/**
+ * Key-level merge of upstream-derived dispatch metadata into a locally stored
+ * contract.
+ *
+ * Precedence: local edits win unless upstream explicitly provides a non-empty
+ * value. A value is non-empty when a trimmed string has length, an array has at
+ * least one non-empty item, or any other non-null scalar is present. Missing or
+ * empty upstream keys (issue body or project fields with no section) leave the
+ * local key unchanged. This applies to every key, including locally authored
+ * contract fields such as `allowed_file_scope`, `test_requirements`, and
+ * `rollback_plan`. `dispatch_ready` is not stored on this object; callers
+ * recompute it from the merged result via `validateDispatchMetadata`.
+ */
+export function mergeDispatchMetadataFromUpstream(
+  local: DispatchMetadata | undefined,
+  upstream: DispatchMetadata | undefined,
+): DispatchMetadata | undefined {
+  const localRecord = local && typeof local === 'object'
+    ? { ...(local as Record<string, unknown>) }
+    : {};
+  const upstreamRecord = upstream && typeof upstream === 'object'
+    ? { ...(upstream as Record<string, unknown>) }
+    : {};
+
+  const merged: Record<string, unknown> = { ...localRecord };
+  for (const [key, value] of Object.entries(upstreamRecord)) {
+    if (isNonEmptyDispatchValue(value)) {
+      merged[key] = value;
+    }
+  }
+
+  return normalizeDispatchMetadata(merged);
+}
+
+
 /**
  * Pre-validates the fields that become the canonical v2 envelope `work` block.
  * Returns operator-readable blockers so short or oversized text is refused

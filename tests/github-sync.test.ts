@@ -10,7 +10,7 @@ import {
   normalizeGitHubProjectStatus,
   reconcileGitHubProjectStatus,
 } from '../src/lib/github-project-sync';
-import { requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract } from '../src/lib/dispatch-contract';
+import { mergeDispatchMetadataFromUpstream, requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
   planGitHubWriteback,
@@ -667,4 +667,102 @@ test('GitHub refresh patch updates imported task metadata without forcing status
   assert.equal(patch.github_source?.project_item_id, 'PVTI_refresh_1');
   assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, ['projects-ops/docs/**']);
   assert.equal('status' in patch, false);
+});
+
+
+test('GitHub refresh patch preserves local dispatch contract fields when the issue body omits them', () => {
+  const localContract = {
+    source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'old-workstream',
+    allowed_file_scope: ['src/lib/hindsight.ts', 'tests/hindsight.test.ts'],
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:hindsight'],
+    risk_level: 'medium' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Local impact statement stays after a body-less resync',
+    rollback_plan: 'Revert the local dispatch contract commit.',
+    safety_rules: ['Do not clear locally authored contract fields'],
+  };
+
+  const patch = buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Old title',
+      description: 'Old description',
+      priority: 'normal',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+      },
+      dispatch_metadata: localContract,
+    },
+    {
+      title: 'Refreshed memsys#991 title',
+      description: 'Issue body without contract sections.',
+      priority: 'high',
+      status: 'inbox',
+      workspace_id: 'default',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        project_item_id: 'PVTI_fa3cfe1d',
+      },
+      dispatch_metadata: {
+        source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        target_repo: 'iMelki/memsys',
+        project_workstream: 'updated-workstream',
+      },
+    }
+  );
+
+  assert.equal(patch.title, 'Refreshed memsys#991 title');
+  assert.equal(patch.priority, 'high');
+  assert.equal(patch.github_source?.project_item_id, 'PVTI_fa3cfe1d');
+  assert.equal(patch.dispatch_metadata?.source_issue_url, localContract.source_issue_url);
+  assert.equal(patch.dispatch_metadata?.target_repo, 'iMelki/memsys');
+  assert.equal(patch.dispatch_metadata?.project_workstream, 'updated-workstream');
+  assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, localContract.allowed_file_scope);
+  assert.deepEqual(patch.dispatch_metadata?.acceptance_criteria, localContract.acceptance_criteria);
+  assert.deepEqual(patch.dispatch_metadata?.test_requirements, localContract.test_requirements);
+  assert.equal(patch.dispatch_metadata?.rollback_plan, localContract.rollback_plan);
+  assert.deepEqual(patch.dispatch_metadata?.safety_rules, localContract.safety_rules);
+  assert.equal(patch.dispatch_metadata?.impact, localContract.impact);
+  assert.equal(patch.dispatch_metadata?.readiness, 'ready_for_agent');
+  assert.equal(patch.dispatch_metadata?.review_mode, 'human_required');
+  assert.equal(patch.dispatch_metadata?.risk_level, 'medium');
+  assert.equal(validateDispatchMetadata(patch.dispatch_metadata).canDispatch, true);
+});
+
+test('GitHub refresh patch applies non-empty upstream contract values and ignores empty ones', () => {
+  const merged = mergeDispatchMetadataFromUpstream(
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'local-stream',
+      allowed_file_scope: ['src/local.ts'],
+      test_requirements: ['npm test'],
+      rollback_plan: 'Revert the local change.',
+      readiness: 'ready_for_agent',
+    },
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'upstream-stream',
+      allowed_file_scope: ['src/upstream.ts', 'tests/upstream.test.ts'],
+      test_requirements: [],
+      rollback_plan: '   ',
+      impact: 'Upstream impact is non-empty so it is applied',
+    }
+  );
+
+  assert.equal(merged?.project_workstream, 'upstream-stream');
+  assert.deepEqual(merged?.allowed_file_scope, ['src/upstream.ts', 'tests/upstream.test.ts']);
+  assert.deepEqual(merged?.test_requirements, ['npm test']);
+  assert.equal(merged?.rollback_plan, 'Revert the local change.');
+  assert.equal(merged?.readiness, 'ready_for_agent');
+  assert.equal(merged?.impact, 'Upstream impact is non-empty so it is applied');
 });

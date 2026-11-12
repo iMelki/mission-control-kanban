@@ -1,4 +1,5 @@
 import {
+  mergeDispatchMetadataFromUpstream,
   normalizeDispatchMetadata,
   type DispatchMetadata,
   type DispatchReadiness,
@@ -432,7 +433,13 @@ export function buildTaskRefreshUpdateFromGitHubPreview(
     title: preview.title || currentTask.title,
     description: preview.description ?? currentTask.description,
     priority: preview.priority ?? currentTask.priority,
+    // github_source keeps the previous whole-object fallback; it is not merged.
     github_source: preview.github_source ?? currentTask.github_source ?? null,
-    dispatch_metadata: preview.dispatch_metadata ?? currentTask.dispatch_metadata,
+    // Key-level merge: upstream non-empty keys refresh, local-only keys stay.
+    // See mergeDispatchMetadataFromUpstream for the precedence rule.
+    dispatch_metadata: mergeDispatchMetadataFromUpstream(
+      currentTask.dispatch_metadata,
+      preview.dispatch_metadata,
+    ),
   };
 }
