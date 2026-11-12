@@ -7,6 +7,32 @@ const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'ws://127.0.0.1:28789';
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 const OPERATOR_SCOPES = ['operator.read', 'operator.write'];
 
+/** Current OpenClaw gateway protocol (openclaw@2026.9.7 PROTOCOL_VERSION). */
+export const OPENCLAW_PROTOCOL_VERSION = 4;
+
+export const OPENCLAW_CLIENT_IDENTITY = {
+  id: 'gateway-client',
+  version: '1.0.0',
+  platform: 'web',
+  mode: 'ui',
+} as const;
+
+export function buildConnectParams(token: string) {
+  return {
+    minProtocol: OPENCLAW_PROTOCOL_VERSION,
+    maxProtocol: OPENCLAW_PROTOCOL_VERSION,
+    client: {
+      id: OPENCLAW_CLIENT_IDENTITY.id,
+      version: OPENCLAW_CLIENT_IDENTITY.version,
+      platform: OPENCLAW_CLIENT_IDENTITY.platform,
+      mode: OPENCLAW_CLIENT_IDENTITY.mode,
+    },
+    role: 'operator',
+    scopes: [...OPERATOR_SCOPES],
+    auth: { token },
+  };
+}
+
 export class OpenClawClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -112,21 +138,7 @@ export class OpenClawClient extends EventEmitter {
                 type: 'req',
                 id: requestId,
                 method: 'connect',
-                params: {
-                  minProtocol: 3,
-                  maxProtocol: 3,
-                  client: {
-                    id: 'gateway-client',
-                    version: '1.0.0',
-                    platform: 'web',
-                    mode: 'ui'
-                  },
-                  role: 'operator',
-                  scopes: OPERATOR_SCOPES,
-                  auth: {
-                    token: this.token
-                  }
-                }
+                params: buildConnectParams(this.token)
               };
 
               // Set up response handler
