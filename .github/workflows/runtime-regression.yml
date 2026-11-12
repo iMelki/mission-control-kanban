@@ -75,7 +75,48 @@ jobs:
             ${{ runner.os }}-playwright-
       - name: Install Playwright system dependencies
         timeout-minutes: 8
-        run: npx playwright install-deps chromium
+        run: |
+          for attempt in 1 2 3; do
+            pgid_file="$(mktemp)"
+            status=0
+            # install-deps runs apt-get under sudo. A plain timeout only signals
+            # its own child, so run this attempt in a new session.
+            timeout --kill-after=15s 2m \
+              setsid --wait bash -c "printf '%s\n' \"\$\$\" > \"\$1\"; exec npx playwright install-deps chromium" \
+              _ "$pgid_file" || status=$?
+            if [ "$status" -eq 0 ]; then
+              rm -f "$pgid_file"
+              exit 0
+            fi
+            if [ "$status" -eq 124 ] || [ "$status" -ge 128 ]; then
+              sid="$(tr -cd '0-9' < "$pgid_file")"
+              self_sid="$(ps -o sid= -p "$$" | tr -d '[:space:]')"
+              self_pgid="$(ps -o pgid= -p "$$" | tr -d '[:space:]')"
+              if [ -n "$sid" ] && [ "$sid" -gt 1 ] && [ "$sid" != "$self_sid" ] && [ "$sid" != "$self_pgid" ]; then
+                groups_file="$(mktemp)"
+                ps -eo sid=,pgid= | awk -v sid="$sid" -v self_pgid="$self_pgid" '$1 == sid && $2 ~ /^[0-9]+$/ && $2 != self_pgid { print $2 }' | sort -u > "$groups_file" || true
+                printf '%s\n' "$sid" >> "$groups_file"
+                sort -u "$groups_file" | while read -r pgid; do
+                  if [ -n "$pgid" ] && [ "$pgid" != "$self_pgid" ]; then
+                    sudo kill -KILL -- "-$pgid" 2>/dev/null || true
+                  fi
+                done
+                rm -f "$groups_file"
+              fi
+            fi
+            rm -f "$pgid_file"
+            if [ "$attempt" -lt 3 ]; then
+              deadline=$((SECONDS + 30))
+              while [ "$SECONDS" -lt "$deadline" ]; do
+                if sudo python3 -c 'import fcntl,os,sys; paths=["/var/lib/dpkg/lock","/var/lib/dpkg/lock-frontend","/var/lib/apt/lists/lock","/var/cache/apt/archives/lock"]; exec("def free(path):\n fd=os.open(path, os.O_RDWR)\n try:\n  fcntl.lockf(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)\n  fcntl.lockf(fd, fcntl.LOCK_UN)\n  return True\n except OSError:\n  return False\n finally:\n  os.close(fd)\nsys.exit(0 if all(free(p) for p in paths if os.path.exists(p)) else 1)")'; then
+                  break
+                fi
+                sleep 1
+              done
+              sleep $((attempt * 10))
+            fi
+          done
+          exit 1
       - name: Install Playwright Chromium
         timeout-minutes: 8
         run: |
@@ -129,7 +170,48 @@ jobs:
             ${{ runner.os }}-playwright-
       - name: Install Playwright system dependencies
         timeout-minutes: 8
-        run: npx playwright install-deps chromium
+        run: |
+          for attempt in 1 2 3; do
+            pgid_file="$(mktemp)"
+            status=0
+            # install-deps runs apt-get under sudo. A plain timeout only signals
+            # its own child, so run this attempt in a new session.
+            timeout --kill-after=15s 2m \
+              setsid --wait bash -c "printf '%s\n' \"\$\$\" > \"\$1\"; exec npx playwright install-deps chromium" \
+              _ "$pgid_file" || status=$?
+            if [ "$status" -eq 0 ]; then
+              rm -f "$pgid_file"
+              exit 0
+            fi
+            if [ "$status" -eq 124 ] || [ "$status" -ge 128 ]; then
+              sid="$(tr -cd '0-9' < "$pgid_file")"
+              self_sid="$(ps -o sid= -p "$$" | tr -d '[:space:]')"
+              self_pgid="$(ps -o pgid= -p "$$" | tr -d '[:space:]')"
+              if [ -n "$sid" ] && [ "$sid" -gt 1 ] && [ "$sid" != "$self_sid" ] && [ "$sid" != "$self_pgid" ]; then
+                groups_file="$(mktemp)"
+                ps -eo sid=,pgid= | awk -v sid="$sid" -v self_pgid="$self_pgid" '$1 == sid && $2 ~ /^[0-9]+$/ && $2 != self_pgid { print $2 }' | sort -u > "$groups_file" || true
+                printf '%s\n' "$sid" >> "$groups_file"
+                sort -u "$groups_file" | while read -r pgid; do
+                  if [ -n "$pgid" ] && [ "$pgid" != "$self_pgid" ]; then
+                    sudo kill -KILL -- "-$pgid" 2>/dev/null || true
+                  fi
+                done
+                rm -f "$groups_file"
+              fi
+            fi
+            rm -f "$pgid_file"
+            if [ "$attempt" -lt 3 ]; then
+              deadline=$((SECONDS + 30))
+              while [ "$SECONDS" -lt "$deadline" ]; do
+                if sudo python3 -c 'import fcntl,os,sys; paths=["/var/lib/dpkg/lock","/var/lib/dpkg/lock-frontend","/var/lib/apt/lists/lock","/var/cache/apt/archives/lock"]; exec("def free(path):\n fd=os.open(path, os.O_RDWR)\n try:\n  fcntl.lockf(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)\n  fcntl.lockf(fd, fcntl.LOCK_UN)\n  return True\n except OSError:\n  return False\n finally:\n  os.close(fd)\nsys.exit(0 if all(free(p) for p in paths if os.path.exists(p)) else 1)")'; then
+                  break
+                fi
+                sleep 1
+              done
+              sleep $((attempt * 10))
+            fi
+          done
+          exit 1
       - name: Install Playwright Chromium
         timeout-minutes: 8
         run: |
