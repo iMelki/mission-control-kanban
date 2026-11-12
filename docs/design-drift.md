@@ -75,8 +75,11 @@ The `Design drift (non-blocking)` job in
 with `continue-on-error: true`. Drift shows as a failed job and an
 `mck-design-drift` artifact, but it does not block the merge.
 
-The first baseline was captured on Chromium 141 (Playwright build 1194). CI
-installs the Chromium build that the locked Playwright version expects.
+The first baseline was captured on Chromium 141 (Playwright build 1194). The
+current baseline is the studio direction B "Evolve" look (#194). It was
+captured with `--start --update-baseline` on Chrome Headless Shell 145
+(Playwright build 1208), the build that the locked Playwright 1.58.1 installs.
+CI installs the Chromium build that the locked Playwright version expects.
 Computed styles rarely differ between Chromium versions. If CI reports drift
 on a pull request that does not touch the UI, refresh the baseline from a CI
 run's candidate files or with `--update-baseline`.

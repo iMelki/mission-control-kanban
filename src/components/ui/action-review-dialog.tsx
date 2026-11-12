@@ -71,15 +71,15 @@ const toneStyles: Record<
 > = {
   default: {
     icon: ListChecks,
-    iconClassName: 'text-mc-accent',
+    iconClassName: 'text-mc-text-secondary',
     confirmClassName:
-      'bg-mc-accent text-mc-bg hover:bg-mc-accent/90 focus-visible:ring-mc-accent',
+      'bg-mc-accent text-mc-accent-ink hover:bg-mc-accent/90 focus-visible:ring-mc-accent',
   },
   destructive: {
     icon: TriangleAlert,
-    iconClassName: 'text-mc-accent-red',
+    iconClassName: 'text-mc-danger',
     confirmClassName:
-      'bg-mc-accent-red text-white hover:bg-mc-accent-red/90 focus-visible:ring-mc-accent-red',
+      'bg-mc-danger text-mc-bg hover:bg-mc-danger/90 focus-visible:ring-mc-danger',
   },
 };
 
@@ -266,9 +266,9 @@ export function ActionReviewDialog({
         {errorMessage ? (
           <div
             role="alert"
-            className="flex items-start gap-2 rounded-md border border-mc-accent-red/40 bg-mc-accent-red/10 p-3"
+            className="flex items-start gap-2 rounded-md border border-mc-danger/40 bg-mc-danger/10 p-3"
           >
-            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-mc-accent-red" />
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-mc-danger" />
             <p className="m-0 text-sm leading-5 text-mc-text">{errorMessage}</p>
           </div>
         ) : null}

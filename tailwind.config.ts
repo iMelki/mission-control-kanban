@@ -9,24 +9,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Dark theme colors matching the screenshot
-        'mc-bg': '#0d1117',
-        'mc-bg-secondary': '#161b22',
-        'mc-bg-tertiary': '#21262d',
-        'mc-border': '#30363d',
-        'mc-text': '#c9d1d9',
-        'mc-text-secondary': '#8b949e',
-        'mc-text-muted': '#8b949e',
-        'mc-accent': '#58a6ff',
-        'mc-accent-green': '#3fb950',
-        'mc-accent-yellow': '#d29922',
-        'mc-accent-red': '#f85149',
-        'mc-accent-purple': '#a371f7',
-        'mc-accent-pink': '#db61a2',
-        'mc-accent-cyan': '#39d353',
-        'mc-success': '#3fb950',
-        'mc-warn': '#d29922',
-        'mc-danger': '#f85149',
+        // Direction B "Evolve" tokens. The values live on :root in globals.css;
+        // these resolve through the `-rgb` channel triples so opacity modifiers
+        // (`bg-mc-warn/10`) work and the CSS stays the single source of truth.
+        'mc-bg': 'rgb(var(--mc-bg-rgb) / <alpha-value>)',
+        'mc-bg-secondary': 'rgb(var(--mc-bg-secondary-rgb) / <alpha-value>)',
+        'mc-bg-tertiary': 'rgb(var(--mc-bg-tertiary-rgb) / <alpha-value>)',
+        'mc-border': 'rgb(var(--mc-border-rgb) / <alpha-value>)',
+        'mc-text': 'rgb(var(--mc-text-rgb) / <alpha-value>)',
+        'mc-text-secondary': 'rgb(var(--mc-text-secondary-rgb) / <alpha-value>)',
+        'mc-text-muted': 'rgb(var(--mc-text-muted-rgb) / <alpha-value>)',
+        'mc-accent': 'rgb(var(--mc-accent-rgb) / <alpha-value>)',
+        'mc-accent-ink': 'rgb(var(--mc-accent-ink-rgb) / <alpha-value>)',
+        'mc-success': 'rgb(var(--mc-success-rgb) / <alpha-value>)',
+        'mc-warn': 'rgb(var(--mc-warn-rgb) / <alpha-value>)',
+        'mc-danger': 'rgb(var(--mc-danger-rgb) / <alpha-value>)',
       },
       fontFamily: {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],

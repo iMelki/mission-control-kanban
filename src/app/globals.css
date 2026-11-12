@@ -2,25 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Direction B "Evolve" (docs/studio/2026-10-mck-studio/direction.md).
+ *
+ * Warm graphite surfaces and one sticky-note yellow accent. Elevation is carried
+ * by FILL, not by border: bg -> lane -> card each step lighter, because a border
+ * alone (#2e3136) stays under 3:1 on every surface and WCAG 1.4.11 needs the card
+ * to be identifiable without it.
+ *
+ * Every hex below is the direction table verbatim. Tokens hold the hex for people
+ * and tests, and an `-rgb` channel triple for Tailwind's `<alpha-value>` path
+ * (tailwind.config.ts), so the two can never drift.
+ *
+ * The accent is spent on four things only: the primary action, focus, the drop
+ * target, and the "Needs you" chip (plus the review rail, which is the same
+ * "needs you" signal on the card). Warn is ORANGE so yellow only ever means accent.
+ * The legacy hue names (mc-accent-green/red/yellow/purple/pink/cyan) are gone;
+ * status tones are mc-success / mc-warn / mc-danger.
+ */
 :root {
-  --mc-bg: #0d1117;
-  --mc-bg-secondary: #161b22;
-  --mc-bg-tertiary: #21262d;
-  --mc-border: #30363d;
-  --mc-text: #c9d1d9;
-  --mc-text-secondary: #8b949e;
-  /* Solid muted metadata. Do not fade this with /60 — that composites to 2.87:1 (mck#151). */
-  --mc-text-muted: #8b949e;
-  --mc-accent: #58a6ff;
-  --mc-accent-green: #3fb950;
-  --mc-accent-yellow: #d29922;
-  --mc-accent-red: #f85149;
-  --mc-accent-purple: #a371f7;
-  --mc-accent-pink: #db61a2;
-  --mc-accent-cyan: #39d353;
-  --mc-success: #3fb950;
-  --mc-warn: #d29922;
-  --mc-danger: #f85149;
+  --mc-bg: #111214;
+  --mc-bg-rgb: 17 18 20;
+  /* lane / surface */
+  --mc-bg-secondary: #18191c;
+  --mc-bg-secondary-rgb: 24 25 28;
+  /* card (raised fill) */
+  --mc-bg-tertiary: #202226;
+  --mc-bg-tertiary-rgb: 32 34 38;
+  --mc-border: #2e3136;
+  --mc-border-rgb: 46 49 54;
+  --mc-text: #e6e4df;
+  --mc-text-rgb: 230 228 223;
+  --mc-text-secondary: #9d9a92;
+  --mc-text-secondary-rgb: 157 154 146;
+  /* Solid muted metadata. Do not fade this with /60 or /70 (mck#151). */
+  --mc-text-muted: #9d9a92;
+  --mc-text-muted-rgb: 157 154 146;
+  --mc-accent: #e6be5a;
+  --mc-accent-rgb: 230 190 90;
+  /* ink on accent: 10.22:1 on #e6be5a */
+  --mc-accent-ink: #1a1608;
+  --mc-accent-ink-rgb: 26 22 8;
+  --mc-success: #4cb782;
+  --mc-success-rgb: 76 183 130;
+  --mc-warn: #e0823d;
+  --mc-warn-rgb: 224 130 61;
+  --mc-danger: #ef6461;
+  --mc-danger-rgb: 239 100 97;
+
+  /* One h1 scale on every route (direction A list, included in B). */
+  --mc-h1-size: 1.25rem;
+  --mc-h1-line: 1.75rem;
+
+  /* Card status rail. */
+  --mc-rail-width: 3px;
+
+  color-scheme: dark;
 }
 
 /*
@@ -98,6 +135,11 @@ h6 {
   letter-spacing: var(--mc-heading-tracking);
 }
 
+h1 {
+  font-size: var(--mc-h1-size);
+  line-height: var(--mc-h1-line);
+}
+
 /* Explicit opt-in for headings that also carry sizing utilities. */
 .text-heading {
   font-weight: var(--mc-heading-weight);
@@ -129,49 +171,28 @@ h6 {
 }
 
 .status-working {
-  @apply bg-mc-accent-green/20 text-mc-accent-green border border-mc-accent-green/50;
+  @apply bg-mc-bg text-mc-success border border-mc-success/50;
 }
 
 .status-offline {
-  @apply bg-mc-bg text-mc-accent-red border border-mc-accent-red/50;
+  @apply bg-mc-bg text-mc-danger border border-mc-danger/50;
 }
 
-/* Priority badge styles */
+/* Priority badge styles. Normal is neutral: the accent is not a priority. */
 .priority-low {
-  @apply bg-mc-text-secondary/20 text-mc-text-secondary;
+  @apply bg-mc-bg text-mc-text-secondary;
 }
 
 .priority-normal {
-  @apply bg-mc-accent/20 text-mc-accent;
+  @apply bg-mc-bg text-mc-text;
 }
 
 .priority-high {
-  @apply bg-mc-accent-yellow/20 text-mc-accent-yellow;
+  @apply bg-mc-bg text-mc-warn;
 }
 
 .priority-urgent {
-  @apply bg-mc-accent-red/20 text-mc-accent-red;
-}
-
-/* Task status column colors */
-.column-inbox {
-  @apply border-t-mc-accent-pink;
-}
-
-.column-assigned {
-  @apply border-t-mc-accent-yellow;
-}
-
-.column-in_progress {
-  @apply border-t-mc-accent;
-}
-
-.column-review {
-  @apply border-t-mc-accent-purple;
-}
-
-.column-done {
-  @apply border-t-mc-accent-green;
+  @apply bg-mc-bg text-mc-danger;
 }
 
 /* Animations */
@@ -208,7 +229,68 @@ h6 {
 
 /* Glow effect for online status */
 .online-glow {
-  box-shadow: 0 0 10px var(--mc-accent-green), 0 0 20px var(--mc-accent-green);
+  box-shadow: 0 0 10px var(--mc-success), 0 0 20px var(--mc-success);
+}
+
+/*
+ * Signature moment: "pick up the note" (direction B).
+ *
+ * Transform and opacity only. Pickup tilts the overlay -1.5deg and lifts it 2px
+ * while a shadow layer fades in by opacity; the target lane shows an accent
+ * insertion bar that grows by scaleX; on drop the card's rail cross-fades from
+ * accent to its new status tone over --duration-slower ("ink drying").
+ *
+ * Reduced motion: Block 2 below collapses every duration, so the bar appears at
+ * full width and the rail takes its new tone at once. The tilt and lift are END
+ * states, not durations, so they are removed explicitly in the reduced-motion
+ * block at the bottom of this file. The move is still announced by dnd-kit's
+ * live region (MissionQueue `announcements`).
+ */
+@keyframes mc-note-pickup {
+  from { transform: rotate(0deg) translateY(0); }
+  to { transform: rotate(-1.5deg) translateY(-2px); }
+}
+
+@keyframes mc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mc-insert-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes mc-ink-dry {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.mc-note-lifted {
+  position: relative;
+  transform: rotate(-1.5deg) translateY(-2px);
+  animation: mc-note-pickup var(--duration-fast) var(--ease-standard);
+}
+
+/* Shadow is its own layer so only its opacity animates. */
+.mc-note-lifted::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 14px 28px -8px rgb(0 0 0 / 0.65), 0 2px 6px rgb(0 0 0 / 0.4);
+  pointer-events: none;
+  animation: mc-fade-in var(--duration-fast) var(--ease-standard);
+}
+
+.mc-insert-bar {
+  transform-origin: left center;
+  animation: mc-insert-grow var(--duration-slow) var(--ease-standard);
+}
+
+.mc-rail-ink {
+  opacity: 0;
+  animation: mc-ink-dry var(--duration-slower) var(--ease-standard);
 }
 
 /*
@@ -323,5 +405,15 @@ h6 {
     animation-timing-function: var(--ease-standard, ease-in-out) !important;
     animation-iteration-count: infinite !important;
     animation-delay: 0s !important;
+  }
+}
+
+/*
+ * Direction B reduced-motion end states. Block 2 collapses durations; the tilt
+ * and lift of a picked-up note are resting transforms, so they go here.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .mc-note-lifted {
+    transform: none;
   }
 }

@@ -125,10 +125,10 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   });
 
   const dispatchSummaryClass = dispatchPreview.tone === 'success'
-    ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-100'
+    ? 'border-mc-success/25 bg-mc-success/10 text-mc-text'
     : dispatchPreview.tone === 'warning'
-      ? 'border-amber-500/25 bg-amber-500/10 text-amber-100'
-      : 'border-rose-500/25 bg-rose-500/10 text-rose-100';
+      ? 'border-mc-warn/25 bg-mc-warn/10 text-mc-text'
+      : 'border-mc-danger/25 bg-mc-danger/10 text-mc-text';
   const fieldIdPrefix = currentTask?.id ? `task-modal-${currentTask.id}` : 'task-modal-new';
   const inputId = (name: string) => `${fieldIdPrefix}-${name}`;
   const assignedAgent = agents.find((candidate) => candidate.id === form.assigned_agent_id) || currentTask?.assigned_agent || null;
@@ -380,7 +380,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'text-mc-accent border-b-2 border-mc-accent'
+                    ? 'text-mc-text border-b-2 border-mc-text'
                     : 'text-mc-text-secondary hover:text-mc-text'
                 }`}
               >
@@ -424,34 +424,34 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           </div>
 
           {submitError && (
-            <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10">
+            <div className="p-3 rounded-lg border border-mc-danger/20 bg-mc-danger/10">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="size-4 text-rose-300 mt-0.5" />
+                <AlertTriangle className="size-4 text-mc-danger mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-rose-200">Task update failed</p>
-                  <p className="mt-1 text-xs text-rose-100">{submitError}</p>
+                  <p className="text-sm font-medium text-mc-text">Task update failed</p>
+                  <p className="mt-1 text-xs text-mc-text">{submitError}</p>
                 </div>
               </div>
             </div>
           )}
 
           {currentTask?.dispatch_blockers && currentTask.dispatch_blockers.length > 0 && (
-            <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10">
+            <div className="p-3 rounded-lg border border-mc-danger/20 bg-mc-danger/10">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="size-4 text-rose-300 mt-0.5" />
+                <AlertTriangle className="size-4 text-mc-danger mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-rose-200">Dispatch is currently blocked</p>
-                  <p className="mt-1 text-xs text-rose-100">
+                  <p className="text-sm font-medium text-mc-text">Dispatch is currently blocked</p>
+                  <p className="mt-1 text-xs text-mc-text">
                     The task can stay in <strong>Inbox</strong>, but moving it into active states like
                     <strong> Assigned</strong>, <strong>In Progress</strong>, <strong>Testing</strong>,
                     <strong> Review</strong>, or <strong>Done</strong> is blocked until the dispatch contract below is complete.
                   </p>
-                  <ul className="mt-1 text-xs text-rose-100 space-y-1 list-disc list-inside">
+                  <ul className="mt-1 text-xs text-mc-text space-y-1 list-disc list-inside">
                     {currentTask.dispatch_blockers.map((blocker) => (
                       <li key={blocker}>{blocker}</li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-xs text-amber-100">
+                  <p className="mt-2 text-xs text-mc-text">
                     Why this exists: imported GitHub tasks should not leave Inbox until scope, tests,
                     impact, and rollback containment are explicit enough for safe execution.
                   </p>
@@ -473,7 +473,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 />
                 <div>
                   <span className="font-medium text-sm flex items-center gap-2">
-                    <ClipboardList className="size-4 text-mc-accent" />
+                    <ClipboardList className="size-4 text-mc-text-secondary" />
                     Enable Planning Mode
                   </span>
                   <p className="text-xs text-mc-text-secondary mt-1">
@@ -543,7 +543,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                   {agent.name} - {agent.role}
                 </option>
               ))}
-              <option value="__add_new__" className="text-mc-accent">
+              <option value="__add_new__">
                 + Add new agent…
               </option>
             </select>
@@ -552,7 +552,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 <span className="font-medium text-mc-text">Runtime: {assignedRuntime.label}</span>
                 {assignedRuntime.reason && (
                   <details className="text-mc-text-secondary">
-                    <summary className="cursor-pointer text-amber-100">Why dispatch is disabled / manual</summary>
+                    <summary className="cursor-pointer text-mc-text">Why dispatch is disabled / manual</summary>
                     <p className="mt-1 max-w-xl">{assignedRuntime.reason}. Assignment still tracks ownership; use Copy handoff unless this agent is configured for OpenClaw/webhook dispatch and auto-dispatch is enabled.</p>
                   </details>
                 )}
@@ -664,7 +664,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                   trigger={
                     <button
                       type="button"
-                      className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
+                      className="flex items-center gap-2 px-3 py-2 text-mc-danger hover:bg-mc-danger/10 rounded text-sm"
                     >
                       <Trash2 className="size-4" />
                       Delete
@@ -694,7 +694,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 type="submit"
                 form={`${fieldIdPrefix}-form`}
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-accent-ink rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
               >
                 <Save className="size-4" />
                 {isSubmitting ? 'Saving…' : 'Save'}

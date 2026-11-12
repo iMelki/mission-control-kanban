@@ -171,7 +171,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 animate-spin text-mc-accent" />
+        <Loader2 className="w-6 h-6 animate-spin text-mc-text-secondary" />
         <span className="ml-2 text-mc-text-secondary">Loading planning state...</span>
       </div>
     );
@@ -181,7 +181,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
   if (state?.isComplete && state?.spec) {
     return (
       <div className="p-4 space-y-6">
-        <div className="flex items-center gap-2 text-green-400">
+        <div className="flex items-center gap-2 text-mc-success">
           <Lock className="w-5 h-5" />
           <span className="font-medium">Planning Complete</span>
         </div>
@@ -248,7 +248,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 text-red-400 text-sm">
+          <div className="flex items-center gap-2 text-mc-danger text-sm">
             <AlertCircle className="w-4 h-4" />
             {error}
           </div>
@@ -258,7 +258,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
               type="button"
           onClick={startPlanning}
           disabled={starting}
-          className="px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center gap-2"
+          className="px-6 py-3 bg-mc-accent text-mc-accent-ink rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center gap-2"
         >
           {starting ? (
             <>
@@ -282,7 +282,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
       {/* Progress indicator */}
       <div className="p-4 border-b border-mc-border">
         <div className="flex items-center gap-2 text-sm text-mc-text-secondary">
-          <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+          <div className="w-2 h-2 bg-mc-text-secondary rounded-full animate-pulse" />
           <span>Planning in progress...</span>
         </div>
       </div>
@@ -309,16 +309,16 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
                       className={`w-full flex items-center gap-3 p-4 rounded-lg border transition-colors text-left ${
                         isSelected
                           ? 'border-mc-accent bg-mc-accent/10'
-                          : 'border-mc-border hover:border-mc-accent/50'
+                          : 'border-mc-border hover:border-mc-text-secondary/60'
                       } disabled:opacity-50`}
                     >
                       <span className={`w-8 h-8 rounded flex items-center justify-center text-sm font-bold ${
-                        isSelected ? 'bg-mc-accent text-mc-bg' : 'bg-mc-bg-tertiary'
+                        isSelected ? 'bg-mc-accent text-mc-accent-ink' : 'bg-mc-bg-tertiary'
                       }`}>
                         {option.id.toUpperCase()}
                       </span>
                       <span className="flex-1">{option.label}</span>
-                      {isSelected && <CheckCircle className="w-5 h-5 text-mc-accent" />}
+                      {isSelected && <CheckCircle className="w-5 h-5 text-mc-text-secondary" />}
                     </button>
 
                     {/* Other text input */}
@@ -344,7 +344,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-red-400 text-sm mt-4">
+              <div className="flex items-center gap-2 text-mc-danger text-sm mt-4">
                 <AlertCircle className="w-4 h-4" />
                 {error}
               </div>
@@ -356,7 +356,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
               type="button"
                 onClick={submitAnswer}
                 disabled={!selectedOption || submitting || (selectedOption === 'Other' && !otherText.trim())}
-                className="w-full px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full px-6 py-3 bg-mc-accent text-mc-accent-ink rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>
@@ -372,7 +372,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-mc-accent mx-auto mb-2" />
+              <Loader2 className="w-8 h-8 animate-spin text-mc-text-secondary mx-auto mb-2" />
               <p className="text-mc-text-secondary">Waiting for next question...</p>
             </div>
           </div>
@@ -387,7 +387,7 @@ export function PlanningTab({ taskId, onSpecLocked }: PlanningTabProps) {
           </summary>
           <div className="p-3 space-y-2 max-h-48 overflow-y-auto bg-mc-bg">
             {state.messages.map((msg, i) => (
-              <div key={i} className={`text-sm ${msg.role === 'user' ? 'text-mc-accent' : 'text-mc-text-secondary'}`}>
+              <div key={i} className={`text-sm ${msg.role === 'user' ? 'text-mc-text' : 'text-mc-text-secondary'}`}>
                 <span className="font-medium">{msg.role === 'user' ? 'You' : 'Charlie'}:</span>{' '}
                 <span className="opacity-75">{msg.content.substring(0, 100)}...</span>
               </div>

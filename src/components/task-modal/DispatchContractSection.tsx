@@ -4,6 +4,7 @@ import {
   RISK_LEVEL_LABELS,
   type DispatchUiSummary,
 } from '@/lib/dispatch-contract';
+import { DISPATCH_CONTRACT_INBOX_GUIDANCE, showsDispatchContractInboxBanner } from '@/lib/board-attention';
 import type { DispatchReadiness, DispatchReviewMode, DispatchRiskLevel, Task } from '@/lib/types';
 
 interface DispatchContractFormState {
@@ -49,10 +50,10 @@ export function DispatchContractSection<TForm extends DispatchContractFormState>
         <p className="text-xs text-mc-text-secondary mt-1">
           These fields mirror the GitHub-native readiness contract used to decide whether auto-dispatch is safe.
         </p>
-        {currentTask?.status === 'inbox' && currentTask.dispatch_blockers && currentTask.dispatch_blockers.length > 0 && (
-          <p className="text-xs text-amber-200 mt-2">
-            Why this task is still in Inbox: it is missing one or more required dispatch fields. Fill the scope,
-            acceptance criteria, tests, review mode, impact, and rollback plan here, then save before moving it forward.
+        {showsDispatchContractInboxBanner(currentTask) && (
+          <p data-dispatch-contract-guidance className="text-xs text-mc-text mt-2">
+            {DISPATCH_CONTRACT_INBOX_GUIDANCE} Fill the scope, acceptance criteria, tests, review mode,
+            impact, and rollback plan here, then save before moving it forward.
           </p>
         )}
       </div>
