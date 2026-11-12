@@ -4,13 +4,14 @@ import assert from 'node:assert/strict';
 import {
   buildGitHubImportPreviewResponse,
   buildTaskRefreshUpdateFromGitHubPreview,
+  mergeGitHubSourceFromUpstream,
 } from '../src/lib/github-task-import';
 import {
   GITHUB_PROJECT_WORKSPACE_MAPPINGS,
   normalizeGitHubProjectStatus,
   reconcileGitHubProjectStatus,
 } from '../src/lib/github-project-sync';
-import { requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract } from '../src/lib/dispatch-contract';
+import { GENERIC_SYNC_PLACEHOLDER_STRINGS, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
   planGitHubWriteback,
@@ -667,4 +668,502 @@ test('GitHub refresh patch updates imported task metadata without forcing status
   assert.equal(patch.github_source?.project_item_id, 'PVTI_refresh_1');
   assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, ['projects-ops/docs/**']);
   assert.equal('status' in patch, false);
+});
+
+
+test('GitHub refresh patch preserves local dispatch contract fields when the issue body omits them', () => {
+  const localContract = {
+    source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'old-workstream',
+    allowed_file_scope: ['src/lib/hindsight.ts', 'tests/hindsight.test.ts'],
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:hindsight'],
+    risk_level: 'medium' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Local impact statement stays after a body-less resync',
+    rollback_plan: 'Revert the local dispatch contract commit.',
+    safety_rules: ['Do not clear locally authored contract fields'],
+  };
+
+  const patch = buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Old title',
+      description: 'Old description',
+      priority: 'normal',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+      },
+      dispatch_metadata: localContract,
+    },
+    {
+      title: 'Refreshed memsys#991 title',
+      description: 'Issue body without contract sections.',
+      priority: 'high',
+      status: 'inbox',
+      workspace_id: 'default',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        project_item_id: 'PVTI_fa3cfe1d',
+      },
+      dispatch_metadata: {
+        source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        target_repo: 'iMelki/memsys',
+        project_workstream: 'updated-workstream',
+      },
+    }
+  );
+
+  assert.equal(patch.title, 'Refreshed memsys#991 title');
+  assert.equal(patch.priority, 'high');
+  assert.equal(patch.github_source?.project_item_id, 'PVTI_fa3cfe1d');
+  assert.equal(patch.dispatch_metadata?.source_issue_url, localContract.source_issue_url);
+  assert.equal(patch.dispatch_metadata?.target_repo, 'iMelki/memsys');
+  assert.equal(patch.dispatch_metadata?.project_workstream, 'updated-workstream');
+  assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, localContract.allowed_file_scope);
+  assert.deepEqual(patch.dispatch_metadata?.acceptance_criteria, localContract.acceptance_criteria);
+  assert.deepEqual(patch.dispatch_metadata?.test_requirements, localContract.test_requirements);
+  assert.equal(patch.dispatch_metadata?.rollback_plan, localContract.rollback_plan);
+  assert.deepEqual(patch.dispatch_metadata?.safety_rules, localContract.safety_rules);
+  assert.equal(patch.dispatch_metadata?.impact, localContract.impact);
+  assert.equal(patch.dispatch_metadata?.readiness, 'ready_for_agent');
+  assert.equal(patch.dispatch_metadata?.review_mode, 'human_required');
+  assert.equal(patch.dispatch_metadata?.risk_level, 'medium');
+  assert.equal(validateDispatchMetadata(patch.dispatch_metadata).canDispatch, true);
+});
+
+test('GitHub refresh patch applies non-empty upstream contract values and ignores empty ones', () => {
+  const merged = mergeDispatchMetadataFromUpstream(
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'local-stream',
+      allowed_file_scope: ['src/local.ts'],
+      test_requirements: ['npm test'],
+      rollback_plan: 'Revert the local change.',
+      readiness: 'ready_for_agent',
+    },
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'upstream-stream',
+      allowed_file_scope: ['src/upstream.ts', 'tests/upstream.test.ts'],
+      test_requirements: [],
+      rollback_plan: '   ',
+      impact: 'Upstream impact is non-empty so it is applied',
+    }
+  );
+
+  assert.equal(merged?.project_workstream, 'upstream-stream');
+  assert.deepEqual(merged?.allowed_file_scope, ['src/upstream.ts', 'tests/upstream.test.ts']);
+  assert.deepEqual(merged?.test_requirements, ['npm test']);
+  assert.equal(merged?.rollback_plan, 'Revert the local change.');
+  assert.equal(merged?.readiness, 'ready_for_agent');
+  assert.equal(merged?.impact, 'Upstream impact is non-empty so it is applied');
+});
+
+test('GitHub refresh patch keeps canDispatch false when a required contract field is missing locally and upstream', () => {
+  const incompleteLocal = {
+    source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'old-workstream',
+    allowed_file_scope: ['src/lib/hindsight.ts'],
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:hindsight'],
+    risk_level: 'medium' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Local impact is present but rollback_plan is not',
+  };
+
+  const before = validateDispatchMetadata(incompleteLocal);
+  assert.equal(before.canDispatch, false);
+  assert.ok(before.missingFields.includes('rollback/fallback plan'));
+
+  const patch = buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Old title',
+      description: 'Old description',
+      priority: 'normal',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+      },
+      dispatch_metadata: incompleteLocal,
+    },
+    {
+      title: 'Refreshed memsys#991 title',
+      description: 'Issue body without contract sections.',
+      priority: 'high',
+      status: 'inbox',
+      workspace_id: 'default',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        project_item_id: 'PVTI_incomplete_contract',
+      },
+      dispatch_metadata: {
+        source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        target_repo: 'iMelki/memsys',
+        project_workstream: 'updated-workstream',
+      },
+    }
+  );
+
+  assert.equal(patch.title, 'Refreshed memsys#991 title');
+  assert.equal(patch.dispatch_metadata?.project_workstream, 'updated-workstream');
+  assert.equal(patch.dispatch_metadata?.rollback_plan, undefined);
+  const after = validateDispatchMetadata(patch.dispatch_metadata);
+  assert.equal(after.canDispatch, false);
+  assert.ok(after.missingFields.includes('rollback/fallback plan'));
+});
+
+test('placeholder upstream overwrite refused', () => {
+  const localImpact = 'Local impact describes the real operator change.';
+  const localScope = ['src/lib/dispatch-contract.ts', 'tests/github-sync.test.ts'];
+  const localCriteria = ['Local acceptance criterion stays'];
+  const localTests = ['npm run test:github-sync'];
+  const localRollback = 'Revert the local dispatch contract commit.';
+
+  const merged = mergeDispatchMetadataFromUpstream(
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'local-stream',
+      allowed_file_scope: localScope,
+      acceptance_criteria: localCriteria,
+      test_requirements: localTests,
+      impact: localImpact,
+      rollback_plan: localRollback,
+      readiness: 'ready_for_agent',
+    },
+    {
+      allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+      acceptance_criteria: [
+        'Issue is present on the mapped GitHub Project.',
+        'Required dispatch fields are populated for MCK import.',
+        'Mapped MCK workspace sync imports or updates the local task mirror.',
+      ],
+      test_requirements: [
+        'Run this script in -DryRun mode before broad repair.',
+        'Run mapped MCK workspace sync after Project membership repair.',
+      ],
+      impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+      rollback_plan: 'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.',
+    },
+  );
+
+  assert.deepEqual(merged?.allowed_file_scope, localScope);
+  assert.deepEqual(merged?.acceptance_criteria, localCriteria);
+  assert.deepEqual(merged?.test_requirements, localTests);
+  assert.equal(merged?.impact, localImpact);
+  assert.equal(merged?.rollback_plan, localRollback);
+  assert.equal(merged?.project_workstream, 'local-stream');
+
+  // A mixed upstream array drops placeholder items, then applies the rest.
+  const mixed = mergeDispatchMetadataFromUpstream(
+    { acceptance_criteria: localCriteria },
+    {
+      acceptance_criteria: [
+        '  Issue is present on the mapped GitHub Project.  ',
+        'A real upstream criterion is kept',
+      ],
+    },
+  );
+  assert.deepEqual(mixed?.acceptance_criteria, ['A real upstream criterion is kept']);
+
+  // Case or wording changes are not placeholders (exact match after trim only).
+  assert.equal(isGenericSyncPlaceholder('issue is present on the mapped GitHub Project.'), false);
+  assert.equal(
+    isGenericSyncPlaceholder('  Issue is present on the mapped GitHub Project.  '),
+    true,
+  );
+  assert.equal(GENERIC_SYNC_PLACEHOLDER_STRINGS.includes('Issue is present on the mapped GitHub Project.'), true);
+});
+
+test('empty upstream keeps local value', () => {
+  const local = {
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'local-stream',
+    allowed_file_scope: ['src/local.ts'],
+    acceptance_criteria: ['Local criterion'],
+    test_requirements: ['npm test'],
+    impact: 'Local impact stays',
+    rollback_plan: 'Revert the local change.',
+    readiness: 'ready_for_agent' as const,
+  };
+
+  const merged = mergeDispatchMetadataFromUpstream(local, {
+    project_workstream: '   ',
+    allowed_file_scope: [],
+    acceptance_criteria: ['   '],
+    test_requirements: undefined,
+    impact: '',
+    rollback_plan: ' \n\t ',
+  });
+
+  assert.equal(merged?.project_workstream, 'local-stream');
+  assert.deepEqual(merged?.allowed_file_scope, ['src/local.ts']);
+  assert.deepEqual(merged?.acceptance_criteria, ['Local criterion']);
+  assert.deepEqual(merged?.test_requirements, ['npm test']);
+  assert.equal(merged?.impact, 'Local impact stays');
+  assert.equal(merged?.rollback_plan, 'Revert the local change.');
+  assert.equal(merged?.readiness, 'ready_for_agent');
+  assert.equal(merged?.target_repo, 'iMelki/memsys');
+});
+
+test('placeholder-only field is not dispatchable', () => {
+  const otherwiseComplete = {
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'local-stream',
+    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+    acceptance_criteria: [
+      'Issue is present on the mapped GitHub Project.',
+      'Required dispatch fields are populated for MCK import.',
+    ],
+    test_requirements: ['Run this wrapper in dry-run mode before apply.'],
+    risk_level: 'medium' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+    rollback_plan: 'Use the generated rollback manifest to restore prior Project field values or remove newly created Project items.',
+  };
+
+  const result = validateDispatchMetadata(otherwiseComplete);
+  assert.equal(result.canDispatch, false);
+  assert.ok(result.missingFields.includes('allowed file scope'));
+  assert.ok(result.missingFields.includes('acceptance criteria'));
+  assert.ok(result.missingFields.includes('test requirements'));
+  assert.ok(result.missingFields.includes('impact'));
+  assert.ok(result.missingFields.includes('rollback/fallback plan'));
+  assert.equal(result.missingFields.includes('target repo'), false);
+  assert.equal(result.missingFields.includes('project/workstream'), false);
+
+  // A required field with a real item plus a placeholder is still present.
+  const mixed = validateDispatchMetadata({
+    ...otherwiseComplete,
+    allowed_file_scope: [
+      'Owning repo issue, docs, scripts, and tests named by the task.',
+      'src/lib/dispatch-contract.ts',
+    ],
+    acceptance_criteria: ['A real acceptance criterion'],
+    test_requirements: ['npm run test:github-sync'],
+    impact: 'Local impact describes the real operator change.',
+    rollback_plan: 'Revert the local dispatch contract commit.',
+  });
+  assert.equal(mixed.canDispatch, true);
+  assert.deepEqual(mixed.missingFields, []);
+});
+
+test('partial upstream github_source keeps local subfields', () => {
+  const localSource = {
+    repo_owner: 'iMelki',
+    repo_name: 'memsys',
+    issue_number: 991,
+    issue_url: 'https://github.com/iMelki/memsys/issues/991',
+    project_item_id: 'PVTI_local_kept',
+  };
+
+  const merged = mergeGitHubSourceFromUpstream(localSource, {
+    repo_owner: 'iMelki',
+    repo_name: '',
+    issue_number: 0,
+    issue_url: '   ',
+    project_item_id: 'PVTI_upstream_refresh',
+  });
+
+  assert.equal(merged?.repo_owner, 'iMelki');
+  assert.equal(merged?.repo_name, 'memsys');
+  assert.equal(merged?.issue_number, 991);
+  assert.equal(merged?.issue_url, 'https://github.com/iMelki/memsys/issues/991');
+  assert.equal(merged?.project_item_id, 'PVTI_upstream_refresh');
+
+  // A placeholder string in an upstream subfield does not wipe the local value.
+  const placeholderOwner = mergeGitHubSourceFromUpstream(localSource, {
+    repo_owner: 'Issue is present on the mapped GitHub Project.',
+    repo_name: 'memsys',
+    issue_number: 991,
+    issue_url: 'https://github.com/iMelki/memsys/issues/991',
+  });
+  assert.equal(placeholderOwner?.repo_owner, 'iMelki');
+  assert.equal(placeholderOwner?.project_item_id, 'PVTI_local_kept');
+
+  // The refresh helper uses the same subfield merge.
+  const patch = buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Old title',
+      description: 'Old description',
+      priority: 'normal',
+      github_source: localSource,
+      dispatch_metadata: { target_repo: 'iMelki/memsys' },
+    },
+    {
+      title: 'Refreshed title',
+      description: 'Refreshed description',
+      priority: 'high',
+      status: 'inbox',
+      workspace_id: 'default',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        // project_item_id absent: local value must stay
+      },
+      dispatch_metadata: { target_repo: 'iMelki/memsys' },
+    },
+  );
+
+  assert.equal(patch.github_source?.project_item_id, 'PVTI_local_kept');
+  assert.equal(patch.github_source?.repo_name, 'memsys');
+  assert.equal(patch.github_source?.issue_number, 991);
+});
+
+test('#114 first-item-only shape is not dispatchable', () => {
+  // 43 of the 44 generic cards, including #114, store only the first list
+  // item and no trailing semicolon. Script single-select defaults are
+  // Ready for Agent / Human Required / Medium and must not make the card
+  // dispatch-ready when the contract text is all placeholder.
+  const firstItemOnly = {
+    target_repo: 'iMelki/projects-ops',
+    project_workstream: 'Agent Infrastructure',
+    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+    acceptance_criteria: ['Issue is present on the mapped GitHub Project.'],
+    test_requirements: ['Run this script in -DryRun mode before broad repair.'],
+    risk_level: 'medium' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+    rollback_plan: 'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.',
+    safety_rules: ['Do not mutate external upstream repos from portfolio repair.'],
+  };
+
+  const result = validateDispatchMetadata(firstItemOnly);
+  assert.equal(result.canDispatch, false);
+  assert.ok(result.missingFields.includes('allowed file scope'));
+  assert.ok(result.missingFields.includes('acceptance criteria'));
+  assert.ok(result.missingFields.includes('test requirements'));
+  assert.ok(result.missingFields.includes('impact'));
+  assert.ok(result.missingFields.includes('rollback/fallback plan'));
+
+  // After MCK splits the scope default on commas, the four pieces are
+  // also placeholders, so the field stays missing.
+  const commaSplitScope = validateDispatchMetadata({
+    ...firstItemOnly,
+    allowed_file_scope: [
+      'Owning repo issue',
+      'docs',
+      'scripts',
+      'and tests named by the task.',
+    ],
+  });
+  assert.equal(commaSplitScope.canDispatch, false);
+  assert.ok(commaSplitScope.missingFields.includes('allowed file scope'));
+
+  assert.equal(isGenericSyncPlaceholder('Issue is present on the mapped GitHub Project.'), true);
+  assert.equal(isGenericSyncPlaceholder('Owning repo issue'), true);
+  assert.equal(isGenericSyncPlaceholder('docs'), true);
+  assert.equal(isGenericSyncPlaceholder('scripts'), true);
+  assert.equal(isGenericSyncPlaceholder('and tests named by the task.'), true);
+  assert.equal(isGenericSyncPlaceholder('Do not mutate external upstream repos from portfolio repair.'), true);
+});
+
+test('#561 full join is not dispatchable', () => {
+  // #561 stores the full list joins: items joined with '; ' (0x3b 0x20),
+  // each item already ending in '.', so a trailing '.;' follows each,
+  // including the last. Invoke-GitHubProjectMutation joins with LF/CRLF.
+  const semicolonJoinedAc = [
+    'Issue is present on the mapped GitHub Project.',
+    'Required dispatch fields are populated for MCK import.',
+    'Mapped MCK workspace sync imports or updates the local task mirror.',
+  ].join('; ') + ';';
+  const semicolonJoinedTests = [
+    'Run this script in -DryRun mode before broad repair.',
+    'Run mapped MCK workspace sync after Project membership repair.',
+  ].join('; ') + ';';
+  const semicolonJoinedSafety = [
+    'Do not mutate external upstream repos from portfolio repair.',
+    'Do not dispatch agents from this repair script.',
+  ].join('; ') + ';';
+  const lfJoinedInvokeTests = [
+    'Run this wrapper in dry-run mode before apply.',
+    'Run mapped MCK workspace sync only after endpoint alignment passes.',
+  ].join('\n');
+  const crlfJoinedInvokeSafety = [
+    'Do not mutate external upstream repos.',
+    'Do not create MCK-only cards.',
+    'Do not dispatch agents from this repair script.',
+  ].join('\r\n');
+
+  assert.equal(isGenericSyncPlaceholder(semicolonJoinedAc), true);
+  assert.equal(isGenericSyncPlaceholder(semicolonJoinedTests), true);
+  assert.equal(isGenericSyncPlaceholder(semicolonJoinedSafety), true);
+  assert.equal(isGenericSyncPlaceholder(lfJoinedInvokeTests), true);
+  assert.equal(isGenericSyncPlaceholder(crlfJoinedInvokeSafety), true);
+  // A proper subset of the joined items is also a placeholder.
+  assert.equal(
+    isGenericSyncPlaceholder(
+      'Issue is present on the mapped GitHub Project.; Required dispatch fields are populated for MCK import.',
+    ),
+    true,
+  );
+
+  const result = validateDispatchMetadata({
+    target_repo: 'iMelki/projects-ops',
+    project_workstream: 'Agent Infrastructure',
+    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+    acceptance_criteria: [semicolonJoinedAc],
+    test_requirements: [semicolonJoinedTests],
+    risk_level: 'medium',
+    readiness: 'ready_for_agent',
+    review_mode: 'human_required',
+    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+    rollback_plan: 'Use the generated rollback manifest to restore prior Project field values or remove newly created Project items.',
+    safety_rules: [semicolonJoinedSafety],
+  });
+  assert.equal(result.canDispatch, false);
+  assert.ok(result.missingFields.includes('acceptance criteria'));
+  assert.ok(result.missingFields.includes('test requirements'));
+  assert.ok(result.missingFields.includes('rollback/fallback plan'));
+  assert.ok(result.missingFields.includes('impact'));
+  assert.ok(result.missingFields.includes('allowed file scope'));
+
+  const invokeNewlines = validateDispatchMetadata({
+    target_repo: 'iMelki/projects-ops',
+    project_workstream: 'Agent Infrastructure',
+    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+    acceptance_criteria: [[
+      'Issue is present on the mapped GitHub Project.',
+      'Required dispatch fields are populated for MCK import.',
+      'Mapped MCK workspace sync imports or updates the local task mirror.',
+    ].join('\n')],
+    test_requirements: [lfJoinedInvokeTests],
+    risk_level: 'medium',
+    readiness: 'ready_for_agent',
+    review_mode: 'human_required',
+    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+    rollback_plan: 'Use the generated rollback manifest to restore prior Project field values or remove newly created Project items.',
+    safety_rules: [crlfJoinedInvokeSafety],
+  });
+  assert.equal(invokeNewlines.canDispatch, false);
+  assert.ok(invokeNewlines.missingFields.includes('acceptance criteria'));
+  assert.ok(invokeNewlines.missingFields.includes('test requirements'));
+
+  // A real criterion among joined placeholders is kept, and that field is present.
+  const mixed = mergeDispatchMetadataFromUpstream(
+    { acceptance_criteria: ['Local criterion stays if upstream is placeholder-only'] },
+    { acceptance_criteria: [semicolonJoinedAc] },
+  );
+  assert.deepEqual(mixed?.acceptance_criteria, ['Local criterion stays if upstream is placeholder-only']);
 });

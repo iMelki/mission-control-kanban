@@ -1,4 +1,6 @@
 import {
+  isGenericSyncPlaceholder,
+  mergeDispatchMetadataFromUpstream,
   normalizeDispatchMetadata,
   type DispatchMetadata,
   type DispatchReadiness,
@@ -284,6 +286,65 @@ export function normalizeGitHubSourceIdentity(input: unknown): GitHubSourceIdent
   };
 }
 
+function isUsableGitHubSourceSubfield(value: unknown): boolean {
+  if (value == null) {
+    return false;
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0 && !Number.isNaN(value);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 && !isGenericSyncPlaceholder(trimmed);
+  }
+
+  return false;
+}
+
+/**
+ * Subfield-level merge of an upstream-derived GitHub source identity into the
+ * locally stored identity.
+ *
+ * Precedence matches `mergeDispatchMetadataFromUpstream`: an absent, empty, or
+ * placeholder upstream subfield never wipes a non-empty local subfield, and a
+ * non-empty non-placeholder upstream subfield still refreshes.
+ */
+export function mergeGitHubSourceFromUpstream(
+  local: GitHubSourceIdentity | undefined | null,
+  upstream: GitHubSourceIdentity | undefined | null,
+): GitHubSourceIdentity | undefined {
+  const merged: Record<string, unknown> = {};
+
+  if (local && typeof local === 'object') {
+    merged.repo_owner = local.repo_owner;
+    merged.repo_name = local.repo_name;
+    merged.issue_number = local.issue_number;
+    merged.issue_url = local.issue_url;
+    if (local.project_item_id !== undefined) {
+      merged.project_item_id = local.project_item_id;
+    }
+  }
+
+  if (upstream && typeof upstream === 'object') {
+    const upstreamSubfields: Array<[string, unknown]> = [
+      ['repo_owner', upstream.repo_owner],
+      ['repo_name', upstream.repo_name],
+      ['issue_number', upstream.issue_number],
+      ['issue_url', upstream.issue_url],
+      ['project_item_id', upstream.project_item_id],
+    ];
+    for (const [key, value] of upstreamSubfields) {
+      if (isUsableGitHubSourceSubfield(value)) {
+        merged[key] = typeof value === 'string' ? value.trim() : value;
+      }
+    }
+  }
+
+  return normalizeGitHubSourceIdentity(merged);
+}
+
 export function parseGitHubIssueUrl(issueUrl: string): GitHubSourceIdentity | undefined {
   const match = issueUrl.match(ISSUE_URL_REGEX);
   if (!match) {
@@ -432,7 +493,17 @@ export function buildTaskRefreshUpdateFromGitHubPreview(
     title: preview.title || currentTask.title,
     description: preview.description ?? currentTask.description,
     priority: preview.priority ?? currentTask.priority,
-    github_source: preview.github_source ?? currentTask.github_source ?? null,
-    dispatch_metadata: preview.dispatch_metadata ?? currentTask.dispatch_metadata,
+    // Subfield-level merge: absent, empty, or placeholder upstream subfields
+    // never wipe a non-empty local subfield; non-empty upstream subfields refresh.
+    github_source: mergeGitHubSourceFromUpstream(
+      currentTask.github_source,
+      preview.github_source,
+    ) ?? null,
+    // Key-level merge: upstream non-empty non-placeholder keys refresh,
+    // local-only keys stay. See mergeDispatchMetadataFromUpstream.
+    dispatch_metadata: mergeDispatchMetadataFromUpstream(
+      currentTask.dispatch_metadata,
+      preview.dispatch_metadata,
+    ),
   };
 }
