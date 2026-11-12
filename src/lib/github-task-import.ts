@@ -315,17 +315,30 @@ export function mergeGitHubSourceFromUpstream(
   local: GitHubSourceIdentity | undefined | null,
   upstream: GitHubSourceIdentity | undefined | null,
 ): GitHubSourceIdentity | undefined {
-  const localRecord = local && typeof local === 'object'
-    ? { ...(local as Record<string, unknown>) }
-    : {};
-  const upstreamRecord = upstream && typeof upstream === 'object'
-    ? { ...(upstream as Record<string, unknown>) }
-    : {};
+  const merged: Record<string, unknown> = {};
 
-  const merged: Record<string, unknown> = { ...localRecord };
-  for (const [key, value] of Object.entries(upstreamRecord)) {
-    if (isUsableGitHubSourceSubfield(value)) {
-      merged[key] = typeof value === 'string' ? value.trim() : value;
+  if (local && typeof local === 'object') {
+    merged.repo_owner = local.repo_owner;
+    merged.repo_name = local.repo_name;
+    merged.issue_number = local.issue_number;
+    merged.issue_url = local.issue_url;
+    if (local.project_item_id !== undefined) {
+      merged.project_item_id = local.project_item_id;
+    }
+  }
+
+  if (upstream && typeof upstream === 'object') {
+    const upstreamSubfields: Array<[string, unknown]> = [
+      ['repo_owner', upstream.repo_owner],
+      ['repo_name', upstream.repo_name],
+      ['issue_number', upstream.issue_number],
+      ['issue_url', upstream.issue_url],
+      ['project_item_id', upstream.project_item_id],
+    ];
+    for (const [key, value] of upstreamSubfields) {
+      if (isUsableGitHubSourceSubfield(value)) {
+        merged[key] = typeof value === 'string' ? value.trim() : value;
+      }
     }
   }
 
