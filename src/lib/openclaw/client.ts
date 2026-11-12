@@ -33,6 +33,14 @@ export function buildConnectParams(token: string) {
   };
 }
 
+function errorFromGateway(error: { code?: number; message: string } | undefined): Error & { code?: number } {
+  const err = new Error(error?.message || 'OpenClaw request failed') as Error & { code?: number };
+  if (typeof error?.code === 'number' && Number.isFinite(error.code)) {
+    err.code = error.code;
+  }
+  return err;
+}
+
 export class OpenClawClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -188,7 +196,7 @@ export class OpenClawClient extends EventEmitter {
         this.pendingRequests.delete(requestId);
 
         if (data.ok === false && data.error) {
-          reject(new Error(data.error.message));
+          reject(errorFromGateway(data.error));
         } else {
           resolve(data.payload);
         }
@@ -203,7 +211,7 @@ export class OpenClawClient extends EventEmitter {
       this.pendingRequests.delete(legacyId);
 
       if (data.error) {
-        reject(new Error(data.error.message));
+        reject(errorFromGateway(data.error));
       } else {
         resolve(data.result);
       }

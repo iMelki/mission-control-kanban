@@ -44,7 +44,7 @@
     "test:runtime-operations": "node --import tsx --test tests/runtime-operations.test.ts",
     "test:task-dependencies": "node --import tsx --test tests/task-dependencies.test.ts",
     "test:fetch-budget": "node --import tsx --test tests/fetch-budget.test.ts",
-    "test:openclaw-protocol": "node --import tsx --test tests/openclaw-client-protocol.test.ts",
+    "test:openclaw-protocol": "node --import tsx --test tests/openclaw-client-protocol.test.ts tests/openclaw-status.test.ts",
     "test:cockpit-load-state": "node --import tsx --test tests/cockpit-load-state.test.ts",
     "test:workspace-sync-summary": "node --import tsx --test tests/workspace-sync-summary.test.ts tests/workspace-status-bar.test.ts",
     "test:contrast-tokens": "node --import tsx --test tests/contrast-tokens.test.ts",
