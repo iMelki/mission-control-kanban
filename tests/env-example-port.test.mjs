@@ -23,3 +23,12 @@ test("canonical port agrees with dev:n8n and the factory base URL", async () => 
   const contracts = await readFile("integrations/paperclip-bridge/src/contracts.ts", "utf8");
   assert.match(contracts, new RegExp(`FACTORY_MCK_BASE_URL = "http://127\\.0\\.0\\.1:${CANONICAL_PORT}"`));
 });
+
+test("dev:n8n binds MCK to 127.0.0.1 only, never 0.0.0.0", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = pkg.scripts["dev:n8n"];
+  assert.equal(typeof script, "string");
+  assert.match(script, /--hostname\s+127\.0\.0\.1\b/);
+  assert.match(script, new RegExp(`-p ${CANONICAL_PORT}\\b`));
+  assert.doesNotMatch(script, /0\.0\.0\.0/);
+});

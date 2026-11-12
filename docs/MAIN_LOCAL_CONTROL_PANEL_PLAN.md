@@ -18,7 +18,7 @@ Service Manager allowlist unless MCK owns a narrow, reviewed action itself.
 
 | Surface | Entry point | MCK role |
 | --- | --- | --- |
-| MCK | `http://127.0.0.1:3021` via `npm run dev:n8n`; managed local workspace: `http://127.0.0.1:3021/workspace/assistants` | Primary GitHub Project cockpit and task board. Docker-backed n8n uses `http://mck.host:3021` for scheduled sync. |
+| MCK | `http://127.0.0.1:3021` via `npm run dev:n8n`; managed local workspace: `http://127.0.0.1:3021/workspace/assistants` | Primary GitHub Project cockpit and task board. `npm run dev:n8n` binds MCK to `127.0.0.1:3021` only. Scheduled n8n sync must reach that loopback address (see [N8N_SCHEDULED_SYNC.md](N8N_SCHEDULED_SYNC.md)); a Docker `mck.host` mapping to a Tailscale or LAN IP will not. |
 | MCK sync history | `/n8n-sync-history` | Local automation run history for scheduled Project sync. |
 | GitHub diagnostics | `/api/github/diagnostics` | Readiness probe for token, issue read, and Project read. |
 | OpenClaw status | `/api/openclaw/status` | Runtime connectivity probe. |
@@ -54,9 +54,10 @@ Each card should expose:
 
 - Use MCK for task/project cockpit state, import, sync, diagnostics, and
   write-back preview.
-- Treat `3021` and `mck.host:3021` as the repo development and managed
-  MCK/n8n sync route unless the operator explicitly records a temporary
-  override.
+- Treat `127.0.0.1:3021` as the repo development MCK bind. Scheduled n8n
+  sync must call that loopback address; do not map `mck.host` to a
+  Tailscale or LAN IP while MCK is localhost-only (see
+  [N8N_SCHEDULED_SYNC.md](N8N_SCHEDULED_SYNC.md)).
 - Use Command Center for app launch when a surface may need to be started first.
 - Use Mission Control or the shared Dev Service Manager for local process,
   Docker, WSL, pressure, log, and stop/start decisions.

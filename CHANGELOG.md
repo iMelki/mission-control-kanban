@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`dev:n8n` binds MCK to 127.0.0.1 only (2026-11-12)** - `npm run dev:n8n`
+  used `--hostname 0.0.0.0`, which published the Next dev server on every
+  interface. It now binds `127.0.0.1:3021`.
+  `tests/env-example-port.test.mjs` rejects any `0.0.0.0` in that script.
+  [docs/N8N_SCHEDULED_SYNC.md](docs/N8N_SCHEDULED_SYNC.md) records why the
+  twice-daily n8n schedule can stop reporting (n8n/Docker down, workflow
+  inactive, or Docker `mck.host` pointing at a Tailscale/LAN IP that cannot
+  reach a localhost-only MCK) and the operator steps to bring it back
+  without opening n8n beyond loopback.
+
 - **Commit the Next.js agent-rules block in `AGENTS.md` (2026-10-05, #187)** -
   Next.js 16.3 `next dev` writes a managed `<!-- BEGIN:nextjs-agent-rules -->`
   block into `AGENTS.md` whenever it detects an AI coding agent and the block
