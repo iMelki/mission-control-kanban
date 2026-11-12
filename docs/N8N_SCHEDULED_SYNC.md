@@ -24,42 +24,96 @@ Two independent sync paths exist (see also
   `src/lib/n8n-sync-freshness.ts`).
 
 Default `mckBaseUrl` is `MCK_N8N_BASE_URL`, then `MCK_BASE_URL`, then
-`http://mck.host:3021`. Manual webhook calls default to dry-run. Scheduled
-runs are also dry-run until the projects-ops schedule artifact sets
-`scheduledNonDryRunApproved` to `true`. While that flag is false, a healthy
-schedule still *reports* (the drawer "Last run" updates) but does not apply
-local-mirror writes; **Sync now** remains the applying path.
+`http://mck.host:3021`. When n8n runs on the host, it **must** set
+`MCK_N8N_BASE_URL=http://127.0.0.1:3021`. The default still falls back to
+`http://mck.host:3021`, which cannot reach a loopback-only MCK.
+
+Manual webhook calls default to dry-run. Scheduled runs are also dry-run
+until the projects-ops schedule artifact sets `scheduledNonDryRunApproved`
+to `true`. While that flag is false, a healthy schedule still *reports*
+(the drawer "Last run" updates) but does not apply local-mirror writes;
+**Sync now** remains the applying path.
 
 ## Localhost Bind
 
 `npm run dev:n8n` starts MCK on `127.0.0.1:3021` only. It must not pass
 `--hostname 0.0.0.0`. `tests/env-example-port.test.mjs` asserts this.
 
-The n8n UI and webhooks belong on `http://127.0.0.1:5678`. When n8n is
-Docker-backed, restrict the *host* publish to loopback, for example
-`127.0.0.1:5678:5678` and `127.0.0.1:5030:3000`. Do not set
-`N8N_LISTEN_ADDRESS=127.0.0.1` *inside* the container: Docker's port publish
-forwards to the container's `0.0.0.0:5678`, and a container-only loopback
-bind would make the published host port miss. The host-side bind is what
-keeps n8n off the LAN.
+The n8n UI and webhooks belong on `http://127.0.0.1:5678`. Because MCK itself
+listens on `127.0.0.1` only, n8n must not rely on `host.docker.internal` or
+Docker `host-gateway` to reach it: those paths cannot reach a loopback-only
+MCK. A Tailscale or LAN address mapped onto `mck.host` also fails, typically
+with `ECONNREFUSED` on the Tailscale IP:3021.
 
-Because MCK itself listens on `127.0.0.1` only, Docker n8n cannot reach it
-through a Tailscale or LAN address mapped onto `mck.host` (that path fails
-with `ECONNREFUSED` on the Tailscale IP:3021). Docker Desktop on Windows
-often also cannot reach a `127.0.0.1`-only host port via `host-gateway`.
-The reliable pairing is: MCK on `127.0.0.1:3021`, and n8n on the host
-(not only in Docker) calling `http://127.0.0.1:3021`. If n8n stays in
-Docker, prove reachability with the projects-ops endpoint-alignment script
-and require `status=aligned` before treating the schedule as healthy.
+The reliable pairing is: MCK on `127.0.0.1:3021`, and n8n running **on the
+host** (not in Docker) with `MCK_N8N_BASE_URL=http://127.0.0.1:3021`.
+
+If Docker stays for anything (n8n or other services), its publishes go only
+on `127.0.0.1` for ports `5678` and `5030`, for example `127.0.0.1:5678:5678`
+and `127.0.0.1:5030:3000`. Do not set `N8N_LISTEN_ADDRESS=127.0.0.1` *inside*
+the container: Docker's port publish forwards to the container's
+`0.0.0.0:5678`, and a container-only loopback bind would make the published
+host port miss. The host-side bind is what keeps the service off the LAN.
+
+If n8n itself stays in Docker, `Test-MckEndpointAlignment.ps1 -Json` from
+the projects-ops checkout is a **hard gate** before enabling the schedule:
+require `status=aligned`. Do not enable the schedule until that gate passes.
+
+## Operator Recipe After Merge
+
+CTO decision: run n8n **on the host** with
+`MCK_N8N_BASE_URL=http://127.0.0.1:3021`. Do not apply these steps from an
+agent unless Ilan (or CTO for operational work) says yes.
+
+1. **Run n8n on the host**, not in Docker. Set
+   `MCK_N8N_BASE_URL=http://127.0.0.1:3021` in the host n8n environment.
+   Never rely on `host.docker.internal` or `host-gateway`; they cannot
+   reach a loopback-only MCK. Leave MCK on `127.0.0.1:3021`.
+
+2. **If Docker stays for anything else**, restrict its host publishes to
+   loopback only. At `C:\Dev\n8n\docker-compose.yml` (local overlay, not
+   this repo), change `"5678:5678"` to `"127.0.0.1:5678:5678"` and
+   `"5030:3000"` to `"127.0.0.1:5030:3000"`. Do **not** set
+   `N8N_LISTEN_ADDRESS=127.0.0.1` inside a container. Remove any
+   `extra_hosts: mck.host:<Tailscale or LAN IP>` mapping: that is the
+   address that failed with `ECONNREFUSED` while MCK listened on
+   `127.0.0.1` only.
+
+3. **If n8n stays in Docker** (not the chosen path): the schedule stays
+   disabled until the hard gate passes. From the projects-ops checkout,
+   run `pwsh -NoProfile -File .\scripts\Test-MckEndpointAlignment.ps1 -Json`
+   and require `status=aligned` before enabling the schedule.
+
+4. **Logon autostart and health.** Add a logon scheduled task (or equivalent)
+   that starts host n8n on login. MCK's LocalNext watchdog starts MCK only;
+   it does not start n8n. Confirm `http://127.0.0.1:5678/healthz` is up and
+   that **PrjOpsMckSync001** is Active. The repo-owned workflow JSON stores
+   `active: false`, so re-activate the workflow after any workflow-pack
+   sync.
+
+5. **Keep `scheduledNonDryRunApproved` false** until one scheduled dry run
+   succeeds. The flag lives in
+   `n8n-workflows/workflow-pack-1/mck-project-workspace-sync.schedule.json`
+   (projects-ops, not this repo). After n8n is up, the drawer "Last run"
+   can update again, but scheduled runs stay **dry-run** for every
+   workspace (the flag as implemented is not asimtop-only). **Sync now**
+   remains the applying path. Do not flip the flag without an explicit
+   operator yes.
+
+6. **Confirm a fresh report.** After a successful dry run (the next 09:00
+   or 17:00 Asia/Jerusalem, or a visible n8n trigger execution), confirm
+   `/api/n8n/mck-sync-status` shows a fresh `received_at`. That, together
+   with a successful n8n execution, is what proves the installed scheduler
+   fired and reached MCK.
 
 ## When The Drawer Says The Schedule Is Dead
 
 Typical causes, in the order to check them (all read-only until an operator
 approves a start or config change):
 
-1. **n8n is not running.** Nothing listens on `127.0.0.1:5678`. Docker Desktop
-   may be stopped, and there may be no Task Scheduler entry that starts the
-   n8n stack (MCK's LocalNext watchdog starts MCK only).
+1. **n8n is not running.** Nothing listens on `127.0.0.1:5678`. There may be
+   no Task Scheduler entry that starts n8n (MCK's LocalNext watchdog starts
+   MCK only).
 2. **The workflow is inactive.** A workflow-pack sync from the repo-owned JSON
    (which stores `active: false`) can deactivate `PrjOpsMckSync001`. Confirm
    it is active in the n8n UI before waiting for 09:00/17:00.
@@ -67,14 +121,16 @@ approves a start or config change):
    `Call MCK Workspace Sync` errors such as `ECONNREFUSED` on `mck.host`.
    Failed runs never reach `POST /api/n8n/mck-sync-status`, so the MCK
    drawer keeps the last *successful report* (which can be months old) and
-   does not show the failures.
+   does not show the failures. Host n8n must set
+   `MCK_N8N_BASE_URL=http://127.0.0.1:3021`; the default still falls back
+   to `http://mck.host:3021`.
 4. **Scheduled non-dry-run is still paused.** The schedule may be reporting
    dry-runs only. That is a policy flag, not a crash; do not flip it without
-   explicit operator approval.
+   explicit operator approval. Keep it false until a dry run succeeds.
 
-Do not start, stop, or restart Docker or n8n from this document alone; see
-the pull-request "Operator steps after merge" (or the operator) for the
-exact local steps.
+For the exact local steps, see [Operator Recipe After Merge](#operator-recipe-after-merge)
+above. Do not start, stop, or restart n8n or Docker from this document
+alone without operator approval.
 
 ## Related Surfaces
 
