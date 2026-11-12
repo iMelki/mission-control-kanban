@@ -1,4 +1,5 @@
 import {
+  isGenericSyncPlaceholder,
   mergeDispatchMetadataFromUpstream,
   normalizeDispatchMetadata,
   type DispatchMetadata,
@@ -285,6 +286,52 @@ export function normalizeGitHubSourceIdentity(input: unknown): GitHubSourceIdent
   };
 }
 
+function isUsableGitHubSourceSubfield(value: unknown): boolean {
+  if (value == null) {
+    return false;
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0 && !Number.isNaN(value);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 && !isGenericSyncPlaceholder(trimmed);
+  }
+
+  return false;
+}
+
+/**
+ * Subfield-level merge of an upstream-derived GitHub source identity into the
+ * locally stored identity.
+ *
+ * Precedence matches `mergeDispatchMetadataFromUpstream`: an absent, empty, or
+ * placeholder upstream subfield never wipes a non-empty local subfield, and a
+ * non-empty non-placeholder upstream subfield still refreshes.
+ */
+export function mergeGitHubSourceFromUpstream(
+  local: GitHubSourceIdentity | undefined | null,
+  upstream: GitHubSourceIdentity | undefined | null,
+): GitHubSourceIdentity | undefined {
+  const localRecord = local && typeof local === 'object'
+    ? { ...(local as Record<string, unknown>) }
+    : {};
+  const upstreamRecord = upstream && typeof upstream === 'object'
+    ? { ...(upstream as Record<string, unknown>) }
+    : {};
+
+  const merged: Record<string, unknown> = { ...localRecord };
+  for (const [key, value] of Object.entries(upstreamRecord)) {
+    if (isUsableGitHubSourceSubfield(value)) {
+      merged[key] = typeof value === 'string' ? value.trim() : value;
+    }
+  }
+
+  return normalizeGitHubSourceIdentity(merged);
+}
+
 export function parseGitHubIssueUrl(issueUrl: string): GitHubSourceIdentity | undefined {
   const match = issueUrl.match(ISSUE_URL_REGEX);
   if (!match) {
@@ -433,10 +480,14 @@ export function buildTaskRefreshUpdateFromGitHubPreview(
     title: preview.title || currentTask.title,
     description: preview.description ?? currentTask.description,
     priority: preview.priority ?? currentTask.priority,
-    // github_source keeps the previous whole-object fallback; it is not merged.
-    github_source: preview.github_source ?? currentTask.github_source ?? null,
-    // Key-level merge: upstream non-empty keys refresh, local-only keys stay.
-    // See mergeDispatchMetadataFromUpstream for the precedence rule.
+    // Subfield-level merge: absent, empty, or placeholder upstream subfields
+    // never wipe a non-empty local subfield; non-empty upstream subfields refresh.
+    github_source: mergeGitHubSourceFromUpstream(
+      currentTask.github_source,
+      preview.github_source,
+    ) ?? null,
+    // Key-level merge: upstream non-empty non-placeholder keys refresh,
+    // local-only keys stay. See mergeDispatchMetadataFromUpstream.
     dispatch_metadata: mergeDispatchMetadataFromUpstream(
       currentTask.dispatch_metadata,
       preview.dispatch_metadata,

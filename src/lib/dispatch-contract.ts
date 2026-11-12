@@ -97,6 +97,74 @@ export const RISK_LEVEL_LABELS: Record<DispatchRiskLevel, string> = {
   critical: 'Critical',
 };
 
+/**
+ * Generic portfolio-repair default strings from iMelki/projects-ops (dev).
+ * Matched EXACTLY after trim: no fuzzy matching, regex, or case folding.
+ * Sources (file:line on projects-ops `dev`):
+ *   scripts/Ensure-RepoIssueProjectVisibility.ps1
+ *   scripts/Invoke-GitHubProjectMutation.ps1
+ * MemSys-sourced strings, if they differ, are a follow-up.
+ */
+export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
+  // Ensure-RepoIssueProjectVisibility.ps1:35 and Invoke-GitHubProjectMutation.ps1:49 (Impact)
+  'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+  // Ensure-RepoIssueProjectVisibility.ps1:36 and Invoke-GitHubProjectMutation.ps1:50 (Allowed File Scope)
+  'Owning repo issue, docs, scripts, and tests named by the task.',
+  // Ensure-RepoIssueProjectVisibility.ps1:38 and Invoke-GitHubProjectMutation.ps1:52 (Acceptance Criteria)
+  'Issue is present on the mapped GitHub Project.',
+  // Ensure-RepoIssueProjectVisibility.ps1:39 and Invoke-GitHubProjectMutation.ps1:53
+  'Required dispatch fields are populated for MCK import.',
+  // Ensure-RepoIssueProjectVisibility.ps1:40 and Invoke-GitHubProjectMutation.ps1:54
+  'Mapped MCK workspace sync imports or updates the local task mirror.',
+  // Ensure-RepoIssueProjectVisibility.ps1:43 (Test Requirements)
+  'Run this script in -DryRun mode before broad repair.',
+  // Ensure-RepoIssueProjectVisibility.ps1:44
+  'Run mapped MCK workspace sync after Project membership repair.',
+  // Ensure-RepoIssueProjectVisibility.ps1:46 (Rollback Plan)
+  'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.',
+  // Invoke-GitHubProjectMutation.ps1:57 (Test Requirements)
+  'Run this wrapper in dry-run mode before apply.',
+  // Invoke-GitHubProjectMutation.ps1:58
+  'Run mapped MCK workspace sync only after endpoint alignment passes.',
+  // Invoke-GitHubProjectMutation.ps1:60 (Rollback Plan)
+  'Use the generated rollback manifest to restore prior Project field values or remove newly created Project items.',
+] as const;
+
+const GENERIC_SYNC_PLACEHOLDER_SET: ReadonlySet<string> = new Set(GENERIC_SYNC_PLACEHOLDER_STRINGS);
+
+/**
+ * True when `value` is a string whose trimmed form equals one of
+ * `GENERIC_SYNC_PLACEHOLDER_STRINGS` exactly.
+ */
+export function isGenericSyncPlaceholder(value: unknown): boolean {
+  return typeof value === 'string' && GENERIC_SYNC_PLACEHOLDER_SET.has(value.trim());
+}
+
+/**
+ * Drop generic placeholder items (and empty strings) from a dispatch value.
+ * A string that is itself a placeholder becomes undefined. Arrays keep only
+ * substantive items; an array of only placeholders becomes undefined.
+ */
+export function stripGenericSyncPlaceholders(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || GENERIC_SYNC_PLACEHOLDER_SET.has(trimmed)) {
+      return undefined;
+    }
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value.flatMap((item) => {
+      const stripped = stripGenericSyncPlaceholders(item);
+      return stripped === undefined ? [] : [stripped];
+    });
+    return items.length > 0 ? items : undefined;
+  }
+
+  return value;
+}
+
 export function requiresDispatchContractBeforeWorkStarts(status: string | undefined): boolean {
   return typeof status === 'string' && ACTIVE_WORK_STATUSES.has(status);
 }
@@ -206,14 +274,16 @@ function isNonEmptyDispatchValue(value: unknown): boolean {
  * Key-level merge of upstream-derived dispatch metadata into a locally stored
  * contract.
  *
- * Precedence: local edits win unless upstream explicitly provides a non-empty
- * value. A value is non-empty when a trimmed string has length, an array has at
- * least one non-empty item, or any other non-null scalar is present. Missing or
- * empty upstream keys (issue body or project fields with no section) leave the
- * local key unchanged. This applies to every key, including locally authored
- * contract fields such as `allowed_file_scope`, `test_requirements`, and
- * `rollback_plan`. `dispatch_ready` is not stored on this object; callers
- * recompute it from the merged result via `validateDispatchMetadata`.
+ * Precedence: local edits win unless upstream explicitly provides a non-empty,
+ * non-placeholder value. A value is non-empty when a trimmed string has length
+ * and is not a known generic sync placeholder, an array has at least one
+ * non-empty non-placeholder item (placeholder items are dropped first), or any
+ * other non-null scalar is present. Missing, empty, or placeholder-only
+ * upstream keys leave the local key unchanged. This applies to every key,
+ * including locally authored contract fields such as `allowed_file_scope`,
+ * `test_requirements`, and `rollback_plan`. `dispatch_ready` is not stored on
+ * this object; callers recompute it from the merged result via
+ * `validateDispatchMetadata`.
  */
 export function mergeDispatchMetadataFromUpstream(
   local: DispatchMetadata | undefined,
@@ -228,8 +298,9 @@ export function mergeDispatchMetadataFromUpstream(
 
   const merged: Record<string, unknown> = { ...localRecord };
   for (const [key, value] of Object.entries(upstreamRecord)) {
-    if (isNonEmptyDispatchValue(value)) {
-      merged[key] = value;
+    const substantive = stripGenericSyncPlaceholders(value);
+    if (isNonEmptyDispatchValue(substantive)) {
+      merged[key] = substantive;
     }
   }
 
@@ -301,10 +372,11 @@ export function validateDispatchMetadata(
   const normalized = normalizeDispatchMetadata(metadata);
   const missingFields = REQUIRED_FIELD_LABELS.flatMap(([field, label]) => {
     const value = normalized?.[field];
-    if (Array.isArray(value)) {
-      return value.length === 0 ? [label] : [];
+    const substantive = stripGenericSyncPlaceholders(value);
+    if (Array.isArray(substantive)) {
+      return substantive.length === 0 ? [label] : [];
     }
-    return value ? [] : [label];
+    return substantive ? [] : [label];
   });
 
   const blockers = [...missingFields.map((field) => `Missing ${field}`)];
