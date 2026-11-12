@@ -75,7 +75,12 @@ jobs:
             ${{ runner.os }}-playwright-
       - name: Install Playwright system dependencies
         timeout-minutes: 8
-        run: npx playwright install-deps chromium
+        run: |
+          for attempt in 1 2 3; do
+            timeout 2m npx playwright install-deps chromium && exit 0
+            sleep $((attempt * 10))
+          done
+          exit 1
       - name: Install Playwright Chromium
         timeout-minutes: 8
         run: |
@@ -129,7 +134,12 @@ jobs:
             ${{ runner.os }}-playwright-
       - name: Install Playwright system dependencies
         timeout-minutes: 8
-        run: npx playwright install-deps chromium
+        run: |
+          for attempt in 1 2 3; do
+            timeout 2m npx playwright install-deps chromium && exit 0
+            sleep $((attempt * 10))
+          done
+          exit 1
       - name: Install Playwright Chromium
         timeout-minutes: 8
         run: |
