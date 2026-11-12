@@ -8,6 +8,12 @@ import { DependencyBadges } from '@/components/DependencyBadges';
 import { cn } from '@/lib/utils';
 import { READINESS_LABELS, REVIEW_MODE_LABELS, RISK_LEVEL_LABELS } from '@/lib/dispatch-contract';
 import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes';
+import {
+  DISPATCH_CONTRACT_INBOX_CHIP_LABEL,
+  DISPATCH_CONTRACT_INBOX_GUIDANCE,
+  isDispatchBlockedInbox,
+  showsDispatchContractInboxBanner,
+} from '@/lib/board-attention';
 import type { Task } from '@/lib/types';
 
 /**
@@ -21,7 +27,7 @@ import type { Task } from '@/lib/types';
  * the brief "ink drying" cross-fade after a move.
  */
 
-export type RailTone = 'neutral' | 'active' | 'needs-you' | 'warn' | 'done';
+type RailTone = 'neutral' | 'active' | 'needs-you' | 'warn' | 'done';
 
 const RAIL_CLASS: Record<RailTone, string> = {
   neutral: 'bg-mc-text-secondary',
@@ -31,21 +37,7 @@ const RAIL_CLASS: Record<RailTone, string> = {
   done: 'bg-mc-success',
 };
 
-/**
- * Only GitHub-sourced work is held by the dispatch contract (moveTask and the PATCH
- * route gate on github_source). Local tasks also carry dispatch_blockers from the API,
- * but nothing blocks them, so they must not count as waiting on Captain.
- */
-export function isDispatchBlockedInbox(task: Task): boolean {
-  return Boolean(task.github_source) && task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0;
-}
-
-/** Review work and dispatch-blocked Inbox work wait on Captain. */
-export function needsCaptain(task: Task): boolean {
-  return task.status === 'review' || isDispatchBlockedInbox(task);
-}
-
-export function railToneFor(task: Task): RailTone {
+function railToneFor(task: Task): RailTone {
   if (isDispatchBlockedInbox(task)) return 'warn';
   switch (task.status) {
     case 'review':
@@ -145,7 +137,7 @@ export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, dragAtt
           {...dragAttributes}
           {...dragListeners}
           aria-label={`Reorder task ${task.title}`}
-          className="flex w-full cursor-grab items-center justify-center py-1.5 opacity-0 transition-opacity duration-fast hover:bg-mc-bg-secondary/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100"
+          className="flex w-full cursor-grab items-center justify-center py-1.5 opacity-0 transition-opacity duration-fast hover:bg-mc-bg-secondary/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100"
         >
           <GripVertical className="size-4 text-mc-text-secondary" />
         </button>
@@ -224,9 +216,13 @@ export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, dragAtt
                 {blockers[0]}
                 {blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}
               </span>
-              {task.status === 'inbox' && (
-                <span className="block text-[10px] text-mc-text-secondary">
-                  Still in Inbox until the Dispatch Contract is complete. Open the task to fill scope, tests, and rollback.
+              {showsDispatchContractInboxBanner(task) && (
+                <span
+                  data-dispatch-contract-chip
+                  title={DISPATCH_CONTRACT_INBOX_GUIDANCE}
+                  className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${pillClass('warn')}`}
+                >
+                  {DISPATCH_CONTRACT_INBOX_CHIP_LABEL}
                 </span>
               )}
             </div>

@@ -21,7 +21,15 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Plus, AlertTriangle, Hand } from 'lucide-react';
 import { Github } from '@/components/icons/BrandIcons';
 import { BoardLane, type BoardLaneColumn } from '@/components/board/board-lane';
-import { TaskCard, needsCaptain } from '@/components/board/task-card';
+import { TaskCard } from '@/components/board/task-card';
+import {
+  NEEDS_YOU_ACCESSIBLE_NAME,
+  applyNeedsYouFilter,
+  countNeedsYou,
+  presentNeedsYouCountDescription,
+  settledMoveOutcome,
+  workspaceScopedTasks,
+} from '@/lib/board-attention';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { presentBoardCount } from '@/lib/cockpit-load-state';
 import { useMissionControl } from '@/lib/store';
@@ -165,10 +173,11 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
   // SSE broadcasts every workspace's task events and the store inserts them as they
   // arrive, so scope the board (and its "Needs you" count) to this workspace.
-  const workspaceTasks = workspaceId ? tasks.filter((task) => task.workspace_id === workspaceId) : tasks;
+  const workspaceTasks = workspaceScopedTasks(tasks, workspaceId);
   const runtimeTasks = workspaceTasks.filter(matchesRuntimeFilter);
-  const needsYouCount = runtimeTasks.filter(needsCaptain).length;
-  const visibleTasks = needsYouOnly ? runtimeTasks.filter(needsCaptain) : runtimeTasks;
+  const needsYouCount = countNeedsYou(runtimeTasks);
+  const visibleTasks = applyNeedsYouFilter(runtimeTasks, needsYouOnly);
+  const needsYouCountDescription = presentNeedsYouCountDescription(boardLoadStatus, needsYouCount);
   const getTasksByStatus = (status: TaskStatus) =>
     visibleTasks.filter((task) => task.status === status);
 
@@ -267,8 +276,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
       if (res.ok) {
         // The ink cross-fade marks a settled move, so it waits for the server to accept it.
-        markInkDrying(task.id);
-        setMoveAnnouncement(`Moved ${task.title} to ${laneName(targetStatus)}.`);
+        const outcome = settledMoveOutcome(true, task.title, laneName(targetStatus), laneName(task.status));
+        if (outcome.playInk) markInkDrying(task.id);
+        setMoveAnnouncement(outcome.announcement);
         addEvent({
           id: crypto.randomUUID(),
           type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
@@ -279,8 +289,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       } else {
         const data = await res.json().catch(() => ({}));
         dispatchUi({ type: 'set_drop_error', error: data.error || 'Failed to move task' });
-        updateTaskStatus(task.id, task.status);
-        setMoveAnnouncement(`${task.title} was not moved. It stayed in ${laneName(task.status)}.`);
+        const outcome = settledMoveOutcome(false, task.title, laneName(targetStatus), laneName(task.status));
+        if (outcome.revert) updateTaskStatus(task.id, task.status);
+        setMoveAnnouncement(outcome.announcement);
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
@@ -289,8 +300,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         error: error instanceof Error ? error.message : 'Failed to update task status',
       });
       // Revert on error
-      updateTaskStatus(task.id, task.status);
-      setMoveAnnouncement(`${task.title} was not moved. It stayed in ${laneName(task.status)}.`);
+      const outcome = settledMoveOutcome(false, task.title, laneName(targetStatus), laneName(task.status));
+      if (outcome.revert) updateTaskStatus(task.id, task.status);
+      setMoveAnnouncement(outcome.announcement);
     }
   };
 
@@ -342,10 +354,12 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <button
             type="button"
             data-needs-you
+            aria-label={NEEDS_YOU_ACCESSIBLE_NAME}
+            aria-describedby="needs-you-count"
             aria-pressed={needsYouOnly}
             onClick={() => dispatchUi({ type: 'toggle_needs_you' })}
             className={cn(
-              'inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tabular-nums active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-text focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg',
+              'inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tabular-nums active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-text focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg',
               needsYouOnly
                 ? 'bg-mc-accent text-mc-accent-ink ring-2 ring-inset ring-mc-accent-ink/40'
                 : needsYouCount > 0
@@ -354,19 +368,15 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             )}
           >
             <Hand aria-hidden="true" className="size-3.5" />
-            <span>Needs you</span>
+            <span aria-hidden="true">Needs you</span>
             <span aria-hidden="true">·</span>
-            {/* Before the board settles the count is unknown, not zero (same rule as presentBoardCount). */}
-            {boardLoadStatus === 'ready' ? (
-              <span>{needsYouCount}</span>
-            ) : (
-              <span>
-                <span aria-hidden="true">–</span>
-                <span className="sr-only">{boardLoadStatus === 'pending' ? 'loading' : 'unavailable'}</span>
-              </span>
-            )}
-            <span className="sr-only">{needsYouOnly ? ', showing only these' : ', press to show only these'}</span>
+            {/* Before the board settles the count is unknown, not zero (same rule as presentBoardCount).
+                The count is spoken by the polite live region below, not as part of the accessible name. */}
+            <span aria-hidden="true">{boardLoadStatus === 'ready' ? needsYouCount : '–'}</span>
           </button>
+          <span id="needs-you-count" role="status" aria-live="polite" className="sr-only">
+            {needsYouCountDescription}
+          </span>
         </div>
         <div role="group" aria-label="Runtime filter" className="order-last flex basis-full flex-wrap items-center gap-1.5 2xl:order-none 2xl:basis-auto">
           <span className="mr-1 text-xs uppercase tracking-wider text-mc-text-secondary">Runtime filter</span>
@@ -374,9 +384,10 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             <button
               key={filterOption.id}
               type="button"
+              data-runtime-filter-chip
               aria-pressed={runtimeFilter === filterOption.id}
               onClick={() => dispatchUi({ type: 'set_runtime_filter', filter: filterOption.id })}
-              className={`rounded-full border px-2.5 py-0.5 text-xs ${
+              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border px-2.5 py-0.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg ${
                 runtimeFilter === filterOption.id
                   ? 'border-mc-text-secondary/60 bg-mc-bg-tertiary text-mc-text'
                   : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
@@ -390,7 +401,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <button
             type="button"
             onClick={() => dispatchUi({ type: 'open_github_import_modal' })}
-            className="flex items-center gap-2 rounded border border-mc-text-secondary/60 px-3 py-1.5 text-sm font-medium text-mc-text hover:bg-mc-bg-tertiary active:scale-[0.98] transition-transform duration-fast"
+            className="flex items-center gap-2 rounded border border-mc-text-secondary/60 px-3 py-1.5 text-sm font-medium text-mc-text hover:bg-mc-bg-tertiary active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
           >
             <Github className="size-4" />
             Import GitHub
@@ -398,7 +409,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <button
             type="button"
             onClick={() => dispatchUi({ type: 'open_create_modal' })}
-            className="flex items-center gap-2 rounded bg-mc-accent px-3 py-1.5 text-sm font-semibold text-mc-accent-ink hover:bg-mc-accent/90 active:scale-[0.98] transition-transform duration-fast"
+            className="flex items-center gap-2 rounded bg-mc-accent px-3 py-1.5 text-sm font-semibold text-mc-accent-ink hover:bg-mc-accent/90 active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
           >
             <Plus className="size-4" />
             New Task
