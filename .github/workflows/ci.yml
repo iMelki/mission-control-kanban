@@ -77,3 +77,18 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Run OpenClaw protocol tests
         run: npm run test:openclaw-protocol -- --test-reporter=spec
+
+  env-example-port:
+    name: Env example port
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24.18.0"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run env-example-port tests
+        run: npm run test:env-example-port -- --test-reporter=spec
