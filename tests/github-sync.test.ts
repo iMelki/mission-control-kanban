@@ -766,3 +766,64 @@ test('GitHub refresh patch applies non-empty upstream contract values and ignore
   assert.equal(merged?.readiness, 'ready_for_agent');
   assert.equal(merged?.impact, 'Upstream impact is non-empty so it is applied');
 });
+
+test('GitHub refresh patch keeps canDispatch false when a required contract field is missing locally and upstream', () => {
+  const incompleteLocal = {
+    source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'old-workstream',
+    allowed_file_scope: ['src/lib/hindsight.ts'],
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:hindsight'],
+    risk_level: 'medium' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Local impact is present but rollback_plan is not',
+  };
+
+  const before = validateDispatchMetadata(incompleteLocal);
+  assert.equal(before.canDispatch, false);
+  assert.ok(before.missingFields.includes('rollback/fallback plan'));
+
+  const patch = buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Old title',
+      description: 'Old description',
+      priority: 'normal',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+      },
+      dispatch_metadata: incompleteLocal,
+    },
+    {
+      title: 'Refreshed memsys#991 title',
+      description: 'Issue body without contract sections.',
+      priority: 'high',
+      status: 'inbox',
+      workspace_id: 'default',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        project_item_id: 'PVTI_incomplete_contract',
+      },
+      dispatch_metadata: {
+        source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        target_repo: 'iMelki/memsys',
+        project_workstream: 'updated-workstream',
+      },
+    }
+  );
+
+  assert.equal(patch.title, 'Refreshed memsys#991 title');
+  assert.equal(patch.dispatch_metadata?.project_workstream, 'updated-workstream');
+  assert.equal(patch.dispatch_metadata?.rollback_plan, undefined);
+  const after = validateDispatchMetadata(patch.dispatch_metadata);
+  assert.equal(after.canDispatch, false);
+  assert.ok(after.missingFields.includes('rollback/fallback plan'));
+});
