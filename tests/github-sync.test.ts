@@ -1029,3 +1029,141 @@ test('partial upstream github_source keeps local subfields', () => {
   assert.equal(patch.github_source?.repo_name, 'memsys');
   assert.equal(patch.github_source?.issue_number, 991);
 });
+
+test('#114 first-item-only shape is not dispatchable', () => {
+  // 43 of the 44 generic cards, including #114, store only the first list
+  // item and no trailing semicolon. Script single-select defaults are
+  // Ready for Agent / Human Required / Medium and must not make the card
+  // dispatch-ready when the contract text is all placeholder.
+  const firstItemOnly = {
+    target_repo: 'iMelki/projects-ops',
+    project_workstream: 'Agent Infrastructure',
+    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+    acceptance_criteria: ['Issue is present on the mapped GitHub Project.'],
+    test_requirements: ['Run this script in -DryRun mode before broad repair.'],
+    risk_level: 'medium' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+    rollback_plan: 'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.',
+    safety_rules: ['Do not mutate external upstream repos from portfolio repair.'],
+  };
+
+  const result = validateDispatchMetadata(firstItemOnly);
+  assert.equal(result.canDispatch, false);
+  assert.ok(result.missingFields.includes('allowed file scope'));
+  assert.ok(result.missingFields.includes('acceptance criteria'));
+  assert.ok(result.missingFields.includes('test requirements'));
+  assert.ok(result.missingFields.includes('impact'));
+  assert.ok(result.missingFields.includes('rollback/fallback plan'));
+
+  // After MCK splits the scope default on commas, the four pieces are
+  // also placeholders, so the field stays missing.
+  const commaSplitScope = validateDispatchMetadata({
+    ...firstItemOnly,
+    allowed_file_scope: [
+      'Owning repo issue',
+      'docs',
+      'scripts',
+      'and tests named by the task.',
+    ],
+  });
+  assert.equal(commaSplitScope.canDispatch, false);
+  assert.ok(commaSplitScope.missingFields.includes('allowed file scope'));
+
+  assert.equal(isGenericSyncPlaceholder('Issue is present on the mapped GitHub Project.'), true);
+  assert.equal(isGenericSyncPlaceholder('Owning repo issue'), true);
+  assert.equal(isGenericSyncPlaceholder('docs'), true);
+  assert.equal(isGenericSyncPlaceholder('scripts'), true);
+  assert.equal(isGenericSyncPlaceholder('and tests named by the task.'), true);
+  assert.equal(isGenericSyncPlaceholder('Do not mutate external upstream repos from portfolio repair.'), true);
+});
+
+test('#561 full join is not dispatchable', () => {
+  // #561 stores the full list joins: items joined with '; ' (0x3b 0x20),
+  // each item already ending in '.', so a trailing '.;' follows each,
+  // including the last. Invoke-GitHubProjectMutation joins with LF/CRLF.
+  const semicolonJoinedAc = [
+    'Issue is present on the mapped GitHub Project.',
+    'Required dispatch fields are populated for MCK import.',
+    'Mapped MCK workspace sync imports or updates the local task mirror.',
+  ].join('; ') + ';';
+  const semicolonJoinedTests = [
+    'Run this script in -DryRun mode before broad repair.',
+    'Run mapped MCK workspace sync after Project membership repair.',
+  ].join('; ') + ';';
+  const semicolonJoinedSafety = [
+    'Do not mutate external upstream repos from portfolio repair.',
+    'Do not dispatch agents from this repair script.',
+  ].join('; ') + ';';
+  const lfJoinedInvokeTests = [
+    'Run this wrapper in dry-run mode before apply.',
+    'Run mapped MCK workspace sync only after endpoint alignment passes.',
+  ].join('\n');
+  const crlfJoinedInvokeSafety = [
+    'Do not mutate external upstream repos.',
+    'Do not create MCK-only cards.',
+    'Do not dispatch agents from this repair script.',
+  ].join('\r\n');
+
+  assert.equal(isGenericSyncPlaceholder(semicolonJoinedAc), true);
+  assert.equal(isGenericSyncPlaceholder(semicolonJoinedTests), true);
+  assert.equal(isGenericSyncPlaceholder(semicolonJoinedSafety), true);
+  assert.equal(isGenericSyncPlaceholder(lfJoinedInvokeTests), true);
+  assert.equal(isGenericSyncPlaceholder(crlfJoinedInvokeSafety), true);
+  // A proper subset of the joined items is also a placeholder.
+  assert.equal(
+    isGenericSyncPlaceholder(
+      'Issue is present on the mapped GitHub Project.; Required dispatch fields are populated for MCK import.',
+    ),
+    true,
+  );
+
+  const result = validateDispatchMetadata({
+    target_repo: 'iMelki/projects-ops',
+    project_workstream: 'Agent Infrastructure',
+    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+    acceptance_criteria: [semicolonJoinedAc],
+    test_requirements: [semicolonJoinedTests],
+    risk_level: 'medium',
+    readiness: 'ready_for_agent',
+    review_mode: 'human_required',
+    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+    rollback_plan: 'Use the generated rollback manifest to restore prior Project field values or remove newly created Project items.',
+    safety_rules: [semicolonJoinedSafety],
+  });
+  assert.equal(result.canDispatch, false);
+  assert.ok(result.missingFields.includes('acceptance criteria'));
+  assert.ok(result.missingFields.includes('test requirements'));
+  assert.ok(result.missingFields.includes('rollback/fallback plan'));
+  assert.ok(result.missingFields.includes('impact'));
+  assert.ok(result.missingFields.includes('allowed file scope'));
+
+  const invokeNewlines = validateDispatchMetadata({
+    target_repo: 'iMelki/projects-ops',
+    project_workstream: 'Agent Infrastructure',
+    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+    acceptance_criteria: [[
+      'Issue is present on the mapped GitHub Project.',
+      'Required dispatch fields are populated for MCK import.',
+      'Mapped MCK workspace sync imports or updates the local task mirror.',
+    ].join('\n')],
+    test_requirements: [lfJoinedInvokeTests],
+    risk_level: 'medium',
+    readiness: 'ready_for_agent',
+    review_mode: 'human_required',
+    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+    rollback_plan: 'Use the generated rollback manifest to restore prior Project field values or remove newly created Project items.',
+    safety_rules: [crlfJoinedInvokeSafety],
+  });
+  assert.equal(invokeNewlines.canDispatch, false);
+  assert.ok(invokeNewlines.missingFields.includes('acceptance criteria'));
+  assert.ok(invokeNewlines.missingFields.includes('test requirements'));
+
+  // A real criterion among joined placeholders is kept, and that field is present.
+  const mixed = mergeDispatchMetadataFromUpstream(
+    { acceptance_criteria: ['Local criterion stays if upstream is placeholder-only'] },
+    { acceptance_criteria: [semicolonJoinedAc] },
+  );
+  assert.deepEqual(mixed?.acceptance_criteria, ['Local criterion stays if upstream is placeholder-only']);
+});

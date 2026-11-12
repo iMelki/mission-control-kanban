@@ -110,6 +110,11 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
   // Ensure-RepoIssueProjectVisibility.ps1:36 and Invoke-GitHubProjectMutation.ps1:50 (Allowed File Scope)
   'Owning repo issue, docs, scripts, and tests named by the task.',
+  // Comma-split pieces of that scope default (normalizeStringArray splits on commas)
+  'Owning repo issue',
+  'docs',
+  'scripts',
+  'and tests named by the task.',
   // Ensure-RepoIssueProjectVisibility.ps1:38 and Invoke-GitHubProjectMutation.ps1:52 (Acceptance Criteria)
   'Issue is present on the mapped GitHub Project.',
   // Ensure-RepoIssueProjectVisibility.ps1:39 and Invoke-GitHubProjectMutation.ps1:53
@@ -122,42 +127,96 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   'Run mapped MCK workspace sync after Project membership repair.',
   // Ensure-RepoIssueProjectVisibility.ps1:46 (Rollback Plan)
   'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.',
+  // Ensure-RepoIssueProjectVisibility.ps1:48 (Safety Rules)
+  'Do not mutate external upstream repos from portfolio repair.',
+  // Ensure-RepoIssueProjectVisibility.ps1:49 and Invoke-GitHubProjectMutation.ps1:64
+  'Do not dispatch agents from this repair script.',
   // Invoke-GitHubProjectMutation.ps1:57 (Test Requirements)
   'Run this wrapper in dry-run mode before apply.',
   // Invoke-GitHubProjectMutation.ps1:58
   'Run mapped MCK workspace sync only after endpoint alignment passes.',
   // Invoke-GitHubProjectMutation.ps1:60 (Rollback Plan)
   'Use the generated rollback manifest to restore prior Project field values or remove newly created Project items.',
+  // Invoke-GitHubProjectMutation.ps1:62 (Safety Rules)
+  'Do not mutate external upstream repos.',
+  // Invoke-GitHubProjectMutation.ps1:63
+  'Do not create MCK-only cards.',
 ] as const;
 
 const GENERIC_SYNC_PLACEHOLDER_SET: ReadonlySet<string> = new Set(GENERIC_SYNC_PLACEHOLDER_STRINGS);
 
 /**
- * True when `value` is a string whose trimmed form equals one of
- * `GENERIC_SYNC_PLACEHOLDER_STRINGS` exactly.
+ * Split a dispatch string on the list separators used by portfolio-repair
+ * joins (`; `, `;`, LF, CRLF), trimming each piece. Does not split on commas,
+ * so the full Allowed File Scope default stays one token and is matched
+ * whole; the comma-split pieces are listed separately.
+ */
+export function splitGenericSyncPlaceholderTokens(value: string): string[] {
+  return value
+    .split(/[;\r\n]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+}
+
+/**
+ * True when `value` is a known generic sync placeholder: an exact trimmed
+ * item, or a `;` / LF / CRLF join whose every non-empty token is such an
+ * item (any join or subset). Case is significant. Whitespace around
+ * separators is ignored.
  */
 export function isGenericSyncPlaceholder(value: unknown): boolean {
-  return typeof value === 'string' && GENERIC_SYNC_PLACEHOLDER_SET.has(value.trim());
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return false;
+  }
+  if (GENERIC_SYNC_PLACEHOLDER_SET.has(trimmed)) {
+    return true;
+  }
+
+  const tokens = splitGenericSyncPlaceholderTokens(trimmed);
+  return tokens.length > 0 && tokens.every((token) => GENERIC_SYNC_PLACEHOLDER_SET.has(token));
 }
 
 /**
  * Drop generic placeholder items (and empty strings) from a dispatch value.
- * A string that is itself a placeholder becomes undefined. Arrays keep only
- * substantive items; an array of only placeholders becomes undefined.
+ * A string that is itself a placeholder, or a join/subset of only
+ * placeholder items, becomes undefined. Mixed joins keep the non-placeholder
+ * tokens. Arrays keep only substantive items; an array of only placeholders
+ * becomes undefined.
  */
 export function stripGenericSyncPlaceholders(value: unknown): unknown {
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    if (trimmed.length === 0 || GENERIC_SYNC_PLACEHOLDER_SET.has(trimmed)) {
+    if (trimmed.length === 0 || isGenericSyncPlaceholder(trimmed)) {
       return undefined;
     }
-    return value;
+
+    const tokens = splitGenericSyncPlaceholderTokens(trimmed);
+    if (tokens.length <= 1) {
+      return value;
+    }
+
+    const kept = tokens.filter((token) => !GENERIC_SYNC_PLACEHOLDER_SET.has(token));
+    if (kept.length === 0) {
+      return undefined;
+    }
+    if (kept.length === tokens.length) {
+      return value;
+    }
+    return kept;
   }
 
   if (Array.isArray(value)) {
     const items = value.flatMap((item) => {
       const stripped = stripGenericSyncPlaceholders(item);
-      return stripped === undefined ? [] : [stripped];
+      if (stripped === undefined) {
+        return [];
+      }
+      return Array.isArray(stripped) ? stripped : [stripped];
     });
     return items.length > 0 ? items : undefined;
   }
