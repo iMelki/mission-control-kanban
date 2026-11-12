@@ -1,6 +1,6 @@
 # Multi-Agent Runtime Dispatch
 
-Last updated: 2026-07-29
+Last updated: 2026-11-12
 
 Mission Control Kanban (MCK) can represent many kinds of agents on the board. Runtime-aware dispatch now separates **ownership tracking** from **runtime launch** so operators can safely use OpenClaw, webhook bridges, and manual/native surfaces such as Hermes, Codex, Copilot, or Claude Code.
 
@@ -121,6 +121,22 @@ explicitly opted in.
 MCK reads the token from the named environment variable at dispatch time. Raw bearer tokens, API keys, and secrets should not be stored in `runtime_config`. Webhook calls are bounded by a default 30 second timeout (`timeout_ms` / `webhook_timeout_ms`, capped at 120 seconds), and API responses redact query strings/fragments from webhook URLs.
 
 If the webhook call fails or returns non-2xx, MCK returns an error and does not move the task to `in_progress`. Direct dispatch calls also validate the dispatch contract before launching OpenClaw/webhook runtimes; manual handoff remains available even when a task still needs grooming.
+
+## Webhooks 0/0 is the expected safe state
+
+The Webhooks health badge showing **0/0** (zero configured, zero verified) is the expected safe state today, not a misconfiguration to fix by enabling dispatch or minting a signing secret.
+
+- **OpenClaw covers auto-dispatch.** Agents that should launch automatically use the `openclaw` runtime, not webhooks.
+- **Paperclip is the only planned webhook consumer, and it is not ready.** See [issue #47](https://github.com/iMelki/mission-control-kanban/issues/47) (signed MCK dispatches to Paperclip with lifecycle receipts).
+- **Real signing keys need Ilan's explicit go.** Do not generate, store, or enable webhook signing secrets until that approval is given.
+- **The legacy agent-completion path is fail-open without a secret or signature header.** `POST /api/webhooks/agent-completion` only runs signature verification when `MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET` is set or the request includes an `X-MCK-Signature` header ([`src/app/api/webhooks/agent-completion/route.ts` lines 434-449](../src/app/api/webhooks/agent-completion/route.ts)). If both are absent, verification is skipped and a legacy (non-lifecycle-v2) completion payload can still be processed. Lifecycle v2 callbacks later require the secret (same file, lines 470-473), so this gap is the legacy path only.
+
+Until signing is on:
+
+- MCK must stay **loopback-only**.
+- `dispatch_enabled` must stay **off** for webhook agents.
+
+Making the legacy path fail closed (reject when no secret is configured or no signature header is present) is tracked in [issue #213](https://github.com/iMelki/mission-control-kanban/issues/213).
 
 ## OpenClaw Compatibility
 
@@ -254,5 +270,6 @@ Before trusting automatic dispatch, confirm:
 3. The task's dispatch metadata is complete.
 4. The runtime target is healthy and configured.
 5. The operator actually wants MCK to start that runtime now.
+6. For webhook agents, 0/0 remains the expected safe state until signing is on. Do not turn on `dispatch_enabled` or bind MCK off loopback to "fix" it. See [Webhooks 0/0 is the expected safe state](#webhooks-00-is-the-expected-safe-state).
 
 If any answer is no, keep the task tracked in MCK and use the handoff prompt/callback instructions instead.
