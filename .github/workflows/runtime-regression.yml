@@ -54,8 +54,7 @@ jobs:
           retention-days: 14
 
   runtime-regression:
-    # Pinned: ubuntu-latest became 26.04 on 2026-11-15, and Playwright 1.58.1 cannot install
-    # Chromium there ("does not support chromium on ubuntu26.04-x64"). Unpin with the Playwright upgrade.
+    # Pinned until our Playwright supports ubuntu 26.04 (ubuntu-latest now resolves to it).
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -150,8 +149,7 @@ jobs:
 
   design-drift:
     name: Design drift (non-blocking)
-    # Pinned: ubuntu-latest became 26.04 on 2026-11-15, and Playwright 1.58.1 cannot install
-    # Chromium there ("does not support chromium on ubuntu26.04-x64"). Unpin with the Playwright upgrade.
+    # Pinned until our Playwright supports ubuntu 26.04 (ubuntu-latest now resolves to it).
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     continue-on-error: true
