@@ -78,6 +78,13 @@ const COLUMNS: BoardLaneColumn[] = [
 const COLUMN_IDS = new Set<string>(COLUMNS.map((column) => column.id));
 const COLUMN_LABELS = new Map<string, string>(COLUMNS.map((column) => [column.id, column.label]));
 
+/**
+ * Save failures (the controller's objects) that a mounted board has committed with
+ * role="alert", i.e. announced. Module-level, like the controllers, so it outlives a tab
+ * switch; weak, so resolved failures are not kept.
+ */
+const liveRenderedFailures = new WeakSet<object>();
+
 // "Ink drying": how long the accent rail layer stays mounted after a move. A
 // little longer than --duration-slower (360ms) so the fade always completes.
 const INK_DRY_MS = 420;
@@ -178,9 +185,16 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const savingTaskIds = useSyncExternalStore(moveController.subscribe, moveController.getSavingSnapshot, moveController.getSavingSnapshot);
   // Failed saves live in the controller too (one alert per card), so they survive a tab switch.
   const saveFailures = useSyncExternalStore(moveController.subscribe, moveController.getFailuresSnapshot, moveController.getFailuresSnapshot);
-  // Alerts restored on mount were already announced when they happened: render them without
-  // role="alert" so a tab switch does not re-announce them. A new failure (a new object) is live.
-  const [restoredFailures] = useState(() => new Set(moveController.getFailuresSnapshot()));
+  // Alerts a board has already rendered live render without role="alert" when restored on mount,
+  // so a tab switch does not re-announce them. A failure that landed while no board was mounted
+  // has not been heard yet, so it stays live on the next mount; so does any new failure.
+  const [quietFailures] = useState(
+    () => new Set(moveController.getFailuresSnapshot().filter((failure) => liveRenderedFailures.has(failure))),
+  );
+  useEffect(() => {
+    // Committed: every alert on screen has now been rendered live (or was already).
+    for (const failure of saveFailures) liveRenderedFailures.add(failure);
+  }, [saveFailures]);
   const reducedMotion = usePrefersReducedMotion();
 
   const sensors = useSensors(
@@ -511,7 +525,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         // A failed save is spoken here only, once per card (role="alert").
         <div
           key={failure.taskId}
-          role={restoredFailures.has(failure) ? undefined : 'alert'}
+          role={quietFailures.has(failure) ? undefined : 'alert'}
           data-drop-error="save-failed"
           data-save-failure={failure.taskId}
           className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60"

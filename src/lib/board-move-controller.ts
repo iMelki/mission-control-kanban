@@ -321,8 +321,10 @@ export function createMoveController(deps: MoveControllerDeps) {
 
     /** Start a move the caller decided as 'move'. Resolves when the outcome has been reported. */
     start(task: Pick<Task, 'id' | 'title' | 'status'> & { updated_at?: string }, target: TaskStatus): Promise<void> {
-      // The store's updated_at is not advanced by optimistic or reconciled writes, so a newer
-      // confirmation held from an earlier save of this card must survive this move's start.
+      // Confirmed writes advance the store's updated_at, but optimistic writes, a fallback to the
+      // last confirmed status (no updated_at) and server reports that reach this controller
+      // without writing the store do not, so the store copy can be older than what is held here.
+      // A newer confirmation held from an earlier save of this card must survive this move's start.
       const held = confirmed.get(task.id);
       const storeTime = timeOf(task.updated_at);
       if (!held || held.status !== task.status || !(held.time > storeTime)) {

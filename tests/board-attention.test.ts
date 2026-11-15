@@ -632,6 +632,19 @@ test('real wiring: the save commits, its SSE echo carries the target (same as th
   }, async () => { throw new TypeError('Failed to fetch'); });
 });
 
+test('real wiring: a confirmed write with an unparsable updated_at sets the status but keeps the store\'s updated_at', async () => {
+  await withRealBoard(async ({ patch }) => {
+    useMissionControl.getState().setTasks([realTask('inbox')]);
+    const controller = getBoardMoveController('ws-real');
+    const run = controller.start(useMissionControl.getState().tasks[0], 'assigned');
+    patch.resolve(new Response(JSON.stringify({ ...realTask('assigned'), updated_at: 'not a time' }), { status: 200 }));
+    await run;
+    const held = useMissionControl.getState().tasks[0];
+    assert.equal(held.status, 'assigned');
+    assert.equal(held.updated_at, T0);
+  }, async () => { throw new TypeError('Failed to fetch'); });
+});
+
 test('reportServerTasks routes each task to its own workspace controller only', async () => {
   const originalFetch = globalThis.fetch;
   const patches: Deferred<Response>[] = [];

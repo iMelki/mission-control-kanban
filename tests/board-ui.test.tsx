@@ -190,6 +190,35 @@ test('a failure alert survives a tab switch (unmount and remount of the board)',
   await second.unmount();
 });
 
+test('a save that fails while the board is unmounted is announced on remount (role="alert"), once', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  let fail!: () => void;
+  stubFetch(async (url, init) => {
+    if (init?.method === 'PATCH') return new Promise<Response>((_resolve, reject) => { fail = () => reject(new TypeError('Failed to fetch')); });
+    if (url.endsWith('/api/tasks/a')) return Promise.reject(new TypeError('Failed to fetch'));
+    return undefined;
+  });
+  const first = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  const controller = m.registry.getBoardMoveController(WS);
+  await m.React.act(async () => { void controller.start(m.store.useMissionControl.getState().tasks[0], 'assigned'); });
+  // Tab switch while the save is pending; it then fails while no board is mounted.
+  await first.unmount();
+  fail();
+  await controller.waitForIdle('a');
+  assert.equal(controller.getFailuresSnapshot().length, 1);
+  const second = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  assert.equal(alerts(second.container).length, 1);
+  // Nobody has heard it yet: the restored alert is live, and nothing else speaks the failure.
+  assert.equal(liveAlerts(second.container).length, 1);
+  assert.doesNotMatch(second.container.querySelector('[data-move-announcements]')?.textContent ?? '', /not/);
+  await second.unmount();
+  // Announced on that mount: the next tab switch restores it quietly.
+  const third = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  assert.equal(alerts(third.container).length, 1);
+  assert.equal(liveAlerts(third.container).length, 0);
+  await third.unmount();
+});
+
 test('a save in flight is still "Saving…" (aria-busy) after a tab switch, and resolving it while unmounted leaves no stale lock', async () => {
   seedBoard([card('a', 'Alpha', 'inbox')]);
   let answer!: (response: Response) => void;

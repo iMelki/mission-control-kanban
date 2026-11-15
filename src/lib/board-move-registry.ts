@@ -49,7 +49,8 @@ export function getBoardMoveController(workspaceId: string): MoveController {
         const held = store.tasks.find((task) => task.id === taskId);
         // A confirmed write carries the server's updated_at (only ever forward), so a poll
         // that left the server before the commit is recognised as stale by mergeServerTasks.
-        if (held && updatedAt && !(serverTimeOf(updatedAt) < serverTimeOf(held.updated_at))) {
+        // An unparsable updated_at is never written: it would make every later copy look unordered.
+        if (held && updatedAt && !Number.isNaN(serverTimeOf(updatedAt)) && !(serverTimeOf(updatedAt) < serverTimeOf(held.updated_at))) {
           store.updateTask({ ...held, status, updated_at: updatedAt });
         } else {
           store.updateTaskStatus(taskId, status);
