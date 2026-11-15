@@ -191,10 +191,27 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [quietFailures] = useState(
     () => new Set(moveController.getFailuresSnapshot().filter((failure) => liveRenderedFailures.has(failure))),
   );
+  // "Retry move" is moot once the card is in its target lane (the server or another move put
+  // it there), or once a fully loaded board no longer has the card. Those alerts are left out
+  // of the render itself, so a failure that settled while the board was unmounted never
+  // attaches an alert, not even for the frame before the effect below clears it.
+  const settledFailureIds = settledSaveFailureIds(saveFailures, tasks, boardLoadStatus === 'ready');
+  const shownFailures = saveFailures.filter((failure) => !settledFailureIds.includes(failure.taskId));
   useEffect(() => {
     // Committed: every alert on screen has now been rendered live (or was already).
-    for (const failure of saveFailures) liveRenderedFailures.add(failure);
-  }, [saveFailures]);
+    for (const failure of shownFailures) liveRenderedFailures.add(failure);
+  }, [shownFailures]);
+  // The failure alert that last had focus. An auto-cleared alert leaves the DOM before the
+  // effect that clears it runs, so focus is already lost by then; this says where it was.
+  const focusedFailureId = useRef<string | null>(null);
+  useEffect(() => {
+    const onFocusIn = (event: FocusEvent) => {
+      const alert = event.target instanceof Element ? event.target.closest('[data-save-failure]') : null;
+      focusedFailureId.current = alert?.getAttribute('data-save-failure') ?? null;
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
   const reducedMotion = usePrefersReducedMotion();
 
   const sensors = useSensors(
@@ -292,7 +309,10 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
    */
   const removeSaveFailures = (taskIds: readonly string[]) => {
     const active = document.activeElement;
-    const focusedAlertId = active instanceof Element ? active.closest('[data-save-failure]')?.getAttribute('data-save-failure') : null;
+    const focusLost = !active || active === document.body || !active.isConnected;
+    const focusedAlertId = focusLost
+      ? focusedFailureId.current
+      : active.closest('[data-save-failure]')?.getAttribute('data-save-failure');
     const before = moveController.getFailuresSnapshot();
     moveController.removeFailures(taskIds);
     if (!focusedAlertId || !taskIds.includes(focusedAlertId)) return;
@@ -316,14 +336,13 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   });
   useEffect(() => () => moveController.setOutcomeListener(null), [moveController]);
 
-  // "Retry move" is moot once the card is in its target lane (the server or another move put
-  // it there), or once a fully loaded board no longer has the card: drop those alerts.
-  const settledFailureIds = settledSaveFailureIds(saveFailures, tasks, boardLoadStatus === 'ready').join(',');
+  // Settled alerts are already off screen (shownFailures); clear them in the controller too.
+  const settledFailureKey = settledFailureIds.join(',');
   useEffect(() => {
-    if (settledFailureIds) removeSaveFailures(settledFailureIds.split(','));
-    // removeSaveFailures only reads the controller and the DOM; re-run on the ids alone.
+    if (settledFailureKey) removeSaveFailures(settledFailureKey.split(','));
+    // removeSaveFailures only reads the controller, the DOM and a ref; re-run on the ids alone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settledFailureIds, moveController]);
+  }, [settledFailureKey, moveController]);
 
   /** Act on a drop decision that was made once, at drop time (see handleDragEnd). */
   const runMove = (task: Task, targetStatus: TaskStatus, decision: MoveDecision) => {
@@ -518,14 +537,12 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         </div>
       )}
 
-      {saveFailures.length > 0 && (
+      {shownFailures.length > 0 && (
       // Bounded and scrollable, so several alerts cannot push the board (and their own buttons) out of view.
       <div data-save-failures className="max-h-[40vh] shrink-0 overflow-y-auto">
-      {saveFailures.map((failure) => (
-        // A failed save is spoken here only, once per card (role="alert").
+      {shownFailures.map((failure) => (
         <div
           key={failure.taskId}
-          role={quietFailures.has(failure) ? undefined : 'alert'}
           data-drop-error="save-failed"
           data-save-failure={failure.taskId}
           className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60"
@@ -533,12 +550,19 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <div className="flex items-start gap-2">
             <AlertTriangle aria-hidden="true" className="size-4 mt-0.5 text-mc-danger" />
             <div className="min-w-0">
-              <p className="font-medium">Move not saved</p>
-              <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">
-                {/* The card's lane now (it may have moved since), falling back to the lane at failure time. */}
-                {failure.retryable
-                  ? `${failure.error}. The server could not confirm the move to ${laneName(failure.target)}, so the board shows the last saved lane. ${failure.title} is in ${laneName(currentLane(failure))}.`
-                  : `${failure.error}. ${failure.title} was not moved to ${laneName(failure.target)}. ${failure.title} is in ${laneName(currentLane(failure))}.`}
+              {/* A failed save is spoken here only, once per card. The live node's text is fixed at
+                  failure time, so a later change (the card's lane) cannot make it re-read. */}
+              <div role={quietFailures.has(failure) ? undefined : 'alert'} data-save-failure-message>
+                <p className="font-medium">Move not saved</p>
+                <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">
+                  {failure.retryable
+                    ? `${failure.error}. The server could not confirm the move of ${failure.title} to ${laneName(failure.target)}, so the board shows the last saved lane.`
+                    : `${failure.error}. ${failure.title} was not moved to ${laneName(failure.target)}.`}
+                </p>
+              </div>
+              {/* Not live: the card's lane now (it may have moved since), falling back to the lane at failure time. */}
+              <p data-save-failure-lane className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">
+                {`${failure.title} is in ${laneName(currentLane(failure))}.`}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {failure.retryable && (

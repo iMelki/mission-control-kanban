@@ -129,7 +129,7 @@ async function moveCard(id: string, target: TaskStatus) {
 }
 
 const alerts = (root: ParentNode) => [...root.querySelectorAll('[data-save-failure]')];
-const liveAlerts = (root: ParentNode) => [...root.querySelectorAll('[role="alert"][data-save-failure]')];
+const liveAlerts = (root: ParentNode) => [...root.querySelectorAll('[data-save-failure] [role="alert"]')];
 const button = (root: ParentNode, name: string) => [...root.querySelectorAll('button')].find((b) => b.textContent?.trim() === name) as HTMLButtonElement | undefined;
 const statusOf = (id: string) => m.store.useMissionControl.getState().tasks.find((t) => t.id === id)?.status;
 
@@ -217,6 +217,48 @@ test('a save that fails while the board is unmounted is announced on remount (ro
   assert.equal(alerts(third.container).length, 1);
   assert.equal(liveAlerts(third.container).length, 0);
   await third.unmount();
+});
+
+test('a failure that is already settled when the board remounts never attaches an alert (not even for one frame)', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  let fail!: () => void;
+  stubFetch(async (url, init) => {
+    if (init?.method === 'PATCH') return new Promise<Response>((_resolve, reject) => { fail = () => reject(new TypeError('Failed to fetch')); });
+    if (url.endsWith('/api/tasks/a')) return Promise.reject(new TypeError('Failed to fetch'));
+    return undefined;
+  });
+  const first = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  const controller = m.registry.getBoardMoveController(WS);
+  await m.React.act(async () => { void controller.start(m.store.useMissionControl.getState().tasks[0], 'assigned'); });
+  await first.unmount();
+  fail();
+  await controller.waitForIdle('a');
+  assert.equal(controller.getFailuresSnapshot().length, 1);
+  // While unmounted, the server reports the card in its target lane (a stream event).
+  m.registry.taskStreamHandlers().onTaskUpdated(card('a', 'Alpha', 'assigned', { updated_at: '2026-11-15T10:00:09.000Z' }));
+  assert.equal(statusOf('a'), 'assigned');
+  const attached: Element[] = [];
+  const observer = new win.MutationObserver((records) => {
+    for (const record of records) {
+      // A node removed again by a later effect is checked through removedNodes: a removed
+      // subtree keeps its children, while an added subtree is only seen as it is now.
+      for (const node of [...record.addedNodes, ...record.removedNodes]) {
+        if (!(node instanceof win.Element)) continue;
+        if (node.matches('[role="alert"], [data-save-failure]')) attached.push(node);
+        attached.push(...node.querySelectorAll('[role="alert"], [data-save-failure]'));
+      }
+      if (record.type === 'attributes' && record.target instanceof win.Element && record.target.getAttribute('role') === 'alert') attached.push(record.target);
+    }
+  });
+  observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['role'] });
+  const second = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await wait(40); });
+  await second.rerender(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await wait(40); });
+  assert.deepEqual(attached.map((node) => node.outerHTML.slice(0, 80)), [], 'no alert was ever attached');
+  assert.equal(controller.getFailuresSnapshot().length, 0, 'the settled failure is cleared in the controller');
+  await second.unmount();
+  observer.disconnect();
 });
 
 test('a save in flight is still "Saving…" (aria-busy) after a tab switch, and resolving it while unmounted leaves no stale lock', async () => {
@@ -308,6 +350,31 @@ test('a failure alert names the card\'s current lane, and the alert list is a bo
   assert.match(alerts(view.container)[0].textContent ?? '', /Alpha is in Review/);
   const list = view.container.querySelector('[data-save-failures]') as HTMLElement;
   assert.ok(list.className.includes('overflow-y-auto') && list.className.includes('max-h-'));
+  await view.unmount();
+});
+
+test('a live alert is not re-spoken when the card changes lane: its live text is frozen, the current lane is a non-live sibling', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  stubFetch(async (url, init) => (init?.method === 'PATCH' || url.endsWith('/api/tasks/a') ? Promise.reject(new TypeError('Failed to fetch')) : undefined));
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); });
+  // Either structure (role on the alert box, or on a node inside it): the test is about the live node.
+  const live = view.container.querySelector('[data-save-failure] [role="alert"], [role="alert"][data-save-failure]') as HTMLElement;
+  assert.ok(live, 'the failure is announced by a live alert');
+  const before = live.textContent;
+  const mutations: MutationRecord[] = [];
+  const observer = new win.MutationObserver((records) => { mutations.push(...records); });
+  observer.observe(live, { subtree: true, childList: true, characterData: true, attributes: true });
+  await m.React.act(async () => { m.store.useMissionControl.getState().updateTaskStatus('a', 'testing'); });
+  await m.React.act(async () => { m.store.useMissionControl.getState().updateTaskStatus('a', 'review'); });
+  mutations.push(...observer.takeRecords());
+  observer.disconnect();
+  assert.equal(mutations.length, 0, 'nothing inside the live alert changed, so nothing is re-read');
+  assert.equal(live.textContent, before);
+  assert.ok(live.isConnected && live.getAttribute('role') === 'alert');
+  // The visible alert still names where the card is now, outside the live node.
+  assert.match(alerts(view.container)[0].textContent ?? '', /Alpha is in Review/);
+  assert.doesNotMatch(live.textContent ?? '', /is in Review/);
   await view.unmount();
 });
 
