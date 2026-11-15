@@ -16,16 +16,23 @@ import {
   DISPATCH_CONTRACT_INBOX_GUIDANCE,
   NEEDS_YOU_ACCESSIBLE_NAME,
   applyNeedsYouFilter,
+  buildBoardAnnouncements,
+  countGatedInbox,
   countNeedsYou,
+  decideMove,
   isDispatchBlockedInbox,
+  isGatedByDispatchContract,
   needsCaptain,
   needsYouTasks,
   presentNeedsYouCountDescription,
+  railToneFor,
   settledMoveOutcome,
   showsDispatchContractInboxBanner,
+  statusAfterSettledMove,
   workspaceScopedTasks,
   type AttentionTask,
 } from '../src/lib/board-attention';
+import type { TaskStatus } from '../src/lib/types';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -216,4 +223,87 @@ test('Needs you has a constant accessible name with the count outside the name',
   // The count and loading words must not be concatenated into the name.
   assert.doesNotMatch(button, /aria-label=\{?[`'"]Needs you.*\{needsYouCount\}/);
   assert.doesNotMatch(queue, /showing only these/);
+});
+
+// --- Independent review of 04d6a46 (third Low): rails, gated count, gate + announcements, rollback ---
+
+const byId = (id: string) => fixtures.find((candidate) => candidate.id === id)!;
+
+test('isDispatchBlockedInbox and needsCaptain hold only GitHub-sourced blocked Inbox work (fails without the github_source check)', () => {
+  assert.equal(isDispatchBlockedInbox(byId('gh-inbox-blocked')), true);
+  assert.equal(needsCaptain(byId('gh-inbox-blocked')), true);
+  assert.equal(isDispatchBlockedInbox(byId('local-inbox-blocked')), false);
+  assert.equal(needsCaptain(byId('local-inbox-blocked')), false);
+  assert.equal(isDispatchBlockedInbox(byId('gh-inbox-ready')), false);
+  assert.equal(needsCaptain(byId('review-a')), true);
+  assert.equal(needsCaptain(byId('in-progress-a')), false);
+});
+
+test('railToneFor: warn only for gated GitHub Inbox, then status tones', () => {
+  assert.equal(railToneFor(byId('gh-inbox-blocked')), 'warn');
+  assert.equal(railToneFor(byId('local-inbox-blocked')), 'neutral');
+  assert.equal(railToneFor(byId('gh-inbox-ready')), 'neutral');
+  assert.equal(railToneFor(byId('review-a')), 'needs-you');
+  assert.equal(railToneFor(byId('in-progress-a')), 'active');
+  assert.equal(railToneFor(task({ id: 't', status: 'testing' })), 'active');
+  assert.equal(railToneFor(task({ id: 'd', status: 'done' })), 'done');
+  assert.equal(railToneFor(task({ id: 'a', status: 'assigned' })), 'neutral');
+  // Blockers only gate Inbox: a GitHub Review card keeps the needs-you rail.
+  assert.equal(railToneFor(task({ id: 'r', status: 'review', github_source: githubSource, dispatch_blockers: ['x'] })), 'needs-you');
+});
+
+test('"gated in Inbox" counts the same cards as the move gate, per workspace', () => {
+  assert.equal(countGatedInbox(fixtures, 'ws-a'), 1);
+  assert.equal(countGatedInbox(fixtures, 'ws-b'), 1);
+  assert.equal(countGatedInbox(fixtures), 2);
+});
+
+const LANES: Record<TaskStatus, string> = {
+  planning: 'Planning',
+  inbox: 'Inbox',
+  assigned: 'Assigned',
+  in_progress: 'In progress',
+  testing: 'Testing',
+  review: 'Review',
+  done: 'Done',
+};
+
+const gatedCard = { id: 'gh-1', title: 'Imported issue', status: 'inbox' as TaskStatus, github_source: githubSource };
+const localCard = { id: 'local-1', title: 'Local note', status: 'inbox' as TaskStatus, github_source: undefined };
+
+function dropEnd(cards: { id: string; title: string; status: TaskStatus; github_source?: typeof githubSource }[], activeId: string, overId: string | null) {
+  const announcements = buildBoardAnnouncements({
+    tasks: cards,
+    resolveTargetStatus: (id) => (id in LANES ? (id as TaskStatus) : cards.find((card) => card.id === id)?.status ?? null),
+    laneLabel: (status) => LANES[status],
+  });
+  return announcements.onDragEnd({
+    active: { id: activeId },
+    over: overId ? { id: overId } : null,
+  } as unknown as Parameters<typeof announcements.onDragEnd>[0]);
+}
+
+test('a gated GitHub card is refused by the move gate and announced as refused, never as moving', () => {
+  assert.equal(isGatedByDispatchContract(gatedCard, 'assigned'), true);
+  assert.equal(decideMove(gatedCard, 'assigned'), 'gated');
+  const spoken = dropEnd([gatedCard], gatedCard.id, 'assigned');
+  assert.equal(spoken, 'Imported issue cannot move to Assigned yet: the dispatch contract is incomplete.');
+  assert.doesNotMatch(spoken ?? '', /Mov(ed|ing)/);
+});
+
+test('a local card is not gated: the drop is announced as pending ("Moving"), not done', () => {
+  assert.equal(isGatedByDispatchContract(localCard, 'assigned'), false);
+  assert.equal(decideMove(localCard, 'assigned'), 'move');
+  assert.equal(dropEnd([localCard], localCard.id, 'assigned'), 'Moving Local note to Assigned.');
+  assert.equal(dropEnd([localCard], localCard.id, 'inbox'), 'Local note stayed in Inbox.');
+  assert.equal(decideMove(localCard, 'inbox'), 'stay');
+  assert.equal(dropEnd([localCard], localCard.id, null), 'Local note was dropped outside the board.');
+});
+
+test('a failed PATCH rolls the card back to its original lane; a saved one settles in the target', () => {
+  assert.equal(statusAfterSettledMove(false, 'inbox', 'assigned'), 'inbox');
+  assert.equal(statusAfterSettledMove(true, 'inbox', 'assigned'), 'assigned');
+  const failed = settledMoveOutcome(false, 'Local note', LANES.assigned, LANES.inbox);
+  assert.equal(failed.revert, true);
+  assert.equal(failed.announcement, 'Local note was not moved. It stayed in Inbox.');
 });

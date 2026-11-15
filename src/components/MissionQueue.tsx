@@ -18,16 +18,19 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Plus, AlertTriangle, Hand } from 'lucide-react';
+import { Plus, AlertTriangle, Hand, ListFilter } from 'lucide-react';
 import { Github } from '@/components/icons/BrandIcons';
 import { BoardLane, type BoardLaneColumn } from '@/components/board/board-lane';
 import { TaskCard } from '@/components/board/task-card';
 import {
   NEEDS_YOU_ACCESSIBLE_NAME,
   applyNeedsYouFilter,
+  buildBoardAnnouncements,
   countNeedsYou,
+  decideMove,
   presentNeedsYouCountDescription,
   settledMoveOutcome,
+  statusAfterSettledMove,
   workspaceScopedTasks,
 } from '@/lib/board-attention';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -35,7 +38,6 @@ import { presentBoardCount } from '@/lib/cockpit-load-state';
 import { useMissionControl } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-  requiresDispatchContractBeforeWorkStarts,
   summarizeDispatchContract,
   validateDispatchMetadata,
 } from '@/lib/dispatch-contract';
@@ -181,36 +183,15 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const getTasksByStatus = (status: TaskStatus) =>
     visibleTasks.filter((task) => task.status === status);
 
-  const taskTitle = (id: UniqueIdentifier) => tasks.find((task) => task.id === id)?.title ?? 'task';
-  const laneLabel = (overId: UniqueIdentifier | undefined) => {
-    if (overId == null) return null;
-    const status = resolveTargetStatus(String(overId));
-    return status ? COLUMN_LABELS.get(status) ?? status : null;
-  };
+  const laneName = (status: TaskStatus) => COLUMN_LABELS.get(status) ?? status;
 
   // Spoken through dnd-kit's polite live region. The move is always announced,
   // which is what reduced motion keeps when the tilt, lift and ink are gone.
-  const announcements: Announcements = {
-    onDragStart: ({ active }) => `Picked up ${taskTitle(active.id)}.`,
-    onDragOver: ({ active, over }) => {
-      const lane = laneLabel(over?.id);
-      return lane ? `${taskTitle(active.id)} is over ${lane}.` : `${taskTitle(active.id)} is not over a lane.`;
-    },
-    onDragEnd: ({ active, over }) => {
-      const lane = laneLabel(over?.id);
-      if (!lane) return `${taskTitle(active.id)} was dropped outside the board.`;
-      const task = tasks.find((candidate) => candidate.id === active.id);
-      const target = over ? resolveTargetStatus(String(over.id)) : null;
-      if (task && target && task.status === target) return `${task.title} stayed in ${lane}.`;
-      // Same synchronous gate moveTask applies; never announce a move it refuses.
-      if (task && target && isGatedByDispatchContract(task, target)) {
-        return `${task.title} cannot move to ${lane} yet: the dispatch contract is incomplete.`;
-      }
-      // Not confirmed yet: moveTask announces the result once the PATCH answers.
-      return `Moving ${taskTitle(active.id)} to ${lane}.`;
-    },
-    onDragCancel: ({ active }) => `Move cancelled. ${taskTitle(active.id)} stayed where it was.`,
-  };
+  const announcements = buildBoardAnnouncements({
+    tasks: workspaceTasks,
+    resolveTargetStatus: (overId) => resolveTargetStatus(overId),
+    laneLabel: laneName,
+  });
 
   const dropAnimation: DropAnimation | null = reducedMotion
     ? null
@@ -232,35 +213,27 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     return overTask ? overTask.status : null;
   };
 
-  const isGatedByDispatchContract = (task: Task, targetStatus: TaskStatus) =>
-    Boolean(task.github_source)
-    && requiresDispatchContractBeforeWorkStarts(targetStatus)
-    && !validateDispatchMetadata(task.dispatch_metadata).canDispatch;
-
-  const laneName = (status: TaskStatus) => COLUMN_LABELS.get(status) ?? status;
-
   const moveTask = async (task: Task, targetStatus: TaskStatus) => {
-    if (task.status === targetStatus) return;
+    const decision = decideMove(task, targetStatus);
+    if (decision === 'stay') return;
     setMoveAnnouncement('');
 
     dispatchUi({ type: 'set_drop_error', error: null });
 
-    if (task.github_source && requiresDispatchContractBeforeWorkStarts(targetStatus)) {
+    if (decision === 'gated') {
       const validation = validateDispatchMetadata(task.dispatch_metadata);
-      if (!validation.canDispatch) {
-        const summary = summarizeDispatchContract(task.dispatch_metadata);
-        const message = `${task.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
+      const summary = summarizeDispatchContract(task.dispatch_metadata);
+      const message = `${task.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
 
-        dispatchUi({ type: 'set_drop_error', error: `${message} ${validation.blockers.join('; ')}`.trim() });
-        addEvent({
-          id: crypto.randomUUID(),
-          type: 'system',
-          task_id: task.id,
-          message,
-          created_at: new Date().toISOString(),
-        });
-        return;
-      }
+      dispatchUi({ type: 'set_drop_error', error: `${message} ${validation.blockers.join('; ')}`.trim() });
+      addEvent({
+        id: crypto.randomUUID(),
+        type: 'system',
+        task_id: task.id,
+        message,
+        created_at: new Date().toISOString(),
+      });
+      return;
     }
 
     // Optimistic update
@@ -290,7 +263,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         const data = await res.json().catch(() => ({}));
         dispatchUi({ type: 'set_drop_error', error: data.error || 'Failed to move task' });
         const outcome = settledMoveOutcome(false, task.title, laneName(targetStatus), laneName(task.status));
-        if (outcome.revert) updateTaskStatus(task.id, task.status);
+        if (outcome.revert) updateTaskStatus(task.id, statusAfterSettledMove(false, task.status, targetStatus));
         setMoveAnnouncement(outcome.announcement);
       }
     } catch (error) {
@@ -301,7 +274,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       });
       // Revert on error
       const outcome = settledMoveOutcome(false, task.title, laneName(targetStatus), laneName(task.status));
-      if (outcome.revert) updateTaskStatus(task.id, task.status);
+      if (outcome.revert) updateTaskStatus(task.id, statusAfterSettledMove(false, task.status, targetStatus));
       setMoveAnnouncement(outcome.announcement);
     }
   };
@@ -361,13 +334,19 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             className={cn(
               'inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tabular-nums active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-text focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg',
               needsYouOnly
-                ? 'bg-mc-accent text-mc-accent-ink ring-2 ring-inset ring-mc-accent-ink/40'
+                // Pressed: a solid ink ring, 10.22:1 against the accent fill (the old /40 ring
+                // composited to 2.31:1, under WCAG 1.4.11's 3:1), plus a filter glyph for the hand.
+                ? 'bg-mc-accent text-mc-accent-ink ring-2 ring-inset ring-mc-accent-ink'
                 : needsYouCount > 0
                   ? 'bg-mc-accent text-mc-accent-ink'
                   : 'bg-mc-bg-tertiary text-mc-text-secondary',
             )}
           >
-            <Hand aria-hidden="true" className="size-3.5" />
+            {needsYouOnly ? (
+              <ListFilter aria-hidden="true" data-needs-you-filtering className="size-3.5" />
+            ) : (
+              <Hand aria-hidden="true" className="size-3.5" />
+            )}
             <span aria-hidden="true">Needs you</span>
             <span aria-hidden="true">·</span>
             {/* Before the board settles the count is unknown, not zero (same rule as presentBoardCount).

@@ -4,7 +4,9 @@
  * announce / ink decisions. Kept free of React so node --test can import them.
  */
 
-import type { Task } from './types';
+import type { Announcements, UniqueIdentifier } from '@dnd-kit/core';
+import { requiresDispatchContractBeforeWorkStarts, validateDispatchMetadata } from './dispatch-contract';
+import type { Task, TaskStatus } from './types';
 
 export type AttentionTask = Pick<
   Task,
@@ -54,6 +56,15 @@ export function workspaceScopedTasks<T extends { workspace_id: string }>(
   workspaceId?: string,
 ): T[] {
   return workspaceId ? tasks.filter((task) => task.workspace_id === workspaceId) : [...tasks];
+}
+
+/**
+ * The status bar's "gated in Inbox" count: GitHub-sourced, dispatch-blocked Inbox
+ * cards in this workspace, the same cards the move gate holds and the card's
+ * Contract chip marks.
+ */
+export function countGatedInbox<T extends AttentionTask>(tasks: readonly T[], workspaceId?: string): number {
+  return workspaceScopedTasks(tasks, workspaceId).filter(isDispatchBlockedInbox).length;
 }
 
 /** Review plus GitHub-sourced dispatch-blocked Inbox, scoped to a workspace. */
@@ -124,5 +135,93 @@ export function settledMoveOutcome(
     announcement: `${title} was not moved. It stayed in ${originLane}.`,
     playInk: false,
     revert: true,
+  };
+}
+
+/**
+ * Where the card sits once the PATCH has answered: the target lane on success,
+ * otherwise the lane it came from (the optimistic update is rolled back).
+ */
+export function statusAfterSettledMove<S extends string>(ok: boolean, originStatus: S, targetStatus: S): S {
+  return ok ? targetStatus : originStatus;
+}
+
+export type RailTone = 'neutral' | 'active' | 'needs-you' | 'warn' | 'done';
+
+/** The card's 3 px status rail. Orange only for cards the dispatch gate holds. */
+export function railToneFor(task: Pick<AttentionTask, 'github_source' | 'status' | 'dispatch_blockers'>): RailTone {
+  if (isDispatchBlockedInbox(task)) return 'warn';
+  switch (task.status) {
+    case 'review':
+      return 'needs-you';
+    case 'done':
+      return 'done';
+    case 'in_progress':
+    case 'testing':
+      return 'active';
+    default:
+      return 'neutral';
+  }
+}
+
+/** The synchronous dispatch gate moveTask applies before any optimistic update. */
+export function isGatedByDispatchContract(
+  task: Pick<Task, 'github_source' | 'dispatch_metadata'>,
+  targetStatus: TaskStatus,
+): boolean {
+  return Boolean(task.github_source)
+    && requiresDispatchContractBeforeWorkStarts(targetStatus)
+    && !validateDispatchMetadata(task.dispatch_metadata).canDispatch;
+}
+
+export type MoveDecision = 'stay' | 'gated' | 'move';
+
+/** One decision for both the drop announcement and moveTask, so they cannot disagree. */
+export function decideMove(task: Pick<Task, 'status' | 'github_source' | 'dispatch_metadata'>, targetStatus: TaskStatus): MoveDecision {
+  if (task.status === targetStatus) return 'stay';
+  if (isGatedByDispatchContract(task, targetStatus)) return 'gated';
+  return 'move';
+}
+
+/**
+ * dnd-kit live-region text for the board. A drop is announced as "Moving", never
+ * "Moved": the result is only known after the PATCH (settledMoveOutcome). A move
+ * the dispatch gate refuses is announced as refused.
+ */
+export function buildBoardAnnouncements({
+  tasks,
+  resolveTargetStatus,
+  laneLabel,
+}: {
+  tasks: readonly Pick<Task, 'id' | 'title' | 'status' | 'github_source' | 'dispatch_metadata'>[];
+  resolveTargetStatus: (overId: string) => TaskStatus | null;
+  laneLabel: (status: TaskStatus) => string;
+}): Announcements {
+  const titleOf = (id: UniqueIdentifier) => tasks.find((task) => task.id === id)?.title ?? 'task';
+  const laneOf = (overId: UniqueIdentifier | undefined) => {
+    if (overId == null) return null;
+    const status = resolveTargetStatus(String(overId));
+    return status ? laneLabel(status) : null;
+  };
+
+  return {
+    onDragStart: ({ active }) => `Picked up ${titleOf(active.id)}.`,
+    onDragOver: ({ active, over }) => {
+      const lane = laneOf(over?.id);
+      return lane ? `${titleOf(active.id)} is over ${lane}.` : `${titleOf(active.id)} is not over a lane.`;
+    },
+    onDragEnd: ({ active, over }) => {
+      const lane = laneOf(over?.id);
+      if (!lane) return `${titleOf(active.id)} was dropped outside the board.`;
+      const task = tasks.find((candidate) => candidate.id === active.id);
+      const target = over ? resolveTargetStatus(String(over.id)) : null;
+      if (task && target) {
+        const decision = decideMove(task, target);
+        if (decision === 'stay') return `${task.title} stayed in ${lane}.`;
+        if (decision === 'gated') return `${task.title} cannot move to ${lane} yet: the dispatch contract is incomplete.`;
+      }
+      return `Moving ${titleOf(active.id)} to ${lane}.`;
+    },
+    onDragCancel: ({ active }) => `Move cancelled. ${titleOf(active.id)} stayed where it was.`,
   };
 }

@@ -11,8 +11,9 @@ import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes'
 import {
   DISPATCH_CONTRACT_INBOX_CHIP_LABEL,
   DISPATCH_CONTRACT_INBOX_GUIDANCE,
-  isDispatchBlockedInbox,
+  railToneFor,
   showsDispatchContractInboxBanner,
+  type RailTone,
 } from '@/lib/board-attention';
 import type { Task } from '@/lib/types';
 
@@ -27,8 +28,6 @@ import type { Task } from '@/lib/types';
  * the brief "ink drying" cross-fade after a move.
  */
 
-type RailTone = 'neutral' | 'active' | 'needs-you' | 'warn' | 'done';
-
 const RAIL_CLASS: Record<RailTone, string> = {
   neutral: 'bg-mc-text-secondary',
   active: 'bg-mc-text',
@@ -36,21 +35,6 @@ const RAIL_CLASS: Record<RailTone, string> = {
   warn: 'bg-mc-warn',
   done: 'bg-mc-success',
 };
-
-function railToneFor(task: Task): RailTone {
-  if (isDispatchBlockedInbox(task)) return 'warn';
-  switch (task.status) {
-    case 'review':
-      return 'needs-you';
-    case 'done':
-      return 'done';
-    case 'in_progress':
-    case 'testing':
-      return 'active';
-    default:
-      return 'neutral';
-  }
-}
 
 type PillTone = 'ready' | 'warn' | 'risk' | 'neutral';
 
@@ -137,7 +121,7 @@ export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, dragAtt
           {...dragAttributes}
           {...dragListeners}
           aria-label={`Reorder task ${task.title}`}
-          className="flex w-full cursor-grab items-center justify-center py-1.5 opacity-0 transition-opacity duration-fast hover:bg-mc-bg-secondary/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+          className="flex w-full cursor-grab items-center justify-center py-1.5 opacity-0 [@media(hover:none)]:min-h-11 transition-opacity duration-fast hover:bg-mc-bg-secondary/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100"
         >
           <GripVertical className="size-4 text-mc-text-secondary" />
         </button>

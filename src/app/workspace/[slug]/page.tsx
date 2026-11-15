@@ -20,6 +20,7 @@ import { fetchWithBudget } from '@/lib/fetch-budget';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
+import { countGatedInbox } from '@/lib/board-attention';
 import { extractGitHubSyncNoteGroups, formatSyncCount } from '@/lib/workspace-sync-summary';
 import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
 
@@ -379,7 +380,9 @@ export default function WorkspacePage() {
     return <CockpitLoadingShell slug={slug} />;
   }
 
-  const gatedInboxCount = tasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0).length;
+  // The cards the move gate actually holds, in this workspace only: the same rule as
+  // the board's "Needs you" chip and the card's Contract chip (src/lib/board-attention.ts).
+  const gatedInboxCount = countGatedInbox(tasks, workspace.id);
 
   return (
     <div

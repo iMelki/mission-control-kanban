@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Zap, Settings, ChevronLeft, LayoutGrid } from 'lucide-react';
 import { EntityEmoji } from '@/components/ui/EntityEmoji';
 import { presentConnection } from '@/lib/cockpit-load-state';
+import { workspaceScopedTasks } from '@/lib/board-attention';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import { RuntimeHealthBadges } from '@/components/RuntimeHealthBadges';
@@ -50,7 +51,8 @@ export function Header({ workspace }: HeaderProps) {
 
   const workingAgents = agents.filter((a) => a.status === 'working').length;
   const activeAgents = workingAgents + activeSubAgents;
-  const tasksInQueue = tasks.filter((t) => t.status !== 'done' && t.status !== 'review').length;
+  // Scoped like the board: SSE also delivers other workspaces' tasks into the store.
+  const tasksInQueue = workspaceScopedTasks(tasks, workspace?.id).filter((t) => t.status !== 'done' && t.status !== 'review').length;
 
   return (
     <header className="h-14 bg-mc-bg-secondary border-b border-mc-border flex items-center justify-between gap-2 px-4">
