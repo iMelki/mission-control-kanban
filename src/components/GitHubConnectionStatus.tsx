@@ -54,7 +54,7 @@ export function GitHubConnectionStatus() {
       className="flex items-center gap-2 rounded border border-mc-border/70 bg-mc-bg-secondary/70 px-3 py-1.5 text-xs text-mc-text-secondary"
       data-github-connection-phase={presented.phase}
     >
-      <Github className="size-4 text-mc-accent-cyan" />
+      <Github className="size-4 text-mc-text-secondary" />
       {checking ? (
         <>
           <Loader2 className="size-3 animate-spin" />
@@ -63,9 +63,9 @@ export function GitHubConnectionStatus() {
       ) : (
         <>
           {ok ? (
-            <CheckCircle2 className="size-3 text-emerald-300" />
+            <CheckCircle2 className="size-3 text-mc-success" />
           ) : (
-            <AlertTriangle className={`size-3 ${limited ? 'text-amber-300' : 'text-rose-300'}`} />
+            <AlertTriangle className={`size-3 ${limited ? 'text-mc-warn' : 'text-mc-danger'}`} />
           )}
           <span className="font-medium text-mc-text">{presented.title}</span>
           {presented.detail ? <span>{presented.detail}</span> : null}

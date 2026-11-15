@@ -73,7 +73,7 @@ export function RuntimeHealthBadges() {
 
   return (
     <div className="hidden items-center gap-2 text-xs text-mc-text-secondary 2xl:flex" aria-label="Runtime health summary">
-      <span className={health.ok ? 'inline-flex items-center gap-1 rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-emerald-200' : 'inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-amber-200'}>
+      <span className={health.ok ? 'inline-flex items-center gap-1 rounded border border-mc-success/30 bg-mc-success/10 px-2 py-1 text-mc-text' : 'inline-flex items-center gap-1 rounded border border-mc-warn/30 bg-mc-warn/10 px-2 py-1 text-mc-text'}>
         {health.ok ? <CheckCircle2 className="size-3" /> : <AlertTriangle className="size-3" />}
         Runtime {health.ok ? 'ok' : 'attention'}
       </span>
@@ -83,7 +83,7 @@ export function RuntimeHealthBadges() {
       <span className="inline-flex items-center gap-1 rounded border border-mc-border px-2 py-1">
         <ShieldCheck className="size-3" /> Callback sig {callbackOk ? 'on' : 'off'}
       </span>
-      {!webhookOk && <span className="text-amber-200">missing webhook secrets</span>}
+      {!webhookOk && <span className="text-mc-text">missing webhook secrets</span>}
     </div>
   );
 }
