@@ -22,6 +22,7 @@ import {
   decideMove,
   isDispatchBlockedInbox,
   isGatedByDispatchContract,
+  moveLeavesNeedsYouFilter,
   needsCaptain,
   needsYouTasks,
   presentNeedsYouCountDescription,
@@ -306,4 +307,16 @@ test('a failed PATCH rolls the card back to its original lane; a saved one settl
   const failed = settledMoveOutcome(false, 'Local note', LANES.assigned, LANES.inbox);
   assert.equal(failed.revert, true);
   assert.equal(failed.announcement, 'Local note was not moved. It stayed in Inbox.');
+});
+
+test('a move out of the "Needs you" filter is detected so focus can fall back to the board', () => {
+  assert.equal(moveLeavesNeedsYouFilter(byId('review-a'), 'done', true), true);
+  assert.equal(moveLeavesNeedsYouFilter(byId('review-a'), 'done', false), false);
+  assert.equal(moveLeavesNeedsYouFilter(byId('in-progress-a'), 'review', true), false);
+  // A gated GitHub card moving within Inbox-blocked state stays in the filter.
+  assert.equal(moveLeavesNeedsYouFilter(byId('gh-inbox-blocked'), 'inbox', true), false);
+});
+
+test('the drag handle opts out of browser touch scrolling so PointerSensor drags are not cancelled', () => {
+  assert.match(source('src/components/board/task-card.tsx'), /data-task-drag-handle[\s\S]*?className="[^"]*\btouch-none\b/);
 });

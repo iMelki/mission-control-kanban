@@ -28,6 +28,7 @@ import {
   buildBoardAnnouncements,
   countNeedsYou,
   decideMove,
+  moveLeavesNeedsYouFilter,
   presentNeedsYouCountDescription,
   settledMoveOutcome,
   statusAfterSettledMove,
@@ -156,6 +157,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [overStatus, setOverStatus] = useState<TaskStatus | null>(null);
   const [inkTask, setInkTask] = useState<{ id: string; key: number } | null>(null);
   const inkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
   // The settled result of a move, spoken once the server has answered (dnd-kit's own
   // region only speaks at drop time, before the PATCH returns).
   const [moveAnnouncement, setMoveAnnouncement] = useState('');
@@ -238,6 +240,14 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
     // Optimistic update
     updateTaskStatus(task.id, targetStatus);
+    if (moveLeavesNeedsYouFilter(task, targetStatus, needsYouOnly)) {
+      // The card (and its focused handle) leaves the filtered board; after dnd-kit's own
+      // focus restore has had its frame, fall back to the board region, not the document.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (!active || active === document.body || !active.isConnected) boardRef.current?.focus();
+      }));
+    }
 
     // Persist to API
     try {
@@ -421,6 +431,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         accessibility={{ announcements }}
       >
         <div
+          ref={boardRef}
           role="region"
           tabIndex={0}
           aria-label="Mission queue board"

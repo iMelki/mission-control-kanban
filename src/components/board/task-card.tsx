@@ -121,7 +121,7 @@ export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, dragAtt
           {...dragAttributes}
           {...dragListeners}
           aria-label={`Reorder task ${task.title}`}
-          className="flex w-full cursor-grab items-center justify-center py-1.5 opacity-0 [@media(hover:none)]:min-h-11 transition-opacity duration-fast hover:bg-mc-bg-secondary/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+          className="flex w-full cursor-grab touch-none items-center justify-center py-1.5 opacity-0 [@media(hover:none)]:min-h-11 transition-opacity duration-fast hover:bg-mc-bg-secondary/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100"
         >
           <GripVertical className="size-4 text-mc-text-secondary" />
         </button>

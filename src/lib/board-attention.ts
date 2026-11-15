@@ -225,3 +225,17 @@ export function buildBoardAnnouncements({
     onDragCancel: ({ active }) => `Move cancelled. ${titleOf(active.id)} stayed where it was.`,
   };
 }
+
+/**
+ * With "Needs you" on, moving a card to a status that no longer needs Captain
+ * (Review -> Done, say) removes it, and its focused drag handle, from the board.
+ * dnd-kit cannot restore focus to a node that is gone, so the caller moves focus
+ * to the board region instead of letting it fall to the document.
+ */
+export function moveLeavesNeedsYouFilter(
+  task: Pick<AttentionTask, 'github_source' | 'status' | 'dispatch_blockers'>,
+  targetStatus: TaskStatus,
+  needsYouOnly: boolean,
+): boolean {
+  return needsYouOnly && !needsCaptain({ ...task, status: targetStatus });
+}
