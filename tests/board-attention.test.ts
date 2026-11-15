@@ -357,12 +357,16 @@ function moveHarness(initial: TaskStatus) {
   const store = { status: initial };
   const sequencer = createMoveSequencer();
   const spoken: string[] = [];
+  /** Returns the PATCH-answer callback, or null when the move is refused (as moveTask does). */
   const start = (target: TaskStatus) => {
+    const decision = decideMove({ status: store.status, github_source: undefined, dispatch_metadata: undefined }, target, sequencer.isSaving('a'));
+    if (decision !== 'move') return null;
     const origin = store.status;
     const seq = sequencer.begin('a');
     store.status = target; // optimistic
     return (ok: boolean) => {
-      const decision = decideSettledMove({
+      sequencer.finish('a', seq);
+      const settled = decideSettledMove({
         ok,
         isLatestMove: sequencer.isLatest('a', seq),
         currentStatus: store.status,
@@ -371,9 +375,9 @@ function moveHarness(initial: TaskStatus) {
         title: 'A',
         laneName: (status) => LANES[status],
       });
-      if (decision.revertTo) store.status = decision.revertTo;
-      for (const text of [decision.successAnnouncement, decision.failureMessage]) if (text) spoken.push(text);
-      return decision;
+      if (settled.revertTo) store.status = settled.revertTo;
+      for (const text of [settled.successAnnouncement, settled.failureMessage]) if (text) spoken.push(text);
+      return settled;
     };
   };
   return { store, start, spoken };
@@ -381,35 +385,65 @@ function moveHarness(initial: TaskStatus) {
 
 test('a failed PATCH rolls the card back to its original lane; a saved one settles in the target', () => {
   const failed = moveHarness('inbox');
-  failed.start('assigned')(false);
+  failed.start('assigned')!(false);
   assert.equal(failed.store.status, 'inbox');
   assert.deepEqual(failed.spoken, ['A was not moved. It stayed in Inbox.']);
 
   const saved = moveHarness('inbox');
-  saved.start('assigned')(true);
+  saved.start('assigned')!(true);
   assert.equal(saved.store.status, 'assigned');
   assert.deepEqual(saved.spoken, ['Moved A to Assigned.']);
 });
 
-test('race: an older move failing after a newer move succeeded does not snap the card back', () => {
+test('race: a second move of a card is refused while its first PATCH is pending, so no rollback restores an unconfirmed status', () => {
   const h = moveHarness('inbox');
   const first = h.start('assigned'); // Inbox -> Assigned, PATCH pending
-  const second = h.start('in_progress'); // Assigned -> In progress
-  second(true);
-  const late = first(false); // the first PATCH fails last
-  assert.equal(late.revertTo, null);
+  assert.ok(first);
+  assert.equal(h.start('in_progress'), null); // refused: the card is still saving
+  assert.equal(h.store.status, 'assigned');
+  first!(false); // the only PATCH fails: back to the confirmed Inbox, not to an unconfirmed lane
+  assert.equal(h.store.status, 'inbox');
+  // Once answered, the card can move again.
+  const again = h.start('in_progress');
+  assert.ok(again);
+  again!(true);
   assert.equal(h.store.status, 'in_progress');
-  assert.deepEqual(h.spoken, ['Moved A to In progress.']);
+  assert.deepEqual(h.spoken, ['A was not moved. It stayed in Inbox.', 'Moved A to In progress.']);
+});
+
+test('a late answer for a superseded move does not settle the card', () => {
+  const sequencer = createMoveSequencer();
+  const older = sequencer.begin('a');
+  sequencer.finish('a', older);
+  const newer = sequencer.begin('a');
+  assert.equal(sequencer.isLatest('a', older), false);
+  assert.equal(sequencer.isLatest('a', newer), true);
+  const decision = decideSettledMove({
+    ok: false, isLatestMove: false, currentStatus: 'in_progress', originStatus: 'inbox', targetStatus: 'assigned', title: 'A', laneName: (status) => LANES[status],
+  });
+  assert.deepEqual(decision, { revertTo: null, playInk: false, successAnnouncement: null, failureMessage: null });
 });
 
 test('race: an SSE update while the PATCH is pending wins over the failed move\'s revert', () => {
   const h = moveHarness('inbox');
-  const settle = h.start('assigned');
+  const settle = h.start('assigned')!;
   h.store.status = 'review'; // task_updated from the server lands meanwhile
   const decision = settle(false);
   assert.equal(decision.revertTo, null);
   assert.equal(h.store.status, 'review');
   assert.deepEqual(h.spoken, ['A was not moved to Assigned. It is in Review.']);
+});
+
+test('a drop on a card that is still saving is announced as such, not as moving', () => {
+  const card = { id: 'local-1', title: 'Local note', status: 'assigned' as TaskStatus, github_source: undefined };
+  const announcements = buildBoardAnnouncements({
+    tasks: [card],
+    resolveTargetStatus: (id) => (id in LANES ? (id as TaskStatus) : null),
+    laneLabel: (status) => LANES[status],
+    isSaving: (id) => id === 'local-1',
+  });
+  const spoken = announcements.onDragEnd({ active: { id: 'local-1' }, over: { id: 'review' } } as unknown as Parameters<typeof announcements.onDragEnd>[0]);
+  assert.equal(spoken, 'Local note is still being saved. It stayed in Assigned.');
 });
 
 test('a move out of the "Needs you" filter is detected so focus can fall back to the board', () => {
@@ -430,6 +464,9 @@ test('MissionQueue settles every PATCH answer through the sequencer and decideSe
   assert.match(queue, /isLatestMove: moveSequencer\.isLatest\(task\.id, seq\)/);
   assert.match(queue, /currentStatus: useMissionControl\.getState\(\)\.tasks/);
   assert.match(queue, /if \(decision\.revertTo\) updateTaskStatus\(task\.id, decision\.revertTo\);/);
+  assert.match(queue, /decideMove\(task, targetStatus, moveSequencer\.isSaving\(task\.id\)\)/);
+  assert.match(queue, /if \(decision === 'stay' \|\| decision === 'saving'\) return;/);
+  assert.match(queue, /moveSequencer\.finish\(task\.id, seq\);/);
   assert.match(queue, /settle\(true\)/);
   assert.match(queue, /settle\(false, /);
   // No direct revert to the drag-start status remains.

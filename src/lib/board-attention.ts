@@ -166,17 +166,28 @@ export function decideSettledMove(input: SettleMoveInput): SettleMoveDecision {
 }
 
 /**
- * Per-card move sequence numbers. begin() is called at each optimistic move;
- * isLatest() tells a PATCH answer whether a newer move of the same card started
- * while it was in flight (then the answer must not settle the card).
+ * Per-card move bookkeeping. Moves of one card are serialized: while a card's
+ * PATCH is in flight (isSaving), a new move of that card is refused, so every
+ * move starts from a status the server has confirmed and a rollback can never
+ * restore an unconfirmed one. begin() returns a sequence number; finish() clears
+ * the in-flight flag; isLatest() still guards against an answer that arrives
+ * after a newer move of the same card started.
  */
 export function createMoveSequencer() {
   const latest = new Map<string, number>();
+  const inFlight = new Map<string, number>();
   return {
     begin(taskId: string): number {
       const seq = (latest.get(taskId) ?? 0) + 1;
       latest.set(taskId, seq);
+      inFlight.set(taskId, seq);
       return seq;
+    },
+    finish(taskId: string, seq: number): void {
+      if (inFlight.get(taskId) === seq) inFlight.delete(taskId);
+    },
+    isSaving(taskId: string): boolean {
+      return inFlight.has(taskId);
     },
     isLatest(taskId: string, seq: number): boolean {
       return latest.get(taskId) === seq;
@@ -212,11 +223,19 @@ export function isGatedByDispatchContract(
     && !validateDispatchMetadata(task.dispatch_metadata).canDispatch;
 }
 
-export type MoveDecision = 'stay' | 'gated' | 'move';
+export type MoveDecision = 'stay' | 'saving' | 'gated' | 'move';
 
-/** One decision for both the drop announcement and moveTask, so they cannot disagree. */
-export function decideMove(task: Pick<Task, 'status' | 'github_source' | 'dispatch_metadata'>, targetStatus: TaskStatus): MoveDecision {
+/**
+ * One decision for both the drop announcement and moveTask, so they cannot disagree.
+ * `saving`: the card's previous move has not been answered yet (moves are serialized).
+ */
+export function decideMove(
+  task: Pick<Task, 'status' | 'github_source' | 'dispatch_metadata'>,
+  targetStatus: TaskStatus,
+  isSaving = false,
+): MoveDecision {
   if (task.status === targetStatus) return 'stay';
+  if (isSaving) return 'saving';
   if (isGatedByDispatchContract(task, targetStatus)) return 'gated';
   return 'move';
 }
@@ -230,10 +249,13 @@ export function buildBoardAnnouncements({
   tasks,
   resolveTargetStatus,
   laneLabel,
+  isSaving = () => false,
 }: {
   tasks: readonly Pick<Task, 'id' | 'title' | 'status' | 'github_source' | 'dispatch_metadata'>[];
   resolveTargetStatus: (overId: string) => TaskStatus | null;
   laneLabel: (status: TaskStatus) => string;
+  /** The card's previous move is still being saved. */
+  isSaving?: (taskId: string) => boolean;
 }): Announcements {
   const titleOf = (id: UniqueIdentifier) => tasks.find((task) => task.id === id)?.title ?? 'task';
   const laneOf = (overId: UniqueIdentifier | undefined) => {
@@ -254,8 +276,9 @@ export function buildBoardAnnouncements({
       const task = tasks.find((candidate) => candidate.id === active.id);
       const target = over ? resolveTargetStatus(String(over.id)) : null;
       if (task && target) {
-        const decision = decideMove(task, target);
+        const decision = decideMove(task, target, isSaving(task.id));
         if (decision === 'stay') return `${task.title} stayed in ${lane}.`;
+        if (decision === 'saving') return `${task.title} is still being saved. It stayed in ${laneLabel(task.status)}.`;
         if (decision === 'gated') return `${task.title} cannot move to ${lane} yet: the dispatch contract is incomplete.`;
       }
       return `Moving ${titleOf(active.id)} to ${lane}.`;

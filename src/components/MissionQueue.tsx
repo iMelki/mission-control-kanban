@@ -162,7 +162,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const inkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
   // Per-card move sequence: only the latest move's PATCH answer may settle a card.
-  const moveSequencer = useRef(createMoveSequencer()).current;
+  const [moveSequencer] = useState(createMoveSequencer);
   // The settled result of a move, spoken once the server has answered (dnd-kit's own
   // region only speaks at drop time, before the PATCH returns).
   const [moveAnnouncement, setMoveAnnouncement] = useState('');
@@ -198,6 +198,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     tasks: workspaceTasks,
     resolveTargetStatus: (overId) => resolveTargetStatus(overId),
     laneLabel: laneName,
+    isSaving: (taskId) => moveSequencer.isSaving(taskId),
   });
 
   const dropAnimation: DropAnimation | null = reducedMotion
@@ -234,8 +235,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   };
 
   const moveTask = async (task: Task, targetStatus: TaskStatus) => {
-    const decision = decideMove(task, targetStatus);
-    if (decision === 'stay') return;
+    const decision = decideMove(task, targetStatus, moveSequencer.isSaving(task.id));
+    // 'saving': the previous move of this card is unanswered; dnd-kit's announcement says so.
+    if (decision === 'stay' || decision === 'saving') return;
     setMoveAnnouncement('');
 
     dispatchUi({ type: 'set_drop_error', error: null });
@@ -265,6 +267,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     }
 
     const settle = (ok: boolean, error?: string) => {
+      moveSequencer.finish(task.id, seq);
       const decision = decideSettledMove({
         ok,
         isLatestMove: moveSequencer.isLatest(task.id, seq),
