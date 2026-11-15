@@ -271,10 +271,11 @@ export function settledSaveFailureIds(
 ): string[] {
   return list
     .filter((failure) => {
-      if (!failure.retryable) return false;
       const card = tasks.find((task) => task.id === failure.taskId);
-      if (!card) return boardLoaded;
-      return card.status === failure.target;
+      // Any failure is moot once the card reached its target ("not moved to X. It is in X.").
+      if (card) return card.status === failure.target;
+      // A missing card clears only retryable alerts, and only once the board has loaded.
+      return failure.retryable && boardLoaded;
     })
     .map((failure) => failure.taskId);
 }

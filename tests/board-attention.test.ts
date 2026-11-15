@@ -787,26 +787,83 @@ test('queued outcomes older than OUTCOME_REPLAY_MS are not announced on a later 
 });
 
 for (const tz of ['America/New_York', 'Asia/Tokyo']) {
-  test(`SQLite datetime('now') timestamps are read as UTC under TZ=${tz}: a newer remote move wins, an older one is ignored`, () => {
+  test(`SQLite datetime('now') timestamps are ordered as UTC under TZ=${tz} (behaviour, not just parsing)`, () => {
+    // Each run: start a move, feed reports, let the save and the re-read fail, print the lane
+    // the card falls back to (the newest server report). Parsed as local time, New York shifts
+    // SQLite times 5 h later and Tokyo 9 h earlier, which reorders these reports.
     const script = `
-      const { serverTimeOf, createMoveController } = require('./src/lib/board-move-controller.ts');
-      const t = serverTimeOf('2026-11-15 10:00:00');
-      if (t !== Date.parse('2026-11-15T10:00:00Z')) throw new Error('parsed as local time: ' + new Date(t).toISOString());
-      const card = { status: 'inbox' };
-      const c = createMoveController({ getStatus: () => card.status, setStatus: (_i, s) => { card.status = s; },
-        patchStatus: () => Promise.reject(new Error('connection reset')), readStatus: async () => null });
-      c.setOutcomeListener(() => {});
-      const run = c.start({ id: 'a', title: 'A', status: 'inbox', updated_at: '2026-11-15T10:00:00.000Z' }, 'assigned');
-      c.observeServerStatus('a', 'assigned', '2026-11-15T10:00:01.000Z');
-      c.observeServerStatus('a', 'review', '2026-11-15 10:00:02'); // newer, SQLite format
-      c.observeServerStatus('a', 'inbox', '2026-11-15 10:00:00');  // older, SQLite format
-      run.then(() => process.stdout.write(card.status));
+      const { createMoveController } = require('./src/lib/board-move-controller.ts');
+      async function run(reports) {
+        const card = { status: 'inbox' };
+        const c = createMoveController({ getStatus: () => card.status, setStatus: (_i, s) => { card.status = s; },
+          patchStatus: () => Promise.reject(new Error('connection reset')), readStatus: async () => null });
+        c.setOutcomeListener(() => {});
+        const done = c.start({ id: 'a', title: 'A', status: 'inbox', updated_at: '2026-11-15T10:00:00.000Z' }, 'assigned');
+        for (const [status, at] of reports) c.observeServerStatus('a', status, at);
+        await done;
+        return card.status;
+      }
+      (async () => {
+        const first = await run([['assigned', '2026-11-15T10:00:01.000Z'], ['review', '2026-11-15 10:00:02']]);
+        const second = await run([['assigned', '2026-11-15T10:00:01.000Z'], ['review', '2026-11-15 10:00:02'], ['testing', '2026-11-15T10:00:03.000Z']]);
+        const third = await run([['review', '2026-11-15 10:00:02'], ['inbox', '2026-11-15 10:00:00']]);
+        process.stdout.write([first, second, third].join(','));
+      })();
     `;
     const result = spawnSync(process.execPath, ['--import', 'tsx', '-e', script], { cwd: repoRoot, env: { ...process.env, TZ: tz }, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, 'review');
+    // Newer SQLite report wins; a later ISO report beats it; an older SQLite report is ignored.
+    assert.equal(result.stdout, 'review,testing,review');
   });
 }
+
+test('a confirmed save carries its updated_at into the store, so a poll from before the commit cannot snap the card back', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    if (init?.method === 'PATCH') return new Response(JSON.stringify({ ...realTask('assigned', T1) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    throw new TypeError('unexpected request');
+  }) as typeof fetch;
+  resetBoardMoveControllers();
+  try {
+    useMissionControl.getState().setTasks([realTask('inbox', T0)]);
+    const controller = getBoardMoveController('ws-real');
+    controller.setOutcomeListener(() => {});
+    await controller.start(useMissionControl.getState().tasks[0], 'assigned');
+    assert.equal(useMissionControl.getState().tasks[0].updated_at, T1);
+    // The reviewer's probe: a poll response that left the server before the commit (T0).
+    applyServerTasks([realTask('inbox', T0)]);
+    assert.equal(useMissionControl.getState().tasks[0].status, 'assigned');
+  } finally {
+    globalThis.fetch = originalFetch;
+    resetBoardMoveControllers();
+    useMissionControl.getState().setTasks([]);
+  }
+});
+
+test('a not-saved (non-retryable) alert is moot once the card reaches the target', () => {
+  assert.deepEqual(settledSaveFailureIds([{ taskId: 'a', target: 'assigned', retryable: false }], [{ id: 'a', status: 'assigned' }], true), ['a']);
+  assert.deepEqual(settledSaveFailureIds([{ taskId: 'a', target: 'assigned', retryable: false }], [{ id: 'a', status: 'inbox' }], true), []);
+  assert.deepEqual(settledSaveFailureIds([{ taskId: 'a', target: 'assigned', retryable: false }], [], true), []); // kept until dismissed
+});
+
+test('status-changing planning routes stamp updated_at with ISO UTC (so ordering by updated_at holds)', () => {
+  // Narrow source checks: these routes need a live planning session to exercise.
+  const start = source('src/app/api/tasks/[id]/planning/route.ts');
+  assert.match(start, /status = 'planning', updated_at = \?\n\s+WHERE id = \?\n\s+`\)\.run\(sessionKey, JSON\.stringify\(messages\), new Date\(\)\.toISOString\(\), taskId\)/);
+  const answer = source('src/app/api/tasks/[id]/planning/answer/route.ts');
+  assert.match(answer, /status = 'inbox',\n\s+updated_at = \?\n/);
+  assert.match(answer, /JSON\.stringify\(parsed\.agents\),\n\s+new Date\(\)\.toISOString\(\),\n\s+taskId/);
+  const approve = source('src/app/api/tasks/[id]/planning/approve/route.ts');
+  assert.match(approve, /status = 'inbox', updated_at = \?/);
+});
+
+test('wiring without a practical jsdom path: page load/poll use applyServerTasks, GitHub refresh resets the dialog baseline', () => {
+  const page = source('src/app/workspace/[slug]/page.tsx');
+  assert.match(page, /applyServerTasks\(tasksData\);/);
+  assert.match(page, /applyServerTasks\(newTasks\);/);
+  const modal = source('src/components/TaskModal.tsx');
+  assert.match(modal, /onTaskUpdated=\{\(updatedTask\) => \{\n\s+setCurrentTask\(updatedTask\);\n\s+setForm\(buildTaskFormState\(updatedTask\)\);\n\s+setOpenedStatus\(buildTaskFormState\(updatedTask\)\.status\);/);
+});
 
 test('a newer confirmation from an earlier save survives the next move (stale report after it is ignored)', async () => {
   const second = deferred<PatchStatusResult>();

@@ -51,8 +51,12 @@ export type MoveOutcome =
 export interface MoveControllerDeps {
   /** The card's status in the board store right now. */
   getStatus(taskId: string): TaskStatus | null;
-  /** Write the card's status to the board store (optimistic or reconciled). */
-  setStatus(taskId: string, status: TaskStatus): void;
+  /**
+   * Write the card's status to the board store. A reconciled (server-confirmed) write passes
+   * the server's updated_at so the store copy carries it and a stale refetch cannot undo it;
+   * the optimistic write passes none.
+   */
+  setStatus(taskId: string, status: TaskStatus, updatedAt?: string | null): void;
   /** PATCH the status. Must honour the signal; may throw on network errors. */
   patchStatus(taskId: string, status: TaskStatus, signal: AbortSignal): Promise<PatchStatusResult>;
   /** GET the task from the server; null or a throw means the read failed. */
@@ -196,7 +200,7 @@ export function createMoveController(deps: MoveControllerDeps) {
     // A server status that arrived during the read wins unless the read is provably newer.
     if (server && (!newerArrived || timeOf(server.updatedAt) > latest.time)) {
       confirm(task.id, server.status, server.updatedAt);
-      if (deps.getStatus(task.id) !== server.status) deps.setStatus(task.id, server.status);
+      deps.setStatus(task.id, server.status, server.updatedAt);
       return server.status === target
         ? { kind: 'saved', taskId: task.id, title: task.title, status: server.status }
         : { kind: 'not-saved', taskId: task.id, title: task.title, status: server.status, target, error };
@@ -209,7 +213,8 @@ export function createMoveController(deps: MoveControllerDeps) {
       && !(newerArrived && Number.isNaN(timeOf(fallback.updatedAt)));
     const keep = fallbackWins ? fallback.status : latest.status;
     if (fallbackWins) confirm(task.id, fallback.status, fallback.updatedAt);
-    if (deps.getStatus(task.id) !== keep) deps.setStatus(task.id, keep);
+    if (fallbackWins) deps.setStatus(task.id, keep, fallback.updatedAt);
+    else if (deps.getStatus(task.id) !== keep) deps.setStatus(task.id, keep);
     if (keep === target) return { kind: 'saved', taskId: task.id, title: task.title, status: keep };
     // The server told us where the card is (another client, a refetch): not a guess, no retry.
     if (newerArrived || observedDuringSave.has(task.id)) {
@@ -339,7 +344,7 @@ export function createMoveController(deps: MoveControllerDeps) {
           } else if (result.ok) {
             const status = result.status ?? target;
             confirm(task.id, status, result.updatedAt);
-            if (deps.getStatus(task.id) !== status) deps.setStatus(task.id, status);
+            deps.setStatus(task.id, status, result.updatedAt);
             outcome = status === target
               ? { kind: 'saved', taskId: task.id, title: task.title, status }
               : { kind: 'not-saved', taskId: task.id, title: task.title, status, target, error: 'The server kept a different status' };

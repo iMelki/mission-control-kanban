@@ -128,7 +128,8 @@ async function moveCard(id: string, target: TaskStatus) {
   return run;
 }
 
-const alerts = (root: ParentNode) => [...root.querySelectorAll('[role="alert"][data-drop-error="save-failed"]')];
+const alerts = (root: ParentNode) => [...root.querySelectorAll('[data-save-failure]')];
+const liveAlerts = (root: ParentNode) => [...root.querySelectorAll('[role="alert"][data-save-failure]')];
 const button = (root: ParentNode, name: string) => [...root.querySelectorAll('button')].find((b) => b.textContent?.trim() === name) as HTMLButtonElement | undefined;
 const statusOf = (id: string) => m.store.useMissionControl.getState().tasks.find((t) => t.id === id)?.status;
 
@@ -184,6 +185,8 @@ test('a failure alert survives a tab switch (unmount and remount of the board)',
   const second = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
   assert.equal(alerts(second.container).length, 1);
   assert.ok(button(alerts(second.container)[0], 'Retry move'));
+  // Already announced when it happened: restored without role="alert", so it is not re-announced.
+  assert.equal(liveAlerts(second.container).length, 0);
   await second.unmount();
 });
 
@@ -297,5 +300,143 @@ test('a Retry refused by the dispatch gate is announced (a retry is not a drag, 
   await m.React.act(async () => { button(alerts(view.container)[0], 'Retry move')!.click(); });
   const spoken = view.container.querySelector('[data-move-announcements]')?.textContent ?? '';
   assert.match(spoken, /Gamma cannot move to Assigned yet: the dispatch contract is incomplete\./);
+  await view.unmount();
+});
+
+/** Record focus() calls so preventScroll can be checked. */
+function recordFocus() {
+  const calls: { label: string | null; options?: FocusOptions }[] = [];
+  const original = win.HTMLElement.prototype.focus;
+  win.HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
+    calls.push({ label: this.getAttribute('aria-label') ?? this.textContent?.trim() ?? null, options });
+    return original.call(this, options);
+  };
+  return { calls, restore: () => { win.HTMLElement.prototype.focus = original; } };
+}
+
+const failingFetch = (ids: string[]) => stubFetch(async (url, init) =>
+  (init?.method === 'PATCH' || ids.some((id) => url.endsWith(`/api/tasks/${id}`)) ? Promise.reject(new TypeError('Failed to fetch')) : undefined));
+
+test('auto-clear leaves focus alone when it is outside the alert; when it was on the alert, focus goes to the board without scrolling', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox'), card('b', 'Beta', 'inbox')]);
+  failingFetch(['a', 'b']);
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); await moveCard('b', 'assigned'); });
+  assert.equal(alerts(view.container).length, 2);
+  // Focus elsewhere (New Task): the server puts Alpha in its target, its alert clears, focus stays.
+  const newTask = button(view.container, 'New Task')!;
+  newTask.focus();
+  await m.React.act(async () => { m.store.useMissionControl.getState().updateTaskStatus('a', 'assigned'); });
+  await m.React.act(async () => { await wait(80); });
+  assert.equal(alerts(view.container).length, 1);
+  assert.equal(document.activeElement, newTask);
+  // Focus on Beta's Retry: its alert clears the same way, and focus moves to the board.
+  const focus = recordFocus();
+  try {
+    button(alerts(view.container)[0], 'Retry move')!.focus();
+    await m.React.act(async () => { m.store.useMissionControl.getState().updateTaskStatus('b', 'assigned'); });
+    await m.React.act(async () => { await wait(80); });
+    assert.equal(alerts(view.container).length, 0);
+    assert.equal((document.activeElement as HTMLElement | null)?.getAttribute('aria-label'), 'Mission queue board');
+    const boardFocus = focus.calls.find((call) => call.label === 'Mission queue board');
+    assert.deepEqual(boardFocus?.options, { preventScroll: true });
+  } finally {
+    focus.restore();
+  }
+  await view.unmount();
+});
+
+test('a not-saved alert clears itself once the card reaches its target', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  stubFetch(async (url, init) => {
+    if (init?.method === 'PATCH') return json({ error: 'Conflict' }, 409);
+    if (url.endsWith('/api/tasks/a')) return json(card('a', 'Alpha', 'inbox'));
+    return undefined;
+  });
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); });
+  assert.equal(alerts(view.container).length, 1);
+  assert.equal(button(alerts(view.container)[0], 'Retry move'), undefined); // not-saved: no retry
+  await m.React.act(async () => { m.store.useMissionControl.getState().updateTaskStatus('a', 'assigned'); });
+  await m.React.act(async () => { await wait(20); });
+  assert.equal(alerts(view.container).length, 0);
+  await view.unmount();
+});
+
+test('Dismiss moves focus to the next alert when there is one', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox'), card('b', 'Beta', 'inbox')]);
+  failingFetch(['a', 'b']);
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); await moveCard('b', 'assigned'); });
+  const dismiss = button(alerts(view.container)[0], 'Dismiss')!;
+  dismiss.focus();
+  await m.React.act(async () => { dismiss.click(); });
+  await m.React.act(async () => { await wait(80); });
+  assert.equal(alerts(view.container).length, 1);
+  const focused = document.activeElement as HTMLElement | null;
+  assert.equal(focused?.closest('[data-save-failure]')?.getAttribute('data-save-failure'), 'b');
+  await view.unmount();
+});
+
+/** Open a card's dialog from the board (the card's open button). */
+async function openCardDialog(root: ParentNode, title: string) {
+  const cardEl = [...root.querySelectorAll('[data-task-card]')].find((el) => el.textContent?.includes(title))!;
+  const open = [...cardEl.querySelectorAll('button')].find((b) => !b.hasAttribute('data-task-drag-handle'))!;
+  await m.React.act(async () => { open.click(); });
+  await m.React.act(async () => { await wait(20); });
+}
+
+test('the board\'s dialog waits for the card\'s pending drag save before saving (beforeSave -> waitForIdle)', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  const patches: string[] = [];
+  let releaseDrag!: (response: Response) => void;
+  stubFetch(async (url, init) => {
+    if (init?.method !== 'PATCH' || !url.endsWith('/api/tasks/a')) return undefined;
+    const body = JSON.parse(String(init.body));
+    if (Object.keys(body).length === 1 && body.status) {
+      patches.push('drag');
+      return new Promise<Response>((resolve) => { releaseDrag = resolve; });
+    }
+    patches.push('dialog');
+    return json({ ...card('a', String(body.title), 'assigned'), updated_at: '2026-11-15T10:00:06.000Z' });
+  });
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  const controller = m.registry.getBoardMoveController(WS);
+  await m.React.act(async () => { void controller.start(m.store.useMissionControl.getState().tasks[0], 'assigned'); });
+  await openCardDialog(view.container, 'Alpha');
+  setValue(document.querySelector('[role="dialog"] input') as HTMLInputElement, 'Alpha renamed');
+  const form = document.querySelector('[role="dialog"] form') as HTMLFormElement;
+  await m.React.act(async () => { form.requestSubmit(); });
+  await m.React.act(async () => { await wait(50); });
+  assert.deepEqual(patches, ['drag'], 'the dialog save waits while the drag save is pending');
+  await m.React.act(async () => {
+    releaseDrag(json({ ...card('a', 'Alpha', 'assigned'), updated_at: '2026-11-15T10:00:05.000Z' }));
+    await controller.waitForIdle('a');
+    await wait(50);
+  });
+  assert.deepEqual(patches, ['drag', 'dialog']);
+  await view.unmount();
+});
+
+test('a dialog-save response is reported to the move controller (it becomes the confirmed lane if the drag save is lost)', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  let rejectDrag!: (error: unknown) => void;
+  stubFetch(async (url, init) => {
+    if (!url.endsWith('/api/tasks/a')) return undefined;
+    if (init?.method !== 'PATCH') return Promise.reject(new TypeError('Failed to fetch')); // re-reads fail
+    const body = JSON.parse(String(init.body));
+    if (Object.keys(body).length === 1 && body.status) return new Promise<Response>((_, reject) => { rejectDrag = reject; });
+    // The dialog's save answers with the server copy: Review, newer than the move's origin.
+    return json({ ...card('a', String(body.title), 'review'), updated_at: '2026-11-15T10:00:06.000Z' });
+  });
+  const controller = m.registry.getBoardMoveController(WS);
+  let run!: Promise<void>;
+  await m.React.act(async () => { run = controller.start(m.store.useMissionControl.getState().tasks[0], 'assigned'); });
+  // A standalone dialog (no beforeSave) saves while the drag save is still pending.
+  const view = await mount(m.React.createElement(m.TaskModal, { task: card('a', 'Alpha', 'assigned'), onClose: () => {}, workspaceId: WS }));
+  setValue(document.querySelector('[role="dialog"] input') as HTMLInputElement, 'Alpha renamed');
+  await submitDialog();
+  await m.React.act(async () => { rejectDrag(new TypeError('Failed to fetch')); await run; });
+  assert.equal(statusOf('a'), 'review');
   await view.unmount();
 });

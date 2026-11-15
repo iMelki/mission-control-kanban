@@ -178,6 +178,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const savingTaskIds = useSyncExternalStore(moveController.subscribe, moveController.getSavingSnapshot, moveController.getSavingSnapshot);
   // Failed saves live in the controller too (one alert per card), so they survive a tab switch.
   const saveFailures = useSyncExternalStore(moveController.subscribe, moveController.getFailuresSnapshot, moveController.getFailuresSnapshot);
+  // Alerts restored on mount were already announced when they happened: render them without
+  // role="alert" so a tab switch does not re-announce them. A new failure (a new object) is live.
+  const [restoredFailures] = useState(() => new Set(moveController.getFailuresSnapshot()));
   const reducedMotion = usePrefersReducedMotion();
 
   const sensors = useSensors(
@@ -243,7 +246,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const focusBoardIfFocusLost = () => {
     requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
       const active = document.activeElement;
-      if (!active || active === document.body || !active.isConnected) boardRef.current?.focus();
+      if (!active || active === document.body || !active.isConnected) boardRef.current?.focus({ preventScroll: true });
     }, 0)));
   };
 
@@ -268,10 +271,28 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const currentLane = (failure: { taskId: string; status: TaskStatus }) =>
     tasks.find((task) => task.id === failure.taskId)?.status ?? failure.status;
 
-  /** Remove failure alerts; if the focused button went with them, keep focus on the board. */
+  /**
+   * Remove failure alerts. Focus moves only if it was inside a removed alert (Retry, Dismiss,
+   * or an auto-clear while the user was on it): to the next remaining alert, else the board,
+   * without scrolling. Focus anywhere else is left alone.
+   */
   const removeSaveFailures = (taskIds: readonly string[]) => {
+    const active = document.activeElement;
+    const focusedAlertId = active instanceof Element ? active.closest('[data-save-failure]')?.getAttribute('data-save-failure') : null;
+    const before = moveController.getFailuresSnapshot();
     moveController.removeFailures(taskIds);
-    focusBoardIfFocusLost();
+    if (!focusedAlertId || !taskIds.includes(focusedAlertId)) return;
+    const index = before.findIndex((failure) => failure.taskId === focusedAlertId);
+    const remaining = before.filter((failure) => !taskIds.includes(failure.taskId));
+    const next = remaining.find((failure) => before.indexOf(failure) > index) ?? remaining[remaining.length - 1];
+    requestAnimationFrame(() => {
+      const target = next
+        ? [...document.querySelectorAll<HTMLElement>('[data-save-failure] button')].find(
+          (element) => element.closest('[data-save-failure]')?.getAttribute('data-save-failure') === next.taskId,
+        )
+        : null;
+      (target ?? boardRef.current)?.focus({ preventScroll: true });
+    });
   };
 
   // The controller outlives this component: point it at this render's outcome handler, and
@@ -285,10 +306,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   // it there), or once a fully loaded board no longer has the card: drop those alerts.
   const settledFailureIds = settledSaveFailureIds(saveFailures, tasks, boardLoadStatus === 'ready').join(',');
   useEffect(() => {
-    if (settledFailureIds) {
-      moveController.removeFailures(settledFailureIds.split(','));
-      focusBoardIfFocusLost();
-    }
+    if (settledFailureIds) removeSaveFailures(settledFailureIds.split(','));
+    // removeSaveFailures only reads the controller and the DOM; re-run on the ids alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settledFailureIds, moveController]);
 
   /** Act on a drop decision that was made once, at drop time (see handleDragEnd). */
@@ -491,7 +511,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         // A failed save is spoken here only, once per card (role="alert").
         <div
           key={failure.taskId}
-          role="alert"
+          role={restoredFailures.has(failure) ? undefined : 'alert'}
           data-drop-error="save-failed"
           data-save-failure={failure.taskId}
           className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60"

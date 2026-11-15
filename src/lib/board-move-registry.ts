@@ -44,7 +44,17 @@ export function getBoardMoveController(workspaceId: string): MoveController {
   if (!controller) {
     controller = createMoveController({
       getStatus: (taskId) => useMissionControl.getState().tasks.find((task) => task.id === taskId)?.status ?? null,
-      setStatus: (taskId, status) => useMissionControl.getState().updateTaskStatus(taskId, status),
+      setStatus: (taskId, status, updatedAt) => {
+        const store = useMissionControl.getState();
+        const held = store.tasks.find((task) => task.id === taskId);
+        // A confirmed write carries the server's updated_at (only ever forward), so a poll
+        // that left the server before the commit is recognised as stale by mergeServerTasks.
+        if (held && updatedAt && !(serverTimeOf(updatedAt) < serverTimeOf(held.updated_at))) {
+          store.updateTask({ ...held, status, updated_at: updatedAt });
+        } else {
+          store.updateTaskStatus(taskId, status);
+        }
+      },
       patchStatus: patchTaskStatus,
       readStatus: (taskId, signal) => readTaskStatus(taskId, signal),
     });
