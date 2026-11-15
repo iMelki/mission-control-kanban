@@ -277,8 +277,14 @@ test('download: dangling absolute link whose target folds .. back into the base 
   }
 });
 
+// On Windows, Win32 CreateSymbolicLink normalizes absolute targets at creation time,
+// collapsing <base>\escape-dir\..\nope.txt to <base>\nope.txt (inside base).
+const absDotDotResolvesInside = symlinksSupported && fs.readlinkSync(path.join(base, 'abs-dotdot-out.txt')).startsWith(base);
+const outsideLinks = ['alias-out.txt', 'abs-dotdot-out.txt'].filter((l) => !(l === 'abs-dotdot-out.txt' && absDotDotResolvesInside));
+const insideLinks = ['alias-in.txt', 'abs-dotdot-in.txt', 'abs-dotdot-up.txt', ...(absDotDotResolvesInside ? ['abs-dotdot-out.txt'] : [])];
+
 test('download: dangling absolute links that really resolve outside stay 403', { skip: symlinkSkip }, async () => {
-  for (const link of ['alias-out.txt', 'abs-dotdot-out.txt']) {
+  for (const link of outsideLinks) {
     const response = await download(downloadRequest({ path: path.join(base, link) }));
     assert.equal(response.status, 403, link);
   }
@@ -286,7 +292,7 @@ test('download: dangling absolute links that really resolve outside stay 403', {
   fs.writeFileSync(path.join(outside, 'missing.txt'), 'outside-secret');
   fs.writeFileSync(path.join(root, 'nope.txt'), 'outside-secret');
   try {
-    for (const link of ['alias-out.txt', 'abs-dotdot-out.txt']) {
+    for (const link of outsideLinks) {
       const response = await download(downloadRequest({ path: path.join(base, link) }));
       assert.equal(response.status, 403, link);
       await assertNoLeak(response);
@@ -345,7 +351,7 @@ test('resolvePathWithinBases classifies missing targets by their deepest existin
     ok: false,
     reason: 'not-found',
   });
-  for (const link of ['alias-in.txt', 'abs-dotdot-in.txt', 'abs-dotdot-up.txt']) {
+  for (const link of insideLinks) {
     assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, link), [base]), { ok: false, reason: 'not-found' }, link);
     // Same answer when the base itself is configured through the symlinked ancestor.
     assert.deepEqual(
@@ -354,9 +360,10 @@ test('resolvePathWithinBases classifies missing targets by their deepest existin
       link,
     );
   }
-  for (const link of ['alias-out.txt', 'abs-dotdot-out.txt', 'dotdot-out.txt']) {
+  for (const link of outsideLinks) {
     assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, link), [base]), { ok: false, reason: 'outside-base' }, link);
   }
+  assert.deepEqual(await containment.resolvePathWithinBases(path.join(base, 'dotdot-out.txt'), [base]), { ok: false, reason: 'outside-base' });
 });
 
 // --- helper -----------------------------------------------------------------
