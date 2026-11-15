@@ -54,7 +54,8 @@ jobs:
           retention-days: 14
 
   runtime-regression:
-    runs-on: ubuntu-latest
+    # Pinned until our Playwright supports ubuntu 26.04 (ubuntu-latest now resolves to it).
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -148,7 +149,8 @@ jobs:
 
   design-drift:
     name: Design drift (non-blocking)
-    runs-on: ubuntu-latest
+    # Pinned until our Playwright supports ubuntu 26.04 (ubuntu-latest now resolves to it).
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     continue-on-error: true
     steps:
