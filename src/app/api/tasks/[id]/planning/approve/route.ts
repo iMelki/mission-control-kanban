@@ -115,9 +115,9 @@ export async function POST(
     // Update task description with spec and move to inbox
     getDb().prepare(`
       UPDATE tasks
-      SET description = ?, status = 'inbox', updated_at = datetime('now')
+      SET description = ?, status = 'inbox', updated_at = ?
       WHERE id = ?
-    `).run(specMarkdown, taskId);
+    `).run(specMarkdown, new Date().toISOString(), taskId);
 
     // Log activity
     const activityId = crypto.randomUUID();

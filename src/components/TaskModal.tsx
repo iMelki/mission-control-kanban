@@ -100,8 +100,9 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
   // Auto-switch to planning tab if task is in planning status
   const [activeTab, setActiveTab] = useState<TabType>(initialTask?.status === 'planning' ? 'planning' : 'overview');
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
-  // The status the card had when the dialog opened; the save sends status only if the user changed it.
-  const [openedStatus] = useState(() => buildTaskFormState(initialTask).status);
+  // The card's status when the form was last built from a server copy; the save sends status
+  // only if the user changed it from this. Reset wherever the form is rebuilt from the server.
+  const [openedStatus, setOpenedStatus] = useState(() => buildTaskFormState(initialTask).status);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
@@ -111,6 +112,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
   useEffect(() => {
     setCurrentTask(initialTask);
     setForm(buildTaskFormState(initialTask));
+    setOpenedStatus(buildTaskFormState(initialTask).status);
     setActiveTab(initialTask?.status === 'planning' ? 'planning' : 'overview');
   }, [initialTask]);
 
@@ -648,6 +650,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
                 onTaskUpdated={(updatedTask) => {
                   setCurrentTask(updatedTask);
                   setForm(buildTaskFormState(updatedTask));
+                  setOpenedStatus(buildTaskFormState(updatedTask).status);
                   updateTask(updatedTask);
                 }}
               />

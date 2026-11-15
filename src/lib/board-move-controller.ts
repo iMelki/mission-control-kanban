@@ -87,8 +87,37 @@ export async function withTimeout<T>(ms: number, run: (signal: AbortSignal) => P
 
 const messageOf = (error: unknown) => (error instanceof Error && error.message ? error.message : 'The save did not complete');
 
-/** updated_at as epoch ms, or NaN when unknown or unparsable (never "provably newer"). */
-const timeOf = (updatedAt: string | null | undefined) => (updatedAt ? Date.parse(updatedAt) : Number.NaN);
+const SQLITE_DATETIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/;
+
+/**
+ * A server updated_at as epoch ms, or NaN when unknown or unparsable (never "provably
+ * newer"). SQLite's datetime('now') writes UTC as "YYYY-MM-DD HH:MM:SS" with no zone,
+ * which Date.parse would read as local time; it is parsed as UTC here.
+ */
+export function serverTimeOf(updatedAt: string | null | undefined): number {
+  if (!updatedAt) return Number.NaN;
+  return Date.parse(SQLITE_DATETIME.test(updatedAt) ? `${updatedAt.replace(' ', 'T')}Z` : updatedAt);
+}
+const timeOf = serverTimeOf;
+
+/**
+ * How long an outcome that landed while the board was unmounted may still be announced
+ * when it mounts again. Failures are kept as alerts regardless (see failures below).
+ */
+export const OUTCOME_REPLAY_MS = 30_000;
+
+/** A failed save the board shows as an alert until it is resolved or dismissed. */
+export interface SaveFailure {
+  taskId: string;
+  title: string;
+  /** Where the card is now. */
+  status: TaskStatus;
+  /** Where the move tried to put it. */
+  target: TaskStatus;
+  error: string;
+  /** The outcome was unknown (no server answer): the move can be retried. */
+  retryable: boolean;
+}
 
 export type MoveController = ReturnType<typeof createMoveController>;
 
@@ -106,16 +135,39 @@ export function createMoveController(deps: MoveControllerDeps) {
   const pendingListeners = new Set<() => void>();
   let savingSnapshot: ReadonlySet<string> = new Set();
   let outcomeListener: ((outcome: MoveOutcome) => void) | null = null;
-  const undelivered: MoveOutcome[] = [];
+  const undelivered: { outcome: MoveOutcome; at: number }[] = [];
+  /** Unresolved failures, one per card, kept here so they survive the board unmounting. */
+  let failures: readonly SaveFailure[] = [];
+  const notify = () => {
+    for (const listener of pendingListeners) listener();
+  };
+  const setFailures = (next: readonly SaveFailure[]) => {
+    failures = next;
+    notify();
+  };
 
   const setPending = (taskId: string, run: Promise<void> | null) => {
     if (run) pending.set(taskId, run); else pending.delete(taskId);
     savingSnapshot = new Set(pending.keys());
-    for (const listener of pendingListeners) listener();
+    notify();
   };
 
   const report = (outcome: MoveOutcome) => {
-    if (outcomeListener) outcomeListener(outcome); else undelivered.push(outcome);
+    // Record the failure first (or clear it on success), whether or not a board is listening.
+    const others = failures.filter((failure) => failure.taskId !== outcome.taskId);
+    if (outcome.kind === 'saved') {
+      if (others.length !== failures.length) setFailures(others);
+    } else {
+      setFailures([...others, {
+        taskId: outcome.taskId,
+        title: outcome.title,
+        status: outcome.status,
+        target: outcome.target,
+        error: outcome.error,
+        retryable: outcome.kind === 'unknown',
+      }]);
+    }
+    if (outcomeListener) outcomeListener(outcome); else undelivered.push({ outcome, at: Date.now() });
   };
 
   /** Record a server-confirmed status; an unknown updated_at keeps the time already held. */
@@ -168,12 +220,23 @@ export function createMoveController(deps: MoveControllerDeps) {
       return pending.has(taskId);
     },
 
-    /** For useSyncExternalStore: notified whenever a card starts or stops saving. */
+    /** For useSyncExternalStore: notified whenever a card starts or stops saving, or failures change. */
     subscribe(listener: () => void): () => void {
       pendingListeners.add(listener);
       return () => {
         pendingListeners.delete(listener);
       };
+    },
+
+    /** Unresolved save failures (a stable reference between changes). */
+    getFailuresSnapshot(): readonly SaveFailure[] {
+      return failures;
+    },
+
+    /** The user dismissed these alerts, retried the move, or there is nothing left to retry. */
+    removeFailures(taskIds: readonly string[]): void {
+      const next = failures.filter((failure) => !taskIds.includes(failure.taskId));
+      if (next.length !== failures.length) setFailures(next);
     },
 
     /** The ids of cards with a save in flight (a stable reference between changes). */
@@ -215,7 +278,13 @@ export function createMoveController(deps: MoveControllerDeps) {
     setOutcomeListener(listener: ((outcome: MoveOutcome) => void) | null): void {
       outcomeListener = listener;
       if (!listener) return;
-      while (undelivered.length > 0) listener(undelivered.shift()!);
+      // Failures are already kept as alerts; only recent outcomes are replayed, so a stale
+      // "Moved ..." is not announced on a much later remount.
+      const now = Date.now();
+      while (undelivered.length > 0) {
+        const { outcome, at } = undelivered.shift()!;
+        if (now - at <= OUTCOME_REPLAY_MS) listener(outcome);
+      }
     },
 
     /**
@@ -225,7 +294,12 @@ export function createMoveController(deps: MoveControllerDeps) {
      */
     observeServerStatus(taskId: string, status: TaskStatus, updatedAt?: string | null): void {
       const held = confirmed.get(taskId);
-      if (held && timeOf(updatedAt) < held.time) return; // NaN (unknown) is never "older"
+      if (held) {
+        const time = timeOf(updatedAt);
+        if (time < held.time) return; // older than what is held (NaN, unknown, is never "older")
+        // Same time (or unknown time) and the same status: the controller already holds it.
+        if ((time === held.time || Number.isNaN(time)) && status === held.status) return;
+      }
       confirm(taskId, status, updatedAt);
       if (!pending.has(taskId)) return;
       serverSeq.set(taskId, (serverSeq.get(taskId) ?? 0) + 1);

@@ -7,7 +7,7 @@
  * (taskStreamHandlers), task refetches and dialog-save responses (reportServerTask[s]).
  */
 
-import { createMoveController, type MoveController, type PatchStatusResult, type ServerStatus } from './board-move-controller';
+import { createMoveController, serverTimeOf, type MoveController, type PatchStatusResult, type ServerStatus } from './board-move-controller';
 import { useMissionControl } from './store';
 import type { Task, TaskStatus } from './types';
 
@@ -70,6 +70,31 @@ export function reportServerTasks(tasks: readonly ServerTask[]): void {
   for (const task of tasks) reportServerTask(task);
 }
 
+/** True when `incoming` is provably older than what the store holds for the same card. */
+function isStale(held: Pick<Task, 'updated_at'> | undefined, incoming: Pick<Task, 'updated_at'>): boolean {
+  if (!held) return false;
+  return serverTimeOf(incoming.updated_at) < serverTimeOf(held.updated_at);
+}
+
+/**
+ * A refetched task list for the store: the server's list, except that a card the store
+ * holds with a strictly newer updated_at keeps the store's copy (a stale poll response
+ * must not undo a newer SSE update).
+ */
+export function mergeServerTasks(current: readonly Task[], incoming: readonly Task[]): Task[] {
+  return incoming.map((task) => {
+    const held = current.find((candidate) => candidate.id === task.id);
+    return held && isStale(held, task) ? held : task;
+  });
+}
+
+/** Report a refetched list and write it to the store, newest copy per card winning. */
+export function applyServerTasks(tasks: readonly Task[]): void {
+  reportServerTasks(tasks);
+  const store = useMissionControl.getState();
+  store.setTasks(mergeServerTasks(store.tasks, tasks));
+}
+
 /**
  * The task stream's handlers: report the server status first, then write the store.
  * useSSE wraps these; tests drive them with the real store.
@@ -82,7 +107,10 @@ export function taskStreamHandlers(onUpdated?: (task: Task) => void) {
     },
     onTaskUpdated: (task: Task) => {
       reportServerTask(task);
-      useMissionControl.getState().updateTask(task);
+      const store = useMissionControl.getState();
+      // A stale event (older updated_at than the store's copy) is not written over newer data.
+      if (isStale(store.tasks.find((candidate) => candidate.id === task.id), task)) return;
+      store.updateTask(task);
       onUpdated?.(task);
     },
   };

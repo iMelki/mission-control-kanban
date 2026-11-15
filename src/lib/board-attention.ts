@@ -252,17 +252,11 @@ export function createAnnouncementQueue({
   };
 }
 
-/** A failed card save shown in its own alert until resolved or dismissed. */
-export interface SaveFailure {
+/** The parts of a failed save that decide whether its alert is moot. */
+export interface SettleableFailure {
   taskId: string;
-  message: string;
-  /** Present when the outcome was unknown: the move can be retried to this lane. */
-  retryTarget?: TaskStatus;
-}
-
-/** One alert per card: a newer failure for the same card replaces its older one. */
-export function upsertSaveFailure(list: readonly SaveFailure[], failure: SaveFailure): SaveFailure[] {
-  return [...list.filter((entry) => entry.taskId !== failure.taskId), failure];
+  target: TaskStatus;
+  retryable: boolean;
 }
 
 /**
@@ -271,16 +265,16 @@ export function upsertSaveFailure(list: readonly SaveFailure[], failure: SaveFai
  * count) the card no longer exists.
  */
 export function settledSaveFailureIds(
-  list: readonly SaveFailure[],
+  list: readonly SettleableFailure[],
   tasks: readonly Pick<Task, 'id' | 'status'>[],
   boardLoaded: boolean,
 ): string[] {
   return list
     .filter((failure) => {
-      if (!failure.retryTarget) return false;
+      if (!failure.retryable) return false;
       const card = tasks.find((task) => task.id === failure.taskId);
       if (!card) return boardLoaded;
-      return card.status === failure.retryTarget;
+      return card.status === failure.target;
     })
     .map((failure) => failure.taskId);
 }

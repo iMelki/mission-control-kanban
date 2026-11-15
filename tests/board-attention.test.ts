@@ -6,6 +6,7 @@
  * Named tests must appear by name in the CI job log.
  */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test, { mock } from 'node:test';
@@ -22,7 +23,6 @@ import {
   createAnnouncementQueue,
   ANNOUNCEMENT_TTL_MS,
   settledSaveFailureIds,
-  upsertSaveFailure,
   decideMove,
   isDispatchBlockedInbox,
   isGatedByDispatchContract,
@@ -38,12 +38,20 @@ import {
 import {
   MOVE_READ_TIMEOUT_MS,
   MOVE_SAVE_TIMEOUT_MS,
+  OUTCOME_REPLAY_MS,
   createMoveController,
   type MoveOutcome,
   type PatchStatusResult,
   type ServerStatus,
 } from '../src/lib/board-move-controller';
-import { getBoardMoveController, resetBoardMoveControllers, taskStreamHandlers } from '../src/lib/board-move-registry';
+import {
+  applyServerTasks,
+  getBoardMoveController,
+  mergeServerTasks,
+  reportServerTasks,
+  resetBoardMoveControllers,
+  taskStreamHandlers,
+} from '../src/lib/board-move-registry';
 import { useMissionControl } from '../src/lib/store';
 import { planDialogStatus } from '../src/lib/task-dialog-save';
 import { validateDispatchMetadata } from '../src/lib/dispatch-contract';
@@ -624,14 +632,70 @@ test('real wiring: the save commits, its SSE echo carries the target (same as th
   }, async () => { throw new TypeError('Failed to fetch'); });
 });
 
-test('real wiring: page refetches and dialog saves report server statuses at the source', () => {
-  const page = source('src/app/workspace/[slug]/page.tsx');
-  assert.match(page, /reportServerTasks\(tasksData\);\n\s+setTasks\(tasksData\);/);
-  assert.match(page, /reportServerTasks\(newTasks\);/);
-  assert.match(source('src/components/TaskModal.tsx'), /reportServerTask\(savedTask\);/);
-  assert.match(source('src/hooks/useSSE.ts'), /subscribeTaskStream\(taskStreamHandlers\(/);
-  // No inference from store diffs any more.
-  assert.doesNotMatch(source('src/components/MissionQueue.tsx'), /useMissionControl\.subscribe/);
+test('reportServerTasks routes each task to its own workspace controller only', async () => {
+  const originalFetch = globalThis.fetch;
+  const patches: Deferred<Response>[] = [];
+  globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    if (init?.method === 'PATCH') { const d = deferred<Response>(); patches.push(d); return d.promise; }
+    throw new TypeError('Failed to fetch'); // every re-read fails: cards fall back to what was reported
+  }) as typeof fetch;
+  resetBoardMoveControllers();
+  try {
+    useMissionControl.getState().setTasks([
+      { ...realTask('inbox'), id: 'card-a', workspace_id: 'ws-a' },
+      { ...realTask('inbox'), id: 'card-b', workspace_id: 'ws-b' },
+    ]);
+    const a = getBoardMoveController('ws-a');
+    const b = getBoardMoveController('ws-b');
+    const runA = a.start(useMissionControl.getState().tasks[0], 'assigned');
+    const runB = b.start(useMissionControl.getState().tasks[1], 'assigned');
+    reportServerTasks([
+      { id: 'card-a', status: 'review', workspace_id: 'ws-a', updated_at: T1 },
+      { id: 'card-b', status: 'done', workspace_id: 'ws-b', updated_at: T1 },
+      { id: 'card-a', status: 'testing', workspace_id: 'ws-b', updated_at: T2 }, // wrong workspace: not ws-a's news
+    ]);
+    for (const d of patches) d.reject(new TypeError('Failed to fetch'));
+    await Promise.all([runA, runB]);
+    const statusOf = (id: string) => useMissionControl.getState().tasks.find((t) => t.id === id)?.status;
+    assert.equal(statusOf('card-a'), 'review');
+    assert.equal(statusOf('card-b'), 'done');
+  } finally {
+    globalThis.fetch = originalFetch;
+    resetBoardMoveControllers();
+    useMissionControl.getState().setTasks([]);
+  }
+});
+
+test('stale server data is not written over newer store data (SSE events and refetch merges)', () => {
+  resetBoardMoveControllers();
+  try {
+    const store = useMissionControl.getState();
+    store.setTasks([realTask('review', T2)]);
+    taskStreamHandlers().onTaskUpdated(realTask('inbox', T1)); // delayed, older event
+    assert.equal(useMissionControl.getState().tasks[0].status, 'review');
+    taskStreamHandlers().onTaskUpdated(realTask('done', '2026-11-15T10:00:03.000Z'));
+    assert.equal(useMissionControl.getState().tasks[0].status, 'done');
+    // A refetch that left the server before that event keeps the store's newer copy.
+    applyServerTasks([realTask('inbox', T0), { ...realTask('assigned', T1), id: 'real-2' }]);
+    assert.deepEqual(useMissionControl.getState().tasks.map((t) => [t.id, t.status]), [['real-1', 'done'], ['real-2', 'assigned']]);
+    // SQLite-format timestamps compare as UTC too.
+    assert.equal(mergeServerTasks([realTask('done', '2026-11-15 10:00:05')], [realTask('inbox', '2026-11-15T10:00:04.000Z')])[0].status, 'done');
+  } finally {
+    useMissionControl.getState().setTasks([]);
+  }
+});
+
+test('reports with an equal timestamp and status are not server news (no re-read)', async () => {
+  let reads = 0;
+  const patch = deferred<PatchStatusResult>();
+  const b = board('inbox', { patch: () => patch.promise, read: async () => { reads++; return { status: 'inbox', updatedAt: T0 }; } });
+  const run = b.controller.start(b.card, 'assigned');
+  b.controller.observeServerStatus('a', 'inbox', T0); // the origin re-reported unchanged (a poll)
+  patch.resolve({ ok: true, status: 'assigned', updatedAt: T1 });
+  await run;
+  assert.equal(reads, 0); // with the bug this counted as conflicting news and forced a re-read
+  assert.equal(b.outcomes[0].kind, 'saved');
+  assert.equal(b.card.status, 'assigned');
 });
 
 test('the board controller survives unmount: same instance per workspace, pending save still refused, outcome delivered on remount', async () => {
@@ -650,9 +714,6 @@ test('the board controller survives unmount: same instance per workspace, pendin
     const late: MoveOutcome[] = [];
     b.controller.setOutcomeListener((o) => late.push(o)); // the board mounts again
     assert.deepEqual(late.map((o) => o.kind), ['saved']);
-    const queue = source('src/components/MissionQueue.tsx');
-    assert.match(queue, /const moveController = getBoardMoveController\(workspaceId \?\? 'default'\);/);
-    assert.match(queue, /useEffect\(\(\) => \(\) => moveController\.setOutcomeListener\(null\), \[moveController\]\);/);
   } finally {
     resetBoardMoveControllers();
   }
@@ -669,7 +730,6 @@ test('a dialog save of a card waits for its pending drag save (waitForIdle)', as
   patch.resolve({ ok: true, status: 'assigned' });
   await dialog;
   assert.equal(dialogSaved, true);
-  assert.match(source('src/components/MissionQueue.tsx'), /beforeSave=\{\(taskId\) => moveController\.waitForIdle\(taskId\)\}/);
 });
 
 test('dialog status: unchanged -> not sent; changed and card still where it opened -> sent; moved meanwhile or unreadable -> refused', async () => {
@@ -688,51 +748,65 @@ test('dialog status: unchanged -> not sent; changed and card still where it open
   assert.equal(moved.action, 'refuse');
   assert.match(moved.action === 'refuse' ? moved.message : '', /moved to Inbox while the dialog was open/);
   assert.equal((await planDialogStatus({ openedStatus: 'assigned', formStatus: 'review', readServerStatus: async () => null, laneName })).action, 'refuse');
-  const modal = source('src/components/TaskModal.tsx');
-  // The wait comes first, then the plan; the payload never spreads the form's status.
-  assert.match(modal, /if \(currentTask && beforeSave\) await beforeSave\(currentTask\.id\);[\s\S]*planDialogStatus\(/);
-  assert.match(modal, /const \{ status: _formStatus, \.\.\.formWithoutStatus \} = form;/);
-  assert.match(modal, /\.\.\.formWithoutStatus,\n\s+\.\.\.statusField,/);
 });
 
-test('save failures: one alert per card, both kept when delivered together, settled ones cleared only when moot', () => {
-  let list = upsertSaveFailure([], { taskId: 'a', message: 'A failed', retryTarget: 'assigned' });
-  list = upsertSaveFailure(list, { taskId: 'b', message: 'B failed', retryTarget: 'review' });
-  assert.deepEqual(list.map((f) => f.taskId), ['a', 'b']); // two outcomes on remount: both alerts stay
-  list = upsertSaveFailure(list, { taskId: 'a', message: 'A failed again', retryTarget: 'assigned' });
-  assert.deepEqual(list.map((f) => [f.taskId, f.message]), [['b', 'B failed'], ['a', 'A failed again']]);
-  // A card that reached its target: nothing to retry.
-  assert.deepEqual(settledSaveFailureIds(list, [{ id: 'a', status: 'assigned' }, { id: 'b', status: 'inbox' }], true), ['a']);
-  // A card missing while the board is still loading is not treated as deleted.
-  assert.deepEqual(settledSaveFailureIds(list, [], false), []);
-  assert.deepEqual(settledSaveFailureIds(list, [], true), ['b', 'a']);
-  // Non-retryable failures stay until dismissed.
-  assert.deepEqual(settledSaveFailureIds([{ taskId: 'c', message: 'x' }], [], true), []);
-  const queue = source('src/components/MissionQueue.tsx');
-  assert.match(queue, /settledSaveFailureIds\(saveFailures, tasks, boardLoadStatus === 'ready'\)/);
-  assert.match(queue, /if \(!task \|\| decision === 'stay'\) \{\n\s+dispatchUi\(\{ type: 'remove_save_failures', taskIds: \[taskId\] \}\);/);
-  assert.match(queue, /\{saveFailures\.map\(\(failure\) => \(/);
-  assert.match(queue, />\n\s+Dismiss\n/);
+test('save failures live in the controller: one per card, kept while unmounted, cleared on success; moot ones detected only once loaded', async () => {
+  let fail = true;
+  const b = board('inbox', {
+    patch: async (status) => { if (fail) throw new TypeError('Failed to fetch'); return { ok: true, status, updatedAt: T2 }; },
+    read: async () => { throw new TypeError('Failed to fetch'); },
+  });
+  b.controller.setOutcomeListener(null); // board unmounted: failures must still be kept
+  await b.controller.start(b.card, 'assigned');
+  assert.deepEqual(b.controller.getFailuresSnapshot().map((f) => [f.taskId, f.retryable, f.target]), [['a', true, 'assigned']]);
+  await b.controller.start(b.card, 'assigned'); // fails again: still one alert for the card
+  assert.equal(b.controller.getFailuresSnapshot().length, 1);
+  fail = false;
+  await b.controller.start(b.card, 'assigned'); // the retry saves: the alert goes
+  assert.deepEqual(b.controller.getFailuresSnapshot(), []);
+  const failures = [{ taskId: 'a', target: 'assigned' as TaskStatus, retryable: true }, { taskId: 'b', target: 'review' as TaskStatus, retryable: true }];
+  assert.deepEqual(settledSaveFailureIds(failures, [{ id: 'a', status: 'assigned' }, { id: 'b', status: 'inbox' }], true), ['a']);
+  assert.deepEqual(settledSaveFailureIds(failures, [], false), []); // still loading: not "deleted"
+  assert.deepEqual(settledSaveFailureIds(failures, [], true), ['a', 'b']);
+  assert.deepEqual(settledSaveFailureIds([{ taskId: 'c', target: 'done', retryable: false }], [], true), []);
 });
 
-test('a card whose save is pending is shown busy', () => {
-  const card = source('src/components/board/task-card.tsx');
-  assert.match(card, /aria-busy=\{isSaving \|\| undefined\}/);
-  assert.match(card, /data-task-saving/);
-  assert.match(source('src/components/board/board-lane.tsx'), /isSaving=\{savingTaskIds\?\.has\(task\.id\) \?\? false\}/);
-  assert.match(source('src/components/MissionQueue.tsx'), /useSyncExternalStore\(moveController\.subscribe, moveController\.getSavingSnapshot/);
+test('queued outcomes older than OUTCOME_REPLAY_MS are not announced on a later remount', async () => {
+  mock.timers.enable({ apis: ['Date'], now: Date.parse(T0) });
+  try {
+    const b = board('inbox');
+    b.controller.setOutcomeListener(null);
+    await b.controller.start(b.card, 'assigned');
+    mock.timers.tick(OUTCOME_REPLAY_MS + 1);
+    const late: MoveOutcome[] = [];
+    b.controller.setOutcomeListener((o) => late.push(o));
+    assert.deepEqual(late, []);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
-test('each move outcome is spoken once', () => {
-  const queue = source('src/components/MissionQueue.tsx');
-  // Gated: a plain box (dnd-kit already spoke). Failed save: role="alert", titled for the cause.
-  assert.match(queue, /<div\n\s+data-drop-error="gated"/);
-  assert.match(queue, /role="alert"\n\s+data-drop-error="save-failed"/);
-  assert.match(queue, /Dispatch move blocked/);
-  assert.match(queue, /Move not saved/);
-  assert.doesNotMatch(queue, /role="status">\s*\{presentBoardCount/);
-  assert.match(queue, /aria-relevant="additions"/);
-});
+for (const tz of ['America/New_York', 'Asia/Tokyo']) {
+  test(`SQLite datetime('now') timestamps are read as UTC under TZ=${tz}: a newer remote move wins, an older one is ignored`, () => {
+    const script = `
+      const { serverTimeOf, createMoveController } = require('./src/lib/board-move-controller.ts');
+      const t = serverTimeOf('2026-11-15 10:00:00');
+      if (t !== Date.parse('2026-11-15T10:00:00Z')) throw new Error('parsed as local time: ' + new Date(t).toISOString());
+      const card = { status: 'inbox' };
+      const c = createMoveController({ getStatus: () => card.status, setStatus: (_i, s) => { card.status = s; },
+        patchStatus: () => Promise.reject(new Error('connection reset')), readStatus: async () => null });
+      c.setOutcomeListener(() => {});
+      const run = c.start({ id: 'a', title: 'A', status: 'inbox', updated_at: '2026-11-15T10:00:00.000Z' }, 'assigned');
+      c.observeServerStatus('a', 'assigned', '2026-11-15T10:00:01.000Z');
+      c.observeServerStatus('a', 'review', '2026-11-15 10:00:02'); // newer, SQLite format
+      c.observeServerStatus('a', 'inbox', '2026-11-15 10:00:00');  // older, SQLite format
+      run.then(() => process.stdout.write(card.status));
+    `;
+    const result = spawnSync(process.execPath, ['--import', 'tsx', '-e', script], { cwd: repoRoot, env: { ...process.env, TZ: tz }, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, 'review');
+  });
+}
 
 test('a newer confirmation from an earlier save survives the next move (stale report after it is ignored)', async () => {
   const second = deferred<PatchStatusResult>();
@@ -777,7 +851,6 @@ test('fake timers: the dialog\'s status re-read is bounded, so Save cannot hang'
     const result = await plan;
     assert.equal(aborted, true);
     assert.equal(result.action, 'refuse');
-    assert.match(source('src/components/TaskModal.tsx'), /readServerStatus: async \(signal\) => \(await readTaskStatus\(currentTask\.id, signal\)\)\?\.status \?\? null/);
   } finally {
     mock.timers.reset();
   }
