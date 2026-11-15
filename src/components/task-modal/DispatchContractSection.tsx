@@ -50,7 +50,7 @@ export function DispatchContractSection<TForm extends DispatchContractFormState>
           These fields mirror the GitHub-native readiness contract used to decide whether auto-dispatch is safe.
         </p>
         {currentTask?.status === 'inbox' && currentTask.dispatch_blockers && currentTask.dispatch_blockers.length > 0 && (
-          <p className="text-xs text-amber-200 mt-2">
+          <p className="text-xs text-mc-text mt-2">
             Why this task is still in Inbox: it is missing one or more required dispatch fields. Fill the scope,
             acceptance criteria, tests, review mode, impact, and rollback plan here, then save before moving it forward.
           </p>

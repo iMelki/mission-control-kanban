@@ -58,7 +58,7 @@ export function WorkspaceRuntimePolicyPanel({
     <section className="border-b border-mc-border bg-mc-bg-secondary/70 px-4 py-2" aria-label="Workspace runtime policy">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-start gap-2">
-          <RadioTower className="mt-0.5 size-4 shrink-0 text-mc-accent" />
+          <RadioTower className="mt-0.5 size-4 shrink-0 text-mc-text-secondary" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-semibold">Workspace runtime defaults</h2>
@@ -120,7 +120,7 @@ export function WorkspaceRuntimePolicyPanel({
         </div>
       </div>
       {state === 'error' && (
-        <p className="mt-2 text-xs text-rose-200">Could not save runtime defaults. Check the JSON config and retry.</p>
+        <p className="mt-2 text-xs text-mc-text">Could not save runtime defaults. Check the JSON config and retry.</p>
       )}
     </section>
   );

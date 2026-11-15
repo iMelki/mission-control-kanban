@@ -107,10 +107,10 @@ const columns: DataTableColumn<MckN8nSyncRun>[] = [
     render: (run) => {
       const presentation = presentMckN8nSyncRun(run);
       const alertClassName = presentation.state === 'error'
-        ? 'text-rose-200'
+        ? 'text-mc-text'
         : presentation.state === 'warning'
-          ? 'text-amber-200'
-          : 'text-emerald-200';
+          ? 'text-mc-text'
+          : 'text-mc-text';
       return (
         <div className={alertClassName}>
           <div className="flex items-center gap-2">
@@ -167,12 +167,12 @@ export default function N8nSyncHistoryPage() {
           <div>
             <Link
               href="/"
-              className="mb-3 inline-flex items-center gap-2 text-sm text-mc-text-secondary hover:text-mc-accent"
+              className="mb-3 inline-flex items-center gap-2 text-sm text-mc-text-secondary hover:text-mc-text"
             >
               <ChevronLeft className="size-4" />
               Back to workspaces
             </Link>
-            <h1 className="text-2xl font-semibold">n8n MCK Sync History</h1>
+            <h1>n8n MCK Sync History</h1>
             <p className="mt-1 text-sm text-mc-text-secondary">
               Last local automation runs recorded by MCK.
             </p>
@@ -190,7 +190,7 @@ export default function N8nSyncHistoryPage() {
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 border border-rose-400/40 bg-rose-950/30 px-4 py-3 text-sm text-rose-100">
+          <div className="flex items-center gap-2 border border-mc-danger/40 bg-mc-danger/10 px-4 py-3 text-sm text-mc-text">
             <AlertTriangle className="size-4 shrink-0" />
             {error}
           </div>
@@ -202,11 +202,11 @@ export default function N8nSyncHistoryPage() {
               <div className="text-xs uppercase text-mc-text-secondary">Latest result</div>
               <div className="mt-1 flex items-center gap-2 font-medium">
                 {latestPresentation?.state === 'error' ? (
-                  <AlertTriangle className="size-4 text-rose-300" />
+                  <AlertTriangle className="size-4 text-mc-danger" />
                 ) : latestPresentation?.state === 'warning' ? (
-                  <AlertTriangle className="size-4 text-amber-300" />
+                  <AlertTriangle className="size-4 text-mc-warn" />
                 ) : (
-                  <CheckCircle2 className="size-4 text-emerald-300" />
+                  <CheckCircle2 className="size-4 text-mc-success" />
                 )}
                 {latestPresentation?.label ?? 'No runs'}
               </div>

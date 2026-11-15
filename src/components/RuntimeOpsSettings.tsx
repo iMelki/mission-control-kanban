@@ -80,7 +80,7 @@ const callbackColumns: DataTableColumn<CallbackDeliveryRow>[] = [
     header: 'Status',
     accessor: (row) => row.status,
     render: (row) => (
-      <span className={`rounded border px-2 py-1 text-xs ${row.status === 'accepted' ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200' : row.status === 'duplicate' ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-rose-400/30 bg-rose-500/10 text-rose-100'}`}>
+      <span className={`rounded border px-2 py-1 text-xs ${row.status === 'accepted' ? 'border-mc-success/30 bg-mc-success/10 text-mc-text' : row.status === 'duplicate' ? 'border-mc-warn/30 bg-mc-warn/10 text-mc-text' : 'border-mc-danger/30 bg-mc-danger/10 text-mc-text'}`}>
         {row.status}
       </span>
     ),
@@ -153,7 +153,7 @@ function RuntimeFailureRateCards({ points }: { points: RuntimeFailureRateTrendPo
                   <div
                     key={`${point.date}-${group.runtime}`}
                     title={`${point.date}: ${Math.round(point.failure_rate * 100)}% (${point.failed + point.timeout}/${point.total})`}
-                    className={`min-w-3 flex-1 rounded-t ${isFailure ? 'bg-amber-400/80' : 'bg-emerald-400/60'}`}
+                    className={`min-w-3 flex-1 rounded-t ${isFailure ? 'bg-mc-warn/80' : 'bg-mc-success/60'}`}
                     style={{ height }}
                   />
                 );
@@ -259,7 +259,7 @@ export function RuntimeOpsSettings() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-mc-accent" />
+            <Clock className="h-5 w-5 text-mc-text-secondary" />
             <h2 className="text-xl font-semibold text-mc-text">Runtime operations</h2>
           </div>
           <p className="max-w-3xl text-sm text-mc-text-secondary">
@@ -273,7 +273,7 @@ export function RuntimeOpsSettings() {
 
       <div className="grid gap-3 md:grid-cols-5">
         {cards.map((card) => (
-          <div key={card.label} className={`rounded border p-3 ${card.tone === 'warn' ? 'border-amber-400/30 bg-amber-500/10' : 'border-mc-border bg-mc-bg'}`}>
+          <div key={card.label} className={`rounded border p-3 ${card.tone === 'warn' ? 'border-mc-warn/30 bg-mc-warn/10' : 'border-mc-border bg-mc-bg'}`}>
             <div className="text-xs uppercase tracking-wide text-mc-text-secondary">{card.label}</div>
             <div className="mt-1 text-2xl font-semibold text-mc-text">{card.value}</div>
           </div>
@@ -281,13 +281,13 @@ export function RuntimeOpsSettings() {
       </div>
 
       {health?.failure_threshold_alerts && health.failure_threshold_alerts.length > 0 && (
-        <div className="space-y-2 rounded border border-amber-400/30 bg-amber-500/10 p-4">
-          <div className="flex items-center gap-2 font-semibold text-amber-100">
+        <div className="space-y-2 rounded border border-mc-warn/30 bg-mc-warn/10 p-4">
+          <div className="flex items-center gap-2 font-semibold text-mc-text">
             <ShieldAlert className="size-4" /> Runtime failure threshold alerts
           </div>
           {health.failure_threshold_alerts.map((alert) => (
             <div key={`${alert.runtime_type}-${alert.level}`} className="rounded border border-mc-border bg-mc-bg px-3 py-2 text-sm">
-              <span className={alert.level === 'critical' ? 'font-semibold text-rose-200' : 'font-semibold text-amber-100'}>{alert.level.toUpperCase()}</span>
+              <span className={alert.level === 'critical' ? 'font-semibold text-mc-text' : 'font-semibold text-mc-text'}>{alert.level.toUpperCase()}</span>
               <span className="ml-2 text-mc-text-secondary">{alert.message} Failed/timeout: {alert.failed + alert.timeout}/{alert.total}.</span>
             </div>
           ))}
@@ -302,7 +302,7 @@ export function RuntimeOpsSettings() {
       <div className="rounded border border-mc-border bg-mc-bg-secondary p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Activity className="size-4 text-mc-accent" />
+            <Activity className="size-4 text-mc-text-secondary" />
             <h3 className="font-semibold">Per-runtime failure-rate trends</h3>
           </div>
           <span className="text-xs text-mc-text-secondary">14-day dispatch attempt window</span>
@@ -316,7 +316,7 @@ export function RuntimeOpsSettings() {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded border border-mc-border bg-mc-bg p-4">
           <div className="mb-3 flex items-center gap-2">
-            <DatabaseZap className="size-4 text-mc-accent" />
+            <DatabaseZap className="size-4 text-mc-text-secondary" />
             <h3 className="font-semibold">Dispatch attempt cleanup</h3>
           </div>
           <p className="mb-4 text-sm text-mc-text-secondary">
@@ -324,14 +324,14 @@ export function RuntimeOpsSettings() {
           </p>
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={loading} onClick={() => void runRetention(true)} className="rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-tertiary disabled:opacity-50">Dry-run cleanup</button>
-            <button type="button" disabled={loading} onClick={() => void runRetention(false)} className="inline-flex items-center gap-2 rounded border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-100 hover:bg-rose-500/20 disabled:opacity-50"><Trash2 className="size-4" /> Apply cleanup</button>
+            <button type="button" disabled={loading} onClick={() => void runRetention(false)} className="inline-flex items-center gap-2 rounded border border-mc-danger/40 bg-mc-danger/10 px-3 py-2 text-sm text-mc-text hover:bg-mc-danger/20 disabled:opacity-50"><Trash2 className="size-4" /> Apply cleanup</button>
           </div>
           {retentionResult && <pre className="mt-4 max-h-48 overflow-auto rounded border border-mc-border bg-mc-bg-secondary p-3 text-xs text-mc-text-secondary">{JSON.stringify(retentionResult, null, 2)}</pre>}
         </div>
 
         <div className="rounded border border-mc-border bg-mc-bg p-4">
           <div className="mb-3 flex items-center gap-2">
-            <ShieldCheck className="size-4 text-mc-accent" />
+            <ShieldCheck className="size-4 text-mc-text-secondary" />
             <h3 className="font-semibold">Webhook templates & callback cleanup</h3>
           </div>
           <p className="mb-4 text-sm text-mc-text-secondary">
@@ -351,7 +351,7 @@ export function RuntimeOpsSettings() {
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" disabled={loading} onClick={() => void runCallbackPrune(true)} className="rounded border border-mc-border px-3 py-2 text-sm hover:bg-mc-bg-tertiary disabled:opacity-50">Dry-run callback prune</button>
-            <button type="button" disabled={loading} onClick={() => void runCallbackPrune(false)} className="rounded border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-500/20 disabled:opacity-50">Apply callback prune</button>
+            <button type="button" disabled={loading} onClick={() => void runCallbackPrune(false)} className="rounded border border-mc-warn/40 bg-mc-warn/10 px-3 py-2 text-sm text-mc-text hover:bg-mc-warn/20 disabled:opacity-50">Apply callback prune</button>
           </div>
           {callbackResult && <pre className="mt-4 max-h-48 overflow-auto rounded border border-mc-border bg-mc-bg-secondary p-3 text-xs text-mc-text-secondary">{JSON.stringify(callbackResult, null, 2)}</pre>}
         </div>
@@ -360,7 +360,7 @@ export function RuntimeOpsSettings() {
       <div className="rounded border border-mc-border bg-mc-bg p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Activity className="size-4 text-mc-accent" />
+            <Activity className="size-4 text-mc-text-secondary" />
             <h3 className="font-semibold">Webhook callback replay ledger</h3>
           </div>
           <span className="text-xs text-mc-text-secondary">{callbacks.length} recent deliveries</span>
@@ -369,7 +369,7 @@ export function RuntimeOpsSettings() {
       </div>
 
       {health?.latest_failure && (
-        <div className="rounded border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+        <div className="rounded border border-mc-warn/30 bg-mc-warn/10 p-3 text-sm text-mc-text">
           Latest runtime failure: {health.latest_failure.runtime_type} at {new Date(health.latest_failure.created_at).toLocaleString()} — {health.latest_failure.reason}
         </div>
       )}
