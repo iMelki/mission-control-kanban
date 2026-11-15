@@ -11,6 +11,8 @@
  * Ported from crshdn/mission-control 555fa9a.
  */
 
+import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'path';
 
 export type ContainedPathResult =
@@ -25,7 +27,6 @@ export function isWithinBase(candidate: string, base: string): boolean {
 }
 
 async function realpathOrNull(target: string): Promise<string | null> {
-  const fs = await import('node:fs/promises');
   try {
     return await fs.realpath(target);
   } catch {
@@ -35,6 +36,40 @@ async function realpathOrNull(target: string): Promise<string | null> {
 
 /** Upper bound on symlink hops followed while classifying a missing target (Linux uses 40). */
 const MAX_LINK_HOPS = 40;
+
+/**
+ * Resolve `..` segments through directory symlinks before path evaluation.
+ * On POSIX, kernel path resolution follows directory symlinks before `..` applies.
+ * On Windows, Win32 lexical path normalization cancels `symlink\..` to the parent of
+ * the symlink without following it. This helper walks segments from left to right,
+ * resolving directory symlinks before `..` steps so Windows matches POSIX semantics.
+ */
+function canonicalizeSymlinkPath(target: string): string {
+  if (!target.includes('..')) return target;
+  const segs = target.split(/[\\\/]/).filter(Boolean);
+  const winDrive = target.match(/^[A-Za-z]:[\\\/]?/);
+  let cur = target.startsWith('/') ? '/' : (winDrive ? winDrive[0] : '');
+  const items = target.startsWith('/') ? segs : (winDrive ? segs.slice(1) : segs);
+  for (const s of items) {
+    if (s === '.') continue;
+    if (s === '..') {
+      try {
+        const l = fsSync.lstatSync(cur);
+        if (l.isSymbolicLink()) {
+          const r = fsSync.realpathSync(cur);
+          cur = path.dirname(r);
+        } else {
+          cur = path.dirname(cur);
+        }
+      } catch {
+        cur = path.dirname(cur);
+      }
+    } else {
+      cur = path.join(cur, s);
+    }
+  }
+  return cur;
+}
 
 /**
  * Decide between `not-found` and `outside-base` for a target that does not exist.
@@ -52,10 +87,9 @@ async function classifyMissingTarget(
   hops = 0,
 ): Promise<'outside-base' | 'not-found'> {
   if (hops > MAX_LINK_HOPS) return 'outside-base';
-  const fs = await import('node:fs/promises');
 
   // Deepest existing entry. lstat (not stat) so a dangling symlink counts as existing.
-  let probe = absoluteTarget;
+  let probe = canonicalizeSymlinkPath(absoluteTarget);
   let isSymlink: boolean;
   for (;;) {
     try {
@@ -125,7 +159,6 @@ export async function resolvePathWithinBases(
   );
   if (!lexicallyInside) return { ok: false, reason: 'outside-base' };
 
-  const fs = await import('node:fs/promises');
   let realPath: string;
   try {
     realPath = await fs.realpath(absoluteTarget);
