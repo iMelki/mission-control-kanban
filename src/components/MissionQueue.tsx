@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -27,13 +27,12 @@ import {
   applyNeedsYouFilter,
   buildBoardAnnouncements,
   countNeedsYou,
-  decideMove,
   moveLeavesNeedsYouFilter,
   presentNeedsYouCountDescription,
-  createMoveSequencer,
-  decideSettledMove,
   workspaceScopedTasks,
+  type MoveDecision,
 } from '@/lib/board-attention';
+import { createMoveController, type MoveOutcome, type PatchStatusResult } from '@/lib/board-move-controller';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { presentBoardCount } from '@/lib/cockpit-load-state';
 import { useMissionControl } from '@/lib/store';
@@ -44,6 +43,30 @@ import {
 } from '@/lib/dispatch-contract';
 import { resolveAgentRuntime } from '@/lib/agent-runtimes';
 import type { AgentRuntimeType, Task, TaskStatus } from '@/lib/types';
+
+const TASK_STATUSES: readonly TaskStatus[] = ['planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'done'];
+const isTaskStatus = (value: unknown): value is TaskStatus => typeof value === 'string' && (TASK_STATUSES as readonly string[]).includes(value);
+
+/** PATCH a card's status; non-OK answers carry the server's error text. Throws on network errors and aborts. */
+async function patchTaskStatus(taskId: string, status: TaskStatus, signal: AbortSignal): Promise<PatchStatusResult> {
+  const res = await fetch(`/api/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+    signal,
+  });
+  const data = await res.json().catch(() => null);
+  if (res.ok) return { ok: true, status: isTaskStatus(data?.status) ? data.status : null };
+  return { ok: false, error: typeof data?.error === 'string' && data.error ? data.error : `The server answered HTTP ${res.status}` };
+}
+
+/** Re-read a card's status from the server after a failed or ambiguous save. */
+async function readTaskStatus(taskId: string, signal: AbortSignal): Promise<TaskStatus | null> {
+  const res = await fetch(`/api/tasks/${taskId}`, { signal, cache: 'no-store' });
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => null);
+  return isTaskStatus(data?.status) ? data.status : null;
+}
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
 
@@ -78,8 +101,10 @@ const COLUMN_LABELS = new Map<string, string>(COLUMNS.map((column) => [column.id
 // "Ink drying": how long the accent rail layer stays mounted after a move. A
 // little longer than --duration-slower (360ms) so the fade always completes.
 const INK_DRY_MS = 420;
+// How long a settled-move message stays in the polite region (long enough to be spoken).
+const ANNOUNCEMENT_TTL_MS = 8000;
 
-type DropError = { kind: 'gated' | 'save-failed'; message: string };
+type DropError = { kind: 'gated' | 'save-failed'; message: string; retry?: { taskId: string; target: TaskStatus } };
 
 interface MissionQueueUiState {
   showCreateModal: boolean;
@@ -161,11 +186,40 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [inkTask, setInkTask] = useState<{ id: string; key: number } | null>(null);
   const inkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
-  // Per-card move sequence: only the latest move's PATCH answer may settle a card.
-  const [moveSequencer] = useState(createMoveSequencer);
-  // The settled result of a move, spoken once the server has answered (dnd-kit's own
-  // region only speaks at drop time, before the PATCH returns).
-  const [moveAnnouncement, setMoveAnnouncement] = useState('');
+  // Settled results of moves, spoken once the server has answered (dnd-kit's own region
+  // only speaks at drop time). Appended, never replaced, so a second card's move cannot
+  // swallow the first card's "Moved ..."; each entry is pruned after it has been spoken.
+  const [moveAnnouncements, setMoveAnnouncements] = useState<{ id: number; text: string }[]>([]);
+  const announceSeq = useRef(0);
+  const announceMove = (text: string) => {
+    const id = ++announceSeq.current;
+    setMoveAnnouncements((previous) => [...previous.slice(-4), { id, text }]);
+    setTimeout(() => setMoveAnnouncements((previous) => previous.filter((entry) => entry.id !== id)), ANNOUNCEMENT_TTL_MS);
+  };
+  // Cards whose save is in flight: shown as busy, and refused as drop sources.
+  const [savingTaskIds, setSavingTaskIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [moveController] = useState(() => createMoveController({
+    getStatus: (taskId) => useMissionControl.getState().tasks.find((candidate) => candidate.id === taskId)?.status ?? null,
+    setStatus: (taskId, status) => useMissionControl.getState().updateTaskStatus(taskId, status),
+    patchStatus: patchTaskStatus,
+    readStatus: readTaskStatus,
+    onPendingChange: (taskId, isPending) => setSavingTaskIds((previous) => {
+      const next = new Set(previous);
+      if (isPending) next.add(taskId); else next.delete(taskId);
+      return next;
+    }),
+  }));
+
+  // Statuses written by anyone but the controller (SSE task_updated, a dialog save, a
+  // refetch) are server facts; while a card's save is pending they become its confirmed status.
+  useEffect(() => useMissionControl.subscribe((state, previous) => {
+    if (moveController.isOwnWrite()) return;
+    for (const task of state.tasks) {
+      if (!moveController.isSaving(task.id)) continue;
+      const before = previous.tasks.find((candidate) => candidate.id === task.id);
+      if (!before || before.status !== task.status) moveController.observeServerStatus(task.id, task.status);
+    }
+  }), [moveController]);
   const reducedMotion = usePrefersReducedMotion();
 
   const sensors = useSensors(
@@ -198,7 +252,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     tasks: workspaceTasks,
     resolveTargetStatus: (overId) => resolveTargetStatus(overId),
     laneLabel: laneName,
-    isSaving: (taskId) => moveSequencer.isSaving(taskId),
+    isSaving: (taskId) => moveController.isSaving(taskId),
+    decisionFor: (taskId, target) => moveController.recordedDecision(taskId, target),
   });
 
   const dropAnimation: DropAnimation | null = reducedMotion
@@ -234,11 +289,43 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     }, 0)));
   };
 
-  const moveTask = async (task: Task, targetStatus: TaskStatus) => {
-    const decision = decideMove(task, targetStatus, moveSequencer.isSaving(task.id));
-    // 'saving': the previous move of this card is unanswered; dnd-kit's announcement says so.
+  const handleMoveOutcome = (outcome: MoveOutcome) => {
+    if (outcome.kind === 'saved') {
+      // The ink cross-fade marks a saved move, so it waits for the server.
+      markInkDrying(outcome.taskId);
+      announceMove(`Moved ${outcome.title} to ${laneName(outcome.status)}.`);
+      addEvent({
+        id: crypto.randomUUID(),
+        type: outcome.status === 'done' ? 'task_completed' : 'task_status_changed',
+        task_id: outcome.taskId,
+        message: `Task "${outcome.title}" moved to ${outcome.status}`,
+        created_at: new Date().toISOString(),
+      });
+      return;
+    }
+    // A failure is spoken once, by the assertive alert, not also by the polite region.
+    const where = `${outcome.title} is in ${laneName(outcome.status)}.`;
+    dispatchUi({
+      type: 'set_drop_error',
+      error: outcome.kind === 'not-saved'
+        ? { kind: 'save-failed', message: `${outcome.error}. ${outcome.title} was not moved to ${laneName(outcome.target)}. ${where}` }
+        : {
+            kind: 'save-failed',
+            message: `${outcome.error}. The server could not confirm the move to ${laneName(outcome.target)}, so the board shows the last saved lane. ${where}`,
+            retry: { taskId: outcome.taskId, target: outcome.target },
+          },
+    });
+  };
+
+  // The controller outlives renders; point it at this render's outcome handler.
+  useEffect(() => {
+    moveController.setOutcomeListener(handleMoveOutcome);
+  });
+
+  /** Act on a drop decision that was made once, at drop time (see handleDragEnd). */
+  const runMove = (task: Task, targetStatus: TaskStatus, decision: MoveDecision) => {
+    // 'saving': the card's previous move is unanswered; dnd-kit's announcement says so.
     if (decision === 'stay' || decision === 'saving') return;
-    setMoveAnnouncement('');
 
     dispatchUi({ type: 'set_drop_error', error: null });
 
@@ -258,68 +345,22 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       return;
     }
 
-    // Optimistic update
-    const seq = moveSequencer.begin(task.id);
-    updateTaskStatus(task.id, targetStatus);
     if (moveLeavesNeedsYouFilter(task, targetStatus, needsYouOnly)) {
       // The card (and its focused handle) leaves the filtered board.
       focusBoardIfFocusLost();
     }
+    // Optimistic update, save, timeout and server reconciliation live in the controller.
+    void moveController.start(task, targetStatus);
+  };
 
-    const settle = (ok: boolean, error?: string) => {
-      moveSequencer.finish(task.id, seq);
-      const decision = decideSettledMove({
-        ok,
-        isLatestMove: moveSequencer.isLatest(task.id, seq),
-        // Read the store now, not the render closure: SSE or a newer move may have changed the card.
-        currentStatus: useMissionControl.getState().tasks.find((candidate) => candidate.id === task.id)?.status ?? null,
-        originStatus: task.status,
-        targetStatus,
-        title: task.title,
-        laneName,
-      });
-      if (decision.revertTo) updateTaskStatus(task.id, decision.revertTo);
-      // The ink cross-fade marks a settled move, so it waits for the server to accept it.
-      if (decision.playInk) markInkDrying(task.id);
-      if (decision.successAnnouncement) setMoveAnnouncement(decision.successAnnouncement);
-      // A failure is spoken once, by the assertive alert, not also by the polite region.
-      if (decision.failureMessage) {
-        dispatchUi({
-          type: 'set_drop_error',
-          error: { kind: 'save-failed', message: `${error ? `${error}. ` : ''}${decision.failureMessage}` },
-        });
-      }
-      return decision;
-    };
-
-    // Persist to API
-    try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: targetStatus }),
-      });
-
-      if (res.ok) {
-        settle(true);
-        addEvent({
-          id: crypto.randomUUID(),
-          type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
-          task_id: task.id,
-          message: `Task \"${task.title}\" moved to ${targetStatus}`,
-          created_at: new Date().toISOString(),
-        });
-      } else {
-        const data = await res.json().catch(() => ({}));
-        settle(false, typeof data.error === 'string' && data.error ? data.error : 'Failed to move task');
-      }
-    } catch (error) {
-      console.error('Failed to update task status:', error);
-      settle(false, error instanceof Error ? error.message : 'Failed to update task status');
-    }
+  const retryMove = (retry: { taskId: string; target: TaskStatus }) => {
+    const task = useMissionControl.getState().tasks.find((candidate) => candidate.id === retry.taskId);
+    if (!task) return;
+    runMove(task, retry.target, moveController.decide(task, retry.target));
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    moveController.forgetDrop(String(event.active.id));
     const task = tasks.find((candidate) => candidate.id === event.active.id);
     setActiveTask(task ?? null);
   };
@@ -340,7 +381,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     const targetStatus = resolveTargetStatus(String(over.id));
     if (!targetStatus) return;
 
-    void moveTask(task, targetStatus);
+    // Decide once, here. dnd-kit runs this handler before announcements.onDragEnd, so the
+    // announcement reads this recorded decision instead of re-deciding after the save began.
+    runMove(task, targetStatus, moveController.recordDrop(task, targetStatus));
   };
 
   const handleDragCancel = () => {
@@ -359,7 +402,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       <div className="px-3 py-2 border-b border-mc-border flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="mr-auto flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-mc-text">Mission Queue</h2>
-          <span className="text-xs text-mc-text-secondary" role="status">
+          {/* Plain text, not a live region: with "Needs you" on every move changes it, and the
+              move's outcome is already spoken once by the board's own announcement. */}
+          <span className="text-xs text-mc-text-secondary">
             {presentBoardCount(boardLoadStatus, visibleTasks.length, workspaceTasks.length).text}
           </span>
           {/* The "needs Captain" answer in one glance: Review plus dispatch-blocked
@@ -438,7 +483,11 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         </div>
       </div>
 
-      <p role="status" aria-live="polite" className="sr-only">{moveAnnouncement}</p>
+      <div role="status" aria-live="polite" aria-relevant="additions" className="sr-only" data-move-announcements>
+        {moveAnnouncements.map((entry) => (
+          <p key={entry.id}>{entry.text}</p>
+        ))}
+      </div>
 
       {dropError && (
         // One channel per outcome: a gated drop is already spoken by dnd-kit's polite
@@ -453,6 +502,15 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             <div className="min-w-0">
               <p className="font-medium">{dropError.kind === 'gated' ? 'Dispatch move blocked' : 'Move not saved'}</p>
               <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">{dropError.message}</p>
+              {dropError.retry && (
+                <button
+                  type="button"
+                  onClick={() => dropError.retry && retryMove(dropError.retry)}
+                  className="mt-2 inline-flex min-h-11 items-center rounded border border-mc-text-secondary/60 px-3 text-xs font-medium text-mc-text hover:bg-mc-bg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
+                >
+                  Retry move
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -483,6 +541,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
               activeTaskId={activeTask?.id ?? null}
               isDropTarget={activeTask !== null && overStatus === column.id && activeTask.status !== column.id}
               inkTask={inkTask}
+              savingTaskIds={savingTaskIds}
               onCardClick={(task) => dispatchUi({ type: 'edit_task', task })}
             />
           ))}
@@ -503,6 +562,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       {editingTask && (
         <TaskModal
           task={editingTask}
+          beforeSave={(taskId) => moveController.waitForIdle(taskId)}
           onClose={() => {
             dispatchUi({ type: 'clear_editing_task' });
             // Saving can move the card out of the "Needs you" filter, removing the trigger

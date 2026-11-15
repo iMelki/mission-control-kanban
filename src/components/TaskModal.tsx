@@ -45,6 +45,11 @@ interface TaskModalProps {
   task?: Task;
   onClose: () => void;
   workspaceId?: string;
+  /**
+   * Awaited before saving an existing task. The board passes its move controller's
+   * waitForIdle, so a dialog save never races a drag save of the same card.
+   */
+  beforeSave?: (taskId: string) => Promise<void>;
 }
 
 function joinLines(values?: string[]) {
@@ -83,7 +88,7 @@ function buildTaskFormState(task?: Task) {
   };
 }
 
-export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModalProps) {
+export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave }: TaskModalProps) {
   type TaskFormState = ReturnType<typeof buildTaskFormState>;
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -215,6 +220,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     setSubmitError(null);
 
     try {
+      // A drag save of this card may still be in flight; let it settle first.
+      if (currentTask && beforeSave) await beforeSave(currentTask.id);
       const url = currentTask ? `/api/tasks/${currentTask.id}` : '/api/tasks';
       const method = currentTask ? 'PATCH' : 'POST';
 

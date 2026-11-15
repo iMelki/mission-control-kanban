@@ -107,94 +107,6 @@ export function presentNeedsYouCountDescription(phase: BoardLoadPhase, count: nu
   return String(count);
 }
 
-export interface SettleMoveInput {
-  /** The PATCH was accepted. */
-  ok: boolean;
-  /** No newer move of this card was started while this PATCH was in flight. */
-  isLatestMove: boolean;
-  /** The card's status in the store when the PATCH answered (null if the card is gone). */
-  currentStatus: TaskStatus | null;
-  /** Where the card was when this move started. */
-  originStatus: TaskStatus;
-  targetStatus: TaskStatus;
-  title: string;
-  laneName: (status: TaskStatus) => string;
-}
-
-export interface SettleMoveDecision {
-  /** Put the card back here, or leave the store alone (null). */
-  revertTo: TaskStatus | null;
-  /** The "ink drying" cross-fade, the success cue. */
-  playInk: boolean;
-  /** Spoken by the board's polite status region (success only). */
-  successAnnouncement: string | null;
-  /** Shown in the assertive "Move not saved" alert (failure only); the one channel for it. */
-  failureMessage: string | null;
-}
-
-/**
- * How a move settles once its PATCH answers. Only the latest move of a card may
- * settle it: an older move's answer is ignored. A failed move rolls back to its
- * origin only while the card still sits in the optimistic target; if the card has
- * moved since (an SSE update, or another client), the newer state wins and is
- * not overwritten.
- */
-export function decideSettledMove(input: SettleMoveInput): SettleMoveDecision {
-  const { ok, isLatestMove, currentStatus, originStatus, targetStatus, title, laneName } = input;
-  if (!isLatestMove) {
-    return { revertTo: null, playInk: false, successAnnouncement: null, failureMessage: null };
-  }
-  if (ok) {
-    return { revertTo: null, playInk: true, successAnnouncement: `Moved ${title} to ${laneName(targetStatus)}.`, failureMessage: null };
-  }
-  if (currentStatus === targetStatus) {
-    return {
-      revertTo: originStatus,
-      playInk: false,
-      successAnnouncement: null,
-      failureMessage: `${title} was not moved. It stayed in ${laneName(originStatus)}.`,
-    };
-  }
-  return {
-    revertTo: null,
-    playInk: false,
-    successAnnouncement: null,
-    failureMessage: currentStatus
-      ? `${title} was not moved to ${laneName(targetStatus)}. It is in ${laneName(currentStatus)}.`
-      : `${title} was not moved to ${laneName(targetStatus)}.`,
-  };
-}
-
-/**
- * Per-card move bookkeeping. Moves of one card are serialized: while a card's
- * PATCH is in flight (isSaving), a new move of that card is refused, so every
- * move starts from a status the server has confirmed and a rollback can never
- * restore an unconfirmed one. begin() returns a sequence number; finish() clears
- * the in-flight flag; isLatest() still guards against an answer that arrives
- * after a newer move of the same card started.
- */
-export function createMoveSequencer() {
-  const latest = new Map<string, number>();
-  const inFlight = new Map<string, number>();
-  return {
-    begin(taskId: string): number {
-      const seq = (latest.get(taskId) ?? 0) + 1;
-      latest.set(taskId, seq);
-      inFlight.set(taskId, seq);
-      return seq;
-    },
-    finish(taskId: string, seq: number): void {
-      if (inFlight.get(taskId) === seq) inFlight.delete(taskId);
-    },
-    isSaving(taskId: string): boolean {
-      return inFlight.has(taskId);
-    },
-    isLatest(taskId: string, seq: number): boolean {
-      return latest.get(taskId) === seq;
-    },
-  };
-}
-
 export type RailTone = 'neutral' | 'active' | 'needs-you' | 'warn' | 'done';
 
 /** The card's 3 px status rail. Orange only for cards the dispatch gate holds. */
@@ -242,7 +154,7 @@ export function decideMove(
 
 /**
  * dnd-kit live-region text for the board. A drop is announced as "Moving", never
- * "Moved": the result is only known after the PATCH (decideSettledMove). A move
+ * "Moved": the result is only known after the save answers (board-move-controller). A move
  * the dispatch gate refuses is announced as refused.
  */
 export function buildBoardAnnouncements({
@@ -250,12 +162,19 @@ export function buildBoardAnnouncements({
   resolveTargetStatus,
   laneLabel,
   isSaving = () => false,
+  decisionFor = () => undefined,
 }: {
   tasks: readonly Pick<Task, 'id' | 'title' | 'status' | 'github_source' | 'dispatch_metadata'>[];
   resolveTargetStatus: (overId: string) => TaskStatus | null;
   laneLabel: (status: TaskStatus) => string;
   /** The card's previous move is still being saved. */
   isSaving?: (taskId: string) => boolean;
+  /**
+   * The decision the board already made for this drop. dnd-kit calls DndContext's
+   * onDragEnd (which starts the save) before announcements.onDragEnd, so recomputing
+   * here would see the save just started and wrongly say "still being saved".
+   */
+  decisionFor?: (taskId: string, target: TaskStatus) => MoveDecision | undefined;
 }): Announcements {
   const titleOf = (id: UniqueIdentifier) => tasks.find((task) => task.id === id)?.title ?? 'task';
   const laneOf = (overId: UniqueIdentifier | undefined) => {
@@ -276,7 +195,7 @@ export function buildBoardAnnouncements({
       const task = tasks.find((candidate) => candidate.id === active.id);
       const target = over ? resolveTargetStatus(String(over.id)) : null;
       if (task && target) {
-        const decision = decideMove(task, target, isSaving(task.id));
+        const decision = decisionFor(task.id, target) ?? decideMove(task, target, isSaving(task.id));
         if (decision === 'stay') return `${task.title} stayed in ${lane}.`;
         if (decision === 'saving') return `${task.title} is still being saved. It stayed in ${laneLabel(task.status)}.`;
         if (decision === 'gated') return `${task.title} cannot move to ${lane} yet: the dispatch contract is incomplete.`;
