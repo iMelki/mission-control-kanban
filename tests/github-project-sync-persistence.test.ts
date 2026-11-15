@@ -259,3 +259,87 @@ test('targeted GitHub Project sync fails closed when the issue ref is missing', 
     /must match exactly one active Project item; found 0/
   );
 });
+
+test('GitHub Project sync preserves locally authored dispatch contract fields when the issue body omits them', async () => {
+  seedWorkspaceAndTask();
+  const localContract = {
+    source_issue_url: 'https://github.com/iMelki/mission-control-kanban/issues/34',
+    target_repo: 'iMelki/mission-control-kanban',
+    project_workstream: 'local-workstream',
+    allowed_file_scope: ['src/lib/dispatch-contract.ts', 'tests/github-project-sync-persistence.test.ts'],
+    acceptance_criteria: ['Local acceptance criterion is not cleared by sync'],
+    test_requirements: ['npm run test:github-sync'],
+    risk_level: 'medium',
+    readiness: 'ready_for_agent',
+    review_mode: 'human_required',
+    impact: 'Local impact statement stays after a body-less resync',
+    rollback_plan: 'Revert the local dispatch contract commit.',
+    safety_rules: ['Do not clear locally authored contract fields'],
+  };
+  run(
+    `UPDATE tasks SET dispatch_metadata = ?, title = ? WHERE id = ?`,
+    [JSON.stringify(localContract), 'Stale imported task', 'task-existing']
+  );
+
+  const result = await syncLoadedGitHubProjectWorkspace(
+    'assistants',
+    {
+      title: 'Assistants',
+      allItems: [
+        {
+          id: 'PVTI_existing',
+          isArchived: false,
+          content: {
+            __typename: 'Issue',
+            number: 34,
+            title: 'Upstream title should refresh',
+            body: 'A short issue body with no dispatch-contract headings.\n\nJust a goal paragraph.',
+            url: 'https://github.com/iMelki/mission-control-kanban/issues/34',
+            state: 'OPEN',
+            closed: false,
+            repository: {
+              name: 'mission-control-kanban',
+              nameWithOwner: 'iMelki/mission-control-kanban',
+              owner: { login: 'iMelki' },
+            },
+            labels: { nodes: [{ name: 'type:bug' }] },
+          },
+          fieldValues: {
+            nodes: [
+              { name: 'High', field: { name: 'Priority' } },
+              { name: 'upstream-workstream', field: { name: 'Project' } },
+              { name: 'Ready for Agent', field: { name: 'Status' } },
+            ],
+          },
+        },
+      ],
+    },
+    { dryRun: false }
+  );
+
+  assert.equal(result.updated, 1);
+  assert.equal(result.imported, 0);
+  assert.equal(result.status_reconciled, 0);
+
+  const row = queryOne<{ title: string; status: string; priority: string; dispatch_metadata: string }>(
+    'SELECT title, status, priority, dispatch_metadata FROM tasks WHERE id = ?',
+    ['task-existing']
+  );
+  assert.equal(row?.title, 'Upstream title should refresh');
+  assert.equal(row?.status, 'in_progress');
+  assert.equal(row?.priority, 'high');
+  const metadata = parseDispatchMetadata(row?.dispatch_metadata);
+  assert.equal(metadata?.source_issue_url, localContract.source_issue_url);
+  assert.equal(metadata?.target_repo, 'iMelki/mission-control-kanban');
+  assert.equal(metadata?.project_workstream, 'upstream-workstream');
+  assert.deepEqual(metadata?.allowed_file_scope, localContract.allowed_file_scope);
+  assert.deepEqual(metadata?.acceptance_criteria, localContract.acceptance_criteria);
+  assert.deepEqual(metadata?.test_requirements, localContract.test_requirements);
+  assert.equal(metadata?.rollback_plan, localContract.rollback_plan);
+  assert.deepEqual(metadata?.safety_rules, localContract.safety_rules);
+  assert.equal(metadata?.impact, localContract.impact);
+  assert.equal(metadata?.readiness, 'ready_for_agent');
+  assert.equal(metadata?.review_mode, 'human_required');
+  assert.equal(metadata?.risk_level, 'medium');
+  assert.equal(validateDispatchMetadata(metadata).canDispatch, true);
+});
