@@ -940,3 +940,19 @@ test('recovery with a status arriving during the read still weighs this save\'s 
   assert.equal(b.card.status, 'assigned');
   assert.equal(b.outcomes[0].kind, 'saved');
 });
+
+test('the mck-b studio note describes the current move announcements (no role="alert" drop banner, no failures in the polite region)', () => {
+  const note = source('docs/studio/2026-10-mck-studio/variants/mck-b.md').replace(/\s+/g, ' ');
+  // The old text: a role="alert" drop-error banner, and failures spoken by the polite region.
+  assert.doesNotMatch(note, /drop-error banner is now `role="alert"`/);
+  assert.doesNotMatch(note, /it says the card stayed in its lane/);
+  // The current behaviour, as rendered by MissionQueue.tsx.
+  assert.match(note, /"Moving <title> to Review\."/);
+  assert.match(note, /Only after the save succeeds[^.]*"Moved <title> to Review\."/);
+  assert.match(note, /"Move not saved" alert \(`role="alert"`\)/);
+  assert.match(note, /gated-move banner is not a live region/);
+  const queue = source('src/components/MissionQueue.tsx');
+  const gated = queue.slice(queue.indexOf('data-drop-error="gated"') - 200, queue.indexOf('data-drop-error="gated"') + 200);
+  assert.doesNotMatch(gated, /role=|aria-live/, 'the gated banner really is not a live region');
+  assert.match(queue, /data-drop-error="save-failed"/);
+});

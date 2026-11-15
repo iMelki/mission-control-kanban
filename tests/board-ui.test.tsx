@@ -413,6 +413,50 @@ function recordFocus() {
 const failingFetch = (ids: string[]) => stubFetch(async (url, init) =>
   (init?.method === 'PATCH' || ids.some((id) => url.endsWith(`/api/tasks/${id}`)) ? Promise.reject(new TypeError('Failed to fetch')) : undefined));
 
+test('focus that left an alert for the page is not pulled back when that alert auto-clears', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox'), card('b', 'Beta', 'inbox')]);
+  failingFetch(['a', 'b']);
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); await moveCard('b', 'assigned'); });
+  assert.equal(alerts(view.container).length, 2);
+  // Focus Alpha's Dismiss, then click a blank area: focus goes to <body> (focusout, no focusin).
+  const dismiss = button(alerts(view.container)[0], 'Dismiss')!;
+  dismiss.focus();
+  assert.ok(document.activeElement === dismiss);
+  await m.React.act(async () => { dismiss.blur(); await wait(0); });
+  // (Compare names, not elements: a failing assert on two jsdom nodes tries to diff them.)
+  const focused = () => (document.activeElement === document.body ? 'body' : document.activeElement?.textContent?.trim() ?? String(document.activeElement));
+  assert.equal(focused(), 'body');
+  // Later the server puts Alpha in its target and its alert clears: focus must stay where it is.
+  await m.React.act(async () => { m.store.useMissionControl.getState().updateTaskStatus('a', 'assigned'); });
+  await m.React.act(async () => { await wait(80); });
+  assert.equal(alerts(view.container).length, 1);
+  assert.equal(focused(), 'body', 'focus did not jump to Beta\'s alert or the board');
+  await view.unmount();
+});
+
+test('the polite move region speaks each addition on its own (aria-atomic="false", one node per announcement)', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox'), card('b', 'Beta', 'inbox')]);
+  stubFetch(async (url, init) => {
+    if (init?.method === 'PATCH') {
+      const id = url.split('/').pop()!;
+      return json({ ...card(id, id === 'a' ? 'Alpha' : 'Beta', 'assigned'), updated_at: '2026-11-15T10:00:05.000Z' });
+    }
+    return undefined;
+  });
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); });
+  await m.React.act(async () => { await moveCard('b', 'assigned'); });
+  const region = view.container.querySelector('[data-move-announcements]') as HTMLElement;
+  // role="status" defaults to aria-atomic="true", which would re-read "Moved Alpha" with "Moved Beta".
+  assert.equal(region.getAttribute('role'), 'status');
+  assert.equal(region.getAttribute('aria-atomic'), 'false');
+  assert.equal(region.getAttribute('aria-relevant'), 'additions');
+  const entries = [...region.children].map((node) => node.textContent);
+  assert.deepEqual(entries, ['Moved Alpha to Assigned.', 'Moved Beta to Assigned.']);
+  await view.unmount();
+});
+
 test('auto-clear leaves focus alone when it is outside the alert; when it was on the alert, focus goes to the board without scrolling', async () => {
   seedBoard([card('a', 'Alpha', 'inbox'), card('b', 'Beta', 'inbox')]);
   failingFetch(['a', 'b']);

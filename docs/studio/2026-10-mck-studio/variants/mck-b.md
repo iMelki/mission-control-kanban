@@ -61,13 +61,21 @@ picks. Spec: `../direction.md` § Direction B, with `../brief.md` and
     0.01 ms).
   - The drop animation is turned off from JS (`usePrefersReducedMotion`),
     because the stylesheet cannot reach WAAPI.
-  - The live region still announces the move. At the drop it says "Moving
-    <title> to Review.", and once the server accepts the PATCH a second polite
-    region says "Moved <title> to Review." If the server refuses the move or the
-    request fails, it says the card stayed in its lane. If the dispatch contract
-    refuses the move at the drop, the live region says so instead of claiming
-    the move. The drop-error banner is now `role="alert"`. (Updated 2026-11-10
-    after review: the old drop-time "Moved" could contradict a rejected PATCH.)
+  - The move is still announced, in three steps:
+    - At the drop, dnd-kit's polite live region says "Moving <title> to
+      Review."
+    - Only after the save succeeds, a second polite region (`aria-atomic`
+      false, one node per message) says "Moved <title> to Review."
+    - If the save fails or the server keeps another lane, the polite regions
+      say nothing more. Each failed card gets its own "Move not saved" alert
+      (`role="alert"`), spoken once. It names the target lane, and a
+      non-live line under it says which lane the card is in now.
+  - If the dispatch contract refuses the move at the drop, dnd-kit's polite
+    announcement says so instead of claiming the move. The gated-move banner
+    is not a live region, so the refusal is not spoken twice.
+  - (Updated 2026-11-15 for #194. The 2026-11-10 text described a
+    `role="alert"` drop-error banner and failures spoken by the polite region.
+    Neither is current.)
 - **Per-route `document.title`.** Root template `%s · Mission Control`. Route
   layouts set "Settings", "n8n sync history", "Runtime regression", and
   "<workspace name> board". A slug with no row in the database gets

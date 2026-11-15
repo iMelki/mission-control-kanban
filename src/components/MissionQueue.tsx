@@ -201,16 +201,34 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     // Committed: every alert on screen has now been rendered live (or was already).
     for (const failure of shownFailures) liveRenderedFailures.add(failure);
   }, [shownFailures]);
-  // The failure alert that last had focus. An auto-cleared alert leaves the DOM before the
-  // effect that clears it runs, so focus is already lost by then; this says where it was.
+  // The failure alert that holds focus. An auto-cleared alert leaves the DOM before the effect
+  // that clears it runs, so focus is already lost by then; this says where it was.
   const focusedFailureId = useRef<string | null>(null);
   useEffect(() => {
+    const alertIdOf = (node: EventTarget | null) =>
+      node instanceof Element ? node.closest('[data-save-failure]')?.getAttribute('data-save-failure') ?? null : null;
     const onFocusIn = (event: FocusEvent) => {
-      const alert = event.target instanceof Element ? event.target.closest('[data-save-failure]') : null;
-      focusedFailureId.current = alert?.getAttribute('data-save-failure') ?? null;
+      focusedFailureId.current = alertIdOf(event.target);
+    };
+    const onFocusOut = (event: FocusEvent) => {
+      const left = event.target;
+      // Focus moving to another alert is handled by its focusin.
+      if (alertIdOf(event.relatedTarget) !== null) return;
+      // Decide after the event: a control that is still in the page lost focus to the page
+      // (a click on a blank area), so no alert holds focus any more. A control that was removed
+      // (its alert auto-cleared; some browsers fire focusout then) keeps the id for that clear.
+      queueMicrotask(() => {
+        if (left instanceof Node && left.isConnected && alertIdOf(document.activeElement) === null) {
+          focusedFailureId.current = null;
+        }
+      });
     };
     document.addEventListener('focusin', onFocusIn);
-    return () => document.removeEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+    };
   }, []);
   const reducedMotion = usePrefersReducedMotion();
 
@@ -515,7 +533,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         </div>
       </div>
 
-      <div role="status" aria-live="polite" aria-relevant="additions" className="sr-only" data-move-announcements>
+      {/* aria-atomic="false": role="status" is atomic by default, which would re-read every earlier
+          "Moved …" still in the region each time one is added. Each announcement is its own node. */}
+      <div role="status" aria-live="polite" aria-atomic="false" aria-relevant="additions" className="sr-only" data-move-announcements>
         {moveAnnouncements.map((entry) => (
           <p key={entry.id}>{entry.text}</p>
         ))}
