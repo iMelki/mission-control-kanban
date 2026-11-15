@@ -580,3 +580,43 @@ test('a dialog-save response is reported to the move controller (it becomes the 
   assert.equal(statusOf('a'), 'review');
   await view.unmount();
 });
+
+test('a move that saved and was then moved on by the board is announced politely, with no failure alert', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  let answer!: (response: Response) => void;
+  stubFetch(async (url, init) => {
+    if (init?.method === 'PATCH') return new Promise<Response>((resolve) => { answer = resolve; });
+    if (url.endsWith('/api/tasks/a')) return json(card('a', 'Alpha', 'in_progress', { updated_at: '2026-11-15T10:00:02.000Z' }));
+    return undefined;
+  });
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  const controller = m.registry.getBoardMoveController(WS);
+  await m.React.act(async () => { void controller.start(m.store.useMissionControl.getState().tasks[0], 'assigned'); });
+  // Another client moves the card to In progress (10:00:02) before this PATCH's answer (Assigned, 10:00:01) arrives.
+  await m.React.act(async () => {
+    m.registry.taskStreamHandlers().onTaskUpdated(card('a', 'Alpha', 'in_progress', { updated_at: '2026-11-15T10:00:02.000Z' }));
+    answer(json({ ...card('a', 'Alpha', 'assigned'), updated_at: '2026-11-15T10:00:01.000Z' }));
+    await controller.waitForIdle('a');
+  });
+  assert.equal(statusOf('a'), 'in_progress');
+  assert.equal(alerts(view.container).length, 0, 'no "Move not saved" alert for a move that saved');
+  const spoken = [...view.container.querySelectorAll('[data-move-announcements] > *')].map((node) => node.textContent);
+  assert.deepEqual(spoken, ['Moved Alpha to Assigned, then the board moved it to In progress.']);
+  await view.unmount();
+});
+
+test('each alert\'s buttons are named for their card (WCAG 2.4.6), keeping the visible words first (2.5.3)', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox'), card('b', 'Beta', 'inbox')]);
+  failingFetch(['a', 'b']);
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); await moveCard('b', 'assigned'); });
+  const names = alerts(view.container).map((alert) => [...alert.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim()));
+  assert.deepEqual(names, [
+    ['Retry move of Alpha', 'Dismiss alert for Alpha'],
+    ['Retry move of Beta', 'Dismiss alert for Beta'],
+  ]);
+  for (const b of view.container.querySelectorAll<HTMLButtonElement>('[data-save-failure] button')) {
+    assert.ok((b.getAttribute('aria-label') ?? '').startsWith(b.textContent!.trim()), 'the visible label starts the accessible name');
+  }
+  await view.unmount();
+});

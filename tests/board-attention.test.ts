@@ -895,7 +895,7 @@ test('a newer confirmation from an earlier save survives the next move (stale re
   assert.equal(b.card.status, 'assigned');
 });
 
-test('when the recovery read fails, a newer SSE confirmation beats this save\'s older answer', async () => {
+test('when the recovery read fails, a newer SSE confirmation beats this save\'s older answer: saved, then moved on (not a failure)', async () => {
   const patch = deferred<PatchStatusResult>();
   const b = board('inbox', { patch: () => patch.promise, read: async () => { throw new Error('offline'); } });
   const run = b.controller.start(b.card, 'assigned');
@@ -903,6 +903,46 @@ test('when the recovery read fails, a newer SSE confirmation beats this save\'s 
   patch.resolve({ ok: true, status: 'assigned', updatedAt: T2 }); // the PATCH answered Assigned at T2
   await run;
   assert.equal(b.card.status, 'review');
+  // The PATCH saved Assigned; Review (T3, provably later) replaced it.
+  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'review', target: 'assigned', confirmed: true });
+  assert.deepEqual(b.controller.getFailuresSnapshot(), []);
+});
+
+test('an OK PATCH followed by a later server move is "superseded", not "not-saved", when the re-read confirms the later lane', async () => {
+  const patch = deferred<PatchStatusResult>();
+  const b = board('inbox', { patch: () => patch.promise, read: async () => ({ status: 'in_progress', updatedAt: T2 }) });
+  const run = b.controller.start(b.card, 'assigned');
+  b.serverPush('in_progress', T2); // SSE: In progress at 10:00:02
+  patch.resolve({ ok: true, status: 'assigned', updatedAt: T1 }); // the PATCH saved Assigned at 10:00:01
+  await run;
+  assert.equal(b.card.status, 'in_progress');
+  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'in_progress', target: 'assigned', confirmed: true });
+  assert.deepEqual(b.controller.getFailuresSnapshot(), [], 'no failure alert for a move that saved');
+});
+
+test('an OK PATCH whose re-read fails and whose order cannot be proven is "superseded" with the lane unconfirmed, never "not-saved"', async () => {
+  const patch = deferred<PatchStatusResult>();
+  const read = deferred<ServerStatus | null>();
+  const b = board('inbox', { patch: () => patch.promise, read: () => read.promise, readTimeoutMs: 1000 });
+  const run = b.controller.start(b.card, 'assigned');
+  b.serverPush('in_progress', T2); // conflicting news while saving: the save re-reads
+  patch.resolve({ ok: true, status: 'assigned', updatedAt: null }); // saved, but no updated_at to order it by
+  await flush();
+  b.serverPush('review', '2026-11-15T10:00:03.000Z'); // more news while the re-read is in flight
+  read.reject(new Error('offline'));
+  await run;
+  assert.equal(b.card.status, 'review');
+  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'review', target: 'assigned', confirmed: false });
+  assert.deepEqual(b.controller.getFailuresSnapshot(), []);
+});
+
+test('a PATCH that answers OK with a different lane is still "not-saved" (the server kept another status)', async () => {
+  const patch = deferred<PatchStatusResult>();
+  const b = board('inbox', { patch: () => patch.promise, read: async () => ({ status: 'inbox', updatedAt: T2 }) });
+  const run = b.controller.start(b.card, 'assigned');
+  b.serverPush('review', T1);
+  patch.resolve({ ok: true, status: 'inbox', updatedAt: T2 });
+  await run;
   assert.equal(b.outcomes[0].kind, 'not-saved');
 });
 

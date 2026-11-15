@@ -1,8 +1,8 @@
 {
   "url": "http://127.0.0.1:3021/",
-  "extractedAt": "2026-11-10T18:47:28.813Z",
+  "extractedAt": "2026-11-15T20:20:08.572Z",
   "meta": {
-    "snapshotId": "60e0b426-ce17-46df-999b-5dc1ca0c12c3",
+    "snapshotId": "a88cc008-dd1c-4b6f-bacb-cdfef504f39e",
     "httpStatus": 200,
     "dembrandtVersion": "0.39.2",
     "schemaVersion": "1.19.0",
@@ -318,7 +318,7 @@
         "normalized": "#202226",
         "count": 21,
         "usageFrac": 0.09251101321585903,
-        "areaFrac": 0.0034583397108287044,
+        "areaFrac": 0.0034217470179967084,
         "confidence": "high",
         "sources": [],
         "isToken": true
@@ -328,7 +328,7 @@
         "normalized": "#111214",
         "count": 13,
         "usageFrac": 0.05726872246696035,
-        "areaFrac": 0.8234670695453944,
+        "areaFrac": 0.8235242668401158,
         "confidence": "high",
         "sources": [],
         "isToken": true
@@ -338,7 +338,7 @@
         "normalized": "#18191c",
         "count": 9,
         "usageFrac": 0.039647577092511016,
-        "areaFrac": 0.1720527321769601,
+        "areaFrac": 0.17206058167111063,
         "confidence": "high",
         "sources": [
           "border-b",
@@ -361,7 +361,7 @@
         "normalized": "#e6be5a",
         "count": 1,
         "usageFrac": 0.004405286343612335,
-        "areaFrac": 0.001021858566816835,
+        "areaFrac": 0.0009934044707768167,
         "confidence": "high",
         "sources": [
           "flex"
@@ -434,7 +434,7 @@
         "paints": "fill",
         "slot": null,
         "count": 21,
-        "area": 25180,
+        "area": 24912,
         "cssVar": "--mc-bg-tertiary",
         "state": null
       },
@@ -443,7 +443,7 @@
         "paints": "fill",
         "slot": null,
         "count": 13,
-        "area": 5995541,
+        "area": 5995684,
         "cssVar": "--mc-bg",
         "state": null
       },
@@ -488,7 +488,7 @@
         "paints": "fill",
         "slot": null,
         "count": 1,
-        "area": 7440,
+        "area": 7233,
         "cssVar": "--mc-accent",
         "state": null
       },

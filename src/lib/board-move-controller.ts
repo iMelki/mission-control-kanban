@@ -46,7 +46,13 @@ export type MoveOutcome =
   /** The server answered and the card is not in the target lane. */
   | { kind: 'not-saved'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; error: string }
   /** The save failed and the re-read failed too: the card shows the last confirmed status. */
-  | { kind: 'unknown'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; error: string };
+  | { kind: 'unknown'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; error: string }
+  /**
+   * The PATCH saved the target lane, and a later server change moved the card on to `status`.
+   * Not a failure. `confirmed` is false when neither the re-read nor updated_at proves that
+   * `status` is newer than the save: the card shows it, but its current lane is unconfirmed.
+   */
+  | { kind: 'superseded'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; confirmed: boolean };
 
 export interface MoveControllerDeps {
   /** The card's status in the board store right now. */
@@ -159,7 +165,7 @@ export function createMoveController(deps: MoveControllerDeps) {
   const report = (outcome: MoveOutcome) => {
     // Record the failure first (or clear it on success), whether or not a board is listening.
     const others = failures.filter((failure) => failure.taskId !== outcome.taskId);
-    if (outcome.kind === 'saved') {
+    if (outcome.kind === 'saved' || outcome.kind === 'superseded') {
       if (others.length !== failures.length) setFailures(others);
     } else {
       setFailures([...others, {
@@ -197,13 +203,17 @@ export function createMoveController(deps: MoveControllerDeps) {
     }
     const newerArrived = (serverSeq.get(task.id) ?? 0) !== seqBefore;
     const latest = confirmed.get(task.id)!;
+    // This save's own PATCH answered OK with the target lane: the move did save, whatever the
+    // card shows now. A different lane after that is a later change, not a failed move.
+    const patchSaved = fallback !== null && fallback.status === target;
     // A server status that arrived during the read wins unless the read is provably newer.
     if (server && (!newerArrived || timeOf(server.updatedAt) > latest.time)) {
       confirm(task.id, server.status, server.updatedAt);
       deps.setStatus(task.id, server.status, server.updatedAt);
-      return server.status === target
-        ? { kind: 'saved', taskId: task.id, title: task.title, status: server.status }
-        : { kind: 'not-saved', taskId: task.id, title: task.title, status: server.status, target, error };
+      if (server.status === target) return { kind: 'saved', taskId: task.id, title: task.title, status: server.status };
+      // The read left after the PATCH answered, so its lane is the one that followed the save.
+      if (patchSaved) return { kind: 'superseded', taskId: task.id, title: task.title, status: server.status, target, confirmed: true };
+      return { kind: 'not-saved', taskId: task.id, title: task.title, status: server.status, target, error };
     }
     // No usable answer from the read: show the newest status the server confirmed, comparing
     // this save's own answer (if any) with confirmations from elsewhere by updated_at.
@@ -216,6 +226,12 @@ export function createMoveController(deps: MoveControllerDeps) {
     if (fallbackWins) deps.setStatus(task.id, keep, fallback.updatedAt);
     else if (deps.getStatus(task.id) !== keep) deps.setStatus(task.id, keep);
     if (keep === target) return { kind: 'saved', taskId: task.id, title: task.title, status: keep };
+    if (patchSaved) {
+      // The save happened; the card shows a server status from elsewhere. Only an updated_at
+      // provably newer than the save's own answer says that status came after the save.
+      const confirmed = timeOf(fallback.updatedAt) < latest.time;
+      return { kind: 'superseded', taskId: task.id, title: task.title, status: keep, target, confirmed };
+    }
     // The server told us where the card is (another client, a refetch): not a guess, no retry.
     if (newerArrived || observedDuringSave.has(task.id)) {
       return { kind: 'not-saved', taskId: task.id, title: task.title, status: keep, target, error };

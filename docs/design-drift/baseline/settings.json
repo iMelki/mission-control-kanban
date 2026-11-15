@@ -1,8 +1,8 @@
 {
   "url": "http://127.0.0.1:3021/settings",
-  "extractedAt": "2026-11-10T18:47:56.791Z",
+  "extractedAt": "2026-11-15T20:20:35.393Z",
   "meta": {
-    "snapshotId": "f340a6e7-ef58-473d-983a-d64a32b29cb7",
+    "snapshotId": "f6566d0a-ddc9-43d8-844f-4b7215439d41",
     "httpStatus": 200,
     "dembrandtVersion": "0.39.2",
     "schemaVersion": "1.19.0",
@@ -344,11 +344,11 @@
         "normalized": "#111214",
         "count": 22,
         "usageFrac": 0.1073170731707317,
-        "areaFrac": 0.8221761866474733,
+        "areaFrac": 0.8219013147889942,
         "confidence": "high",
         "sources": [
           "h-10",
-          "p-4"
+          "p-6"
         ],
         "isToken": true
       },
@@ -369,7 +369,7 @@
         "normalized": "#18191c",
         "count": 7,
         "usageFrac": 0.03414634146341464,
-        "areaFrac": 0.17605820484856863,
+        "areaFrac": 0.17638905752614534,
         "confidence": "high",
         "sources": [
           "mb-8"
@@ -393,7 +393,7 @@
         "normalized": "#e6be5a",
         "count": 1,
         "usageFrac": 0.004878048780487805,
-        "areaFrac": 0.0003955538399906056,
+        "areaFrac": 0.0003748622320570672,
         "confidence": "high",
         "sources": [
           "px-4"
@@ -417,7 +417,7 @@
         "normalized": "#202226",
         "count": 1,
         "usageFrac": 0.004878048780487805,
-        "areaFrac": 0.0013700546639674612,
+        "areaFrac": 0.0013347654528034355,
         "confidence": "medium",
         "sources": [],
         "isToken": true
@@ -456,7 +456,7 @@
         "paints": "fill",
         "slot": null,
         "count": 22,
-        "area": 14632952,
+        "area": 15014804,
         "cssVar": "--mc-bg",
         "state": null
       },
@@ -474,7 +474,7 @@
         "paints": "fill",
         "slot": null,
         "count": 7,
-        "area": 3133454,
+        "area": 3222342,
         "cssVar": "--mc-bg-secondary",
         "state": null
       },
@@ -510,7 +510,7 @@
         "paints": "fill",
         "slot": null,
         "count": 1,
-        "area": 7040,
+        "area": 6848,
         "cssVar": "--mc-accent",
         "state": null
       }

@@ -1,8 +1,8 @@
 {
   "url": "http://127.0.0.1:3021/workspace/default",
-  "extractedAt": "2026-11-10T18:47:42.703Z",
+  "extractedAt": "2026-11-15T20:20:22.582Z",
   "meta": {
-    "snapshotId": "9250001c-22d2-4e5b-93f5-33ddcee9e2ab",
+    "snapshotId": "61483a34-db4c-45ce-864e-84b194bd779a",
     "httpStatus": 200,
     "dembrandtVersion": "0.39.2",
     "schemaVersion": "1.19.0",
@@ -47,7 +47,7 @@
     "width": 24,
     "height": 24,
     "rect": {
-      "x": 191,
+      "x": 197,
       "y": 20,
       "width": 16,
       "height": 16
@@ -67,7 +67,7 @@
     },
     "position": {
       "top": 19.5,
-      "left": 190.5
+      "left": 196.5
     }
   },
   "logoInstances": [],
@@ -395,7 +395,7 @@
         "normalized": "#111214",
         "count": 12,
         "usageFrac": 0.08888888888888889,
-        "areaFrac": 0.6645719004980335,
+        "areaFrac": 0.6658795399942599,
         "confidence": "high",
         "sources": [],
         "isToken": true
@@ -405,7 +405,7 @@
         "normalized": "#18191c",
         "count": 12,
         "usageFrac": 0.08888888888888889,
-        "areaFrac": 0.330336026763802,
+        "areaFrac": 0.32896615279672087,
         "confidence": "high",
         "sources": [
           "h-14",
@@ -418,7 +418,7 @@
         "normalized": "#202226",
         "count": 8,
         "usageFrac": 0.05925925925925926,
-        "areaFrac": 0.00452475440869413,
+        "areaFrac": 0.00456991249748756,
         "confidence": "high",
         "sources": [
           "inline-flex",
@@ -443,7 +443,7 @@
         "normalized": "#ef6461",
         "count": 3,
         "usageFrac": 0.022222222222222223,
-        "areaFrac": 0.000009952953148601664,
+        "areaFrac": 0.000009972340098128022,
         "confidence": "low",
         "sources": [],
         "isToken": false
@@ -463,7 +463,7 @@
         "normalized": "#e6be5a",
         "count": 1,
         "usageFrac": 0.007407407407407408,
-        "areaFrac": 0.0005573653763216931,
+        "areaFrac": 0.0005744223714335774,
         "confidence": "high",
         "sources": [
           "flex"
@@ -516,7 +516,7 @@
         "paints": "fill",
         "slot": null,
         "count": 12,
-        "area": 4273365,
+        "area": 4273449,
         "cssVar": "--mc-bg",
         "state": null
       },
@@ -525,7 +525,7 @@
         "paints": "fill",
         "slot": null,
         "count": 12,
-        "area": 2124144,
+        "area": 2111223,
         "cssVar": "--mc-bg-secondary",
         "state": null
       },
@@ -534,7 +534,7 @@
         "paints": "fill",
         "slot": null,
         "count": 8,
-        "area": 29095,
+        "area": 29329,
         "cssVar": "--mc-bg-tertiary",
         "state": null
       },
@@ -597,7 +597,7 @@
         "paints": "fill",
         "slot": null,
         "count": 1,
-        "area": 3584,
+        "area": 3687,
         "cssVar": "--mc-accent",
         "state": null
       },
@@ -979,14 +979,14 @@
         "px": "8px",
         "display": "8px",
         "rem": "0.50rem",
-        "count": 29,
+        "count": 27,
         "numericValue": 8
       },
       {
         "px": "12px",
         "display": "12px",
         "rem": "0.75rem",
-        "count": 18,
+        "count": 20,
         "numericValue": 12
       },
       {

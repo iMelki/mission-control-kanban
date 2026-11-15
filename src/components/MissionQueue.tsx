@@ -313,6 +313,20 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       });
       return;
     }
+    if (outcome.kind === 'superseded') {
+      // The move saved and a later change moved the card on: not a failure, so no alert.
+      announceMove(outcome.confirmed
+        ? `Moved ${outcome.title} to ${laneName(outcome.target)}, then the board moved it to ${laneName(outcome.status)}.`
+        : `Moved ${outcome.title} to ${laneName(outcome.target)}. Its lane changed after that and could not be confirmed. It shows in ${laneName(outcome.status)}.`);
+      addEvent({
+        id: crypto.randomUUID(),
+        type: outcome.target === 'done' ? 'task_completed' : 'task_status_changed',
+        task_id: outcome.taskId,
+        message: `Task "${outcome.title}" moved to ${outcome.target}`,
+        created_at: new Date().toISOString(),
+      });
+      return;
+    }
     // Failures are recorded by the controller itself and shown from its failure list, each
     // spoken once by its own role="alert" (so two failures delivered together both stay).
   };
@@ -589,6 +603,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
                   <button
                     type="button"
                     onClick={() => retryMove(failure.taskId, failure.target)}
+                    // Named per card: several alerts can each have a Retry (WCAG 2.4.6). The
+                    // visible words stay at the start of the name (label in name, 2.5.3).
+                    aria-label={`Retry move of ${failure.title}`}
                     className="inline-flex min-h-11 items-center rounded border border-mc-text-secondary/60 px-3 text-xs font-medium text-mc-text hover:bg-mc-bg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
                   >
                     Retry move
@@ -597,6 +614,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
                 <button
                   type="button"
                   onClick={() => removeSaveFailures([failure.taskId])}
+                  aria-label={`Dismiss alert for ${failure.title}`}
                   className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
                 >
                   Dismiss
