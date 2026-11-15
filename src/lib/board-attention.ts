@@ -107,43 +107,81 @@ export function presentNeedsYouCountDescription(phase: BoardLoadPhase, count: nu
   return String(count);
 }
 
-export interface SettledMoveOutcome {
-  announcement: string;
+export interface SettleMoveInput {
+  /** The PATCH was accepted. */
+  ok: boolean;
+  /** No newer move of this card was started while this PATCH was in flight. */
+  isLatestMove: boolean;
+  /** The card's status in the store when the PATCH answered (null if the card is gone). */
+  currentStatus: TaskStatus | null;
+  /** Where the card was when this move started. */
+  originStatus: TaskStatus;
+  targetStatus: TaskStatus;
+  title: string;
+  laneName: (status: TaskStatus) => string;
+}
+
+export interface SettleMoveDecision {
+  /** Put the card back here, or leave the store alone (null). */
+  revertTo: TaskStatus | null;
+  /** The "ink drying" cross-fade, the success cue. */
   playInk: boolean;
-  revert: boolean;
+  /** Spoken by the board's polite status region (success only). */
+  successAnnouncement: string | null;
+  /** Shown in the assertive "Move not saved" alert (failure only); the one channel for it. */
+  failureMessage: string | null;
 }
 
 /**
- * Announce-after-PATCH / ink-after-saved-move. The success cue (ink fade and
- * "Moved …") only fires when the server accepted the change. A failed PATCH
- * announces that the card stayed and asks the caller to revert.
+ * How a move settles once its PATCH answers. Only the latest move of a card may
+ * settle it: an older move's answer is ignored. A failed move rolls back to its
+ * origin only while the card still sits in the optimistic target; if the card has
+ * moved since (an SSE update, or another client), the newer state wins and is
+ * not overwritten.
  */
-export function settledMoveOutcome(
-  ok: boolean,
-  title: string,
-  targetLane: string,
-  originLane: string,
-): SettledMoveOutcome {
+export function decideSettledMove(input: SettleMoveInput): SettleMoveDecision {
+  const { ok, isLatestMove, currentStatus, originStatus, targetStatus, title, laneName } = input;
+  if (!isLatestMove) {
+    return { revertTo: null, playInk: false, successAnnouncement: null, failureMessage: null };
+  }
   if (ok) {
+    return { revertTo: null, playInk: true, successAnnouncement: `Moved ${title} to ${laneName(targetStatus)}.`, failureMessage: null };
+  }
+  if (currentStatus === targetStatus) {
     return {
-      announcement: `Moved ${title} to ${targetLane}.`,
-      playInk: true,
-      revert: false,
+      revertTo: originStatus,
+      playInk: false,
+      successAnnouncement: null,
+      failureMessage: `${title} was not moved. It stayed in ${laneName(originStatus)}.`,
     };
   }
   return {
-    announcement: `${title} was not moved. It stayed in ${originLane}.`,
+    revertTo: null,
     playInk: false,
-    revert: true,
+    successAnnouncement: null,
+    failureMessage: currentStatus
+      ? `${title} was not moved to ${laneName(targetStatus)}. It is in ${laneName(currentStatus)}.`
+      : `${title} was not moved to ${laneName(targetStatus)}.`,
   };
 }
 
 /**
- * Where the card sits once the PATCH has answered: the target lane on success,
- * otherwise the lane it came from (the optimistic update is rolled back).
+ * Per-card move sequence numbers. begin() is called at each optimistic move;
+ * isLatest() tells a PATCH answer whether a newer move of the same card started
+ * while it was in flight (then the answer must not settle the card).
  */
-export function statusAfterSettledMove<S extends string>(ok: boolean, originStatus: S, targetStatus: S): S {
-  return ok ? targetStatus : originStatus;
+export function createMoveSequencer() {
+  const latest = new Map<string, number>();
+  return {
+    begin(taskId: string): number {
+      const seq = (latest.get(taskId) ?? 0) + 1;
+      latest.set(taskId, seq);
+      return seq;
+    },
+    isLatest(taskId: string, seq: number): boolean {
+      return latest.get(taskId) === seq;
+    },
+  };
 }
 
 export type RailTone = 'neutral' | 'active' | 'needs-you' | 'warn' | 'done';
@@ -185,7 +223,7 @@ export function decideMove(task: Pick<Task, 'status' | 'github_source' | 'dispat
 
 /**
  * dnd-kit live-region text for the board. A drop is announced as "Moving", never
- * "Moved": the result is only known after the PATCH (settledMoveOutcome). A move
+ * "Moved": the result is only known after the PATCH (decideSettledMove). A move
  * the dispatch gate refuses is announced as refused.
  */
 export function buildBoardAnnouncements({

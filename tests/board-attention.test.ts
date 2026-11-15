@@ -19,6 +19,8 @@ import {
   buildBoardAnnouncements,
   countGatedInbox,
   countNeedsYou,
+  createMoveSequencer,
+  decideSettledMove,
   decideMove,
   isDispatchBlockedInbox,
   isGatedByDispatchContract,
@@ -27,13 +29,12 @@ import {
   needsYouTasks,
   presentNeedsYouCountDescription,
   railToneFor,
-  settledMoveOutcome,
   showsDispatchContractInboxBanner,
-  statusAfterSettledMove,
   workspaceScopedTasks,
   type AttentionTask,
 } from '../src/lib/board-attention';
-import type { TaskStatus } from '../src/lib/types';
+import { validateDispatchMetadata } from '../src/lib/dispatch-contract';
+import type { DispatchMetadata, TaskStatus } from '../src/lib/types';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -136,18 +137,25 @@ test('Dispatch-contract Inbox banner is hidden for locally created Inbox tasks',
   assert.equal(showsDispatchContractInboxBanner(null), false);
 });
 
+const settleLane = (status: TaskStatus) => ({ inbox: 'Inbox', assigned: 'Assigned', in_progress: 'In progress', review: 'Review' } as Record<string, string>)[status] ?? status;
+
 test('Settled move announces and plays ink only after a successful PATCH', () => {
-  const outcome = settledMoveOutcome(true, 'Ship the board', 'Review', 'In progress');
-  assert.equal(outcome.announcement, 'Moved Ship the board to Review.');
-  assert.equal(outcome.playInk, true);
-  assert.equal(outcome.revert, false);
+  const decision = decideSettledMove({
+    ok: true, isLatestMove: true, currentStatus: 'review', originStatus: 'in_progress', targetStatus: 'review', title: 'Ship the board', laneName: settleLane,
+  });
+  assert.deepEqual(decision, { revertTo: null, playInk: true, successAnnouncement: 'Moved Ship the board to Review.', failureMessage: null });
 });
 
-test('Failed PATCH announces the card stayed and does not play ink', () => {
-  const outcome = settledMoveOutcome(false, 'Ship the board', 'Review', 'In progress');
-  assert.equal(outcome.announcement, 'Ship the board was not moved. It stayed in In progress.');
-  assert.equal(outcome.playInk, false);
-  assert.equal(outcome.revert, true);
+test('Failed PATCH reverts, says the card stayed (alert only) and does not play ink', () => {
+  const decision = decideSettledMove({
+    ok: false, isLatestMove: true, currentStatus: 'review', originStatus: 'in_progress', targetStatus: 'review', title: 'Ship the board', laneName: settleLane,
+  });
+  assert.deepEqual(decision, {
+    revertTo: 'in_progress',
+    playInk: false,
+    successAnnouncement: null,
+    failureMessage: 'Ship the board was not moved. It stayed in In progress.',
+  });
 });
 
 test('Needs you count description lives outside the accessible name', () => {
@@ -217,10 +225,11 @@ test('Needs you has a constant accessible name with the count outside the name',
   const button = queue.slice(queue.indexOf('data-needs-you'), queue.indexOf('id="needs-you-count"') + 400);
   assert.match(button, /aria-label=\{NEEDS_YOU_ACCESSIBLE_NAME\}/);
   assert.match(button, /aria-describedby="needs-you-count"/);
-  assert.match(queue, /id="needs-you-count"[^>]*aria-live="polite"/);
+  // A description for the button, not a live region that speaks a bare number on every update.
+  assert.match(queue, /<span id="needs-you-count" className="sr-only">/);
+  assert.doesNotMatch(queue, /id="needs-you-count"[^>]*(aria-live|role=)/);
   assert.match(queue, /presentNeedsYouCountDescription\(boardLoadStatus, needsYouCount\)/);
-  assert.match(queue, /settledMoveOutcome\(true,/);
-  assert.match(queue, /settledMoveOutcome\(false,/);
+  assert.match(queue, /decideSettledMove\(\{/);
   // The count and loading words must not be concatenated into the name.
   assert.doesNotMatch(button, /aria-label=\{?[`'"]Needs you.*\{needsYouCount\}/);
   assert.doesNotMatch(queue, /showing only these/);
@@ -253,10 +262,49 @@ test('railToneFor: warn only for gated GitHub Inbox, then status tones', () => {
   assert.equal(railToneFor(task({ id: 'r', status: 'review', github_source: githubSource, dispatch_blockers: ['x'] })), 'needs-you');
 });
 
-test('"gated in Inbox" counts the same cards as the move gate, per workspace', () => {
-  assert.equal(countGatedInbox(fixtures, 'ws-a'), 1);
-  assert.equal(countGatedInbox(fixtures, 'ws-b'), 1);
-  assert.equal(countGatedInbox(fixtures), 2);
+const READY_CONTRACT: DispatchMetadata = {
+  target_repo: 'iMelki/mission-control-kanban',
+  project_workstream: 'Board',
+  allowed_file_scope: ['src/components/**'],
+  acceptance_criteria: ['Card moves'],
+  test_requirements: ['npm run test:board-attention'],
+  risk_level: 'low',
+  readiness: 'ready_for_agent',
+  review_mode: 'human_required',
+  impact: 'UI only',
+  rollback_plan: 'Revert the commit',
+};
+
+/** Build a card the way the API does: dispatch_blockers come from validateDispatchMetadata. */
+function apiCard(id: string, workspace: string, github: boolean, contract: DispatchMetadata | undefined) {
+  return {
+    id,
+    title: id,
+    status: 'inbox' as TaskStatus,
+    workspace_id: workspace,
+    github_source: github ? githubSource : undefined,
+    dispatch_metadata: contract,
+    dispatch_blockers: validateDispatchMetadata(contract).blockers,
+  };
+}
+
+test('"gated in Inbox" counts exactly the cards the move gate refuses, per workspace', () => {
+  const cards = [
+    apiCard('gh-no-contract-a', 'ws-a', true, undefined),
+    apiCard('gh-ready-a', 'ws-a', true, READY_CONTRACT),
+    apiCard('gh-partial-a', 'ws-a', true, { ...READY_CONTRACT, readiness: 'needs_grooming' }),
+    apiCard('local-no-contract-a', 'ws-a', false, undefined),
+    apiCard('gh-no-contract-b', 'ws-b', true, undefined),
+  ];
+  // The same fixtures feed both functions, and they must agree card by card.
+  for (const card of cards) {
+    assert.equal(isDispatchBlockedInbox(card), isGatedByDispatchContract(card, 'assigned'), card.id);
+  }
+  const refusedIn = (ws?: string) => cards.filter((card) => (!ws || card.workspace_id === ws) && isGatedByDispatchContract(card, 'assigned')).length;
+  assert.equal(countGatedInbox(cards, 'ws-a'), refusedIn('ws-a'));
+  assert.equal(countGatedInbox(cards, 'ws-a'), 2);
+  assert.equal(countGatedInbox(cards, 'ws-b'), refusedIn('ws-b'));
+  assert.equal(countGatedInbox(cards), refusedIn());
 });
 
 const LANES: Record<TaskStatus, string> = {
@@ -301,12 +349,67 @@ test('a local card is not gated: the drop is announced as pending ("Moving"), no
   assert.equal(dropEnd([localCard], localCard.id, null), 'Local note was dropped outside the board.');
 });
 
+/**
+ * A miniature of MissionQueue's move path: optimistic update, then settle the PATCH
+ * answer with the real sequencer and decideSettledMove against the live store.
+ */
+function moveHarness(initial: TaskStatus) {
+  const store = { status: initial };
+  const sequencer = createMoveSequencer();
+  const spoken: string[] = [];
+  const start = (target: TaskStatus) => {
+    const origin = store.status;
+    const seq = sequencer.begin('a');
+    store.status = target; // optimistic
+    return (ok: boolean) => {
+      const decision = decideSettledMove({
+        ok,
+        isLatestMove: sequencer.isLatest('a', seq),
+        currentStatus: store.status,
+        originStatus: origin,
+        targetStatus: target,
+        title: 'A',
+        laneName: (status) => LANES[status],
+      });
+      if (decision.revertTo) store.status = decision.revertTo;
+      for (const text of [decision.successAnnouncement, decision.failureMessage]) if (text) spoken.push(text);
+      return decision;
+    };
+  };
+  return { store, start, spoken };
+}
+
 test('a failed PATCH rolls the card back to its original lane; a saved one settles in the target', () => {
-  assert.equal(statusAfterSettledMove(false, 'inbox', 'assigned'), 'inbox');
-  assert.equal(statusAfterSettledMove(true, 'inbox', 'assigned'), 'assigned');
-  const failed = settledMoveOutcome(false, 'Local note', LANES.assigned, LANES.inbox);
-  assert.equal(failed.revert, true);
-  assert.equal(failed.announcement, 'Local note was not moved. It stayed in Inbox.');
+  const failed = moveHarness('inbox');
+  failed.start('assigned')(false);
+  assert.equal(failed.store.status, 'inbox');
+  assert.deepEqual(failed.spoken, ['A was not moved. It stayed in Inbox.']);
+
+  const saved = moveHarness('inbox');
+  saved.start('assigned')(true);
+  assert.equal(saved.store.status, 'assigned');
+  assert.deepEqual(saved.spoken, ['Moved A to Assigned.']);
+});
+
+test('race: an older move failing after a newer move succeeded does not snap the card back', () => {
+  const h = moveHarness('inbox');
+  const first = h.start('assigned'); // Inbox -> Assigned, PATCH pending
+  const second = h.start('in_progress'); // Assigned -> In progress
+  second(true);
+  const late = first(false); // the first PATCH fails last
+  assert.equal(late.revertTo, null);
+  assert.equal(h.store.status, 'in_progress');
+  assert.deepEqual(h.spoken, ['Moved A to In progress.']);
+});
+
+test('race: an SSE update while the PATCH is pending wins over the failed move\'s revert', () => {
+  const h = moveHarness('inbox');
+  const settle = h.start('assigned');
+  h.store.status = 'review'; // task_updated from the server lands meanwhile
+  const decision = settle(false);
+  assert.equal(decision.revertTo, null);
+  assert.equal(h.store.status, 'review');
+  assert.deepEqual(h.spoken, ['A was not moved to Assigned. It is in Review.']);
 });
 
 test('a move out of the "Needs you" filter is detected so focus can fall back to the board', () => {
@@ -319,4 +422,26 @@ test('a move out of the "Needs you" filter is detected so focus can fall back to
 
 test('the drag handle opts out of browser touch scrolling so PointerSensor drags are not cancelled', () => {
   assert.match(source('src/components/board/task-card.tsx'), /data-task-drag-handle[\s\S]*?className="[^"]*\btouch-none\b/);
+});
+
+test('MissionQueue settles every PATCH answer through the sequencer and decideSettledMove, and applies its revert', () => {
+  const queue = source('src/components/MissionQueue.tsx');
+  assert.match(queue, /const seq = moveSequencer\.begin\(task\.id\);/);
+  assert.match(queue, /isLatestMove: moveSequencer\.isLatest\(task\.id, seq\)/);
+  assert.match(queue, /currentStatus: useMissionControl\.getState\(\)\.tasks/);
+  assert.match(queue, /if \(decision\.revertTo\) updateTaskStatus\(task\.id, decision\.revertTo\);/);
+  assert.match(queue, /settle\(true\)/);
+  assert.match(queue, /settle\(false, /);
+  // No direct revert to the drag-start status remains.
+  assert.doesNotMatch(queue, /updateTaskStatus\(task\.id, task\.status\)/);
+});
+
+test('each move outcome has one announcement channel and a title that matches its cause', () => {
+  const queue = source('src/components/MissionQueue.tsx');
+  // Gated drops are spoken by dnd-kit's polite announcement; the box is only assertive for failed saves.
+  assert.match(queue, /role=\{dropError\.kind === 'save-failed' \? 'alert' : undefined\}/);
+  assert.match(queue, /dropError\.kind === 'gated' \? 'Dispatch move blocked' : 'Move not saved'/);
+  // Failures do not also go to the polite region.
+  assert.match(queue, /if \(decision\.successAnnouncement\) setMoveAnnouncement\(decision\.successAnnouncement\);/);
+  assert.doesNotMatch(queue, /setMoveAnnouncement\(decision\.failureMessage/);
 });

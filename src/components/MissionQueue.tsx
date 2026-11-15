@@ -30,8 +30,8 @@ import {
   decideMove,
   moveLeavesNeedsYouFilter,
   presentNeedsYouCountDescription,
-  settledMoveOutcome,
-  statusAfterSettledMove,
+  createMoveSequencer,
+  decideSettledMove,
   workspaceScopedTasks,
 } from '@/lib/board-attention';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -79,11 +79,14 @@ const COLUMN_LABELS = new Map<string, string>(COLUMNS.map((column) => [column.id
 // little longer than --duration-slower (360ms) so the fade always completes.
 const INK_DRY_MS = 420;
 
+type DropError = { kind: 'gated' | 'save-failed'; message: string };
+
 interface MissionQueueUiState {
   showCreateModal: boolean;
   showGitHubImportModal: boolean;
   editingTask: Task | null;
-  dropError: string | null;
+  /** gated: the dispatch gate refused the drop; save-failed: the PATCH failed. */
+  dropError: DropError | null;
   runtimeFilter: RuntimeFilter;
   needsYouOnly: boolean;
 }
@@ -95,7 +98,7 @@ type MissionQueueUiAction =
   | { type: 'close_github_import_modal' }
   | { type: 'edit_task'; task: Task }
   | { type: 'clear_editing_task' }
-  | { type: 'set_drop_error'; error: string | null }
+  | { type: 'set_drop_error'; error: DropError | null }
   | { type: 'set_runtime_filter'; filter: RuntimeFilter }
   | { type: 'toggle_needs_you' };
 
@@ -158,6 +161,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [inkTask, setInkTask] = useState<{ id: string; key: number } | null>(null);
   const inkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
+  // Per-card move sequence: only the latest move's PATCH answer may settle a card.
+  const moveSequencer = useRef(createMoveSequencer()).current;
   // The settled result of a move, spoken once the server has answered (dnd-kit's own
   // region only speaks at drop time, before the PATCH returns).
   const [moveAnnouncement, setMoveAnnouncement] = useState('');
@@ -215,6 +220,19 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     return overTask ? overTask.status : null;
   };
 
+  /**
+   * When the focused control disappears (a card leaves the "Needs you" filter, or a
+   * dialog closes after its trigger card left), focus would fall to the document.
+   * Wait until dnd-kit's restore (a frame) and Radix's (a 0 ms timeout after unmount)
+   * have run, then fall back to the board region if focus is still lost.
+   */
+  const focusBoardIfFocusLost = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body || !active.isConnected) boardRef.current?.focus();
+    }, 0)));
+  };
+
   const moveTask = async (task: Task, targetStatus: TaskStatus) => {
     const decision = decideMove(task, targetStatus);
     if (decision === 'stay') return;
@@ -227,7 +245,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       const summary = summarizeDispatchContract(task.dispatch_metadata);
       const message = `${task.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
 
-      dispatchUi({ type: 'set_drop_error', error: `${message} ${validation.blockers.join('; ')}`.trim() });
+      dispatchUi({ type: 'set_drop_error', error: { kind: 'gated', message: `${message} ${validation.blockers.join('; ')}`.trim() } });
       addEvent({
         id: crypto.randomUUID(),
         type: 'system',
@@ -239,15 +257,37 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     }
 
     // Optimistic update
+    const seq = moveSequencer.begin(task.id);
     updateTaskStatus(task.id, targetStatus);
     if (moveLeavesNeedsYouFilter(task, targetStatus, needsYouOnly)) {
-      // The card (and its focused handle) leaves the filtered board; after dnd-kit's own
-      // focus restore has had its frame, fall back to the board region, not the document.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const active = document.activeElement;
-        if (!active || active === document.body || !active.isConnected) boardRef.current?.focus();
-      }));
+      // The card (and its focused handle) leaves the filtered board.
+      focusBoardIfFocusLost();
     }
+
+    const settle = (ok: boolean, error?: string) => {
+      const decision = decideSettledMove({
+        ok,
+        isLatestMove: moveSequencer.isLatest(task.id, seq),
+        // Read the store now, not the render closure: SSE or a newer move may have changed the card.
+        currentStatus: useMissionControl.getState().tasks.find((candidate) => candidate.id === task.id)?.status ?? null,
+        originStatus: task.status,
+        targetStatus,
+        title: task.title,
+        laneName,
+      });
+      if (decision.revertTo) updateTaskStatus(task.id, decision.revertTo);
+      // The ink cross-fade marks a settled move, so it waits for the server to accept it.
+      if (decision.playInk) markInkDrying(task.id);
+      if (decision.successAnnouncement) setMoveAnnouncement(decision.successAnnouncement);
+      // A failure is spoken once, by the assertive alert, not also by the polite region.
+      if (decision.failureMessage) {
+        dispatchUi({
+          type: 'set_drop_error',
+          error: { kind: 'save-failed', message: `${error ? `${error}. ` : ''}${decision.failureMessage}` },
+        });
+      }
+      return decision;
+    };
 
     // Persist to API
     try {
@@ -258,10 +298,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       });
 
       if (res.ok) {
-        // The ink cross-fade marks a settled move, so it waits for the server to accept it.
-        const outcome = settledMoveOutcome(true, task.title, laneName(targetStatus), laneName(task.status));
-        if (outcome.playInk) markInkDrying(task.id);
-        setMoveAnnouncement(outcome.announcement);
+        settle(true);
         addEvent({
           id: crypto.randomUUID(),
           type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
@@ -271,21 +308,11 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         });
       } else {
         const data = await res.json().catch(() => ({}));
-        dispatchUi({ type: 'set_drop_error', error: data.error || 'Failed to move task' });
-        const outcome = settledMoveOutcome(false, task.title, laneName(targetStatus), laneName(task.status));
-        if (outcome.revert) updateTaskStatus(task.id, statusAfterSettledMove(false, task.status, targetStatus));
-        setMoveAnnouncement(outcome.announcement);
+        settle(false, typeof data.error === 'string' && data.error ? data.error : 'Failed to move task');
       }
     } catch (error) {
       console.error('Failed to update task status:', error);
-      dispatchUi({
-        type: 'set_drop_error',
-        error: error instanceof Error ? error.message : 'Failed to update task status',
-      });
-      // Revert on error
-      const outcome = settledMoveOutcome(false, task.title, laneName(targetStatus), laneName(task.status));
-      if (outcome.revert) updateTaskStatus(task.id, statusAfterSettledMove(false, task.status, targetStatus));
-      setMoveAnnouncement(outcome.announcement);
+      settle(false, error instanceof Error ? error.message : 'Failed to update task status');
     }
   };
 
@@ -363,7 +390,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
                 The count is spoken by the polite live region below, not as part of the accessible name. */}
             <span aria-hidden="true">{boardLoadStatus === 'ready' ? needsYouCount : '–'}</span>
           </button>
-          <span id="needs-you-count" role="status" aria-live="polite" className="sr-only">
+          {/* A description only, not a live region: a bare number spoken on every optimistic
+              move, revert and SSE update was noise. It is read with the button. */}
+          <span id="needs-you-count" className="sr-only">
             {needsYouCountDescription}
           </span>
         </div>
@@ -409,12 +438,18 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       <p role="status" aria-live="polite" className="sr-only">{moveAnnouncement}</p>
 
       {dropError && (
-        <div role="alert" className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60">
+        // One channel per outcome: a gated drop is already spoken by dnd-kit's polite
+        // announcement, so that box is not a live region; a failed save is spoken here only.
+        <div
+          role={dropError.kind === 'save-failed' ? 'alert' : undefined}
+          data-drop-error={dropError.kind}
+          className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60"
+        >
           <div className="flex items-start gap-2">
-            <AlertTriangle className="size-4 mt-0.5 text-mc-danger" />
+            <AlertTriangle aria-hidden="true" className="size-4 mt-0.5 text-mc-danger" />
             <div className="min-w-0">
-              <p className="font-medium">Dispatch move blocked</p>
-              <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">{dropError}</p>
+              <p className="font-medium">{dropError.kind === 'gated' ? 'Dispatch move blocked' : 'Move not saved'}</p>
+              <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">{dropError.message}</p>
             </div>
           </div>
         </div>
@@ -457,13 +492,22 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
       {/* Modals */}
       {showCreateModal && (
-        <TaskModal onClose={() => dispatchUi({ type: 'close_create_modal' })} workspaceId={workspaceId} />
+        <TaskModal onClose={() => { dispatchUi({ type: 'close_create_modal' }); focusBoardIfFocusLost(); }} workspaceId={workspaceId} />
       )}
       {showGitHubImportModal && (
         <GitHubImportModal onClose={() => dispatchUi({ type: 'close_github_import_modal' })} workspaceId={workspaceId} />
       )}
       {editingTask && (
-        <TaskModal task={editingTask} onClose={() => dispatchUi({ type: 'clear_editing_task' })} workspaceId={workspaceId} />
+        <TaskModal
+          task={editingTask}
+          onClose={() => {
+            dispatchUi({ type: 'clear_editing_task' });
+            // Saving can move the card out of the "Needs you" filter, removing the trigger
+            // Radix would return focus to.
+            focusBoardIfFocusLost();
+          }}
+          workspaceId={workspaceId}
+        />
       )}
     </div>
   );
