@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:turbo": "next dev",
-    "dev:n8n": "next dev --webpack --hostname 0.0.0.0 -p 3021",
+    "dev:n8n": "next dev --webpack --hostname 127.0.0.1 -p 3021",
     "build": "next build --webpack",
     "build:turbo": "next build",
     "start": "next start",
