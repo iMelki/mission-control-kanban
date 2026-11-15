@@ -431,21 +431,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing X-MCK-Delivery-ID for lifecycle callback' }, { status: 400 });
     }
 
-    if (inboundSecret || suppliedSignature) {
-      const verification = verifyWebhookSignature({
-        rawBody,
-        secret: inboundSecret || '',
-        timestamp: request.headers.get('x-mck-timestamp') || '',
-        signature: suppliedSignature,
-        deliveryId,
-        requireDeliveryIdBinding: lifecycleV2,
-      });
-      if (!verification.ok) {
-        return NextResponse.json({ error: 'Invalid webhook signature', reason: verification.reason }, { status: 401 });
-      }
-      if (!deliveryId) {
-        return NextResponse.json({ error: 'Missing X-MCK-Delivery-ID for signed callback' }, { status: 400 });
-      }
+    if (lifecycleV2 && !inboundSecret) {
+      return NextResponse.json({ error: 'MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET is required for lifecycle callbacks' }, { status: 503 });
+    }
+
+    const verification = verifyWebhookSignature({
+      rawBody,
+      secret: inboundSecret || '',
+      timestamp: request.headers.get('x-mck-timestamp') || '',
+      signature: suppliedSignature,
+      deliveryId,
+      requireDeliveryIdBinding: lifecycleV2,
+    });
+    if (!verification.ok) {
+      return NextResponse.json({ error: 'Invalid webhook signature', reason: verification.reason }, { status: 401 });
+    }
+    if (!deliveryId) {
+      return NextResponse.json({ error: 'Missing X-MCK-Delivery-ID for signed callback' }, { status: 400 });
     }
 
     if (body === undefined) {
