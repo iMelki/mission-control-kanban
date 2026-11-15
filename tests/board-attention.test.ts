@@ -855,3 +855,18 @@ test('fake timers: the dialog\'s status re-read is bounded, so Save cannot hang'
     mock.timers.reset();
   }
 });
+
+test('recovery with a status arriving during the read still weighs this save\'s newer answer (saved)', async () => {
+  const patch = deferred<PatchStatusResult>();
+  const read = deferred<ServerStatus | null>();
+  const b = board('inbox', { patch: () => patch.promise, read: () => read.promise, readTimeoutMs: 1000 });
+  const run = b.controller.start(b.card, 'assigned');
+  b.serverPush('review', T1); // conflicting news during the save (held: Review at T1)
+  patch.resolve({ ok: true, status: 'assigned', updatedAt: '2026-11-15T10:00:03.000Z' }); // answer: Assigned at T3
+  await flush();
+  b.serverPush('testing', T2); // arrives during the recovery read, older than the answer
+  read.reject(new Error('offline'));
+  await run;
+  assert.equal(b.card.status, 'assigned');
+  assert.equal(b.outcomes[0].kind, 'saved');
+});

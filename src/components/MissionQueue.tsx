@@ -265,6 +265,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     // spoken once by its own role="alert" (so two failures delivered together both stay).
   };
 
+  const currentLane = (failure: { taskId: string; status: TaskStatus }) =>
+    tasks.find((task) => task.id === failure.taskId)?.status ?? failure.status;
+
   /** Remove failure alerts; if the focused button went with them, keep focus on the board. */
   const removeSaveFailures = (taskIds: readonly string[]) => {
     moveController.removeFailures(taskIds);
@@ -329,6 +332,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       removeSaveFailures([taskId]);
       return;
     }
+    // A retry is not a drag, so dnd-kit says nothing: speak a refusal here (the gated box is not live).
+    if (decision === 'gated') announceMove(`${task.title} cannot move to ${laneName(target)} yet: the dispatch contract is incomplete.`);
+    if (decision === 'saving') announceMove(`${task.title} is still being saved.`);
     runMove(task, target, decision);
   };
 
@@ -478,6 +484,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         </div>
       )}
 
+      {saveFailures.length > 0 && (
+      // Bounded and scrollable, so several alerts cannot push the board (and their own buttons) out of view.
+      <div data-save-failures className="max-h-[40vh] shrink-0 overflow-y-auto">
       {saveFailures.map((failure) => (
         // A failed save is spoken here only, once per card (role="alert").
         <div
@@ -492,9 +501,10 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             <div className="min-w-0">
               <p className="font-medium">Move not saved</p>
               <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">
+                {/* The card's lane now (it may have moved since), falling back to the lane at failure time. */}
                 {failure.retryable
-                  ? `${failure.error}. The server could not confirm the move to ${laneName(failure.target)}, so the board shows the last saved lane. ${failure.title} is in ${laneName(failure.status)}.`
-                  : `${failure.error}. ${failure.title} was not moved to ${laneName(failure.target)}. ${failure.title} is in ${laneName(failure.status)}.`}
+                  ? `${failure.error}. The server could not confirm the move to ${laneName(failure.target)}, so the board shows the last saved lane. ${failure.title} is in ${laneName(currentLane(failure))}.`
+                  : `${failure.error}. ${failure.title} was not moved to ${laneName(failure.target)}. ${failure.title} is in ${laneName(currentLane(failure))}.`}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {failure.retryable && (
@@ -518,6 +528,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           </div>
         </div>
       ))}
+      </div>
+      )}
 
       {/* Kanban Columns */}
       <DndContext

@@ -264,3 +264,38 @@ test('after the dialog is rebuilt from a fresh server copy, a status change is c
   assert.equal(sent[0].status, 'review');
   await view.unmount();
 });
+
+test('a failure alert names the card\'s current lane, and the alert list is a bounded scrolling area', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  stubFetch(async (url, init) => (init?.method === 'PATCH' || url.endsWith('/api/tasks/a') ? Promise.reject(new TypeError('Failed to fetch')) : undefined));
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); });
+  assert.match(alerts(view.container)[0].textContent ?? '', /Alpha is in Inbox/);
+  // The card moves on (another client) to Review: the alert follows the card.
+  await m.React.act(async () => { m.store.useMissionControl.getState().updateTaskStatus('a', 'review'); });
+  assert.match(alerts(view.container)[0].textContent ?? '', /Alpha is in Review/);
+  const list = view.container.querySelector('[data-save-failures]') as HTMLElement;
+  assert.ok(list.className.includes('overflow-y-auto') && list.className.includes('max-h-'));
+  await view.unmount();
+});
+
+test('a Retry refused by the dispatch gate is announced (a retry is not a drag, so dnd-kit says nothing)', async () => {
+  const github = { repo_owner: 'example', repo_name: 'repo', issue_number: 7, issue_url: 'https://github.com/example/repo/issues/7' };
+  const ready = {
+    target_repo: 'example/repo', project_workstream: 'Board', allowed_file_scope: ['src/**'], acceptance_criteria: ['moves'],
+    test_requirements: ['npm test'], risk_level: 'low', readiness: 'ready_for_agent', review_mode: 'human_required', impact: 'UI', rollback_plan: 'revert',
+  } as Task['dispatch_metadata'];
+  seedBoard([card('g', 'Gamma', 'inbox', { github_source: github, dispatch_metadata: ready, dispatch_blockers: [] })]);
+  stubFetch(async (url, init) => (init?.method === 'PATCH' || url.endsWith('/api/tasks/g') ? Promise.reject(new TypeError('Failed to fetch')) : undefined));
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('g', 'assigned'); });
+  // Meanwhile the contract became incomplete; the card is back in Inbox.
+  await m.React.act(async () => {
+    const t = m.store.useMissionControl.getState().tasks[0];
+    m.store.useMissionControl.getState().updateTask({ ...t, dispatch_metadata: { ...ready, readiness: 'needs_grooming' } as Task['dispatch_metadata'] });
+  });
+  await m.React.act(async () => { button(alerts(view.container)[0], 'Retry move')!.click(); });
+  const spoken = view.container.querySelector('[data-move-announcements]')?.textContent ?? '';
+  assert.match(spoken, /Gamma cannot move to Assigned yet: the dispatch contract is incomplete\./);
+  await view.unmount();
+});

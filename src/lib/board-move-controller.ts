@@ -203,7 +203,10 @@ export function createMoveController(deps: MoveControllerDeps) {
     }
     // No usable answer from the read: show the newest status the server confirmed, comparing
     // this save's own answer (if any) with confirmations from elsewhere by updated_at.
-    const fallbackWins = fallback !== null && !newerArrived && !(timeOf(fallback.updatedAt) < latest.time);
+    // Weighed by updated_at even if a status arrived during the read: that status can be
+    // older than this save's own answer.
+    const fallbackWins = fallback !== null && !(timeOf(fallback.updatedAt) < latest.time)
+      && !(newerArrived && Number.isNaN(timeOf(fallback.updatedAt)));
     const keep = fallbackWins ? fallback.status : latest.status;
     if (fallbackWins) confirm(task.id, fallback.status, fallback.updatedAt);
     if (deps.getStatus(task.id) !== keep) deps.setStatus(task.id, keep);
