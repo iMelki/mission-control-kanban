@@ -278,8 +278,17 @@ test('download: dangling absolute link whose target folds .. back into the base 
 });
 
 // On Windows, Win32 CreateSymbolicLink normalizes absolute targets at creation time,
-// collapsing <base>\escape-dir\..\nope.txt to <base>\nope.txt (inside base).
-const absDotDotResolvesInside = symlinksSupported && fs.readlinkSync(path.join(base, 'abs-dotdot-out.txt')).startsWith(base);
+// collapsing <base>\escape-dir\..\nope.txt to <base>\nope.txt (inside base). POSIX
+// stores the target verbatim, so the kernel follows escape-dir before `..` and the
+// link really points at <root>/nope.txt (outside). Detect the normalization by the
+// stored target itself: a raw POSIX target also starts with <base>, so a prefix check
+// would wrongly move the escaping link into the inside set on Linux.
+const absDotDotStoredTarget = symlinksSupported
+  ? fs.readlinkSync(path.join(base, 'abs-dotdot-out.txt')).replace(/^\\\\\?\\/, '')
+  : '';
+const sameWin32Path = (a: string, b: string) =>
+  process.platform === 'win32' ? path.normalize(a).toLowerCase() === path.normalize(b).toLowerCase() : a === b;
+const absDotDotResolvesInside = symlinksSupported && sameWin32Path(absDotDotStoredTarget, path.join(base, 'nope.txt'));
 const outsideLinks = ['alias-out.txt', 'abs-dotdot-out.txt'].filter((l) => !(l === 'abs-dotdot-out.txt' && absDotDotResolvesInside));
 const insideLinks = ['alias-in.txt', 'abs-dotdot-in.txt', 'abs-dotdot-up.txt', ...(absDotDotResolvesInside ? ['abs-dotdot-out.txt'] : [])];
 

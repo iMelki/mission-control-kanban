@@ -92,6 +92,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Run GitHub sync tests
         run: npm run test:github-sync -- --test-reporter=spec
+      # The root `npm test` chain is not run in CI, so the path-containment
+      # suite (file download/preview/reveal routes) runs here explicitly.
+      - name: Run file path containment tests
+        run: npm run test:file-path-containment -- --test-reporter=spec
 
   env-example-port:
     name: Env example port
