@@ -219,3 +219,35 @@ export function moveLeavesNeedsYouFilter(
 ): boolean {
   return needsYouOnly && !needsCaptain({ ...task, status: targetStatus });
 }
+
+/** How long a settled-move message stays in the board's polite region (long enough to be spoken). */
+export const ANNOUNCEMENT_TTL_MS = 8_000;
+
+/**
+ * The board's settled-move messages. Each message is appended (never replacing an
+ * earlier one, so a second card's move cannot swallow the first card's "Moved ..."),
+ * at most `max` are kept, and each is pruned `ttlMs` after it was added.
+ */
+export function createAnnouncementQueue({
+  onChange,
+  ttlMs = ANNOUNCEMENT_TTL_MS,
+  max = 5,
+}: {
+  onChange: (entries: readonly { id: number; text: string }[]) => void;
+  ttlMs?: number;
+  max?: number;
+}) {
+  let entries: { id: number; text: string }[] = [];
+  let nextId = 0;
+  return {
+    announce(text: string): void {
+      const id = ++nextId;
+      entries = [...entries.slice(-(max - 1)), { id, text }];
+      onChange(entries);
+      setTimeout(() => {
+        entries = entries.filter((entry) => entry.id !== id);
+        onChange(entries);
+      }, ttlMs);
+    },
+  };
+}

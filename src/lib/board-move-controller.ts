@@ -1,20 +1,22 @@
 /**
  * Board move controller (#194). Owns the save of a card's status after a drop,
- * free of React so tests/board-attention.test.ts can drive it.
+ * free of React so tests/board-attention.test.ts can drive it. One controller per
+ * workspace lives in src/lib/board-move-registry.ts, outside the board component, so
+ * a pending save (and its outcome) survives the board unmounting.
  *
  * Rules:
  * - Moves of one card are serialized: while a card's save is in flight, a new move
- *   of that card is refused (decide() returns 'saving'), so every move starts from
- *   a status the client has no pending change for.
+ *   of that card is refused (decide() returns 'saving').
+ * - Server facts come in at their source (SSE events, task refetches, dialog-save
+ *   responses -> observeServerStatus), never inferred from store diffs, because an
+ *   optimistic write and a server write look the same in the store.
  * - The client never guesses after a failed or ambiguous save. A non-OK answer, a
- *   network error or a timeout re-reads the task from the server and adopts the
- *   server's status. Only if that read also fails does the card fall back to the
- *   last server-confirmed status (from the move's origin, a PATCH answer, or a
- *   status that arrived from elsewhere while the save was pending, such as an SSE
- *   task_updated or a dialog save). Then the outcome is "unknown" and the UI offers
- *   a retry.
- * - A save that never answers is aborted after MOVE_SAVE_TIMEOUT_MS and handled as
- *   ambiguous, so a hung request cannot lock the card until reload.
+ *   network error or a timeout re-reads the task and adopts the server's status,
+ *   unless a newer server status arrived while the read was in flight. Only if the
+ *   read fails does the card fall back to the last server-confirmed status; then the
+ *   outcome is "unknown" and the UI offers a retry.
+ * - A save that never answers is aborted after MOVE_SAVE_TIMEOUT_MS, and a re-read
+ *   after MOVE_READ_TIMEOUT_MS, so a hung request cannot lock the card.
  */
 
 import { decideMove, type MoveDecision } from './board-attention';
@@ -30,7 +32,13 @@ export const MOVE_SAVE_TIMEOUT_MS = 15_000;
 /** How long the reconciling GET /api/tasks/:id may take before the card falls back. */
 export const MOVE_READ_TIMEOUT_MS = 5_000;
 
-export type PatchStatusResult = { ok: true; status: TaskStatus | null } | { ok: false; error: string };
+/** A status as the server reported it, with its updated_at when known. */
+export interface ServerStatus {
+  status: TaskStatus;
+  updatedAt?: string | null;
+}
+
+export type PatchStatusResult = { ok: true; status: TaskStatus | null; updatedAt?: string | null } | { ok: false; error: string };
 
 export type MoveOutcome =
   /** The server has the card in the target lane (PATCH OK, or the re-read / an SSE update says so). */
@@ -47,11 +55,8 @@ export interface MoveControllerDeps {
   setStatus(taskId: string, status: TaskStatus): void;
   /** PATCH the status. Must honour the signal; may throw on network errors. */
   patchStatus(taskId: string, status: TaskStatus, signal: AbortSignal): Promise<PatchStatusResult>;
-  /** GET the task's status from the server; null or a throw means the read failed. */
-  readStatus(taskId: string, signal: AbortSignal): Promise<TaskStatus | null>;
-  onPendingChange(taskId: string, pending: boolean): void;
-  /** Optional initial outcome listener; setOutcomeListener() replaces it. */
-  onOutcome?: (outcome: MoveOutcome) => void;
+  /** GET the task from the server; null or a throw means the read failed. */
+  readStatus(taskId: string, signal: AbortSignal): Promise<ServerStatus | null>;
   saveTimeoutMs?: number;
   readTimeoutMs?: number;
 }
@@ -82,26 +87,42 @@ async function withTimeout<T>(ms: number, run: (signal: AbortSignal) => Promise<
 
 const messageOf = (error: unknown) => (error instanceof Error && error.message ? error.message : 'The save did not complete');
 
+/** updated_at as epoch ms, or NaN when unknown or unparsable (never "provably newer"). */
+const timeOf = (updatedAt: string | null | undefined) => (updatedAt ? Date.parse(updatedAt) : Number.NaN);
+
 export type MoveController = ReturnType<typeof createMoveController>;
 
 export function createMoveController(deps: MoveControllerDeps) {
   const saveTimeoutMs = deps.saveTimeoutMs ?? MOVE_SAVE_TIMEOUT_MS;
   const readTimeoutMs = deps.readTimeoutMs ?? MOVE_READ_TIMEOUT_MS;
   const pending = new Map<string, Promise<void>>();
-  const confirmed = new Map<string, TaskStatus>();
+  /** Last server-confirmed status per card while it saves, with its updated_at time. */
+  const confirmed = new Map<string, { status: TaskStatus; time: number }>();
+  /** Bumped on every server status observed for a card, so a slower re-read cannot overwrite it. */
+  const serverSeq = new Map<string, number>();
   /** The latest server status that arrived from elsewhere while a card's save was in flight. */
   const observedDuringSave = new Map<string, TaskStatus>();
   const dropDecisions = new Map<string, { target: TaskStatus; decision: MoveDecision }>();
-  let outcomeListener: (outcome: MoveOutcome) => void = deps.onOutcome ?? (() => {});
-  let ownWrite = false;
+  const pendingListeners = new Set<() => void>();
+  let savingSnapshot: ReadonlySet<string> = new Set();
+  let outcomeListener: ((outcome: MoveOutcome) => void) | null = null;
+  const undelivered: MoveOutcome[] = [];
 
-  const write = (taskId: string, status: TaskStatus) => {
-    ownWrite = true;
-    try {
-      deps.setStatus(taskId, status);
-    } finally {
-      ownWrite = false;
-    }
+  const setPending = (taskId: string, run: Promise<void> | null) => {
+    if (run) pending.set(taskId, run); else pending.delete(taskId);
+    savingSnapshot = new Set(pending.keys());
+    for (const listener of pendingListeners) listener();
+  };
+
+  const report = (outcome: MoveOutcome) => {
+    if (outcomeListener) outcomeListener(outcome); else undelivered.push(outcome);
+  };
+
+  /** Record a server-confirmed status; an unknown updated_at keeps the time already held. */
+  const confirm = (taskId: string, status: TaskStatus, updatedAt?: string | null) => {
+    const time = timeOf(updatedAt);
+    const held = confirmed.get(taskId);
+    confirmed.set(taskId, { status, time: Number.isNaN(time) ? (held?.time ?? Number.NEGATIVE_INFINITY) : time });
   };
 
   async function reconcile(
@@ -110,29 +131,47 @@ export function createMoveController(deps: MoveControllerDeps) {
     error: string,
     fallback: TaskStatus | null = null,
   ): Promise<MoveOutcome> {
-    let serverStatus: TaskStatus | null = null;
+    const seqBefore = serverSeq.get(task.id) ?? 0;
+    let server: ServerStatus | null = null;
     try {
-      serverStatus = await withTimeout(readTimeoutMs, (signal) => deps.readStatus(task.id, signal));
+      server = await withTimeout(readTimeoutMs, (signal) => deps.readStatus(task.id, signal));
     } catch {
-      serverStatus = null;
+      server = null;
     }
-    if (serverStatus) {
-      confirmed.set(task.id, serverStatus);
-      if (deps.getStatus(task.id) !== serverStatus) write(task.id, serverStatus);
-      return serverStatus === target
-        ? { kind: 'saved', taskId: task.id, title: task.title, status: serverStatus }
-        : { kind: 'not-saved', taskId: task.id, title: task.title, status: serverStatus, target, error };
+    const newerArrived = (serverSeq.get(task.id) ?? 0) !== seqBefore;
+    const latest = confirmed.get(task.id)!;
+    // A server status that arrived during the read wins unless the read is provably newer.
+    if (server && (!newerArrived || timeOf(server.updatedAt) > latest.time)) {
+      confirm(task.id, server.status, server.updatedAt);
+      if (deps.getStatus(task.id) !== server.status) deps.setStatus(task.id, server.status);
+      return server.status === target
+        ? { kind: 'saved', taskId: task.id, title: task.title, status: server.status }
+        : { kind: 'not-saved', taskId: task.id, title: task.title, status: server.status, target, error };
     }
-    // No answer from the server at all: show the last status it confirmed.
-    const keep = fallback ?? confirmed.get(task.id)!;
-    if (deps.getStatus(task.id) !== keep) write(task.id, keep);
+    // No usable answer from the read: show the last status the server confirmed.
+    const keep = newerArrived ? latest.status : (fallback ?? latest.status);
+    if (deps.getStatus(task.id) !== keep) deps.setStatus(task.id, keep);
     if (keep === target) return { kind: 'saved', taskId: task.id, title: task.title, status: keep };
+    if (newerArrived) return { kind: 'not-saved', taskId: task.id, title: task.title, status: keep, target, error };
     return { kind: 'unknown', taskId: task.id, title: task.title, status: keep, target, error };
   }
 
   return {
     isSaving(taskId: string): boolean {
       return pending.has(taskId);
+    },
+
+    /** For useSyncExternalStore: notified whenever a card starts or stops saving. */
+    subscribe(listener: () => void): () => void {
+      pendingListeners.add(listener);
+      return () => {
+        pendingListeners.delete(listener);
+      };
+    },
+
+    /** The ids of cards with a save in flight (a stable reference between changes). */
+    getSavingSnapshot(): ReadonlySet<string> {
+      return savingSnapshot;
     },
 
     /** The drop decision, from the card's state right now (before any save of this drop starts). */
@@ -162,24 +201,28 @@ export function createMoveController(deps: MoveControllerDeps) {
       dropDecisions.delete(taskId);
     },
 
-    setOutcomeListener(listener: (outcome: MoveOutcome) => void): void {
+    /**
+     * Where outcomes go. With no listener (the board is unmounted) they are kept and
+     * delivered, in order, as soon as a listener is set again.
+     */
+    setOutcomeListener(listener: ((outcome: MoveOutcome) => void) | null): void {
       outcomeListener = listener;
-    },
-
-    /** True while the controller itself is writing to the store (its writes are not server facts). */
-    isOwnWrite(): boolean {
-      return ownWrite;
+      if (!listener) return;
+      while (undelivered.length > 0) listener(undelivered.shift()!);
     },
 
     /**
-     * A status for a card that came from the server while its save is pending
-     * (SSE task_updated, a dialog save, a refetch). It becomes the confirmed status.
+     * A card status reported by the server: an SSE event, a task refetch or a dialog-save
+     * response. Called at the source, including when it equals the optimistic lane (the
+     * save's own broadcast). Reports older (by updated_at) than the one held are ignored.
      */
-    observeServerStatus(taskId: string, status: TaskStatus): void {
-      if (!ownWrite && pending.has(taskId)) {
-        confirmed.set(taskId, status);
-        observedDuringSave.set(taskId, status);
-      }
+    observeServerStatus(taskId: string, status: TaskStatus, updatedAt?: string | null): void {
+      if (!pending.has(taskId)) return;
+      const held = confirmed.get(taskId);
+      if (held && timeOf(updatedAt) < held.time) return; // NaN (unknown) is never "older"
+      confirm(taskId, status, updatedAt);
+      serverSeq.set(taskId, (serverSeq.get(taskId) ?? 0) + 1);
+      observedDuringSave.set(taskId, status);
     },
 
     /** Resolves once the card has no save in flight (the dialog waits on this before its own save). */
@@ -188,11 +231,12 @@ export function createMoveController(deps: MoveControllerDeps) {
     },
 
     /** Start a move the caller decided as 'move'. Resolves when the outcome has been reported. */
-    start(task: Pick<Task, 'id' | 'title' | 'status'>, target: TaskStatus): Promise<void> {
-      confirmed.set(task.id, task.status);
+    start(task: Pick<Task, 'id' | 'title' | 'status'> & { updated_at?: string }, target: TaskStatus): Promise<void> {
+      confirmed.delete(task.id);
+      confirm(task.id, task.status, task.updated_at);
       observedDuringSave.delete(task.id);
-      write(task.id, target);
-      deps.onPendingChange(task.id, true);
+      serverSeq.delete(task.id);
+      deps.setStatus(task.id, target);
       const run = (async () => {
         let outcome: MoveOutcome;
         try {
@@ -205,8 +249,8 @@ export function createMoveController(deps: MoveControllerDeps) {
             outcome = await reconcile(task, target, 'The board changed while saving', result.status ?? target);
           } else if (result.ok) {
             const status = result.status ?? target;
-            confirmed.set(task.id, status);
-            if (deps.getStatus(task.id) !== status) write(task.id, status);
+            confirm(task.id, status, result.updatedAt);
+            if (deps.getStatus(task.id) !== status) deps.setStatus(task.id, status);
             outcome = status === target
               ? { kind: 'saved', taskId: task.id, title: task.title, status }
               : { kind: 'not-saved', taskId: task.id, title: task.title, status, target, error: 'The server kept a different status' };
@@ -216,12 +260,12 @@ export function createMoveController(deps: MoveControllerDeps) {
         } catch (error) {
           outcome = await reconcile(task, target, messageOf(error));
         }
-        pending.delete(task.id);
         observedDuringSave.delete(task.id);
-        deps.onPendingChange(task.id, false);
-        outcomeListener(outcome);
+        serverSeq.delete(task.id);
+        setPending(task.id, null);
+        report(outcome);
       })();
-      pending.set(task.id, run);
+      setPending(task.id, run);
       return run;
     },
   };

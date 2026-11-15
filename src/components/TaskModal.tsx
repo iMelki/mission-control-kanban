@@ -24,6 +24,8 @@ import { GitHubIssueDraftPanel } from './task-modal/GitHubIssueDraftPanel';
 import { DispatchContractSection } from './task-modal/DispatchContractSection';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
+import { readTaskStatus, reportServerTask } from '@/lib/board-move-registry';
+import { planDialogStatus } from '@/lib/task-dialog-save';
 import {
   READINESS_LABELS,
   REVIEW_MODE_LABELS,
@@ -98,6 +100,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
   // Auto-switch to planning tab if task is in planning status
   const [activeTab, setActiveTab] = useState<TabType>(initialTask?.status === 'planning' ? 'planning' : 'overview');
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
+  // The status the card had when the dialog opened; the save sends status only if the user changed it.
+  const [openedStatus] = useState(() => buildTaskFormState(initialTask).status);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
@@ -240,10 +244,31 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
         safety_rules: splitLines(form.dispatch_safety_rules),
       };
 
-      const payload = {
-        ...form,
+      // Never send a stale status: a new task sends its own; an existing task sends status only
+      // when the user changed it here, and only if the card has not moved since the dialog opened.
+      let statusField: { status?: TaskStatus } = {};
+      if (!currentTask) {
         // If planning mode is enabled for new tasks, override status to 'planning'
-        status: (!currentTask && usePlanningMode) ? 'planning' : form.status,
+        statusField = { status: usePlanningMode ? 'planning' : form.status };
+      } else {
+        const plan = await planDialogStatus({
+          openedStatus,
+          formStatus: form.status,
+          readServerStatus: async () => (await readTaskStatus(currentTask.id))?.status ?? null,
+          laneName: (status) => status.replace('_', ' '),
+        });
+        if (plan.action === 'refuse') {
+          setSubmitError(plan.message);
+          return;
+        }
+        if (plan.action === 'send') statusField = { status: plan.status };
+      }
+      const { status: _formStatus, ...formWithoutStatus } = form;
+      void _formStatus;
+
+      const payload = {
+        ...formWithoutStatus,
+        ...statusField,
         assigned_agent_id: form.assigned_agent_id || null,
         due_date: form.due_date || null,
         workspace_id: workspaceId || currentTask?.workspace_id || 'default',
@@ -259,6 +284,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
       if (res.ok) {
         const savedTask = await res.json();
 
+        // A dialog-save response is a server fact for any board move of this card.
+        reportServerTask(savedTask);
         if (currentTask) {
           setCurrentTask(savedTask);
           updateTask(savedTask);
