@@ -251,3 +251,36 @@ export function createAnnouncementQueue({
     },
   };
 }
+
+/** A failed card save shown in its own alert until resolved or dismissed. */
+export interface SaveFailure {
+  taskId: string;
+  message: string;
+  /** Present when the outcome was unknown: the move can be retried to this lane. */
+  retryTarget?: TaskStatus;
+}
+
+/** One alert per card: a newer failure for the same card replaces its older one. */
+export function upsertSaveFailure(list: readonly SaveFailure[], failure: SaveFailure): SaveFailure[] {
+  return [...list.filter((entry) => entry.taskId !== failure.taskId), failure];
+}
+
+/**
+ * Retryable failures with nothing left to retry: the card has reached its target lane, or
+ * (only once the board has finished loading, so an empty list during a reload does not
+ * count) the card no longer exists.
+ */
+export function settledSaveFailureIds(
+  list: readonly SaveFailure[],
+  tasks: readonly Pick<Task, 'id' | 'status'>[],
+  boardLoaded: boolean,
+): string[] {
+  return list
+    .filter((failure) => {
+      if (!failure.retryTarget) return false;
+      const card = tasks.find((task) => task.id === failure.taskId);
+      if (!card) return boardLoaded;
+      return card.status === failure.retryTarget;
+    })
+    .map((failure) => failure.taskId);
+}

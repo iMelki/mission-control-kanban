@@ -31,6 +31,9 @@ import {
   presentNeedsYouCountDescription,
   workspaceScopedTasks,
   createAnnouncementQueue,
+  settledSaveFailureIds,
+  upsertSaveFailure,
+  type SaveFailure,
   type MoveDecision,
 } from '@/lib/board-attention';
 import type { MoveOutcome } from '@/lib/board-move-controller';
@@ -81,7 +84,8 @@ const COLUMN_LABELS = new Map<string, string>(COLUMNS.map((column) => [column.id
 // little longer than --duration-slower (360ms) so the fade always completes.
 const INK_DRY_MS = 420;
 
-type DropError = { kind: 'gated' | 'save-failed'; message: string; retry?: { taskId: string; target: TaskStatus } };
+/** The dispatch gate refused a drop (shown once, not a live region: dnd-kit already announced it). */
+type DropError = { kind: 'gated'; message: string };
 
 interface MissionQueueUiState {
   showCreateModal: boolean;
@@ -89,6 +93,8 @@ interface MissionQueueUiState {
   editingTask: Task | null;
   /** gated: the dispatch gate refused the drop; save-failed: the PATCH failed. */
   dropError: DropError | null;
+  /** Failed card saves, one alert per card, kept until resolved or dismissed. */
+  saveFailures: SaveFailure[];
   runtimeFilter: RuntimeFilter;
   needsYouOnly: boolean;
 }
@@ -101,6 +107,8 @@ type MissionQueueUiAction =
   | { type: 'edit_task'; task: Task }
   | { type: 'clear_editing_task' }
   | { type: 'set_drop_error'; error: DropError | null }
+  | { type: 'add_save_failure'; failure: SaveFailure }
+  | { type: 'remove_save_failures'; taskIds: readonly string[] }
   | { type: 'set_runtime_filter'; filter: RuntimeFilter }
   | { type: 'toggle_needs_you' };
 
@@ -109,6 +117,7 @@ const initialMissionQueueUiState: MissionQueueUiState = {
   showGitHubImportModal: false,
   editingTask: null,
   dropError: null,
+  saveFailures: [],
   runtimeFilter: 'all',
   needsYouOnly: false,
 };
@@ -132,6 +141,12 @@ function missionQueueUiReducer(
       return { ...state, editingTask: null };
     case 'set_drop_error':
       return { ...state, dropError: action.error };
+    case 'add_save_failure':
+      return { ...state, saveFailures: upsertSaveFailure(state.saveFailures, action.failure) };
+    case 'remove_save_failures':
+      return action.taskIds.length === 0
+        ? state
+        : { ...state, saveFailures: state.saveFailures.filter((failure) => !action.taskIds.includes(failure.taskId)) };
     case 'set_runtime_filter':
       return { ...state, runtimeFilter: action.filter };
     case 'toggle_needs_you':
@@ -152,6 +167,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     showGitHubImportModal,
     editingTask,
     dropError,
+    saveFailures,
     runtimeFilter,
     needsYouOnly,
   } = uiState;
@@ -244,6 +260,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
   const handleMoveOutcome = (outcome: MoveOutcome) => {
     if (outcome.kind === 'saved') {
+      dispatchUi({ type: 'remove_save_failures', taskIds: [outcome.taskId] });
       // The ink cross-fade marks a saved move, so it waits for the server.
       markInkDrying(outcome.taskId);
       announceMove(`Moved ${outcome.title} to ${laneName(outcome.status)}.`);
@@ -256,16 +273,17 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       });
       return;
     }
-    // A failure is spoken once, by the assertive alert, not also by the polite region.
+    // A failure is spoken once, by its own assertive alert (one per card, so two failures
+    // delivered together on remount both stay visible with their own retry).
     const where = `${outcome.title} is in ${laneName(outcome.status)}.`;
     dispatchUi({
-      type: 'set_drop_error',
-      error: outcome.kind === 'not-saved'
-        ? { kind: 'save-failed', message: `${outcome.error}. ${outcome.title} was not moved to ${laneName(outcome.target)}. ${where}` }
+      type: 'add_save_failure',
+      failure: outcome.kind === 'not-saved'
+        ? { taskId: outcome.taskId, message: `${outcome.error}. ${outcome.title} was not moved to ${laneName(outcome.target)}. ${where}` }
         : {
-            kind: 'save-failed',
+            taskId: outcome.taskId,
             message: `${outcome.error}. The server could not confirm the move to ${laneName(outcome.target)}, so the board shows the last saved lane. ${where}`,
-            retry: { taskId: outcome.taskId, target: outcome.target },
+            retryTarget: outcome.target,
           },
     });
   };
@@ -278,14 +296,11 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   useEffect(() => () => moveController.setOutcomeListener(null), [moveController]);
 
   // "Retry move" is moot once the card is in its target lane (the server or another move put
-  // it there): drop the alert rather than leave a button that would do nothing.
-  const retryTarget = dropError?.retry;
-  const retryCardStatus = retryTarget ? tasks.find((task) => task.id === retryTarget.taskId)?.status : undefined;
+  // it there), or once a fully loaded board no longer has the card: drop those alerts.
+  const settledFailureIds = settledSaveFailureIds(saveFailures, tasks, boardLoadStatus === 'ready').join(',');
   useEffect(() => {
-    if (retryTarget && (retryCardStatus === undefined || retryCardStatus === retryTarget.target)) {
-      dispatchUi({ type: 'set_drop_error', error: null });
-    }
-  }, [retryTarget, retryCardStatus]);
+    if (settledFailureIds) dispatchUi({ type: 'remove_save_failures', taskIds: settledFailureIds.split(',') });
+  }, [settledFailureIds]);
 
   /** Act on a drop decision that was made once, at drop time (see handleDragEnd). */
   const runMove = (task: Task, targetStatus: TaskStatus, decision: MoveDecision) => {
@@ -293,6 +308,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     if (decision === 'stay' || decision === 'saving') return;
 
     dispatchUi({ type: 'set_drop_error', error: null });
+    // A new attempt for this card supersedes its earlier failure.
+    dispatchUi({ type: 'remove_save_failures', taskIds: [task.id] });
 
     if (decision === 'gated') {
       const validation = validateDispatchMetadata(task.dispatch_metadata);
@@ -318,15 +335,15 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     void moveController.start(task, targetStatus);
   };
 
-  const retryMove = (retry: { taskId: string; target: TaskStatus }) => {
-    const task = useMissionControl.getState().tasks.find((candidate) => candidate.id === retry.taskId);
-    const decision = task ? moveController.decide(task, retry.target) : 'stay';
+  const retryMove = (taskId: string, target: TaskStatus) => {
+    const task = useMissionControl.getState().tasks.find((candidate) => candidate.id === taskId);
+    const decision = task ? moveController.decide(task, target) : 'stay';
     // Gone, or already in the target lane: nothing to retry, so clear the alert.
     if (!task || decision === 'stay') {
-      dispatchUi({ type: 'set_drop_error', error: null });
+      dispatchUi({ type: 'remove_save_failures', taskIds: [taskId] });
       return;
     }
-    runMove(task, retry.target, decision);
+    runMove(task, target, decision);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -460,31 +477,57 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       </div>
 
       {dropError && (
-        // One channel per outcome: a gated drop is already spoken by dnd-kit's polite
-        // announcement, so that box is not a live region; a failed save is spoken here only.
+        // A gated drop is already spoken by dnd-kit's polite announcement, so this box is not a live region.
         <div
-          role={dropError.kind === 'save-failed' ? 'alert' : undefined}
-          data-drop-error={dropError.kind}
+          data-drop-error="gated"
           className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60"
         >
           <div className="flex items-start gap-2">
             <AlertTriangle aria-hidden="true" className="size-4 mt-0.5 text-mc-danger" />
             <div className="min-w-0">
-              <p className="font-medium">{dropError.kind === 'gated' ? 'Dispatch move blocked' : 'Move not saved'}</p>
+              <p className="font-medium">Dispatch move blocked</p>
               <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">{dropError.message}</p>
-              {dropError.retry && (
-                <button
-                  type="button"
-                  onClick={() => dropError.retry && retryMove(dropError.retry)}
-                  className="mt-2 inline-flex min-h-11 items-center rounded border border-mc-text-secondary/60 px-3 text-xs font-medium text-mc-text hover:bg-mc-bg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
-                >
-                  Retry move
-                </button>
-              )}
             </div>
           </div>
         </div>
       )}
+
+      {saveFailures.map((failure) => (
+        // A failed save is spoken here only, once per card (role="alert").
+        <div
+          key={failure.taskId}
+          role="alert"
+          data-drop-error="save-failed"
+          data-save-failure={failure.taskId}
+          className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle aria-hidden="true" className="size-4 mt-0.5 text-mc-danger" />
+            <div className="min-w-0">
+              <p className="font-medium">Move not saved</p>
+              <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">{failure.message}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {failure.retryTarget && (
+                  <button
+                    type="button"
+                    onClick={() => failure.retryTarget && retryMove(failure.taskId, failure.retryTarget)}
+                    className="inline-flex min-h-11 items-center rounded border border-mc-text-secondary/60 px-3 text-xs font-medium text-mc-text hover:bg-mc-bg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
+                  >
+                    Retry move
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => dispatchUi({ type: 'remove_save_failures', taskIds: [failure.taskId] })}
+                  className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
 
       {/* Kanban Columns */}
       <DndContext

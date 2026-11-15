@@ -21,6 +21,8 @@ import {
   countNeedsYou,
   createAnnouncementQueue,
   ANNOUNCEMENT_TTL_MS,
+  settledSaveFailureIds,
+  upsertSaveFailure,
   decideMove,
   isDispatchBlockedInbox,
   isGatedByDispatchContract,
@@ -693,10 +695,24 @@ test('dialog status: unchanged -> not sent; changed and card still where it open
   assert.match(modal, /\.\.\.formWithoutStatus,\n\s+\.\.\.statusField,/);
 });
 
-test('"Retry move" clears itself when there is nothing left to retry', () => {
+test('save failures: one alert per card, both kept when delivered together, settled ones cleared only when moot', () => {
+  let list = upsertSaveFailure([], { taskId: 'a', message: 'A failed', retryTarget: 'assigned' });
+  list = upsertSaveFailure(list, { taskId: 'b', message: 'B failed', retryTarget: 'review' });
+  assert.deepEqual(list.map((f) => f.taskId), ['a', 'b']); // two outcomes on remount: both alerts stay
+  list = upsertSaveFailure(list, { taskId: 'a', message: 'A failed again', retryTarget: 'assigned' });
+  assert.deepEqual(list.map((f) => [f.taskId, f.message]), [['b', 'B failed'], ['a', 'A failed again']]);
+  // A card that reached its target: nothing to retry.
+  assert.deepEqual(settledSaveFailureIds(list, [{ id: 'a', status: 'assigned' }, { id: 'b', status: 'inbox' }], true), ['a']);
+  // A card missing while the board is still loading is not treated as deleted.
+  assert.deepEqual(settledSaveFailureIds(list, [], false), []);
+  assert.deepEqual(settledSaveFailureIds(list, [], true), ['b', 'a']);
+  // Non-retryable failures stay until dismissed.
+  assert.deepEqual(settledSaveFailureIds([{ taskId: 'c', message: 'x' }], [], true), []);
   const queue = source('src/components/MissionQueue.tsx');
-  assert.match(queue, /if \(!task \|\| decision === 'stay'\) \{\n\s+dispatchUi\(\{ type: 'set_drop_error', error: null \}\);/);
-  assert.match(queue, /retryCardStatus === undefined \|\| retryCardStatus === retryTarget\.target/);
+  assert.match(queue, /settledSaveFailureIds\(saveFailures, tasks, boardLoadStatus === 'ready'\)/);
+  assert.match(queue, /if \(!task \|\| decision === 'stay'\) \{\n\s+dispatchUi\(\{ type: 'remove_save_failures', taskIds: \[taskId\] \}\);/);
+  assert.match(queue, /\{saveFailures\.map\(\(failure\) => \(/);
+  assert.match(queue, />\n\s+Dismiss\n/);
 });
 
 test('a card whose save is pending is shown busy', () => {
@@ -709,8 +725,60 @@ test('a card whose save is pending is shown busy', () => {
 
 test('each move outcome is spoken once', () => {
   const queue = source('src/components/MissionQueue.tsx');
-  assert.match(queue, /role=\{dropError\.kind === 'save-failed' \? 'alert' : undefined\}/);
-  assert.match(queue, /dropError\.kind === 'gated' \? 'Dispatch move blocked' : 'Move not saved'/);
+  // Gated: a plain box (dnd-kit already spoke). Failed save: role="alert", titled for the cause.
+  assert.match(queue, /<div\n\s+data-drop-error="gated"/);
+  assert.match(queue, /role="alert"\n\s+data-drop-error="save-failed"/);
+  assert.match(queue, /Dispatch move blocked/);
+  assert.match(queue, /Move not saved/);
   assert.doesNotMatch(queue, /role="status">\s*\{presentBoardCount/);
   assert.match(queue, /aria-relevant="additions"/);
+});
+
+test('a newer confirmation from an earlier save survives the next move (stale report after it is ignored)', async () => {
+  const second = deferred<PatchStatusResult>();
+  let call = 0;
+  const b = board('inbox', {
+    patch: async (status) => (++call === 1 ? { ok: true, status, updatedAt: T2 } : second.promise),
+    read: async () => { throw new Error('offline'); },
+  });
+  await b.controller.start(b.card, 'assigned'); // Inbox (T0) -> Assigned, confirmed at T2
+  assert.equal(b.card.status, 'assigned');
+  // The store's updated_at is still T0; the next move must not forget the T2 confirmation.
+  const run = b.controller.start(b.card, 'in_progress');
+  b.controller.observeServerStatus('a', 'inbox', T0); // a delayed, stale Inbox report
+  second.reject(new Error('connection reset'));
+  await run;
+  assert.equal(b.card.status, 'assigned');
+});
+
+test('when the recovery read fails, a newer SSE confirmation beats this save\'s older answer', async () => {
+  const patch = deferred<PatchStatusResult>();
+  const b = board('inbox', { patch: () => patch.promise, read: async () => { throw new Error('offline'); } });
+  const run = b.controller.start(b.card, 'assigned');
+  b.serverPush('review', '2026-11-15T10:00:03.000Z'); // SSE: Review at T3
+  patch.resolve({ ok: true, status: 'assigned', updatedAt: T2 }); // the PATCH answered Assigned at T2
+  await run;
+  assert.equal(b.card.status, 'review');
+  assert.equal(b.outcomes[0].kind, 'not-saved');
+});
+
+test('fake timers: the dialog\'s status re-read is bounded, so Save cannot hang', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    let aborted = false;
+    const plan = planDialogStatus({
+      openedStatus: 'assigned',
+      formStatus: 'review',
+      readServerStatus: (signal) => new Promise((_, reject) => signal.addEventListener('abort', () => { aborted = true; reject(signal.reason); })),
+      laneName: (status) => LANES[status],
+    });
+    await flush();
+    mock.timers.tick(MOVE_READ_TIMEOUT_MS);
+    const result = await plan;
+    assert.equal(aborted, true);
+    assert.equal(result.action, 'refuse');
+    assert.match(source('src/components/TaskModal.tsx'), /readServerStatus: async \(signal\) => \(await readTaskStatus\(currentTask\.id, signal\)\)\?\.status \?\? null/);
+  } finally {
+    mock.timers.reset();
+  }
 });

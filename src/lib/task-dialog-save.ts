@@ -9,6 +9,7 @@
  *   the dialog opened (or the read fails), so the user decides with current facts.
  */
 
+import { MOVE_READ_TIMEOUT_MS, withTimeout } from './board-move-controller';
 import type { TaskStatus } from './types';
 
 export type DialogStatusPlan =
@@ -21,19 +22,22 @@ export async function planDialogStatus({
   formStatus,
   readServerStatus,
   laneName,
+  readTimeoutMs = MOVE_READ_TIMEOUT_MS,
 }: {
   /** The card's status when the dialog opened (the form's starting value). */
   openedStatus: TaskStatus;
   /** The status the form holds now. */
   formStatus: TaskStatus;
-  /** The server's status now; null when the read fails. */
-  readServerStatus: () => Promise<TaskStatus | null>;
+  /** The server's status now; null when the read fails. Must honour the signal. */
+  readServerStatus: (signal: AbortSignal) => Promise<TaskStatus | null>;
   laneName: (status: TaskStatus) => string;
+  /** The read is aborted (and the save refused) after this long, so Save never hangs. */
+  readTimeoutMs?: number;
 }): Promise<DialogStatusPlan> {
   if (formStatus === openedStatus) return { action: 'omit' };
   let server: TaskStatus | null = null;
   try {
-    server = await readServerStatus();
+    server = await withTimeout(readTimeoutMs, readServerStatus);
   } catch {
     server = null;
   }

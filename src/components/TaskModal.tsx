@@ -254,7 +254,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
         const plan = await planDialogStatus({
           openedStatus,
           formStatus: form.status,
-          readServerStatus: async () => (await readTaskStatus(currentTask.id))?.status ?? null,
+          readServerStatus: async (signal) => (await readTaskStatus(currentTask.id, signal))?.status ?? null,
           laneName: (status) => status.replace('_', ' '),
         });
         if (plan.action === 'refuse') {
