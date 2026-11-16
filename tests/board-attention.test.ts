@@ -904,7 +904,7 @@ test('when the recovery read fails, a newer SSE confirmation beats this save\'s 
   await run;
   assert.equal(b.card.status, 'review');
   // The PATCH saved Assigned; Review (T3, provably later) replaced it.
-  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'review', target: 'assigned', confirmed: true });
+  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'review', target: 'assigned', confirmed: true, ownSave: true });
   assert.deepEqual(b.controller.getFailuresSnapshot(), []);
 });
 
@@ -916,7 +916,7 @@ test('an OK PATCH followed by a later server move is "superseded", not "not-save
   patch.resolve({ ok: true, status: 'assigned', updatedAt: T1 }); // the PATCH saved Assigned at 10:00:01
   await run;
   assert.equal(b.card.status, 'in_progress');
-  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'in_progress', target: 'assigned', confirmed: true });
+  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'in_progress', target: 'assigned', confirmed: true, ownSave: true });
   assert.deepEqual(b.controller.getFailuresSnapshot(), [], 'no failure alert for a move that saved');
 });
 
@@ -932,22 +932,39 @@ test('an OK PATCH whose re-read fails and whose order cannot be proven is "super
   read.reject(new Error('offline'));
   await run;
   assert.equal(b.card.status, 'review');
-  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'review', target: 'assigned', confirmed: false });
+  assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'review', target: 'assigned', confirmed: false, ownSave: true });
   assert.deepEqual(b.controller.getFailuresSnapshot(), []);
 });
 
-test('a lost PATCH response after the server confirmed the target and then a later lane is "superseded", not "not-saved"', async () => {
+test('a lost PATCH response after the server reported the target and then a later lane is a neutral "superseded" (ownSave false, unconfirmed), not "not-saved"', async () => {
+  // The Assigned report may be this save's own broadcast or another client's move: without a
+  // request id or version the client cannot tell, so it never claims the move as its own.
   for (const read of [async () => { throw new Error('offline'); }, async () => ({ status: 'in_progress' as const, updatedAt: T2 })]) {
     const patch = deferred<PatchStatusResult>();
     const b = board('inbox', { patch: () => patch.promise, read });
     const run = b.controller.start(b.card, 'assigned');
-    b.serverPush('assigned', T1); // the save's own broadcast: the server has Assigned at T1
-    b.serverPush('in_progress', T2); // then another client moved it on
+    b.serverPush('assigned', T1); // the server has Assigned at T1 (whose write is unknown)
+    b.serverPush('in_progress', T2); // then it moved on
     patch.reject(new TypeError('Failed to fetch')); // the PATCH response was lost
     await run;
     assert.equal(b.card.status, 'in_progress');
-    assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'in_progress', target: 'assigned', confirmed: true });
-    assert.deepEqual(b.controller.getFailuresSnapshot(), [], 'no "Move not saved" alert for a move the server confirmed');
+    assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'in_progress', target: 'assigned', confirmed: false, ownSave: false });
+    assert.deepEqual(b.controller.getFailuresSnapshot(), [], 'no "Move not saved" alert: the card did reach the target');
+  }
+});
+
+test('a server error answer is not a save, even if the server reported the target during it ("not-saved", not "superseded")', async () => {
+  for (const read of [async () => { throw new Error('offline'); }, async () => ({ status: 'in_progress' as const, updatedAt: T2 })]) {
+    const patch = deferred<PatchStatusResult>();
+    const b = board('inbox', { patch: () => patch.promise, read });
+    const run = b.controller.start(b.card, 'assigned');
+    b.serverPush('assigned', T1); // another client put it in Assigned
+    b.serverPush('in_progress', T2); // and moved it on
+    patch.resolve({ ok: false, error: 'Internal Server Error' }); // this save was refused
+    await run;
+    assert.equal(b.card.status, 'in_progress');
+    assert.equal(b.outcomes[0].kind, 'not-saved');
+    assert.equal(b.controller.getFailuresSnapshot().length, 1);
   }
 });
 
@@ -1017,6 +1034,8 @@ test('the mck-b studio note describes the current move announcements (no role="a
   assert.match(note, /"Moving <title> to Review\."/);
   assert.match(note, /Only after the save succeeds[^.]*"Moved <title> to Review\."/);
   assert.match(note, /If the save succeeded but the board then moved the card on, that same polite region says "Moved <title> to Assigned, then the board moved it to In progress\." This is not a failure, so there is no alert\./);
+  assert.match(note, /If the board moved the card on and the order cannot be proven, it says "Moved <title> to Assigned\. Its lane changed after that and could not be confirmed\. It shows in In progress\."/);
+  assert.match(note, /If the save's answer was lost but the server reported the card in the target lane before moving it on, it says "<title> reached Assigned, then the board moved it to In progress\." That report may come from another client, so the board does not claim the move and logs no feed event for it\./);
   assert.match(note, /"Move not saved" alert \(`role="alert"`\)/);
   assert.match(note, /gated-move banner is not a live region/);
   const queue = source('src/components/MissionQueue.tsx');
@@ -1024,4 +1043,6 @@ test('the mck-b studio note describes the current move announcements (no role="a
   assert.doesNotMatch(gated, /role=|aria-live/, 'the gated banner really is not a live region');
   assert.match(queue, /data-drop-error="save-failed"/);
   assert.match(queue, /`Moved \$\{outcome\.title\} to \$\{laneName\(outcome\.target\)\}, then the board moved it to \$\{laneName\(outcome\.status\)\}\.`/, 'the superseded announcement the note quotes');
+  assert.match(queue, /`Moved \$\{outcome\.title\} to \$\{laneName\(outcome\.target\)\}\. Its lane changed after that and could not be confirmed\. It shows in \$\{laneName\(outcome\.status\)\}\.`/, 'the unconfirmed superseded announcement the note quotes');
+  assert.match(queue, /`\$\{outcome\.title\} reached \$\{laneName\(outcome\.target\)\}, then the board moved it to \$\{laneName\(outcome\.status\)\}\.`/, 'the neutral announcement the note quotes');
 });

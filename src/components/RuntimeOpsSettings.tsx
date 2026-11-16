@@ -169,11 +169,27 @@ function RuntimeFailureRateCards({ points }: { points: RuntimeFailureRateTrendPo
   );
 }
 
+/**
+ * A maintenance action's answer for its result panel. The status is checked before the body is
+ * read: a non-OK answer shows the server's error (or its HTTP status), never an error body as if
+ * it were the action's result.
+ */
+async function readActionResult(response: Response): Promise<Record<string, unknown>> {
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null);
+    return { error: typeof failure?.error === 'string' && failure.error ? failure.error : `The server answered HTTP ${response.status}` };
+  }
+  return response.json();
+}
+
 export function RuntimeOpsSettings() {
   const [retentionResult, setRetentionResult] = useState<Record<string, unknown> | null>(null);
   const [callbackResult, setCallbackResult] = useState<Record<string, unknown> | null>(null);
   const [callbacks, setCallbacks] = useState<CallbackDeliveryRow[]>([]);
   const [health, setHealth] = useState<RuntimeHealthPayload | null>(null);
+  // The latest failure's time in the operator's locale, formatted when the health payload loads
+  // (never during render, so a server render cannot disagree with the client's locale).
+  const [latestFailureAt, setLatestFailureAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -184,7 +200,10 @@ export function RuntimeOpsSettings() {
         fetch('/api/runtime/health'),
         fetch('/api/webhook-callback-deliveries?limit=100'),
       ]);
-      setHealth(await healthResponse.json());
+      const healthPayload: RuntimeHealthPayload | null = await healthResponse.json();
+      setHealth(healthPayload);
+      const failedAt = healthPayload?.latest_failure?.created_at;
+      setLatestFailureAt(failedAt ? new Date(failedAt).toLocaleString() : null);
       const callbackPayload = await callbackResponse.json();
       setCallbacks(callbackPayload.deliveries || []);
     } finally {
@@ -204,7 +223,7 @@ export function RuntimeOpsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: dryRun }),
       });
-      setRetentionResult(await response.json());
+      setRetentionResult(await readActionResult(response));
       await loadRuntimeOps();
     } finally {
       setLoading(false);
@@ -219,7 +238,7 @@ export function RuntimeOpsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: dryRun }),
       });
-      setCallbackResult(await response.json());
+      setCallbackResult(await readActionResult(response));
       await loadRuntimeOps();
     } finally {
       setLoading(false);
@@ -370,7 +389,7 @@ export function RuntimeOpsSettings() {
 
       {health?.latest_failure && (
         <div className="rounded border border-mc-warn/30 bg-mc-warn/10 p-3 text-sm text-mc-text">
-          Latest runtime failure: {health.latest_failure.runtime_type} at {new Date(health.latest_failure.created_at).toLocaleString()} — {health.latest_failure.reason}
+          Latest runtime failure: {health.latest_failure.runtime_type} at {latestFailureAt} — {health.latest_failure.reason}
         </div>
       )}
     </section>

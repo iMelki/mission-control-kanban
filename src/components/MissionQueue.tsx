@@ -314,6 +314,13 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       });
       return;
     }
+    if (outcome.kind === 'superseded' && !outcome.ownSave) {
+      // The save's answer was lost, but the server reported the card in the target before moving
+      // it on. That may have been another client's write, so neither the announcement nor the
+      // feed claims this client moved it. Not a failure either: no alert.
+      announceMove(`${outcome.title} reached ${laneName(outcome.target)}, then the board moved it to ${laneName(outcome.status)}.`);
+      return;
+    }
     if (outcome.kind === 'superseded') {
       // The move saved and a later change moved the card on: not a failure, so no alert.
       announceMove(outcome.confirmed

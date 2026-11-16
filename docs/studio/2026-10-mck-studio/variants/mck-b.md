@@ -69,6 +69,14 @@ picks. Spec: `../direction.md` § Direction B, with `../brief.md` and
     - If the save succeeded but the board then moved the card on, that same
       polite region says "Moved <title> to Assigned, then the board moved it
       to In progress." This is not a failure, so there is no alert.
+      - If the board moved the card on and the order cannot be proven, it
+        says "Moved <title> to Assigned. Its lane changed after that and
+        could not be confirmed. It shows in In progress."
+      - If the save's answer was lost but the server reported the card in
+        the target lane before moving it on, it says "<title> reached
+        Assigned, then the board moved it to In progress." That report may
+        come from another client, so the board does not claim the move and
+        logs no feed event for it.
     - If the save fails or the server keeps another lane, the polite regions
       say nothing more. Each failed card gets its own "Move not saved" alert
       (`role="alert"`), spoken once. It names the target lane, and a

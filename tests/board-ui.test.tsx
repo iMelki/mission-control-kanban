@@ -622,6 +622,34 @@ test('a move that saved and was then moved on by the board is announced politely
   await view.unmount();
 });
 
+test('two clients: another client moves the card to the target and on while this PATCH fails; the board says it "reached" the lane and logs no move of its own', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  m.store.useMissionControl.getState().setEvents([]);
+  let fail!: (error: Error) => void;
+  stubFetch(async (url, init) => {
+    if (init?.method === 'PATCH') return new Promise<Response>((_, reject) => { fail = reject; });
+    if (url.endsWith('/api/tasks/a')) return json(card('a', 'Alpha', 'in_progress', { updated_at: '2026-11-15T10:00:02.000Z' }));
+    return undefined;
+  });
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  const controller = m.registry.getBoardMoveController(WS);
+  await m.React.act(async () => { void controller.start(m.store.useMissionControl.getState().tasks[0], 'assigned'); });
+  await m.React.act(async () => {
+    // Client B moves the card to Assigned, then to In progress; this client's PATCH never answers.
+    m.registry.taskStreamHandlers().onTaskUpdated(card('a', 'Alpha', 'assigned', { updated_at: '2026-11-15T10:00:01.000Z' }));
+    m.registry.taskStreamHandlers().onTaskUpdated(card('a', 'Alpha', 'in_progress', { updated_at: '2026-11-15T10:00:02.000Z' }));
+    fail(new TypeError('Failed to fetch'));
+    await controller.waitForIdle('a');
+  });
+  assert.equal(statusOf('a'), 'in_progress');
+  assert.equal(alerts(view.container).length, 0, 'the card did reach Assigned: no "Move not saved" alert');
+  const spoken = [...view.container.querySelectorAll('[data-move-announcements] > *')].map((node) => node.textContent);
+  assert.deepEqual(spoken, ['Alpha reached Assigned, then the board moved it to In progress.']);
+  const claimed = m.store.useMissionControl.getState().events.filter((event) => event.task_id === 'a' && /moved to assigned/.test(event.message));
+  assert.deepEqual(claimed, [], 'no feed event claims this client moved the card');
+  await view.unmount();
+});
+
 test('each alert\'s buttons are named for their card (WCAG 2.4.6), keeping the visible words first (2.5.3)', async () => {
   seedBoard([card('a', 'Alpha', 'inbox'), card('b', 'Beta', 'inbox')]);
   failingFetch(['a', 'b']);

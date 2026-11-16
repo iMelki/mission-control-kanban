@@ -14,10 +14,11 @@
  *   network error or a timeout re-reads the task and adopts the server's status,
  *   unless a newer server status arrived while the read was in flight. If the read
  *   fails, the card shows the newest server-confirmed status and the outcome is:
- *   "saved" when that is the target; "superseded" when the save is proven (its OK
- *   answer, or, for a lost answer, the server reporting the target during the save)
- *   and a later lane followed; "not-saved" when the server reported another lane and
- *   never the target; and "unknown" (the UI offers a retry) when no server news came.
+ *   "saved" when that is the target; "superseded" when the card reached the target
+ *   and a later lane followed (ownSave when this save's OK answer says so; for a lost
+ *   answer the server only reported the target, which may be another client's write,
+ *   so ownSave is false); "not-saved" when the server reported another lane and never
+ *   the target; and "unknown" (the UI offers a retry) when no server news came.
  * - A save that never answers is aborted after MOVE_SAVE_TIMEOUT_MS, and a re-read
  *   after MOVE_READ_TIMEOUT_MS, so a hung request cannot lock the card.
  */
@@ -51,11 +52,17 @@ export type MoveOutcome =
   /** The save failed and the re-read failed too: the card shows the last confirmed status. */
   | { kind: 'unknown'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; error: string }
   /**
-   * The PATCH saved the target lane, and a later server change moved the card on to `status`.
-   * Not a failure. `confirmed` is false when neither the re-read nor updated_at proves that
-   * `status` is newer than the save: the card shows it, but its current lane is unconfirmed.
+   * The card reached the target lane, and a later server change moved it on to `status`. Not a
+   * failure.
+   * - `ownSave` true: this save's PATCH answered OK with the target, so this client moved it.
+   *   `confirmed` is false when neither the re-read nor updated_at proves that `status` is newer
+   *   than the save: the card shows it, but its current lane is unconfirmed.
+   * - `ownSave` false: the PATCH answer was lost, and the server only reported the target while
+   *   it was in flight. That report may be another client's write; with no request id or version
+   *   from the server it cannot be tied to this save, so the move is not claimed and `confirmed`
+   *   is always false.
    */
-  | { kind: 'superseded'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; confirmed: boolean };
+  | { kind: 'superseded'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; confirmed: boolean; ownSave: boolean };
 
 export interface MoveControllerDeps {
   /** The card's status in the board store right now. */
@@ -148,7 +155,8 @@ export function createMoveController(deps: MoveControllerDeps) {
   const pendingTargets = new Map<string, TaskStatus>();
   /**
    * The server reported the save's target lane while the save was in flight (latest report).
-   * Proof the move saved even if the PATCH answer is lost, and kept separately because
+   * If the PATCH answer is lost, this shows the card reached the target (by this save or another
+   * client's), so the outcome is a neutral "superseded", not "not-saved". Kept separately because
    * observedDuringSave holds only the latest status, which may already be a later lane.
    */
   const targetSeenDuringSave = new Map<string, ServerStatus>();
@@ -216,19 +224,23 @@ export function createMoveController(deps: MoveControllerDeps) {
     }
     const newerArrived = (serverSeq.get(task.id) ?? 0) !== seqBefore;
     const latest = confirmed.get(task.id)!;
-    // This save's own PATCH answered OK with the target lane, or (its answer lost) the server
-    // reported the target while it was in flight: the move did save, whatever the card shows
-    // now. A different lane after that is a later change, not a failed move.
+    // This save's own PATCH answered OK with the target lane: the move did save, whatever the
+    // card shows now. A different lane after that is a later change, not a failed move.
+    const ownSave = fallback !== null && fallback.status === target ? fallback : null;
+    // Its answer lost, the server reported the target while it was in flight: the card reached
+    // the target, but maybe by another client's write, so this is not proof of this save. A
+    // non-OK answer never counts: the server said this save failed.
     // (Read after the re-read, so a report of the target that arrived during it counts too.)
-    const targetSeen = answerLost ? (targetSeenDuringSave.get(task.id) ?? null) : null;
-    const saveProof = fallback !== null && fallback.status === target ? fallback : targetSeen;
+    const targetSeen = !ownSave && answerLost ? (targetSeenDuringSave.get(task.id) ?? null) : null;
+    const reached = { kind: 'superseded', taskId: task.id, title: task.title, target, confirmed: false, ownSave: false } as const;
     // A server status that arrived during the read wins unless the read is provably newer.
     if (server && (!newerArrived || timeOf(server.updatedAt) > latest.time)) {
       confirm(task.id, server.status, server.updatedAt);
       deps.setStatus(task.id, server.status, server.updatedAt);
       if (server.status === target) return { kind: 'saved', taskId: task.id, title: task.title, status: server.status };
-      // The read left after the proof arrived, so its lane is the one that followed the save.
-      if (saveProof) return { kind: 'superseded', taskId: task.id, title: task.title, status: server.status, target, confirmed: true };
+      // The read left after the PATCH answered, so its lane is the one that followed the save.
+      if (ownSave) return { kind: 'superseded', taskId: task.id, title: task.title, status: server.status, target, confirmed: true, ownSave: true };
+      if (targetSeen) return { ...reached, status: server.status };
       return { kind: 'not-saved', taskId: task.id, title: task.title, status: server.status, target, error };
     }
     // No usable answer from the read: show the newest status the server confirmed, comparing
@@ -242,12 +254,13 @@ export function createMoveController(deps: MoveControllerDeps) {
     if (fallbackWins) deps.setStatus(task.id, keep, fallback.updatedAt);
     else if (deps.getStatus(task.id) !== keep) deps.setStatus(task.id, keep);
     if (keep === target) return { kind: 'saved', taskId: task.id, title: task.title, status: keep };
-    if (saveProof) {
+    if (ownSave) {
       // The save happened; the card shows a server status from elsewhere. Only an updated_at
-      // provably newer than the save's proof says that status came after the save.
-      const confirmed = timeOf(saveProof.updatedAt) < latest.time;
-      return { kind: 'superseded', taskId: task.id, title: task.title, status: keep, target, confirmed };
+      // provably newer than the save's own answer says that status came after the save.
+      const confirmed = timeOf(ownSave.updatedAt) < latest.time;
+      return { kind: 'superseded', taskId: task.id, title: task.title, status: keep, target, confirmed, ownSave: true };
     }
+    if (targetSeen) return { ...reached, status: keep };
     // The server told us where the card is (another client, a refetch): not a guess, no retry.
     if (newerArrived || observedDuringSave.has(task.id)) {
       return { kind: 'not-saved', taskId: task.id, title: task.title, status: keep, target, error };
