@@ -12,9 +12,12 @@
  *   optimistic write and a server write look the same in the store.
  * - The client never guesses after a failed or ambiguous save. A non-OK answer, a
  *   network error or a timeout re-reads the task and adopts the server's status,
- *   unless a newer server status arrived while the read was in flight. Only if the
- *   read fails does the card fall back to the last server-confirmed status; then the
- *   outcome is "unknown" and the UI offers a retry.
+ *   unless a newer server status arrived while the read was in flight. If the read
+ *   fails, the card shows the newest server-confirmed status and the outcome is:
+ *   "saved" when that is the target; "superseded" when the save is proven (its OK
+ *   answer, or, for a lost answer, the server reporting the target during the save)
+ *   and a later lane followed; "not-saved" when the server reported another lane and
+ *   never the target; and "unknown" (the UI offers a retry) when no server news came.
  * - A save that never answers is aborted after MOVE_SAVE_TIMEOUT_MS, and a re-read
  *   after MOVE_READ_TIMEOUT_MS, so a hung request cannot lock the card.
  */
@@ -141,6 +144,14 @@ export function createMoveController(deps: MoveControllerDeps) {
   const serverSeq = new Map<string, number>();
   /** The latest server status that arrived from elsewhere while a card's save was in flight. */
   const observedDuringSave = new Map<string, TaskStatus>();
+  /** The lane each in-flight save is writing. */
+  const pendingTargets = new Map<string, TaskStatus>();
+  /**
+   * The server reported the save's target lane while the save was in flight (latest report).
+   * Proof the move saved even if the PATCH answer is lost, and kept separately because
+   * observedDuringSave holds only the latest status, which may already be a later lane.
+   */
+  const targetSeenDuringSave = new Map<string, ServerStatus>();
   const dropDecisions = new Map<string, { target: TaskStatus; decision: MoveDecision }>();
   const pendingListeners = new Set<() => void>();
   let savingSnapshot: ReadonlySet<string> = new Set();
@@ -193,6 +204,8 @@ export function createMoveController(deps: MoveControllerDeps) {
     error: string,
     /** What this save's own (successful) answer said, to weigh against other confirmations. */
     fallback: ServerStatus | null = null,
+    /** The PATCH gave no answer (network error, timeout), so the server may have saved it anyway. */
+    answerLost = false,
   ): Promise<MoveOutcome> {
     const seqBefore = serverSeq.get(task.id) ?? 0;
     let server: ServerStatus | null = null;
@@ -203,16 +216,19 @@ export function createMoveController(deps: MoveControllerDeps) {
     }
     const newerArrived = (serverSeq.get(task.id) ?? 0) !== seqBefore;
     const latest = confirmed.get(task.id)!;
-    // This save's own PATCH answered OK with the target lane: the move did save, whatever the
-    // card shows now. A different lane after that is a later change, not a failed move.
-    const patchSaved = fallback !== null && fallback.status === target;
+    // This save's own PATCH answered OK with the target lane, or (its answer lost) the server
+    // reported the target while it was in flight: the move did save, whatever the card shows
+    // now. A different lane after that is a later change, not a failed move.
+    // (Read after the re-read, so a report of the target that arrived during it counts too.)
+    const targetSeen = answerLost ? (targetSeenDuringSave.get(task.id) ?? null) : null;
+    const saveProof = fallback !== null && fallback.status === target ? fallback : targetSeen;
     // A server status that arrived during the read wins unless the read is provably newer.
     if (server && (!newerArrived || timeOf(server.updatedAt) > latest.time)) {
       confirm(task.id, server.status, server.updatedAt);
       deps.setStatus(task.id, server.status, server.updatedAt);
       if (server.status === target) return { kind: 'saved', taskId: task.id, title: task.title, status: server.status };
-      // The read left after the PATCH answered, so its lane is the one that followed the save.
-      if (patchSaved) return { kind: 'superseded', taskId: task.id, title: task.title, status: server.status, target, confirmed: true };
+      // The read left after the proof arrived, so its lane is the one that followed the save.
+      if (saveProof) return { kind: 'superseded', taskId: task.id, title: task.title, status: server.status, target, confirmed: true };
       return { kind: 'not-saved', taskId: task.id, title: task.title, status: server.status, target, error };
     }
     // No usable answer from the read: show the newest status the server confirmed, comparing
@@ -226,10 +242,10 @@ export function createMoveController(deps: MoveControllerDeps) {
     if (fallbackWins) deps.setStatus(task.id, keep, fallback.updatedAt);
     else if (deps.getStatus(task.id) !== keep) deps.setStatus(task.id, keep);
     if (keep === target) return { kind: 'saved', taskId: task.id, title: task.title, status: keep };
-    if (patchSaved) {
+    if (saveProof) {
       // The save happened; the card shows a server status from elsewhere. Only an updated_at
-      // provably newer than the save's own answer says that status came after the save.
-      const confirmed = timeOf(fallback.updatedAt) < latest.time;
+      // provably newer than the save's proof says that status came after the save.
+      const confirmed = timeOf(saveProof.updatedAt) < latest.time;
       return { kind: 'superseded', taskId: task.id, title: task.title, status: keep, target, confirmed };
     }
     // The server told us where the card is (another client, a refetch): not a guess, no retry.
@@ -259,7 +275,8 @@ export function createMoveController(deps: MoveControllerDeps) {
 
     /** The user dismissed these alerts, retried the move, or there is nothing left to retry. */
     removeFailures(taskIds: readonly string[]): void {
-      const next = failures.filter((failure) => !taskIds.includes(failure.taskId));
+      const removed = new Set(taskIds);
+      const next = failures.filter((failure) => !removed.has(failure.taskId));
       if (next.length !== failures.length) setFailures(next);
     },
 
@@ -328,6 +345,7 @@ export function createMoveController(deps: MoveControllerDeps) {
       if (!pending.has(taskId)) return;
       serverSeq.set(taskId, (serverSeq.get(taskId) ?? 0) + 1);
       observedDuringSave.set(taskId, status);
+      if (status === pendingTargets.get(taskId)) targetSeenDuringSave.set(taskId, { status, updatedAt });
     },
 
     /** Resolves once the card has no save in flight (the dialog waits on this before its own save). */
@@ -347,7 +365,9 @@ export function createMoveController(deps: MoveControllerDeps) {
         confirmed.set(task.id, { status: task.status, time: Number.isNaN(storeTime) ? Number.NEGATIVE_INFINITY : storeTime });
       }
       observedDuringSave.delete(task.id);
+      targetSeenDuringSave.delete(task.id);
       serverSeq.delete(task.id);
+      pendingTargets.set(task.id, target);
       deps.setStatus(task.id, target);
       const run = (async () => {
         let outcome: MoveOutcome;
@@ -370,9 +390,11 @@ export function createMoveController(deps: MoveControllerDeps) {
             outcome = await reconcile(task, target, result.error);
           }
         } catch (error) {
-          outcome = await reconcile(task, target, messageOf(error));
+          outcome = await reconcile(task, target, messageOf(error), null, true);
         }
         observedDuringSave.delete(task.id);
+        targetSeenDuringSave.delete(task.id);
+        pendingTargets.delete(task.id);
         serverSeq.delete(task.id);
         setPending(task.id, null);
         report(outcome);

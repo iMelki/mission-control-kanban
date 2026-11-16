@@ -23,9 +23,12 @@ export async function patchTaskStatus(taskId: string, status: TaskStatus, signal
     body: JSON.stringify({ status }),
     signal,
   });
+  if (!res.ok) {
+    const failure = await res.json().catch(() => null);
+    return { ok: false, error: typeof failure?.error === 'string' && failure.error ? failure.error : `The server answered HTTP ${res.status}` };
+  }
   const data = await res.json().catch(() => null);
-  if (res.ok) return { ok: true, status: isTaskStatus(data?.status) ? data.status : null, updatedAt: data?.updated_at ?? null };
-  return { ok: false, error: typeof data?.error === 'string' && data.error ? data.error : `The server answered HTTP ${res.status}` };
+  return { ok: true, status: isTaskStatus(data?.status) ? data.status : null, updatedAt: data?.updated_at ?? null };
 }
 
 /** Read a card's status from the server; null when the read fails. */

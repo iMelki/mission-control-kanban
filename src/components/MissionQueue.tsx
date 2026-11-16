@@ -96,7 +96,7 @@ interface MissionQueueUiState {
   showCreateModal: boolean;
   showGitHubImportModal: boolean;
   editingTask: Task | null;
-  /** gated: the dispatch gate refused the drop; save-failed: the PATCH failed. */
+  /** The dispatch gate refused the drop. Failed saves are not here: the move controller keeps them. */
   dropError: DropError | null;
   runtimeFilter: RuntimeFilter;
   needsYouOnly: boolean;
@@ -196,7 +196,8 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   // of the render itself, so a failure that settled while the board was unmounted never
   // attaches an alert, not even for the frame before the effect below clears it.
   const settledFailureIds = settledSaveFailureIds(saveFailures, tasks, boardLoadStatus === 'ready');
-  const shownFailures = saveFailures.filter((failure) => !settledFailureIds.includes(failure.taskId));
+  const settledFailureIdSet = new Set(settledFailureIds);
+  const shownFailures = saveFailures.filter((failure) => !settledFailureIdSet.has(failure.taskId));
   useEffect(() => {
     // Committed: every alert on screen has now been rendered live (or was already).
     for (const failure of shownFailures) liveRenderedFailures.add(failure);
@@ -347,10 +348,12 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       : active.closest('[data-save-failure]')?.getAttribute('data-save-failure');
     const before = moveController.getFailuresSnapshot();
     moveController.removeFailures(taskIds);
-    if (!focusedAlertId || !taskIds.includes(focusedAlertId)) return;
+    const removed = new Set(taskIds);
+    if (!focusedAlertId || !removed.has(focusedAlertId)) return;
     const index = before.findIndex((failure) => failure.taskId === focusedAlertId);
-    const remaining = before.filter((failure) => !taskIds.includes(failure.taskId));
-    const next = remaining.find((failure) => before.indexOf(failure) > index) ?? remaining[remaining.length - 1];
+    const remaining = before.filter((failure) => !removed.has(failure.taskId));
+    // The next alert after the focused one that stays, else the last one that stays.
+    const next = before.slice(index + 1).find((failure) => !removed.has(failure.taskId)) ?? remaining[remaining.length - 1];
     requestAnimationFrame(() => {
       const target = next
         ? [...document.querySelectorAll<HTMLElement>('[data-save-failure] button')].find(

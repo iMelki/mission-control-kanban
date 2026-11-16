@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
@@ -102,7 +102,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
   // The card's status when the form was last built from a server copy; the save sends status
   // only if the user changed it from this. Reset wherever the form is rebuilt from the server.
-  const [openedStatus, setOpenedStatus] = useState(() => buildTaskFormState(initialTask).status);
+  // A ref, not state: only the save handler reads it, so updating it needs no re-render.
+  const openedStatusRef = useRef(form.status);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
@@ -112,7 +113,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
   useEffect(() => {
     setCurrentTask(initialTask);
     setForm(buildTaskFormState(initialTask));
-    setOpenedStatus(buildTaskFormState(initialTask).status);
+    openedStatusRef.current = buildTaskFormState(initialTask).status;
     setActiveTab(initialTask?.status === 'planning' ? 'planning' : 'overview');
   }, [initialTask]);
 
@@ -254,7 +255,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
         statusField = { status: usePlanningMode ? 'planning' : form.status };
       } else {
         const plan = await planDialogStatus({
-          openedStatus,
+          openedStatus: openedStatusRef.current,
           formStatus: form.status,
           readServerStatus: async (signal) => (await readTaskStatus(currentTask.id, signal))?.status ?? null,
           laneName: (status) => status.replace('_', ' '),
@@ -650,7 +651,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave 
                 onTaskUpdated={(updatedTask) => {
                   setCurrentTask(updatedTask);
                   setForm(buildTaskFormState(updatedTask));
-                  setOpenedStatus(buildTaskFormState(updatedTask).status);
+                  openedStatusRef.current = buildTaskFormState(updatedTask).status;
                   updateTask(updatedTask);
                 }}
               />

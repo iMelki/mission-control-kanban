@@ -875,7 +875,7 @@ test('wiring without a practical jsdom path: page load/poll use applyServerTasks
   assert.match(page, /applyServerTasks\(tasksData\);/);
   assert.match(page, /applyServerTasks\(newTasks\);/);
   const modal = source('src/components/TaskModal.tsx');
-  assert.match(modal, /onTaskUpdated=\{\(updatedTask\) => \{\n\s+setCurrentTask\(updatedTask\);\n\s+setForm\(buildTaskFormState\(updatedTask\)\);\n\s+setOpenedStatus\(buildTaskFormState\(updatedTask\)\.status\);/);
+  assert.match(modal, /onTaskUpdated=\{\(updatedTask\) => \{\n\s+setCurrentTask\(updatedTask\);\n\s+setForm\(buildTaskFormState\(updatedTask\)\);\n\s+openedStatusRef\.current = buildTaskFormState\(updatedTask\)\.status;/);
 });
 
 test('a newer confirmation from an earlier save survives the next move (stale report after it is ignored)', async () => {
@@ -936,6 +936,33 @@ test('an OK PATCH whose re-read fails and whose order cannot be proven is "super
   assert.deepEqual(b.controller.getFailuresSnapshot(), []);
 });
 
+test('a lost PATCH response after the server confirmed the target and then a later lane is "superseded", not "not-saved"', async () => {
+  for (const read of [async () => { throw new Error('offline'); }, async () => ({ status: 'in_progress' as const, updatedAt: T2 })]) {
+    const patch = deferred<PatchStatusResult>();
+    const b = board('inbox', { patch: () => patch.promise, read });
+    const run = b.controller.start(b.card, 'assigned');
+    b.serverPush('assigned', T1); // the save's own broadcast: the server has Assigned at T1
+    b.serverPush('in_progress', T2); // then another client moved it on
+    patch.reject(new TypeError('Failed to fetch')); // the PATCH response was lost
+    await run;
+    assert.equal(b.card.status, 'in_progress');
+    assert.deepEqual(b.outcomes[0], { kind: 'superseded', taskId: 'a', title: 'A', status: 'in_progress', target: 'assigned', confirmed: true });
+    assert.deepEqual(b.controller.getFailuresSnapshot(), [], 'no "Move not saved" alert for a move the server confirmed');
+  }
+});
+
+test('a lost PATCH response with no confirmation of the target is still "not-saved" when the server reports another lane', async () => {
+  const patch = deferred<PatchStatusResult>();
+  const b = board('inbox', { patch: () => patch.promise, read: async () => { throw new Error('offline'); } });
+  const run = b.controller.start(b.card, 'assigned');
+  b.serverPush('in_progress', T2); // the server reports In progress; Assigned was never confirmed
+  patch.reject(new TypeError('Failed to fetch'));
+  await run;
+  assert.equal(b.card.status, 'in_progress');
+  assert.equal(b.outcomes[0].kind, 'not-saved');
+  assert.equal(b.controller.getFailuresSnapshot().length, 1);
+});
+
 test('a PATCH that answers OK with a different lane is still "not-saved" (the server kept another status)', async () => {
   const patch = deferred<PatchStatusResult>();
   const b = board('inbox', { patch: () => patch.promise, read: async () => ({ status: 'inbox', updatedAt: T2 }) });
@@ -989,10 +1016,12 @@ test('the mck-b studio note describes the current move announcements (no role="a
   // The current behaviour, as rendered by MissionQueue.tsx.
   assert.match(note, /"Moving <title> to Review\."/);
   assert.match(note, /Only after the save succeeds[^.]*"Moved <title> to Review\."/);
+  assert.match(note, /If the save succeeded but the board then moved the card on, that same polite region says "Moved <title> to Assigned, then the board moved it to In progress\." This is not a failure, so there is no alert\./);
   assert.match(note, /"Move not saved" alert \(`role="alert"`\)/);
   assert.match(note, /gated-move banner is not a live region/);
   const queue = source('src/components/MissionQueue.tsx');
   const gated = queue.slice(queue.indexOf('data-drop-error="gated"') - 200, queue.indexOf('data-drop-error="gated"') + 200);
   assert.doesNotMatch(gated, /role=|aria-live/, 'the gated banner really is not a live region');
   assert.match(queue, /data-drop-error="save-failed"/);
+  assert.match(queue, /`Moved \$\{outcome\.title\} to \$\{laneName\(outcome\.target\)\}, then the board moved it to \$\{laneName\(outcome\.status\)\}\.`/, 'the superseded announcement the note quotes');
 });

@@ -269,13 +269,14 @@ export function settledSaveFailureIds(
   tasks: readonly Pick<Task, 'id' | 'status'>[],
   boardLoaded: boolean,
 ): string[] {
-  return list
-    .filter((failure) => {
-      const card = tasks.find((task) => task.id === failure.taskId);
-      // Any failure is moot once the card reached its target ("not moved to X. It is in X.").
-      if (card) return card.status === failure.target;
-      // A missing card clears only retryable alerts, and only once the board has loaded.
-      return failure.retryable && boardLoaded;
-    })
-    .map((failure) => failure.taskId);
+  const statusById = new Map(tasks.map((task) => [task.id, task.status]));
+  const settled: string[] = [];
+  for (const failure of list) {
+    const status = statusById.get(failure.taskId);
+    // Any failure is moot once the card reached its target ("not moved to X. It is in X.").
+    // A missing card clears only retryable alerts, and only once the board has loaded.
+    const moot = status !== undefined ? status === failure.target : failure.retryable && boardLoaded;
+    if (moot) settled.push(failure.taskId);
+  }
+  return settled;
 }

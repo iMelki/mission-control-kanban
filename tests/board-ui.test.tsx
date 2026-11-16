@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert/strict';
-import test, { after, before } from 'node:test';
+import test, { after, afterEach, before } from 'node:test';
 import { JSDOM } from 'jsdom';
 import type { Task, TaskStatus } from '../src/lib/types';
 
@@ -100,17 +100,34 @@ function stubFetch(route: FetchRoute) {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Views still mounted; afterEach unmounts them, so a failed assertion cannot leak a board into the next test. */
+const mountedViews = new Set<{ unmount: () => Promise<void> }>();
+
 async function mount(element: import('react').ReactElement) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = m.createRoot(container);
-  await m.React.act(async () => { root.render(element); });
-  return {
+  let mounted = true;
+  const view = {
     container,
     rerender: async (next: import('react').ReactElement) => { await m.React.act(async () => { root.render(next); }); },
-    unmount: async () => { await m.React.act(async () => root.unmount()); container.remove(); },
+    /** Idempotent: a test's own unmount and the afterEach cleanup may both call it. */
+    unmount: async () => {
+      if (!mounted) return;
+      mounted = false;
+      mountedViews.delete(view);
+      await m.React.act(async () => root.unmount());
+      container.remove();
+    },
   };
+  mountedViews.add(view);
+  await m.React.act(async () => { root.render(element); });
+  return view;
 }
+
+afterEach(async () => {
+  for (const view of [...mountedViews]) await view.unmount();
+});
 
 function seedBoard(tasks: Task[]) {
   m.registry.resetBoardMoveControllers();

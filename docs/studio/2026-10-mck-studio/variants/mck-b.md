@@ -66,6 +66,9 @@ picks. Spec: `../direction.md` § Direction B, with `../brief.md` and
       Review."
     - Only after the save succeeds, a second polite region (`aria-atomic`
       false, one node per message) says "Moved <title> to Review."
+    - If the save succeeded but the board then moved the card on, that same
+      polite region says "Moved <title> to Assigned, then the board moved it
+      to In progress." This is not a failure, so there is no alert.
     - If the save fails or the server keeps another lane, the polite regions
       say nothing more. Each failed card gets its own "Move not saved" alert
       (`role="alert"`), spoken once. It names the target lane, and a
