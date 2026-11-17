@@ -8,8 +8,14 @@ import { DependencyBadges } from '@/components/DependencyBadges';
 import { cn } from '@/lib/utils';
 import { READINESS_LABELS, REVIEW_MODE_LABELS, RISK_LEVEL_LABELS } from '@/lib/dispatch-contract';
 import { AGENT_RUNTIME_LABELS, resolveAgentRuntime } from '@/lib/agent-runtimes';
+import {
+  DISPATCH_CONTRACT_INBOX_CHIP_LABEL,
+  DISPATCH_CONTRACT_INBOX_GUIDANCE,
+  railToneFor,
+  showsDispatchContractInboxBanner,
+  type RailTone,
+} from '@/lib/board-attention';
 import type { Task } from '@/lib/types';
-import { railToneFor, type RailTone } from './task-status';
 
 /**
  * Owned board card primitive (mission-control-kanban#48, studio direction B).
@@ -68,11 +74,13 @@ export interface TaskCardProps {
   isOverlay?: boolean;
   /** Changes on each settled move so the rail's ink cross-fade restarts. */
   inkKey?: number | null;
+  /** The card's last move is still being saved: shown busy, and further drops are refused. */
+  isSaving?: boolean;
   dragAttributes?: ReturnType<typeof useSortable>['attributes'];
   dragListeners?: ReturnType<typeof useSortable>['listeners'];
 }
 
-export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, dragAttributes, dragListeners }: TaskCardProps) {
+export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, isSaving, dragAttributes, dragListeners }: TaskCardProps) {
   const isPlanning = task.status === 'planning';
   const blockers = task.dispatch_blockers ?? [];
   const readiness = task.dispatch_metadata?.readiness;
@@ -90,13 +98,24 @@ export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, dragAtt
     <div
       data-task-card
       data-rail-tone={railToneFor(task)}
+      data-saving={isSaving ? 'true' : undefined}
+      aria-busy={isSaving || undefined}
       className={cn(
         'group relative w-full min-w-0 overflow-hidden rounded-md bg-mc-bg-tertiary pl-[var(--mc-rail-width)] text-left ring-1 ring-inset ring-mc-border/70 hover:ring-mc-text-secondary/50',
         isDragging && 'opacity-40',
         isOverlay && 'mc-note-lifted overflow-visible ring-mc-accent/70',
       )}
     >
-      <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-[var(--mc-rail-width)]', RAIL_CLASS[railToneFor(task)])} />
+      <span
+        aria-hidden="true"
+        className={cn('absolute inset-y-0 left-0 w-[var(--mc-rail-width)]', RAIL_CLASS[railToneFor(task)], isSaving && 'motion-safe:animate-pulse')}
+      />
+      {isSaving && (
+        // Why the card will not move again yet. One word, secondary text (5.67:1 on the card).
+        <span data-task-saving className="pointer-events-none absolute right-2 top-1 z-10 text-[10px] font-medium text-mc-text-secondary">
+          Saving…
+        </span>
+      )}
       {inkKey != null && (
         <span
           key={inkKey}
@@ -115,7 +134,7 @@ export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, dragAtt
           {...dragAttributes}
           {...dragListeners}
           aria-label={`Reorder task ${task.title}`}
-          className="flex w-full cursor-grab items-center justify-center py-1.5 opacity-0 transition-opacity duration-fast hover:bg-mc-bg-secondary/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100"
+          className="flex w-full cursor-grab touch-none items-center justify-center py-1.5 opacity-0 [@media(hover:none)]:min-h-11 transition-opacity duration-fast hover:bg-mc-bg-secondary/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mc-accent active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100"
         >
           <GripVertical className="size-4 text-mc-text-secondary" />
         </button>
@@ -194,9 +213,13 @@ export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, dragAtt
                 {blockers[0]}
                 {blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}
               </span>
-              {task.status === 'inbox' && (
-                <span className="block text-[10px] text-mc-text-secondary">
-                  Still in Inbox until the Dispatch Contract is complete. Open the task to fill scope, tests, and rollback.
+              {showsDispatchContractInboxBanner(task) && (
+                <span
+                  data-dispatch-contract-chip
+                  title={DISPATCH_CONTRACT_INBOX_GUIDANCE}
+                  className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${pillClass('warn')}`}
+                >
+                  {DISPATCH_CONTRACT_INBOX_CHIP_LABEL}
                 </span>
               )}
             </div>

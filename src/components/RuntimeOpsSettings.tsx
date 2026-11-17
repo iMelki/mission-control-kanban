@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Activity, Clock, DatabaseZap, Download, RefreshCw, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { RuntimeConfigTemplateGallery } from '@/components/runtime/RuntimeConfigTemplateGallery';
+import { readActionResult } from '@/lib/action-result';
 
 interface CallbackDeliveryRow {
   id: string;
@@ -174,6 +175,9 @@ export function RuntimeOpsSettings() {
   const [callbackResult, setCallbackResult] = useState<Record<string, unknown> | null>(null);
   const [callbacks, setCallbacks] = useState<CallbackDeliveryRow[]>([]);
   const [health, setHealth] = useState<RuntimeHealthPayload | null>(null);
+  // The latest failure's time in the operator's locale, formatted when the health payload loads
+  // (never during render, so a server render cannot disagree with the client's locale).
+  const [latestFailureAt, setLatestFailureAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -184,7 +188,10 @@ export function RuntimeOpsSettings() {
         fetch('/api/runtime/health'),
         fetch('/api/webhook-callback-deliveries?limit=100'),
       ]);
-      setHealth(await healthResponse.json());
+      const healthPayload: RuntimeHealthPayload | null = await healthResponse.json();
+      setHealth(healthPayload);
+      const failedAt = healthPayload?.latest_failure?.created_at;
+      setLatestFailureAt(failedAt ? new Date(failedAt).toLocaleString() : null);
       const callbackPayload = await callbackResponse.json();
       setCallbacks(callbackPayload.deliveries || []);
     } finally {
@@ -204,7 +211,7 @@ export function RuntimeOpsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: dryRun }),
       });
-      setRetentionResult(await response.json());
+      setRetentionResult(await readActionResult(response));
       await loadRuntimeOps();
     } finally {
       setLoading(false);
@@ -219,7 +226,7 @@ export function RuntimeOpsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: dryRun }),
       });
-      setCallbackResult(await response.json());
+      setCallbackResult(await readActionResult(response));
       await loadRuntimeOps();
     } finally {
       setLoading(false);
@@ -255,7 +262,7 @@ export function RuntimeOpsSettings() {
   }, [callbacks, health]);
 
   return (
-    <section className="mb-8 space-y-6 rounded-lg border border-mc-border bg-mc-bg-secondary p-6">
+    <section className="mb-8 space-y-6 rounded-lg border border-mc-border bg-mc-bg-secondary p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="mb-2 flex items-center gap-2">
@@ -370,7 +377,7 @@ export function RuntimeOpsSettings() {
 
       {health?.latest_failure && (
         <div className="rounded border border-mc-warn/30 bg-mc-warn/10 p-3 text-sm text-mc-text">
-          Latest runtime failure: {health.latest_failure.runtime_type} at {new Date(health.latest_failure.created_at).toLocaleString()} — {health.latest_failure.reason}
+          Latest runtime failure: {health.latest_failure.runtime_type} at {latestFailureAt} — {health.latest_failure.reason}
         </div>
       )}
     </section>

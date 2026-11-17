@@ -29,10 +29,12 @@ interface BoardLaneProps {
   /** True while a card from another lane is carried over this lane or its cards. */
   isDropTarget: boolean;
   inkTask: { id: string; key: number } | null;
+  /** Cards whose last move is still being saved. */
+  savingTaskIds?: ReadonlySet<string>;
   onCardClick: (task: Task) => void;
 }
 
-export function BoardLane({ column, tasks, activeTaskId, isDropTarget, inkTask, onCardClick }: BoardLaneProps) {
+export function BoardLane({ column, tasks, activeTaskId, isDropTarget, inkTask, savingTaskIds, onCardClick }: BoardLaneProps) {
   const { setNodeRef } = useDroppable({ id: column.id });
   const isOver = isDropTarget;
 
@@ -71,6 +73,7 @@ export function BoardLane({ column, tasks, activeTaskId, isDropTarget, inkTask, 
                 onClick={() => onCardClick(task)}
                 isActive={activeTaskId === task.id}
                 inkKey={inkTask?.id === task.id ? inkTask.key : null}
+                isSaving={savingTaskIds?.has(task.id) ?? false}
               />
             ))}
           </SortableContext>
@@ -85,11 +88,13 @@ function SortableTaskCard({
   onClick,
   isActive,
   inkKey,
+  isSaving,
 }: {
   task: Task;
   onClick: () => void;
   isActive: boolean;
   inkKey: number | null;
+  isSaving: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
 
@@ -100,6 +105,7 @@ function SortableTaskCard({
         onClick={onClick}
         isDragging={isDragging || isActive}
         inkKey={inkKey}
+        isSaving={isSaving}
         dragAttributes={attributes}
         dragListeners={listeners}
       />

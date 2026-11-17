@@ -124,7 +124,7 @@ export default function SettingsPage() {
         )}
 
         {/* Workspace Paths */}
-        <section className="mb-8 p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
+        <section className="mb-8 p-4 sm:p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
           <div className="flex items-center gap-2 mb-4">
             <FolderOpen className="w-5 h-5 text-mc-text-secondary" />
             <h2 className="text-xl font-semibold text-mc-text">Workspace Paths</h2>
@@ -185,7 +185,7 @@ export default function SettingsPage() {
         </section>
 
         {/* API Configuration */}
-        <section className="mb-8 p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
+        <section className="mb-8 p-4 sm:p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
           <div className="flex items-center gap-2 mb-4">
             <LinkIcon className="w-5 h-5 text-mc-text-secondary" />
             <h2 className="text-xl font-semibold text-mc-text">API Configuration</h2>
@@ -216,7 +216,7 @@ export default function SettingsPage() {
         <RuntimeOpsSettings />
 
         {/* Environment Variables Note */}
-        <section className="p-6 bg-mc-bg border border-mc-border rounded-lg">
+        <section className="p-4 sm:p-6 bg-mc-bg border border-mc-border rounded-lg">
           <h3 className="text-lg font-semibold text-mc-text-secondary mb-2">
             Environment Variables
           </h3>

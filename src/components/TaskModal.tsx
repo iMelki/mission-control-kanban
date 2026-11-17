@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
@@ -24,6 +24,8 @@ import { GitHubIssueDraftPanel } from './task-modal/GitHubIssueDraftPanel';
 import { DispatchContractSection } from './task-modal/DispatchContractSection';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
+import { readTaskStatus, reportServerTask } from '@/lib/board-move-registry';
+import { planDialogStatus } from '@/lib/task-dialog-save';
 import {
   READINESS_LABELS,
   REVIEW_MODE_LABELS,
@@ -45,6 +47,11 @@ interface TaskModalProps {
   task?: Task;
   onClose: () => void;
   workspaceId?: string;
+  /**
+   * Awaited before saving an existing task. The board passes its move controller's
+   * waitForIdle, so a dialog save never races a drag save of the same card.
+   */
+  beforeSave?: (taskId: string) => Promise<void>;
 }
 
 function joinLines(values?: string[]) {
@@ -83,7 +90,7 @@ function buildTaskFormState(task?: Task) {
   };
 }
 
-export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModalProps) {
+export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave }: TaskModalProps) {
   type TaskFormState = ReturnType<typeof buildTaskFormState>;
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,6 +100,10 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   // Auto-switch to planning tab if task is in planning status
   const [activeTab, setActiveTab] = useState<TabType>(initialTask?.status === 'planning' ? 'planning' : 'overview');
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
+  // The card's status when the form was last built from a server copy; the save sends status
+  // only if the user changed it from this. Reset wherever the form is rebuilt from the server.
+  // A ref, not state: only the save handler reads it, so updating it needs no re-render.
+  const openedStatusRef = useRef(form.status);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
@@ -102,6 +113,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   useEffect(() => {
     setCurrentTask(initialTask);
     setForm(buildTaskFormState(initialTask));
+    openedStatusRef.current = buildTaskFormState(initialTask).status;
     setActiveTab(initialTask?.status === 'planning' ? 'planning' : 'overview');
   }, [initialTask]);
 
@@ -215,6 +227,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     setSubmitError(null);
 
     try {
+      // A drag save of this card may still be in flight; let it settle first.
+      if (currentTask && beforeSave) await beforeSave(currentTask.id);
       const url = currentTask ? `/api/tasks/${currentTask.id}` : '/api/tasks';
       const method = currentTask ? 'PATCH' : 'POST';
 
@@ -233,10 +247,31 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
         safety_rules: splitLines(form.dispatch_safety_rules),
       };
 
-      const payload = {
-        ...form,
+      // Never send a stale status: a new task sends its own; an existing task sends status only
+      // when the user changed it here, and only if the card has not moved since the dialog opened.
+      let statusField: { status?: TaskStatus } = {};
+      if (!currentTask) {
         // If planning mode is enabled for new tasks, override status to 'planning'
-        status: (!currentTask && usePlanningMode) ? 'planning' : form.status,
+        statusField = { status: usePlanningMode ? 'planning' : form.status };
+      } else {
+        const plan = await planDialogStatus({
+          openedStatus: openedStatusRef.current,
+          formStatus: form.status,
+          readServerStatus: async (signal) => (await readTaskStatus(currentTask.id, signal))?.status ?? null,
+          laneName: (status) => status.replace('_', ' '),
+        });
+        if (plan.action === 'refuse') {
+          setSubmitError(plan.message);
+          return;
+        }
+        if (plan.action === 'send') statusField = { status: plan.status };
+      }
+      const { status: _formStatus, ...formWithoutStatus } = form;
+      void _formStatus;
+
+      const payload = {
+        ...formWithoutStatus,
+        ...statusField,
         assigned_agent_id: form.assigned_agent_id || null,
         due_date: form.due_date || null,
         workspace_id: workspaceId || currentTask?.workspace_id || 'default',
@@ -252,6 +287,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
       if (res.ok) {
         const savedTask = await res.json();
 
+        // A dialog-save response is a server fact for any board move of this card.
+        reportServerTask(savedTask);
         if (currentTask) {
           setCurrentTask(savedTask);
           updateTask(savedTask);
@@ -614,6 +651,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 onTaskUpdated={(updatedTask) => {
                   setCurrentTask(updatedTask);
                   setForm(buildTaskFormState(updatedTask));
+                  openedStatusRef.current = buildTaskFormState(updatedTask).status;
                   updateTask(updatedTask);
                 }}
               />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -18,22 +18,35 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Plus, AlertTriangle, Hand } from 'lucide-react';
+import { Plus, AlertTriangle, Hand, ListFilter } from 'lucide-react';
 import { Github } from '@/components/icons/BrandIcons';
 import { BoardLane, type BoardLaneColumn } from '@/components/board/board-lane';
 import { TaskCard } from '@/components/board/task-card';
-import { needsCaptain } from '@/components/board/task-status';
+import {
+  NEEDS_YOU_ACCESSIBLE_NAME,
+  applyNeedsYouFilter,
+  buildBoardAnnouncements,
+  countNeedsYou,
+  moveLeavesNeedsYouFilter,
+  presentNeedsYouCountDescription,
+  workspaceScopedTasks,
+  createAnnouncementQueue,
+  settledSaveFailureIds,
+  type MoveDecision,
+} from '@/lib/board-attention';
+import type { MoveOutcome } from '@/lib/board-move-controller';
+import { getBoardMoveController } from '@/lib/board-move-registry';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { presentBoardCount } from '@/lib/cockpit-load-state';
 import { useMissionControl } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import {
-  requiresDispatchContractBeforeWorkStarts,
   summarizeDispatchContract,
   validateDispatchMetadata,
 } from '@/lib/dispatch-contract';
 import { resolveAgentRuntime } from '@/lib/agent-runtimes';
 import type { AgentRuntimeType, Task, TaskStatus } from '@/lib/types';
+
 import { TaskModal } from './TaskModal';
 import { GitHubImportModal } from './GitHubImportModal';
 
@@ -65,15 +78,26 @@ const COLUMNS: BoardLaneColumn[] = [
 const COLUMN_IDS = new Set<string>(COLUMNS.map((column) => column.id));
 const COLUMN_LABELS = new Map<string, string>(COLUMNS.map((column) => [column.id, column.label]));
 
+/**
+ * Save failures (the controller's objects) that a mounted board has committed with
+ * role="alert", i.e. announced. Module-level, like the controllers, so it outlives a tab
+ * switch; weak, so resolved failures are not kept.
+ */
+const liveRenderedFailures = new WeakSet<object>();
+
 // "Ink drying": how long the accent rail layer stays mounted after a move. A
 // little longer than --duration-slower (360ms) so the fade always completes.
 const INK_DRY_MS = 420;
+
+/** The dispatch gate refused a drop (shown once, not a live region: dnd-kit already announced it). */
+type DropError = { kind: 'gated'; message: string };
 
 interface MissionQueueUiState {
   showCreateModal: boolean;
   showGitHubImportModal: boolean;
   editingTask: Task | null;
-  dropError: string | null;
+  /** The dispatch gate refused the drop. Failed saves are not here: the move controller keeps them. */
+  dropError: DropError | null;
   runtimeFilter: RuntimeFilter;
   needsYouOnly: boolean;
 }
@@ -85,7 +109,7 @@ type MissionQueueUiAction =
   | { type: 'close_github_import_modal' }
   | { type: 'edit_task'; task: Task }
   | { type: 'clear_editing_task' }
-  | { type: 'set_drop_error'; error: string | null }
+  | { type: 'set_drop_error'; error: DropError | null }
   | { type: 'set_runtime_filter'; filter: RuntimeFilter }
   | { type: 'toggle_needs_you' };
 
@@ -117,6 +141,7 @@ function missionQueueUiReducer(
       return { ...state, editingTask: null };
     case 'set_drop_error':
       return { ...state, dropError: action.error };
+
     case 'set_runtime_filter':
       return { ...state, runtimeFilter: action.filter };
     case 'toggle_needs_you':
@@ -127,7 +152,7 @@ function missionQueueUiReducer(
 }
 
 export function MissionQueue({ workspaceId }: MissionQueueProps) {
-  const { tasks, updateTaskStatus, addEvent, boardLoadStatus } = useMissionControl();
+  const { tasks, addEvent, boardLoadStatus } = useMissionControl();
   const [uiState, dispatchUi] = useReducer(
     missionQueueUiReducer,
     initialMissionQueueUiState,
@@ -147,6 +172,65 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   const [overStatus, setOverStatus] = useState<TaskStatus | null>(null);
   const [inkTask, setInkTask] = useState<{ id: string; key: number } | null>(null);
   const inkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  // Settled results of moves, spoken once the server has answered (dnd-kit's own region
+  // only speaks at drop time): appended to one polite region and pruned after 8 s.
+  const [moveAnnouncements, setMoveAnnouncements] = useState<readonly { id: number; text: string }[]>([]);
+  const [announcementQueue] = useState(() => createAnnouncementQueue({ onChange: setMoveAnnouncements }));
+  const announceMove = (text: string) => announcementQueue.announce(text);
+  // The workspace's move controller lives outside this component (src/lib/board-move-registry.ts),
+  // so a save in flight, its "Saving…" state and its outcome survive a tab switch.
+  const moveController = getBoardMoveController(workspaceId ?? 'default');
+  // Cards whose save is in flight: shown as busy, and refused as drop sources.
+  const savingTaskIds = useSyncExternalStore(moveController.subscribe, moveController.getSavingSnapshot, moveController.getSavingSnapshot);
+  // Failed saves live in the controller too (one alert per card), so they survive a tab switch.
+  const saveFailures = useSyncExternalStore(moveController.subscribe, moveController.getFailuresSnapshot, moveController.getFailuresSnapshot);
+  // Alerts a board has already rendered live render without role="alert" when restored on mount,
+  // so a tab switch does not re-announce them. A failure that landed while no board was mounted
+  // has not been heard yet, so it stays live on the next mount; so does any new failure.
+  const [quietFailures] = useState(
+    () => new Set(moveController.getFailuresSnapshot().filter((failure) => liveRenderedFailures.has(failure))),
+  );
+  // "Retry move" is moot once the card is in its target lane (the server or another move put
+  // it there), or once a fully loaded board no longer has the card. Those alerts are left out
+  // of the render itself, so a failure that settled while the board was unmounted never
+  // attaches an alert, not even for the frame before the effect below clears it.
+  const settledFailureIds = settledSaveFailureIds(saveFailures, tasks, boardLoadStatus === 'ready');
+  const settledFailureIdSet = new Set(settledFailureIds);
+  const shownFailures = saveFailures.filter((failure) => !settledFailureIdSet.has(failure.taskId));
+  useEffect(() => {
+    // Committed: every alert on screen has now been rendered live (or was already).
+    for (const failure of shownFailures) liveRenderedFailures.add(failure);
+  }, [shownFailures]);
+  // The failure alert that holds focus. An auto-cleared alert leaves the DOM before the effect
+  // that clears it runs, so focus is already lost by then; this says where it was.
+  const focusedFailureId = useRef<string | null>(null);
+  useEffect(() => {
+    const alertIdOf = (node: EventTarget | null) =>
+      node instanceof Element ? node.closest('[data-save-failure]')?.getAttribute('data-save-failure') ?? null : null;
+    const onFocusIn = (event: FocusEvent) => {
+      focusedFailureId.current = alertIdOf(event.target);
+    };
+    const onFocusOut = (event: FocusEvent) => {
+      const left = event.target;
+      // Focus moving to another alert is handled by its focusin.
+      if (alertIdOf(event.relatedTarget) !== null) return;
+      // Decide after the event: a control that is still in the page lost focus to the page
+      // (a click on a blank area), so no alert holds focus any more. A control that was removed
+      // (its alert auto-cleared; some browsers fire focusout then) keeps the id for that clear.
+      queueMicrotask(() => {
+        if (left instanceof Node && left.isConnected && alertIdOf(document.activeElement) === null) {
+          focusedFailureId.current = null;
+        }
+      });
+    };
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+    };
+  }, []);
   const reducedMotion = usePrefersReducedMotion();
 
   const sensors = useSensors(
@@ -161,41 +245,27 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     return runtime.requested_type === runtimeFilter || runtime.effective_type === runtimeFilter;
   };
 
-  const runtimeTasks = tasks.filter(matchesRuntimeFilter);
-  const needsYouCount = runtimeTasks.filter(needsCaptain).length;
-  const visibleTasks = needsYouOnly ? runtimeTasks.filter(needsCaptain) : runtimeTasks;
+  // SSE broadcasts every workspace's task events and the store inserts them as they
+  // arrive, so scope the board (and its "Needs you" count) to this workspace.
+  const workspaceTasks = workspaceScopedTasks(tasks, workspaceId);
+  const runtimeTasks = workspaceTasks.filter(matchesRuntimeFilter);
+  const needsYouCount = countNeedsYou(runtimeTasks);
+  const visibleTasks = applyNeedsYouFilter(runtimeTasks, needsYouOnly);
+  const needsYouCountDescription = presentNeedsYouCountDescription(boardLoadStatus, needsYouCount);
   const getTasksByStatus = (status: TaskStatus) =>
     visibleTasks.filter((task) => task.status === status);
 
-  const taskTitle = (id: UniqueIdentifier) => tasks.find((task) => task.id === id)?.title ?? 'task';
-  const laneLabel = (overId: UniqueIdentifier | undefined) => {
-    if (overId == null) return null;
-    const status = resolveTargetStatus(String(overId));
-    return status ? COLUMN_LABELS.get(status) ?? status : null;
-  };
+  const laneName = (status: TaskStatus) => COLUMN_LABELS.get(status) ?? status;
 
   // Spoken through dnd-kit's polite live region. The move is always announced,
   // which is what reduced motion keeps when the tilt, lift and ink are gone.
-  const announcements: Announcements = {
-    onDragStart: ({ active }) => `Picked up ${taskTitle(active.id)}.`,
-    onDragOver: ({ active, over }) => {
-      const lane = laneLabel(over?.id);
-      return lane ? `${taskTitle(active.id)} is over ${lane}.` : `${taskTitle(active.id)} is not over a lane.`;
-    },
-    onDragEnd: ({ active, over }) => {
-      const lane = laneLabel(over?.id);
-      if (!lane) return `${taskTitle(active.id)} was dropped outside the board.`;
-      const task = tasks.find((candidate) => candidate.id === active.id);
-      const target = over ? resolveTargetStatus(String(over.id)) : null;
-      if (task && target && task.status === target) return `${task.title} stayed in ${lane}.`;
-      // Same synchronous gate moveTask applies; never announce a move it refuses.
-      if (task && target && isGatedByDispatchContract(task, target)) {
-        return `${task.title} cannot move to ${lane} yet: the dispatch contract is incomplete.`;
-      }
-      return `Moved ${taskTitle(active.id)} to ${lane}.`;
-    },
-    onDragCancel: ({ active }) => `Move cancelled. ${taskTitle(active.id)} stayed where it was.`,
-  };
+  const announcements = buildBoardAnnouncements({
+    tasks: workspaceTasks,
+    resolveTargetStatus: (overId) => resolveTargetStatus(overId),
+    laneLabel: laneName,
+    isSaving: (taskId) => moveController.isSaving(taskId),
+    decisionFor: (taskId, target) => moveController.recordedDecision(taskId, target),
+  });
 
   const dropAnimation: DropAnimation | null = reducedMotion
     ? null
@@ -217,71 +287,161 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     return overTask ? overTask.status : null;
   };
 
-  const isGatedByDispatchContract = (task: Task, targetStatus: TaskStatus) =>
-    Boolean(task.github_source)
-    && requiresDispatchContractBeforeWorkStarts(targetStatus)
-    && !validateDispatchMetadata(task.dispatch_metadata).canDispatch;
+  /**
+   * When the focused control disappears (a card leaves the "Needs you" filter, or a
+   * dialog closes after its trigger card left), focus would fall to the document.
+   * Wait until dnd-kit's restore (a frame) and Radix's (a 0 ms timeout after unmount)
+   * have run, then fall back to the board region if focus is still lost.
+   */
+  const focusBoardIfFocusLost = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body || !active.isConnected) boardRef.current?.focus({ preventScroll: true });
+    }, 0)));
+  };
 
-  const moveTask = async (task: Task, targetStatus: TaskStatus) => {
-    if (task.status === targetStatus) return;
+  const handleMoveOutcome = (outcome: MoveOutcome) => {
+    if (outcome.kind === 'saved') {
+      // The ink cross-fade marks a saved move, so it waits for the server.
+      markInkDrying(outcome.taskId);
+      announceMove(`Moved ${outcome.title} to ${laneName(outcome.status)}.`);
+      addEvent({
+        id: crypto.randomUUID(),
+        type: outcome.status === 'done' ? 'task_completed' : 'task_status_changed',
+        task_id: outcome.taskId,
+        message: `Task "${outcome.title}" moved to ${outcome.status}`,
+        created_at: new Date().toISOString(),
+      });
+      return;
+    }
+    if (outcome.kind === 'in-target') {
+      // The card is where the user wanted it, but this save's answer was lost or refused, so
+      // another client may have put it there: no claim, no feed event, no alert. A refusal is
+      // kept by the controller as a quiet (non-live) record with the server's error.
+      announceMove(`${outcome.title} is in ${laneName(outcome.target)}.`);
+      return;
+    }
+    if (outcome.kind === 'superseded' && !outcome.ownSave) {
+      // The save's answer was lost, but the server reported the card in the target before moving
+      // it on. That may have been another client's write, so neither the announcement nor the
+      // feed claims this client moved it. Not a failure either: no alert.
+      announceMove(`${outcome.title} reached ${laneName(outcome.target)}, then the board moved it to ${laneName(outcome.status)}.`);
+      return;
+    }
+    if (outcome.kind === 'superseded') {
+      // The move saved and a later change moved the card on: not a failure, so no alert.
+      announceMove(outcome.confirmed
+        ? `Moved ${outcome.title} to ${laneName(outcome.target)}, then the board moved it to ${laneName(outcome.status)}.`
+        : `Moved ${outcome.title} to ${laneName(outcome.target)}. Its lane changed after that and could not be confirmed. It shows in ${laneName(outcome.status)}.`);
+      addEvent({
+        id: crypto.randomUUID(),
+        type: outcome.target === 'done' ? 'task_completed' : 'task_status_changed',
+        task_id: outcome.taskId,
+        message: `Task "${outcome.title}" moved to ${outcome.target}`,
+        created_at: new Date().toISOString(),
+      });
+      return;
+    }
+    // Failures are recorded by the controller itself and shown from its failure list, each
+    // spoken once by its own role="alert" (so two failures delivered together both stay).
+  };
+
+  const currentLane = (failure: { taskId: string; status: TaskStatus }) =>
+    tasks.find((task) => task.id === failure.taskId)?.status ?? failure.status;
+
+  /**
+   * Remove failure alerts. Focus moves only if it was inside a removed alert (Retry, Dismiss,
+   * or an auto-clear while the user was on it): to the next remaining alert, else the board,
+   * without scrolling. Focus anywhere else is left alone.
+   */
+  const removeSaveFailures = (taskIds: readonly string[]) => {
+    const active = document.activeElement;
+    const focusLost = !active || active === document.body || !active.isConnected;
+    const focusedAlertId = focusLost
+      ? focusedFailureId.current
+      : active.closest('[data-save-failure]')?.getAttribute('data-save-failure');
+    const before = moveController.getFailuresSnapshot();
+    moveController.removeFailures(taskIds);
+    const removed = new Set(taskIds);
+    if (!focusedAlertId || !removed.has(focusedAlertId)) return;
+    const index = before.findIndex((failure) => failure.taskId === focusedAlertId);
+    const remaining = before.filter((failure) => !removed.has(failure.taskId));
+    // The next alert after the focused one that stays, else the last one that stays.
+    const next = before.slice(index + 1).find((failure) => !removed.has(failure.taskId)) ?? remaining[remaining.length - 1];
+    requestAnimationFrame(() => {
+      const target = next
+        ? [...document.querySelectorAll<HTMLElement>('[data-save-failure] button')].find(
+          (element) => element.closest('[data-save-failure]')?.getAttribute('data-save-failure') === next.taskId,
+        )
+        : null;
+      (target ?? boardRef.current)?.focus({ preventScroll: true });
+    });
+  };
+
+  // The controller outlives this component: point it at this render's outcome handler, and
+  // detach on unmount so outcomes that land meanwhile are kept and shown on the next mount.
+  useEffect(() => {
+    moveController.setOutcomeListener(handleMoveOutcome);
+  });
+  useEffect(() => () => moveController.setOutcomeListener(null), [moveController]);
+
+  // Settled alerts are already off screen (shownFailures); clear them in the controller too.
+  const settledFailureKey = settledFailureIds.join(',');
+  useEffect(() => {
+    if (settledFailureKey) removeSaveFailures(settledFailureKey.split(','));
+    // removeSaveFailures only reads the controller, the DOM and a ref; re-run on the ids alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settledFailureKey, moveController]);
+
+  /** Act on a drop decision that was made once, at drop time (see handleDragEnd). */
+  const runMove = (task: Task, targetStatus: TaskStatus, decision: MoveDecision) => {
+    // 'saving': the card's previous move is unanswered; dnd-kit's announcement says so.
+    if (decision === 'stay' || decision === 'saving') return;
 
     dispatchUi({ type: 'set_drop_error', error: null });
+    // A new attempt for this card supersedes its earlier failure.
+    removeSaveFailures([task.id]);
 
-    if (task.github_source && requiresDispatchContractBeforeWorkStarts(targetStatus)) {
+    if (decision === 'gated') {
       const validation = validateDispatchMetadata(task.dispatch_metadata);
-      if (!validation.canDispatch) {
-        const summary = summarizeDispatchContract(task.dispatch_metadata);
-        const message = `${task.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
+      const summary = summarizeDispatchContract(task.dispatch_metadata);
+      const message = `${task.title} cannot move to ${targetStatus.replace('_', ' ')} yet: ${summary.headline}.`;
 
-        dispatchUi({ type: 'set_drop_error', error: `${message} ${validation.blockers.join('; ')}`.trim() });
-        addEvent({
-          id: crypto.randomUUID(),
-          type: 'system',
-          task_id: task.id,
-          message,
-          created_at: new Date().toISOString(),
-        });
-        return;
-      }
+      dispatchUi({ type: 'set_drop_error', error: { kind: 'gated', message: `${message} ${validation.blockers.join('; ')}`.trim() } });
+      addEvent({
+        id: crypto.randomUUID(),
+        type: 'system',
+        task_id: task.id,
+        message,
+        created_at: new Date().toISOString(),
+      });
+      return;
     }
 
-    // Optimistic update
-    updateTaskStatus(task.id, targetStatus);
-    markInkDrying(task.id);
-
-    // Persist to API
-    try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: targetStatus }),
-      });
-
-      if (res.ok) {
-        addEvent({
-          id: crypto.randomUUID(),
-          type: targetStatus === 'done' ? 'task_completed' : 'task_status_changed',
-          task_id: task.id,
-          message: `Task \"${task.title}\" moved to ${targetStatus}`,
-          created_at: new Date().toISOString(),
-        });
-      } else {
-        const data = await res.json().catch(() => ({}));
-        dispatchUi({ type: 'set_drop_error', error: data.error || 'Failed to move task' });
-        updateTaskStatus(task.id, task.status);
-      }
-    } catch (error) {
-      console.error('Failed to update task status:', error);
-      dispatchUi({
-        type: 'set_drop_error',
-        error: error instanceof Error ? error.message : 'Failed to update task status',
-      });
-      // Revert on error
-      updateTaskStatus(task.id, task.status);
+    if (moveLeavesNeedsYouFilter(task, targetStatus, needsYouOnly)) {
+      // The card (and its focused handle) leaves the filtered board.
+      focusBoardIfFocusLost();
     }
+    // Optimistic update, save, timeout and server reconciliation live in the controller.
+    void moveController.start(task, targetStatus);
+  };
+
+  const retryMove = (taskId: string, target: TaskStatus) => {
+    const task = useMissionControl.getState().tasks.find((candidate) => candidate.id === taskId);
+    const decision = task ? moveController.decide(task, target) : 'stay';
+    // Gone, or already in the target lane: nothing to retry, so clear the alert.
+    if (!task || decision === 'stay') {
+      removeSaveFailures([taskId]);
+      return;
+    }
+    // A retry is not a drag, so dnd-kit says nothing: speak a refusal here (the gated box is not live).
+    if (decision === 'gated') announceMove(`${task.title} cannot move to ${laneName(target)} yet: the dispatch contract is incomplete.`);
+    if (decision === 'saving') announceMove(`${task.title} is still being saved.`);
+    runMove(task, target, decision);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    moveController.forgetDrop(String(event.active.id));
     const task = tasks.find((candidate) => candidate.id === event.active.id);
     setActiveTask(task ?? null);
   };
@@ -302,7 +462,9 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
     const targetStatus = resolveTargetStatus(String(over.id));
     if (!targetStatus) return;
 
-    void moveTask(task, targetStatus);
+    // Decide once, here. dnd-kit runs this handler before announcements.onDragEnd, so the
+    // announcement reads this recorded decision instead of re-deciding after the save began.
+    runMove(task, targetStatus, moveController.recordDrop(task, targetStatus));
   };
 
   const handleDragCancel = () => {
@@ -313,38 +475,54 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
   return (
     // min-w-0 lets the board shrink inside the lg row instead of being crushed to a
     // 0px content box (#142). Below lg the cockpit is one scrolling column, so the
-    // queue must not clip: with real data (readiness errors, the blocked-Inbox
-    // banner) the header blocks filled a clipped 60vh box and left the lanes 24px
-    // tall. The board region carries its own mobile height instead (lanes scroll inside it).
+    // queue must not clip: with real data the header blocks filled a clipped 60vh box
+    // and left the lanes 24px tall. The board region carries its own mobile height
+    // instead (lanes scroll inside it).
     <div className="flex-1 min-w-0 lg:min-h-0 flex flex-col lg:overflow-hidden">
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-mc-border p-3">
+      {/* Header: title, count, "Needs you" and actions on one row; the runtime filter joins it on wide screens and drops under it otherwise. */}
+      <div className="px-3 py-2 border-b border-mc-border flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="mr-auto flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-mc-text">Mission Queue</h2>
+          {/* Plain text, not a live region: with "Needs you" on every move changes it, and the
+              move's outcome is already spoken once by the board's own announcement. */}
+          <span className="text-xs text-mc-text-secondary">
+            {presentBoardCount(boardLoadStatus, visibleTasks.length, workspaceTasks.length).text}
+          </span>
           {/* The "needs Captain" answer in one glance: Review plus dispatch-blocked
               Inbox. One of the accent's four uses; pressing it filters the board. */}
           <button
             type="button"
             data-needs-you
+            aria-label={NEEDS_YOU_ACCESSIBLE_NAME}
+            aria-describedby="needs-you-count"
             aria-pressed={needsYouOnly}
             onClick={() => dispatchUi({ type: 'toggle_needs_you' })}
             className={cn(
-              'inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tabular-nums active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-text focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg',
+              'inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tabular-nums active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-text focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg',
               needsYouOnly
-                ? 'bg-mc-accent text-mc-accent-ink ring-2 ring-inset ring-mc-accent-ink/40'
+                // Pressed: a solid ink ring, 10.22:1 against the accent fill (the old /40 ring
+                // composited to 2.31:1, under WCAG 1.4.11's 3:1), plus a filter glyph for the hand.
+                ? 'bg-mc-accent text-mc-accent-ink ring-2 ring-inset ring-mc-accent-ink'
                 : needsYouCount > 0
                   ? 'bg-mc-accent text-mc-accent-ink'
                   : 'bg-mc-bg-tertiary text-mc-text-secondary',
             )}
           >
-            <Hand aria-hidden="true" className="size-3.5" />
-            <span>Needs you</span>
+            {needsYouOnly ? (
+              <ListFilter aria-hidden="true" data-needs-you-filtering className="size-3.5" />
+            ) : (
+              <Hand aria-hidden="true" className="size-3.5" />
+            )}
+            <span aria-hidden="true">Needs you</span>
             <span aria-hidden="true">·</span>
-            <span>{needsYouCount}</span>
-            <span className="sr-only">{needsYouOnly ? ', showing only these' : ', press to show only these'}</span>
+            {/* Before the board settles the count is unknown, not zero (same rule as presentBoardCount).
+                The count is spoken by the polite live region below, not as part of the accessible name. */}
+            <span aria-hidden="true">{boardLoadStatus === 'ready' ? needsYouCount : '–'}</span>
           </button>
-          <span className="text-xs text-mc-text-secondary" role="status">
-            {presentBoardCount(boardLoadStatus, visibleTasks.length, tasks.length).text}
+          {/* A description only, not a live region: a bare number spoken on every optimistic
+              move, revert and SSE update was noise. It is read with the button. */}
+          <span id="needs-you-count" className="sr-only">
+            {needsYouCountDescription}
           </span>
         </div>
         <div role="group" aria-label="Runtime filter" className="order-last flex basis-full flex-wrap items-center gap-1.5 2xl:order-none 2xl:basis-auto">
@@ -353,9 +531,10 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
             <button
               key={filterOption.id}
               type="button"
+              data-runtime-filter-chip
               aria-pressed={runtimeFilter === filterOption.id}
               onClick={() => dispatchUi({ type: 'set_runtime_filter', filter: filterOption.id })}
-              className={`rounded-full border px-2.5 py-0.5 text-xs ${
+              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border px-2.5 py-0.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg ${
                 runtimeFilter === filterOption.id
                   ? 'border-mc-text-secondary/60 bg-mc-bg-tertiary text-mc-text'
                   : 'border-mc-border text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
@@ -369,7 +548,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <button
             type="button"
             onClick={() => dispatchUi({ type: 'open_github_import_modal' })}
-            className="flex items-center gap-2 rounded border border-mc-text-secondary/60 px-3 py-1.5 text-sm font-medium text-mc-text hover:bg-mc-bg-tertiary active:scale-[0.98] transition-transform duration-fast"
+            className="flex items-center gap-2 rounded border border-mc-text-secondary/60 px-3 py-1.5 text-sm font-medium text-mc-text hover:bg-mc-bg-tertiary active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
           >
             <Github className="size-4" />
             Import GitHub
@@ -377,7 +556,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           <button
             type="button"
             onClick={() => dispatchUi({ type: 'open_create_modal' })}
-            className="flex items-center gap-2 rounded bg-mc-accent px-3 py-1.5 text-sm font-semibold text-mc-accent-ink hover:bg-mc-accent/90 active:scale-[0.98] transition-transform duration-fast"
+            className="flex items-center gap-2 rounded bg-mc-accent px-3 py-1.5 text-sm font-semibold text-mc-accent-ink hover:bg-mc-accent/90 active:scale-[0.98] transition-transform duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
           >
             <Plus className="size-4" />
             New Task
@@ -385,16 +564,88 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         </div>
       </div>
 
+      {/* aria-atomic="false": role="status" is atomic by default, which would re-read every earlier
+          "Moved …" still in the region each time one is added. Each announcement is its own node. */}
+      <div role="status" aria-live="polite" aria-atomic="false" aria-relevant="additions" className="sr-only" data-move-announcements>
+        {moveAnnouncements.map((entry) => (
+          <p key={entry.id}>{entry.text}</p>
+        ))}
+      </div>
+
       {dropError && (
-        <div role="alert" className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60">
+        // A gated drop is already spoken by dnd-kit's polite announcement, so this box is not a live region.
+        <div
+          data-drop-error="gated"
+          className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60"
+        >
           <div className="flex items-start gap-2">
-            <AlertTriangle className="size-4 mt-0.5 text-mc-danger" />
+            <AlertTriangle aria-hidden="true" className="size-4 mt-0.5 text-mc-danger" />
             <div className="min-w-0">
               <p className="font-medium">Dispatch move blocked</p>
-              <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">{dropError}</p>
+              <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">{dropError.message}</p>
             </div>
           </div>
         </div>
+      )}
+
+      {shownFailures.length > 0 && (
+      // Bounded and scrollable, so several alerts cannot push the board (and their own buttons) out of view.
+      <div data-save-failures className="max-h-[40vh] shrink-0 overflow-y-auto">
+      {shownFailures.map((failure) => (
+        <div
+          key={failure.taskId}
+          data-drop-error="save-failed"
+          data-save-failure={failure.taskId}
+          data-save-failure-quiet={failure.quiet ? '' : undefined}
+          className={`mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ${failure.quiet ? 'ring-mc-border' : 'ring-mc-danger/60'}`}
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle aria-hidden="true" className={`size-4 mt-0.5 ${failure.quiet ? 'text-mc-text-secondary' : 'text-mc-danger'}`} />
+            <div className="min-w-0">
+              {/* A failed save is spoken here only, once per card. The live node's text is fixed at
+                  failure time, so a later change (the card's lane) cannot make it re-read. A quiet
+                  record (a refused save whose card is in the target anyway) is never live. */}
+              <div role={failure.quiet || quietFailures.has(failure) ? undefined : 'alert'} data-save-failure-message>
+                <p className="font-medium">{failure.quiet ? 'Move refused' : 'Move not saved'}</p>
+                <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">
+                  {failure.quiet
+                    ? `${failure.error}. The server refused this move of ${failure.title} to ${laneName(failure.target)}.`
+                    : failure.retryable
+                    ? `${failure.error}. The server could not confirm the move of ${failure.title} to ${laneName(failure.target)}, so the board shows the last saved lane.`
+                    : `${failure.error}. ${failure.title} was not moved to ${laneName(failure.target)}.`}
+                </p>
+              </div>
+              {/* Not live: the card's lane now (it may have moved since), falling back to the lane at failure time. */}
+              <p data-save-failure-lane className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">
+                {`${failure.title} is in ${laneName(currentLane(failure))}.`}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {failure.retryable && (
+                  <button
+                    type="button"
+                    onClick={() => retryMove(failure.taskId, failure.target)}
+                    // Named per card: several alerts can each have a Retry (WCAG 2.4.6). The
+                    // visible words stay at the start of the name (label in name, 2.5.3).
+                    aria-label={`Retry move of ${failure.title}`}
+                    className="inline-flex min-h-11 items-center rounded border border-mc-text-secondary/60 px-3 text-xs font-medium text-mc-text hover:bg-mc-bg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
+                  >
+                    Retry move
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeSaveFailures([failure.taskId])}
+                  aria-label={`Dismiss ${failure.quiet ? 'note' : 'alert'} for ${failure.title}`}
+                  className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+      </div>
       )}
 
       {/* Kanban Columns */}
@@ -408,6 +659,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
         accessibility={{ announcements }}
       >
         <div
+          ref={boardRef}
           role="region"
           tabIndex={0}
           aria-label="Mission queue board"
@@ -421,6 +673,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
               activeTaskId={activeTask?.id ?? null}
               isDropTarget={activeTask !== null && overStatus === column.id && activeTask.status !== column.id}
               inkTask={inkTask}
+              savingTaskIds={savingTaskIds}
               onCardClick={(task) => dispatchUi({ type: 'edit_task', task })}
             />
           ))}
@@ -433,13 +686,23 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
 
       {/* Modals */}
       {showCreateModal && (
-        <TaskModal onClose={() => dispatchUi({ type: 'close_create_modal' })} workspaceId={workspaceId} />
+        <TaskModal onClose={() => { dispatchUi({ type: 'close_create_modal' }); focusBoardIfFocusLost(); }} workspaceId={workspaceId} />
       )}
       {showGitHubImportModal && (
         <GitHubImportModal onClose={() => dispatchUi({ type: 'close_github_import_modal' })} workspaceId={workspaceId} />
       )}
       {editingTask && (
-        <TaskModal task={editingTask} onClose={() => dispatchUi({ type: 'clear_editing_task' })} workspaceId={workspaceId} />
+        <TaskModal
+          task={editingTask}
+          beforeSave={(taskId) => moveController.waitForIdle(taskId)}
+          onClose={() => {
+            dispatchUi({ type: 'clear_editing_task' });
+            // Saving can move the card out of the "Needs you" filter, removing the trigger
+            // Radix would return focus to.
+            focusBoardIfFocusLost();
+          }}
+          workspaceId={workspaceId}
+        />
       )}
     </div>
   );

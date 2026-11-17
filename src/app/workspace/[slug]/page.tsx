@@ -20,6 +20,8 @@ import { fetchWithBudget } from '@/lib/fetch-budget';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
+import { countGatedInbox } from '@/lib/board-attention';
+import { applyServerTasks, reportServerTasks } from '@/lib/board-move-registry';
 import { extractGitHubSyncNoteGroups, formatSyncCount } from '@/lib/workspace-sync-summary';
 import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
 
@@ -82,9 +84,10 @@ export default function WorkspacePage() {
     }
     const tasksData = await tasksRequest.json<Task[]>();
     debug.api('Loaded tasks', { count: tasksData.length });
-    setTasks(tasksData);
+    // Reports to the move controller and keeps the newer copy of any card (stale-safe merge).
+    applyServerTasks(tasksData);
     setBoardLoadStatus('ready');
-  }, [setBoardLoadStatus, setTasks]);
+  }, [setBoardLoadStatus]);
 
   const retryBoardLoad = useCallback(async (workspaceIdToLoad: string) => {
     setBoardLoadStatus('pending');
@@ -310,8 +313,11 @@ export default function WorkspacePage() {
 
           if (hasChanges || useMissionControl.getState().boardLoadStatus !== 'ready') {
             debug.api('[FALLBACK] Task changes detected, updating store');
-            setTasks(newTasks);
+            applyServerTasks(newTasks);
             setBoardLoadStatus('ready');
+          } else {
+            // No visible change, but still server facts for any card whose move is saving.
+            reportServerTasks(newTasks);
           }
         }
       } catch (error) {
@@ -379,7 +385,9 @@ export default function WorkspacePage() {
     return <CockpitLoadingShell slug={slug} />;
   }
 
-  const gatedInboxCount = tasks.filter((task) => task.status === 'inbox' && (task.dispatch_blockers?.length ?? 0) > 0).length;
+  // The cards the move gate actually holds, in this workspace only: the same rule as
+  // the board's "Needs you" chip and the card's Contract chip (src/lib/board-attention.ts).
+  const gatedInboxCount = countGatedInbox(tasks, workspace.id);
 
   return (
     <div

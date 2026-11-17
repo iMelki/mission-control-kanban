@@ -517,7 +517,8 @@ function AgentRow({
             disabled={isConnecting}
             className={`w-full flex items-center justify-center gap-2 px-2 py-1 rounded text-xs transition-colors ${
               openclawSession
-                ? 'bg-mc-success/20 text-mc-success hover:bg-mc-success/30'
+                // Body text on the green tint: text-mc-success fell to 3.65:1 on a hovered row (#194 review).
+                ? 'bg-mc-success/20 text-mc-text hover:bg-mc-success/30'
                 : 'bg-mc-bg text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text'
             }`}
           >
@@ -548,7 +549,7 @@ function OpenClawButtonContent({
   if (openclawSession) {
     return (
       <>
-        <Zap className="w-3 h-3" />
+        <Zap aria-hidden="true" className="w-3 h-3 text-mc-success" />
         <span>OpenClaw Connected</span>
       </>
     );

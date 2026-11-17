@@ -61,9 +61,37 @@ picks. Spec: `../direction.md` § Direction B, with `../brief.md` and
     0.01 ms).
   - The drop animation is turned off from JS (`usePrefersReducedMotion`),
     because the stylesheet cannot reach WAAPI.
-  - The live region still says "Moved <title> to Review." If the dispatch
-    contract refuses the move, the live region says so instead of claiming the
-    move. The drop-error banner is now `role="alert"`.
+  - The move is still announced, in three steps:
+    - At the drop, dnd-kit's polite live region says "Moving <title> to
+      Review."
+    - Only after the save succeeds, a second polite region (`aria-atomic`
+      false, one node per message) says "Moved <title> to Review."
+    - If the save succeeded but the board then moved the card on, that same
+      polite region says "Moved <title> to Assigned, then the board moved it
+      to In progress." This is not a failure, so there is no alert.
+      - If the board moved the card on and the order cannot be proven, it
+        says "Moved <title> to Assigned. Its lane changed after that and
+        could not be confirmed. It shows in In progress."
+      - If the save's answer was lost but the server reported the card in
+        the target lane before moving it on, it says "<title> reached
+        Assigned, then the board moved it to In progress." That report may
+        come from another client, so the board does not claim the move and
+        logs no feed event for it.
+    - If the save's answer was lost or refused but the card is in the target
+      lane, that region says only "<title> is in Assigned." Another client
+      may have put it there, so the board claims no move and logs no feed
+      event. A refused save also leaves a quiet "Move refused" note with the
+      server's error. It is not a live region, so it is not spoken.
+    - If the save fails or the server keeps another lane, the polite regions
+      say nothing more. Each failed card gets its own "Move not saved" alert
+      (`role="alert"`), spoken once. It names the target lane, and a
+      non-live line under it says which lane the card is in now.
+  - If the dispatch contract refuses the move at the drop, dnd-kit's polite
+    announcement says so instead of claiming the move. The gated-move banner
+    is not a live region, so the refusal is not spoken twice.
+  - (Updated 2026-11-15 for #194. The 2026-11-10 text described a
+    `role="alert"` drop-error banner and failures spoken by the polite region.
+    Neither is current.)
 - **Per-route `document.title`.** Root template `%s · Mission Control`. Route
   layouts set "Settings", "n8n sync history", "Runtime regression", and
   "<workspace name> board". A slug with no row in the database gets
@@ -151,7 +179,7 @@ which scrolls on purpose and is keyboard-focusable.
 | First-load JS `/workspace/[slug]` | 253.6 KB gz vs 252.7 KB on origin/dev (+0.9 KB, +0.36%; budget +10%). This method decodes the URL-encoded `%5Bslug%5D` page chunk. The 212 KB figure in `baseline.md` appears to have missed that chunk. |
 | 390 px overflow, 11 route states (home, board, 4 workspace sections, project board, settings, n8n history, runtime regression, not-found) | scrollWidth = innerWidth on all 11 at 390 and at 1440 |
 | axe-core 4.10.2 (WCAG 2.0, 2.1 and 2.2 A/AA tags), all 11 route states at 390 px | 0 violations |
-| Drag, motion allowed | overlay transform `rotate(-1.5deg) translateY(-2px)`; insertion bar 240 ms; rail ink 360 ms; live region "Moved … to Review." |
+| Drag, motion allowed | overlay transform `rotate(-1.5deg) translateY(-2px)`; insertion bar 240 ms; rail ink 360 ms; live region "Moved … to Review." (now spoken after the PATCH succeeds) |
 | Drag, `prefers-reduced-motion: reduce` | overlay transform `none`; bar and ink 0.01 ms; live region still announces; a gated move says "cannot move … yet" |
 
 The screenshots are not in this repo. They are in

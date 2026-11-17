@@ -408,7 +408,7 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
                   href={workspace.github_project_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-mc-accent hover:underline"
+                  className="inline-flex items-center gap-1 text-mc-text underline decoration-mc-text-secondary/60 underline-offset-2 hover:decoration-mc-text"
                 >
                   Open the Project on GitHub <ExternalLink className="size-3" />
                 </a>
@@ -443,7 +443,7 @@ export function WorkspaceStatusBar({ workspace, githubSync, n8nSync, gatedInboxC
                 </p>
               ) : null}
               {latest?.alert_message && n8nRun?.showMessage ? <p>{latest.alert_message}</p> : null}
-              <Link href="/n8n-sync-history" className="inline-block text-mc-accent hover:underline">
+              <Link href="/n8n-sync-history" className="inline-block text-mc-text underline decoration-mc-text-secondary/60 underline-offset-2 hover:decoration-mc-text">
                 View history
               </Link>
             </DrawerBlock>
