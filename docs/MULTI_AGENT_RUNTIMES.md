@@ -128,7 +128,7 @@ The Webhooks health badge showing **0/0** (zero configured, zero verified) is th
 
 - **OpenClaw covers auto-dispatch.** Agents that should launch automatically use the `openclaw` runtime, not webhooks.
 - **Paperclip is the only planned webhook consumer, and it is not ready.** See [issue #47](https://github.com/iMelki/mission-control-kanban/issues/47) (signed MCK dispatches to Paperclip with lifecycle receipts).
-- **Real signing keys need Ilan's explicit go.** Do not generate, store, or enable webhook signing secrets until that approval is given.
+- **Real signing keys need Captain's explicit go.** Do not generate, store, or enable webhook signing secrets until that approval is given.
 - **The legacy agent-completion path is fail-open without a secret or signature header.** `POST /api/webhooks/agent-completion` only runs signature verification when `MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET` is set or the request includes an `X-MCK-Signature` header ([`src/app/api/webhooks/agent-completion/route.ts` lines 434-449](../src/app/api/webhooks/agent-completion/route.ts)). If both are absent, verification is skipped and a legacy (non-lifecycle-v2) completion payload can still be processed. Lifecycle v2 callbacks later require the secret (same file, lines 470-473), so this gap is the legacy path only.
 
 Until signing is on:
