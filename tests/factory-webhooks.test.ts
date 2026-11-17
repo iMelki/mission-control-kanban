@@ -14,7 +14,7 @@ import {
 } from '../integrations/paperclip-bridge/src/contracts';
 
 process.env.MISSION_CONTROL_URL = 'http://127.0.0.1:3021';
-process.env.PROJECTS_PATH = 'S:/source/CCAI/Assistants';
+process.env.PROJECTS_PATH = 'D:/workspace/assistants';
 process.env.MCK_WEBHOOK_SIGNATURE_SECRET = 'factory-dispatch-secret';
 process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET = 'factory-callback-secret';
 const FACTORY_BASE_SHA = execFileSync(
@@ -269,7 +269,7 @@ function validFactoryDispatchPayload() {
       },
     },
     repository: {
-      path: 'S:/source/CCAI/Assistants/tools/mission-control-kanban',
+      path: 'D:/workspace/assistants/tools/mission-control-kanban',
       slug: 'iMelki/mission-control-kanban',
       originRemote: 'git@github.com:iMelki/mission-control-kanban.git',
       branch: 'dev' as const,
@@ -351,7 +351,7 @@ function validFactoryDispatchPayload() {
       lifecycle: 'http://127.0.0.1:3021/api/webhooks/agent-completion',
     },
     mission_control_url: 'http://127.0.0.1:3021',
-    output_directory: 'S:/source/CCAI/Assistants/tools/mission-control-kanban',
+    output_directory: 'D:/workspace/assistants/tools/mission-control-kanban',
     prompt_markdown: '# Work',
     issued_at: issuedAt,
     factory_contract: {
@@ -891,6 +891,124 @@ test('lifecycle v2 requires the canonical delivery header name', async () => {
     'SELECT delivery_id FROM webhook_callback_deliveries WHERE delivery_id = ?',
     [deliveryId]
   ), undefined);
+});
+
+test('legacy callbacks fail closed without signature secret or header (#213)', async () => {
+  resetDb();
+  seedFactoryTask();
+  const legacyBody = JSON.stringify({
+    task_id: 'task-factory-1',
+    status: 'completed',
+    summary: 'Legacy agent completed work',
+  });
+
+  const originalSecret = process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET;
+  try {
+    // 1. Unset secret and no signature header -> 401 missing_secret
+    delete process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET;
+    const noSecretRes = await completionPost(new NextRequest(
+      'http://127.0.0.1:3021/api/webhooks/agent-completion',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: legacyBody,
+      }
+    ));
+    assert.equal(noSecretRes.status, 401);
+    const noSecretJson = (await noSecretRes.json()) as { error: string; reason: string };
+    assert.equal(noSecretJson.error, 'Invalid webhook signature');
+    assert.equal(noSecretJson.reason, 'missing_secret');
+    assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'assigned');
+    assert.equal(queryOne('SELECT * FROM webhook_callback_deliveries'), undefined);
+
+    // 2. Secret set, but no signature header -> 401 missing_signature
+    process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET = 'factory-callback-secret';
+    const noSigRes = await completionPost(new NextRequest(
+      'http://127.0.0.1:3021/api/webhooks/agent-completion',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: legacyBody,
+      }
+    ));
+    assert.equal(noSigRes.status, 401);
+    const noSigJson = (await noSigRes.json()) as { error: string; reason: string };
+    assert.equal(noSigJson.error, 'Invalid webhook signature');
+    assert.equal(noSigJson.reason, 'missing_signature');
+    assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'assigned');
+    assert.equal(queryOne('SELECT * FROM webhook_callback_deliveries'), undefined);
+
+    // 3. Signature header present, but secret missing -> 401 missing_secret
+    delete process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET;
+    const sigNoSecretRes = await completionPost(new NextRequest(
+      'http://127.0.0.1:3021/api/webhooks/agent-completion',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-MCK-Signature': 'some-sig',
+          'X-MCK-Timestamp': String(Math.floor(Date.now() / 1000)),
+        },
+        body: legacyBody,
+      }
+    ));
+    assert.equal(sigNoSecretRes.status, 401);
+    const sigNoSecretJson = (await sigNoSecretRes.json()) as { error: string; reason: string };
+    assert.equal(sigNoSecretJson.error, 'Invalid webhook signature');
+    assert.equal(sigNoSecretJson.reason, 'missing_secret');
+    assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'assigned');
+
+    // 4. Secret set and signature header invalid -> 401 bad_signature
+    process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET = 'factory-callback-secret';
+    const badSigRes = await completionPost(new NextRequest(
+      'http://127.0.0.1:3021/api/webhooks/agent-completion',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-MCK-Signature': 'invalid-signature-hex',
+          'X-MCK-Timestamp': String(Math.floor(Date.now() / 1000)),
+        },
+        body: legacyBody,
+      }
+    ));
+    assert.equal(badSigRes.status, 401);
+    const badSigJson = (await badSigRes.json()) as { error: string; reason: string };
+    assert.equal(badSigJson.error, 'Invalid webhook signature');
+    assert.equal(badSigJson.reason, 'bad_signature');
+    assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'assigned');
+
+    // 5. Valid signature and delivery id -> accepted and task moved to testing
+    const deliveryId = 'legacy-valid-delivery-1';
+    const timestamp = Math.floor(Date.now() / 1000);
+    const validSignature = signPayload({
+      rawBody: legacyBody,
+      secret: process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET,
+      timestamp,
+      deliveryId,
+    });
+    const validRes = await completionPost(new NextRequest(
+      'http://127.0.0.1:3021/api/webhooks/agent-completion',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-MCK-Delivery-ID': deliveryId,
+          'X-MCK-Timestamp': String(timestamp),
+          'X-MCK-Signature': validSignature,
+        },
+        body: legacyBody,
+      }
+    ));
+    assert.equal(validRes.status, 200);
+    assert.equal(queryOne<{ status: string }>('SELECT status FROM tasks WHERE id = ?', ['task-factory-1'])?.status, 'testing');
+  } finally {
+    if (originalSecret !== undefined) {
+      process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET = originalSecret;
+    } else {
+      delete process.env.MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET;
+    }
+  }
 });
 
 test('callback body reader rejects oversized declared and chunked bodies before authentication', async () => {

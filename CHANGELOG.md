@@ -9,7 +9,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Design-token drift check (2026-10-18)** - `npm run design:drift` runs
+  Dembrandt 0.39.2 (pinned, through `npx`) against `/`, `/workspace/default`
+  and `/settings`. It compares the rendered design tokens with the baseline in
+  `docs/design-drift/baseline/` and fails when a route's drift score is above
+  10. Use `--update-baseline` after an intended visual change. Chromium comes
+  from the repo's Playwright install over CDP, so the check downloads no extra
+  browser. A non-blocking `Design drift` job in Runtime Regression runs it on
+  every pull request. See `docs/design-drift.md`.
+
+- **Static, backend-free demo build and the Direction B "Evolve" look (2026-10-22, #196, stacked on #194)** -
+  `npm run build:demo` (sets `NEXT_PUBLIC_DEMO_MODE=1`) exports a static site
+  to `out-demo/` that runs in the browser on fictional fixtures (6 agents, 22
+  tasks) behind a "Demo with sample data" banner. API routes are left out of
+  that build, `/api` calls are answered from fixtures, and operator-only
+  panels show "Not available in the demo". A normal `npm run build` contains
+  none of the demo code or fixtures. Caveat: `build:demo` also writes its
+  build into `.next/`, so run `npm run build` again before `next start` in a
+  checkout where the demo was built. The Evolve pass adds warm graphite
+  tokens with one yellow accent, extracts `BoardLane` and `TaskCard` from
+  `MissionQueue` (closes #48) with a "Needs you" filter chip, and sweeps raw
+  palette literals to `mc-*` tokens. Merged with dev's #197 status bar: the
+  runtime filter and board count live in the board header, GitHub status and
+  the Inbox gate live in the status bar. All nine captured surfaces were
+  re-probed at the merge commit.
+
 ### Fixed
+
+- **`dev:n8n` binds MCK to 127.0.0.1 only (2026-11-12)** - `npm run dev:n8n`
+  used `--hostname 0.0.0.0`, which published the Next dev server on every
+  interface. It now binds `127.0.0.1:3021`.
+  `tests/env-example-port.test.mjs` rejects any `0.0.0.0` in that script.
+  [docs/N8N_SCHEDULED_SYNC.md](docs/N8N_SCHEDULED_SYNC.md) records why the
+  twice-daily n8n schedule can stop reporting (n8n/Docker down, workflow
+  inactive, or Docker `mck.host` pointing at a Tailscale/LAN IP that cannot
+  reach a localhost-only MCK) and the operator steps to bring it back
+  without opening n8n beyond loopback.
+
+- **Commit the Next.js agent-rules block in `AGENTS.md` (2026-10-05, #187)** -
+  Next.js 16.3 `next dev` writes a managed `<!-- BEGIN:nextjs-agent-rules -->`
+  block into `AGENTS.md` whenever it detects an AI coding agent and the block
+  is missing or stale. That left the live checkout's tracked `AGENTS.md`
+  modified after every start, so the next governed start was refused with
+  `tracked-source-changes`. The block is now committed exactly as Next.js
+  16.3.6 writes it (the same bytes as the live checkout's diff), as
+  content-factory and command-center already do, so a start leaves
+  `git status --porcelain` empty. `tests/agents-md-next-rules.test.mjs` asks the
+  installed Next.js (`hasCurrentAgentRules`) whether `next dev` would rewrite
+  the file, so a Next.js upgrade that changes the block text fails `npm test`
+  in its own pull request instead of at the next live start.
 
 - **Route-level regression tests for every receipt identity field (2026-09-27)** -
   The completion webhook route binds a completed receipt to its persisted

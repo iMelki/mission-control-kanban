@@ -51,7 +51,7 @@ bridge responds.
     "dispatch": "http://mck/api/tasks/task-id/dispatch"
   },
   "mission_control_url": "http://127.0.0.1:3021",
-  "output_directory": "S:/source/CCAI/Assistants/projects/task-title",
+  "output_directory": "<workspace-root>/projects/task-title",
   "prompt_markdown": "# Mission Control handoff\n...",
   "issued_at": "2026-07-01T00:00:00.000Z"
 }
@@ -108,7 +108,7 @@ fields:
     "lifecycle": "http://127.0.0.1:3021/api/webhooks/agent-completion"
   },
   "mission_control_url": "http://127.0.0.1:3021",
-  "output_directory": "S:/source/CCAI/Assistants/tools/mission-control-kanban",
+  "output_directory": "<workspace-root>/tools/mission-control-kanban",
   "prompt_markdown": "# Mission Control handoff\n...",
   "issued_at": "2026-07-29T00:00:00.000Z",
   "factory_contract": {

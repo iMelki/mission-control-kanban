@@ -12,14 +12,14 @@ interface CandidateTask {
 }
 
 function statusTone(status?: string) {
-  if (status === 'done') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
-  if (status === 'review' || status === 'testing') return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  if (status === 'done') return 'border-mc-success/30 bg-mc-success/10 text-mc-text';
+  if (status === 'review' || status === 'testing') return 'border-mc-warn/30 bg-mc-warn/10 text-mc-text';
   return 'border-mc-border bg-mc-bg-tertiary text-mc-text-secondary';
 }
 
 function NodeCard({ title, status, note, active }: { title?: string; status?: string; note?: string | null; active?: boolean }) {
   return (
-    <div className={`rounded border p-2 text-sm ${active ? 'border-mc-accent/50 bg-mc-accent/10' : 'border-mc-border bg-mc-bg'}`}>
+    <div className={`rounded border p-2 text-sm ${active ? 'border-mc-text-secondary/60 bg-mc-bg-tertiary' : 'border-mc-border bg-mc-bg'}`}>
       <div className="line-clamp-2 font-medium text-mc-text">{title || 'Untitled task'}</div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-mc-text-secondary">
         {status && <span className={`rounded border px-1.5 py-0.5 ${statusTone(status)}`}>{status.replace('_', ' ')}</span>}
@@ -106,7 +106,7 @@ export function TaskDependenciesPanel({ task }: { task: Pick<Task, 'id' | 'title
     <section className="rounded border border-mc-border bg-mc-bg-secondary p-3 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-start gap-2">
-          <Link2 className="mt-0.5 size-4 text-mc-accent" />
+          <Link2 className="mt-0.5 size-4 text-mc-text-secondary" />
           <div>
             <h3 className="text-sm font-semibold">Task dependencies / blocked-by</h3>
             <p className="text-xs text-mc-text-secondary">Track local dependency edges before multi-agent work starts. The compact graph keeps DAG navigation visible without adding a heavy graph dependency.</p>
@@ -114,7 +114,7 @@ export function TaskDependenciesPanel({ task }: { task: Pick<Task, 'id' | 'title
         </div>
         <DependencyBadges blockedBy={blockedBy} blocking={blocking} compact />
       </div>
-      {error && <div className="rounded border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{error}</div>}
+      {error && <div className="rounded border border-mc-danger/30 bg-mc-danger/10 px-3 py-2 text-xs text-mc-text">{error}</div>}
       <DependencyGraph task={task} blockedBy={blockedBy} blocking={blocking} />
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <select value={selectedTask} onChange={(event) => setSelectedTask(event.target.value)} className="w-full rounded border border-mc-border bg-mc-bg px-3 py-2 text-sm">

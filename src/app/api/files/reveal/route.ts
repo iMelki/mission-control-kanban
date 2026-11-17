@@ -1,15 +1,13 @@
 /**
  * File Reveal API
- * Opens a file's location in Finder (macOS) or Explorer (Windows)
+ * Opens a file's location in Finder (macOS), Explorer (Windows), or the
+ * default file manager (Linux, via xdg-open on the containing folder)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { existsSync } from 'fs';
 import path from 'path';
-
-const execAsync = promisify(exec);
+import { resolvePathWithinBases } from '@/lib/path-containment';
+import { revealInFileManager } from '@/lib/reveal-in-file-manager';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,11 +27,12 @@ export async function POST(request: NextRequest) {
     ].filter(Boolean) as string[];
 
     const normalizedPath = path.normalize(expandedPath);
-    const isAllowed = allowedPaths.some(allowed =>
-      normalizedPath.startsWith(path.normalize(allowed))
-    );
 
-    if (!isAllowed) {
+    // Containment is checked on real paths with `base + path.sep`, so sibling-prefix
+    // paths and symlinks escaping the allowed directories are rejected.
+    const contained = await resolvePathWithinBases(normalizedPath, allowedPaths);
+
+    if (!contained.ok && contained.reason === 'outside-base') {
       console.warn(`[FILE] Blocked access to: ${filePath}`);
       return NextResponse.json(
         { error: 'Path not in allowed directories' },
@@ -42,27 +41,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if file/directory exists
-    if (!existsSync(normalizedPath)) {
+    if (!contained.ok) {
       return NextResponse.json(
         { error: 'File or directory not found', path: normalizedPath },
         { status: 404 }
       );
     }
 
-    // Open in Finder (macOS) - reveal the file
-    const platform = process.platform;
-    let command: string;
-
-    if (platform === 'darwin') {
-      command = `open -R "${normalizedPath}"`;
-    } else if (platform === 'win32') {
-      command = `explorer /select,"${normalizedPath}"`;
-    } else {
-      // Linux - open containing folder
-      command = `xdg-open "${path.dirname(normalizedPath)}"`;
-    }
-
-    await execAsync(command);
+    // Reveal the contained real path. The opener is run with an argv array and
+    // no shell, so metacharacters in the path are never interpreted.
+    await revealInFileManager(contained.realPath);
 
     console.log(`[FILE] Revealed: ${normalizedPath}`);
     return NextResponse.json({ success: true, path: normalizedPath });

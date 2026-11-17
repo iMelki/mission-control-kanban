@@ -1,6 +1,7 @@
 const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
+const { assertStatusBar } = require('./smoke-status-bar');
 const {
   verifyRuntimeSmokeCleanup,
   writeRuntimeSmokeCleanupReceipt,
@@ -283,6 +284,8 @@ async function main() {
         throw new Error(`${viewport.name} viewport has document-level horizontal overflow`);
       }
     }
+
+    await assertStatusBar(browser, baseUrl, artifactDir);
 
     if (consoleErrors.length) {
       throw new Error(`Browser console errors: ${consoleErrors.join('\n')}`);

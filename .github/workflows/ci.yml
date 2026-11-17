@@ -62,3 +62,67 @@ jobs:
       - run: npm test
       - run: npm run test:migrations
       - run: npm run build
+
+  board-attention:
+    name: Board attention
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24.18.0"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run board attention tests
+        run: npm run test:board-attention -- --test-reporter=spec
+
+  openclaw-protocol:
+    name: OpenClaw protocol
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24.18.0"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run OpenClaw protocol tests
+        run: npm run test:openclaw-protocol -- --test-reporter=spec
+
+  github-sync:
+    name: GitHub sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24.18.0"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run GitHub sync tests
+        run: npm run test:github-sync -- --test-reporter=spec
+      # The root `npm test` chain is not run in CI, so the path-containment
+      # suite (file download/preview/reveal routes) runs here explicitly.
+      - name: Run file path containment tests
+        run: npm run test:file-path-containment -- --test-reporter=spec
+
+  env-example-port:
+    name: Env example port
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24.18.0"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run env-example-port tests
+        run: npm run test:env-example-port -- --test-reporter=spec

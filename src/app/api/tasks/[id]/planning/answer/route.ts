@@ -231,12 +231,14 @@ If planning is complete, respond with JSON:
                 planning_complete = 1,
                 planning_spec = ?,
                 planning_agents = ?,
-                status = 'inbox'
+                status = 'inbox',
+                updated_at = ?
             WHERE id = ?
           `).run(
             JSON.stringify(messages),
             JSON.stringify(parsed.spec),
             JSON.stringify(parsed.agents),
+            new Date().toISOString(),
             taskId
           );
 

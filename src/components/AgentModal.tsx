@@ -143,7 +143,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-mc-accent text-mc-accent'
+                  ? 'border-mc-text text-mc-text'
                   : 'border-transparent text-mc-text-secondary hover:text-mc-text'
               }`}
             >
@@ -315,7 +315,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
                 trigger={
                   <button
                     type="button"
-                    className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
+                    className="flex items-center gap-2 px-3 py-2 text-mc-danger hover:bg-mc-danger/10 rounded text-sm"
                   >
                     <Trash2 className="w-4 h-4" />
                     Delete
@@ -345,7 +345,7 @@ export function AgentModal({ agent, onClose, workspaceId, onAgentCreated }: Agen
               type="submit"
               form="agent-form"
               disabled={isSubmitting}
-              className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-accent-ink rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               {isSubmitting ? 'Saving...' : 'Save'}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, ChevronLeft, Loader2, RefreshCw, SearchX } from 'lucide-react';
+import { ChevronLeft, SearchX } from 'lucide-react';
 import { CockpitLoadingShell } from '@/components/CockpitLoadingShell';
 import { Header } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
@@ -14,95 +14,21 @@ import { WorkspaceRuntimePolicyPanel } from '@/components/WorkspaceRuntimePolicy
 import { DispatchFailureQueue } from '@/components/DispatchFailureQueue';
 import { RuntimeAuditPanel } from '@/components/RuntimeAuditPanel';
 import { WorkspaceSectionTabs, type WorkspaceSection } from '@/components/workspace/WorkspaceSectionTabs';
+import { WorkspaceStatusBar, type GitHubSyncState } from '@/components/workspace/WorkspaceStatusBar';
 import { isCockpitSettled } from '@/lib/cockpit-load-state';
 import { fetchWithBudget } from '@/lib/fetch-budget';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
-import { presentMckN8nSyncRun } from '@/lib/n8n-sync-presentation';
+import { countGatedInbox } from '@/lib/board-attention';
+import { applyServerTasks, reportServerTasks } from '@/lib/board-move-registry';
+import { extractGitHubSyncNoteGroups, formatSyncCount } from '@/lib/workspace-sync-summary';
 import type { MckN8nSyncStatusResponse, Task, Workspace } from '@/lib/types';
-
-const SYNC_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
-  month: 'short',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-function formatSyncTimestamp(value?: string): string {
-  if (!value) {
-    return 'never';
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return 'unknown time';
-  }
-
-  // react-doctor-disable-next-line -- Client-only operator page; sync timestamps render in the operator's locale on purpose.
-  return SYNC_TIMESTAMP_FORMATTER.format(parsed);
-}
-
-function formatSyncCount(value: unknown): number {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatReconciliationSuffix(summary: Record<string, unknown>): string {
-  const statusReconciled = formatSyncCount(summary.status_reconciled);
-  const driftWarnings = formatSyncCount(summary.upstream_drift_warnings);
-  if (statusReconciled === 0 && driftWarnings === 0) {
-    return '';
-  }
-
-  return `, ${statusReconciled} status reconciled, ${driftWarnings} upstream drift warning${driftWarnings === 1 ? '' : 's'}`;
-}
-
-function extractGitHubSyncStatusNotes(payload: Record<string, unknown>): string[] {
-  const details = Array.isArray(payload.details) ? payload.details : [];
-  const notes: string[] = [];
-
-  for (const detail of details) {
-    if (!detail || typeof detail !== 'object') continue;
-    const detailRecord = detail as Record<string, unknown>;
-    if (detailRecord.action !== 'status_reconcile' && detailRecord.action !== 'drift') continue;
-
-    const issue = typeof detailRecord.issue === 'string' ? `${detailRecord.issue}: ` : '';
-    const reason = typeof detailRecord.reason === 'string'
-      ? detailRecord.reason
-      : String(detailRecord.action);
-    notes.push(`${issue}${reason}`);
-
-    if (notes.length === 3) break;
-  }
-
-  return notes;
-}
-
-function formatSyncCadence(status: MckN8nSyncStatusResponse['latest']): string {
-  const cadence = status?.raw_payload?.scheduleCadence;
-  if (!cadence || typeof cadence !== 'object' || Array.isArray(cadence)) {
-    return 'configured schedule';
-  }
-
-  const cadenceRecord = cadence as Record<string, unknown>;
-  const schedule = Array.isArray(cadenceRecord.schedule)
-    ? cadenceRecord.schedule.map((item) => String(item)).join(', ')
-    : '';
-  const timezone = typeof cadenceRecord.timezone === 'string' ? cadenceRecord.timezone : '';
-
-  return [schedule, timezone].filter(Boolean).join(' ') || 'configured schedule';
-}
-
 
 type WorkspacePageState = {
   workspace: Workspace | null;
   notFound: boolean;
-  githubSyncState: {
-    state: 'idle' | 'syncing' | 'success' | 'error';
-    message?: string;
-    statusNotes?: string[];
-  };
+  githubSyncState: GitHubSyncState;
   n8nSyncStatus: MckN8nSyncStatusResponse | null;
   section: WorkspaceSection;
 };
@@ -132,6 +58,7 @@ export default function WorkspacePage() {
     setEventsLoadStatus,
     resetCockpitData,
     boardLoadStatus,
+    tasks,
   } = useMissionControl();
 
   const [pageState, setPageState] = useReducer(workspacePageReducer, initialWorkspacePageState);
@@ -157,9 +84,10 @@ export default function WorkspacePage() {
     }
     const tasksData = await tasksRequest.json<Task[]>();
     debug.api('Loaded tasks', { count: tasksData.length });
-    setTasks(tasksData);
+    // Reports to the move controller and keeps the newer copy of any card (stale-safe merge).
+    applyServerTasks(tasksData);
     setBoardLoadStatus('ready');
-  }, [setBoardLoadStatus, setTasks]);
+  }, [setBoardLoadStatus]);
 
   const retryBoardLoad = useCallback(async (workspaceIdToLoad: string) => {
     setBoardLoadStatus('pending');
@@ -209,7 +137,8 @@ export default function WorkspacePage() {
       setGitHubSyncState({
         state: 'success',
         message: `Workspace sync complete: ${imported} imported, ${updated} updated, ${moved} moved.${statusSuffix}`,
-        statusNotes: extractGitHubSyncStatusNotes(syncPayload),
+        noteGroups: extractGitHubSyncNoteGroups(syncPayload),
+        counts: { imported, updated, moved, statusReconciled, driftWarnings },
       });
     } catch (error) {
       setGitHubSyncState({
@@ -384,8 +313,11 @@ export default function WorkspacePage() {
 
           if (hasChanges || useMissionControl.getState().boardLoadStatus !== 'ready') {
             debug.api('[FALLBACK] Task changes detected, updating store');
-            setTasks(newTasks);
+            applyServerTasks(newTasks);
             setBoardLoadStatus('ready');
+          } else {
+            // No visible change, but still server facts for any card whose move is saving.
+            reportServerTasks(newTasks);
           }
         }
       } catch (error) {
@@ -432,13 +364,13 @@ export default function WorkspacePage() {
       <div className="min-h-screen bg-mc-bg flex items-center justify-center">
         <main id="main-content" tabIndex={-1} className="text-center outline-none">
           <SearchX aria-hidden="true" className="w-14 h-14 mx-auto mb-4 text-mc-text-secondary" />
-          <h1 className="text-2xl font-bold mb-2">Workspace Not Found</h1>
+          <h1 className="mb-2">Workspace Not Found</h1>
           <p className="text-mc-text-secondary mb-6">
             The workspace &ldquo;{slug}&rdquo; doesn&apos;t exist.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-mc-accent text-mc-accent-ink rounded-lg font-medium hover:bg-mc-accent/90"
           >
             <ChevronLeft className="w-4 h-4" />
             Back to Dashboard
@@ -453,12 +385,9 @@ export default function WorkspacePage() {
     return <CockpitLoadingShell slug={slug} />;
   }
 
-  const latestN8nSync = n8nSyncStatus?.latest ?? null;
-  const n8nSummary = (latestN8nSync?.summary ?? {}) as Record<string, unknown>;
-  const n8nSyncPresentation = latestN8nSync ? presentMckN8nSyncRun(latestN8nSync) : null;
-  const n8nSyncCounts = latestN8nSync
-    ? `${formatSyncCount(n8nSummary.scanned_items)} scanned, ${formatSyncCount(n8nSummary.updated)} updated, ${formatSyncCount(n8nSummary.errors)} errors${formatReconciliationSuffix(n8nSummary)}`
-    : 'no recorded runs yet';
+  // The cards the move gate actually holds, in this workspace only: the same rule as
+  // the board's "Needs you" chip and the card's Contract chip (src/lib/board-attention.ts).
+  const gatedInboxCount = countGatedInbox(tasks, workspace.id);
 
   return (
     <div
@@ -485,83 +414,13 @@ export default function WorkspacePage() {
       )}
       {section === 'settings' && <WorkspaceRuntimePolicyPanel workspace={workspace} onWorkspaceUpdated={setWorkspace} />}
 
-      {workspace.github_project_owner && workspace.github_project_number && (
-        <div className="border-b border-mc-border bg-mc-bg-secondary px-4 py-2">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-col gap-1 text-sm text-mc-text-secondary">
-              <div className="flex flex-wrap items-center gap-2">
-                {githubSyncState.state === 'syncing' ? (
-                  <Loader2 className="size-4 animate-spin text-mc-accent-cyan" />
-                ) : githubSyncState.state === 'error' ? (
-                  <AlertTriangle className="size-4 text-rose-300" />
-                ) : githubSyncState.state === 'success' ? (
-                  <CheckCircle2 className="size-4 text-emerald-300" />
-                ) : (
-                  <RefreshCw className="size-4 text-mc-accent-cyan" />
-                )}
-                <span>
-                  GitHub Project #{workspace.github_project_number}
-                  {workspace.github_project_title ? ` (${workspace.github_project_title})` : ''} is the source for this workspace.
-                </span>
-                {githubSyncState.message && (
-                  <span className={githubSyncState.state === 'error' ? 'text-rose-200' : 'text-mc-text-secondary'}>
-                    {githubSyncState.message}
-                  </span>
-                )}
-              </div>
-              {githubSyncState.statusNotes && githubSyncState.statusNotes.length > 0 && (
-                <div className="flex items-start gap-2 text-amber-200">
-                  <AlertTriangle className="size-4 mt-0.5 shrink-0" />
-                  <div className="space-y-0.5">
-                    <span className="block">GitHub/MCK status reconciliation is visible for this sync.</span>
-                    {githubSyncState.statusNotes.map((note: string) => (
-                      <span key={note} className="block text-xs text-amber-100/90">{note}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className={n8nSyncPresentation?.state === 'error'
-                ? 'flex flex-wrap items-center gap-2 text-rose-200'
-                : n8nSyncPresentation?.state === 'warning'
-                  ? 'flex flex-wrap items-center gap-2 text-amber-200'
-                  : 'flex flex-wrap items-center gap-2 text-mc-text-secondary'}>
-                {n8nSyncPresentation?.state === 'error' ? (
-                  <AlertTriangle className="size-4 shrink-0" />
-                ) : n8nSyncPresentation?.state === 'warning' ? (
-                  <AlertTriangle className="size-4 shrink-0 text-amber-300" />
-                ) : n8nSyncPresentation ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
-                ) : (
-                  <RefreshCw className="size-4 shrink-0" />
-                )}
-                <span>
-                  n8n sync: {n8nSyncPresentation?.label ?? 'waiting for first scheduled run'}
-                </span>
-                <span>
-                  Last run {formatSyncTimestamp(latestN8nSync?.received_at)} - {n8nSyncCounts} - {formatSyncCadence(latestN8nSync)}
-                </span>
-                <Link href="/n8n-sync-history" className="text-mc-accent-cyan hover:text-mc-accent">
-                  View history
-                </Link>
-                {latestN8nSync?.alert_message && n8nSyncPresentation?.showMessage && (
-                  <span>{latestN8nSync.alert_message}</span>
-                )}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => void runGitHubProjectSync(workspace, 'manual')}
-              disabled={githubSyncState.state === 'syncing'}
-              aria-label="Sync workspace now from GitHub Project"
-              title="Sync workspace now from GitHub Project"
-              className="inline-flex items-center gap-2 rounded border border-mc-border px-3 py-1.5 text-sm hover:bg-mc-bg-tertiary disabled:opacity-50"
-            >
-              {githubSyncState.state === 'syncing' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-              Sync now
-            </button>
-          </div>
-        </div>
-      )}
+      <WorkspaceStatusBar
+        workspace={workspace}
+        githubSync={githubSyncState}
+        n8nSync={n8nSyncStatus}
+        gatedInboxCount={gatedInboxCount}
+        onSyncNow={() => void runGitHubProjectSync(workspace, 'manual')}
+      />
 
       <main id="main-content" tabIndex={-1} className="flex flex-1 min-h-0 flex-col overflow-hidden outline-none">
         {section === 'board' && (

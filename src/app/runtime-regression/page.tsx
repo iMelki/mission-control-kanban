@@ -77,11 +77,11 @@ export default function RuntimeRegressionPage() {
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-mc-accent">
+            <div className="mb-2 flex items-center gap-2 text-mc-text">
               <Activity className="size-5" />
               <span className="text-xs font-semibold uppercase tracking-[0.2em]">Runtime proof</span>
             </div>
-            <h1 className="text-3xl font-bold">Runtime Regression Evidence</h1>
+            <h1>Runtime Regression Evidence</h1>
             <p className="mt-2 max-w-3xl text-sm text-mc-text-secondary">
               Operator-facing drilldown for the latest local runtime UI smoke artifacts. GitHub Actions artifacts still live on the workflow run; local screenshots stay under the ignored artifact directory.
             </p>
@@ -96,7 +96,7 @@ export default function RuntimeRegressionPage() {
           </button>
         </div>
 
-        <section className={`rounded-lg border p-5 ${payload?.recent ? 'border-emerald-400/30 bg-emerald-500/10' : 'border-amber-400/30 bg-amber-500/10'}`}>
+        <section className={`rounded-lg border p-5 ${payload?.recent ? 'border-mc-success/30 bg-mc-success/10' : 'border-mc-warn/30 bg-mc-warn/10'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm uppercase tracking-wide text-mc-text-secondary">Latest proof</div>
@@ -119,8 +119,8 @@ export default function RuntimeRegressionPage() {
               </div>
               <div className="rounded border border-mc-border bg-mc-bg p-3">
                 <div className="mb-1 text-xs uppercase text-mc-text-secondary">Artifact path</div>
-                <code className="break-all text-xs text-mc-accent">{latest.path}</code>
-                {latest.ci_run_url && <a href={latest.ci_run_url} className="mt-2 inline-flex items-center gap-1 text-xs text-mc-accent hover:underline"><ExternalLink className="size-3" /> CI run</a>}
+                <code className="break-all text-xs text-mc-text">{latest.path}</code>
+                {latest.ci_run_url && <a href={latest.ci_run_url} className="mt-2 inline-flex items-center gap-1 text-xs text-mc-text underline decoration-mc-text-secondary/60 underline-offset-2"><ExternalLink className="size-3" /> CI run</a>}
               </div>
             </div>
           )}
@@ -138,13 +138,13 @@ export default function RuntimeRegressionPage() {
 
         <section className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-mc-border bg-mc-bg-secondary p-5">
-            <div className="mb-2 flex items-center gap-2 font-semibold"><Terminal className="size-4 text-mc-accent" /> Local command</div>
-            <code className="block rounded border border-mc-border bg-mc-bg p-3 text-sm text-mc-accent">{payload?.local_command ?? 'npm run check:runtime-regressions'}</code>
+            <div className="mb-2 flex items-center gap-2 font-semibold"><Terminal className="size-4 text-mc-text-secondary" /> Local command</div>
+            <code className="block rounded border border-mc-border bg-mc-bg p-3 text-sm text-mc-text">{payload?.local_command ?? 'npm run check:runtime-regressions'}</code>
             <p className="mt-3 text-sm text-mc-text-secondary">Runs React Doctor changed-scope plus the browser runtime UI smoke and writes screenshots under {payload?.artifact_root ?? 'artifacts/runtime-ui-smoke'}.</p>
           </div>
           <div className="rounded-lg border border-mc-border bg-mc-bg-secondary p-5">
-            <div className="mb-2 flex items-center gap-2 font-semibold"><ExternalLink className="size-4 text-mc-accent" /> CI workflow</div>
-            <code className="block rounded border border-mc-border bg-mc-bg p-3 text-sm text-mc-accent">{payload?.ci_workflow ?? '.github/workflows/runtime-regression.yml'}</code>
+            <div className="mb-2 flex items-center gap-2 font-semibold"><ExternalLink className="size-4 text-mc-text-secondary" /> CI workflow</div>
+            <code className="block rounded border border-mc-border bg-mc-bg p-3 text-sm text-mc-text">{payload?.ci_workflow ?? '.github/workflows/runtime-regression.yml'}</code>
             <p className="mt-3 text-sm text-mc-text-secondary">Use <code>npm run comment:runtime-artifacts -- --dry-run</code> to preview the latest GitHub Actions run and artifact links.</p>
           </div>
         </section>

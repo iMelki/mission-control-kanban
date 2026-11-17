@@ -64,11 +64,11 @@ export function SessionsList({ taskId }: SessionsListProps) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'active':
-        return <Circle className="w-4 h-4 text-green-500 fill-current animate-pulse" />;
+        return <Circle className="w-4 h-4 text-mc-success fill-current animate-pulse" />;
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-mc-accent" />;
+        return <CheckCircle className="w-4 h-4 text-mc-text-secondary" />;
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 text-mc-danger" />;
       default:
         return <Circle className="w-4 h-4 text-mc-text-secondary" />;
     }
@@ -211,7 +211,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
               <button
               type="button"
                 onClick={() => handleMarkComplete(session.openclaw_session_id)}
-                className="p-1.5 hover:bg-mc-bg-tertiary rounded text-green-500"
+                className="p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-success"
                 title="Mark as complete"
               >
                 <Check className="w-4 h-4" />
@@ -225,7 +225,7 @@ export function SessionsList({ taskId }: SessionsListProps) {
               trigger={
                 <button
                   type="button"
-                  className="p-1.5 hover:bg-mc-bg-tertiary rounded text-red-500"
+                  className="p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-danger"
                   title="Delete session"
                 >
                   <Trash2 className="w-4 h-4" />

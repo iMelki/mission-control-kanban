@@ -23,13 +23,13 @@ shared sourcing workflow before any new UI component lands in `src/components`.
 Copy the 7-field record from the shared prompt
 `agent-settings/shared/prompts/frontend-component-sourcing.md` (resolve your local
 `agent-settings` checkout via the `AGENT_SETTINGS_ROOT` environment variable; on the
-canonical operator machine that is `S:\source\CCAI\Assistants\agent-settings`)
+canonical operator machine that is `<workspace-root>\agent-settings`)
 into `records/<date>-<slug>.md`, fill every field, and add a `Covers:` line naming the
 component file(s). Validate the record body with the shared PowerShell checker:
 
 ```powershell
 # Set AGENT_SETTINGS_ROOT to your local agent-settings checkout first, e.g.
-#   $env:AGENT_SETTINGS_ROOT = 'S:\source\CCAI\Assistants\agent-settings'
+#   $env:AGENT_SETTINGS_ROOT = '<workspace-root>\agent-settings'
 pwsh -File $env:AGENT_SETTINGS_ROOT\shared\tools\Test-FrontendComponentSourcingPreflight.ps1 `
   -BodyFile docs\preflight\records\<date>-<slug>.md -RequireKnownPoolMention -Json
 ```

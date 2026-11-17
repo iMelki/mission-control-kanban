@@ -44,7 +44,10 @@ Two independent sync paths exist, and adding a workspace only wires the first:
   workflow lives in the n8n instance, not in this repo, and carries its own
   workspace slug list (recorded per run in `n8n_sync_runs.workspaces`). Adding a
   workspace here does **not** add it to that schedule; the slug has to be added
-  on the n8n side as a separate, operator-approved change.
+  on the n8n side as a separate, operator-approved change. The schedule is
+  twice daily at 09:00 and 17:00 Asia/Jerusalem; if the board drawer says
+  it has not reported within 32 hours, see
+  [N8N_SCHEDULED_SYNC.md](N8N_SCHEDULED_SYNC.md).
 
 ## Sync Behavior
 

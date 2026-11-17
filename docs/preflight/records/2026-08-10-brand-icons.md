@@ -17,7 +17,7 @@ visual drift across the eight GitHub-surface components.
   — no existing icon-shim or brand-icon primitive; the only prior source of
   the glyph was the lucide-react package itself, which dropped it in 1.0.
 - Component Marketplace primitive checked: the local Component Marketplace
-  (S:\source\Component-Marketplace\component-marketplace) carries no
+  (`<workspace-root>\Component-Marketplace\component-marketplace`) carries no
   brand-icon or lucide-shim primitive; it consumes lucide-react directly and
   uses no brand icons (verified during the same alignment pass).
 - External pools checked or deliberately skipped: lucide 1.x itself removed

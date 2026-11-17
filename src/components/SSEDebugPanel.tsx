@@ -83,8 +83,8 @@ export function SSEDebugPanel() {
         className="flex items-center gap-2 px-3 py-2 bg-mc-bg-secondary border border-mc-border rounded-lg shadow-lg text-sm"
       >
         {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        <span className="text-mc-accent">Debug</span>
-        <span className="bg-mc-accent text-mc-bg px-2 py-0.5 rounded text-xs">
+        <span className="text-mc-text">Debug</span>
+        <span className="bg-mc-bg-tertiary text-mc-text px-2 py-0.5 rounded text-xs">
           {logs.length}
         </span>
       </button>
@@ -110,7 +110,7 @@ export function SSEDebugPanel() {
               logs.map((log, i) => (
                 <div key={i} className="p-2 bg-mc-bg rounded border border-mc-border">
                   <div className="flex justify-between text-mc-text-secondary">
-                    <span className="text-mc-accent">{log.type}</span>
+                    <span className="text-mc-text">{log.type}</span>
                     <span>{log.timestamp.toLocaleTimeString()}</span>
                   </div>
                   {log.data !== null && log.data !== undefined && (

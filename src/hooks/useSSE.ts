@@ -9,9 +9,10 @@
 import { useEffect, useRef } from 'react';
 import { useMissionControl } from '@/lib/store';
 import { subscribeTaskStream } from '@/lib/task-sse-stream';
+import { taskStreamHandlers } from '@/lib/board-move-registry';
 
 export function useSSE() {
-  const { updateTask, addTask, selectedTask, setSelectedTask } = useMissionControl();
+  const { selectedTask, setSelectedTask } = useMissionControl();
   const selectedTaskRef = useRef(selectedTask);
 
   useEffect(() => {
@@ -19,14 +20,12 @@ export function useSSE() {
   }, [selectedTask]);
 
   useEffect(() => {
-    return subscribeTaskStream({
-      onTaskCreated: addTask,
-      onTaskUpdated: (incomingTask) => {
-        updateTask(incomingTask);
-        if (selectedTaskRef.current?.id === incomingTask.id) {
-          setSelectedTask(incomingTask);
-        }
-      },
-    });
-  }, [addTask, updateTask, setSelectedTask]);
+    // taskStreamHandlers reports each task's server status to the board's move controller
+    // (at the source, before the store write) and then updates the store.
+    return subscribeTaskStream(taskStreamHandlers((incomingTask) => {
+      if (selectedTaskRef.current?.id === incomingTask.id) {
+        setSelectedTask(incomingTask);
+      }
+    }));
+  }, [setSelectedTask]);
 }

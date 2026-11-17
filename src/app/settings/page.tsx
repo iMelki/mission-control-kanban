@@ -68,8 +68,8 @@ export default function SettingsPage() {
             >
               ← Back
             </button>
-            <Settings className="w-6 h-6 text-mc-accent" />
-            <h1 className="text-2xl font-bold text-mc-text">Settings</h1>
+            <Settings className="w-6 h-6 text-mc-text-secondary" />
+            <h1 className="text-mc-text">Settings</h1>
           </div>
 
           <div className="flex items-center gap-2">
@@ -101,7 +101,7 @@ export default function SettingsPage() {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-4 py-2 bg-mc-accent text-mc-bg rounded hover:bg-mc-accent/90 flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 bg-mc-accent text-mc-accent-ink rounded hover:bg-mc-accent/90 flex items-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               {isSaving ? 'Saving...' : 'Save Changes'}
@@ -124,9 +124,9 @@ export default function SettingsPage() {
         )}
 
         {/* Workspace Paths */}
-        <section className="mb-8 p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
+        <section className="mb-8 p-4 sm:p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
           <div className="flex items-center gap-2 mb-4">
-            <FolderOpen className="w-5 h-5 text-mc-accent" />
+            <FolderOpen className="w-5 h-5 text-mc-text-secondary" />
             <h2 className="text-xl font-semibold text-mc-text">Workspace Paths</h2>
           </div>
           <p className="text-sm text-mc-text-secondary mb-4">
@@ -185,9 +185,9 @@ export default function SettingsPage() {
         </section>
 
         {/* API Configuration */}
-        <section className="mb-8 p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
+        <section className="mb-8 p-4 sm:p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
           <div className="flex items-center gap-2 mb-4">
-            <LinkIcon className="w-5 h-5 text-mc-accent" />
+            <LinkIcon className="w-5 h-5 text-mc-text-secondary" />
             <h2 className="text-xl font-semibold text-mc-text">API Configuration</h2>
           </div>
           <p className="text-sm text-mc-text-secondary mb-4">
@@ -216,21 +216,21 @@ export default function SettingsPage() {
         <RuntimeOpsSettings />
 
         {/* Environment Variables Note */}
-        <section className="p-6 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <h3 className="text-lg font-semibold text-blue-400 mb-2">
+        <section className="p-4 sm:p-6 bg-mc-bg border border-mc-border rounded-lg">
+          <h3 className="text-lg font-semibold text-mc-text-secondary mb-2">
             Environment Variables
           </h3>
-          <p className="text-sm text-blue-300 mb-3">
+          <p className="text-sm text-mc-text mb-3">
             Some settings are also configurable via environment variables in <code className="px-2 py-1 bg-mc-bg rounded">.env.local</code>:
           </p>
-          <ul className="text-sm text-blue-300 space-y-1 ml-4 list-disc">
+          <ul className="text-sm text-mc-text space-y-1 ml-4 list-disc">
             <li><code>MISSION_CONTROL_URL</code> - API URL override</li>
             <li><code>WORKSPACE_BASE_PATH</code> - Base workspace directory</li>
             <li><code>PROJECTS_PATH</code> - Projects directory</li>
             <li><code>OPENCLAW_GATEWAY_URL</code> - Gateway WebSocket URL</li>
             <li><code>OPENCLAW_GATEWAY_TOKEN</code> - Gateway auth token</li>
           </ul>
-          <p className="text-xs text-blue-400 mt-3">
+          <p className="text-xs text-mc-text-secondary mt-3">
             Environment variables take precedence over UI settings for server-side operations.
           </p>
         </section>

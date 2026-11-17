@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
+import { resolvePathWithinBases } from '@/lib/path-containment';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,16 +37,18 @@ export async function GET(request: NextRequest) {
     process.env.PROJECTS_PATH?.replace(/^~/, process.env.HOME || ''),
   ].filter(Boolean) as string[];
 
-  const isAllowed = allowedPaths.some(allowed =>
-    normalizedPath.startsWith(path.normalize(allowed))
-  );
-
-  if (!isAllowed) {
-    return NextResponse.json({ error: 'Path not allowed' }, { status: 403 });
-  }
-
   try {
-    const content = await readPreviewFile(normalizedPath);
+    // Containment is checked on real paths with `base + path.sep`, so sibling-prefix
+    // paths and symlinks escaping the allowed directories are rejected.
+    const contained = await resolvePathWithinBases(normalizedPath, allowedPaths);
+    if (!contained.ok) {
+      if (contained.reason === 'not-found') {
+        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'Path not allowed' }, { status: 403 });
+    }
+
+    const content = await readPreviewFile(contained.realPath);
     return new NextResponse(content, {
       headers: {
         'Content-Type': 'text/html',

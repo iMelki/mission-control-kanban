@@ -79,12 +79,12 @@ export function WorkspaceDashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🦞</span>
-              <h1 className="text-xl font-bold">Mission Control</h1>
+              <h1>Mission Control</h1>
             </div>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
+              className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-accent-ink rounded-lg font-medium hover:bg-mc-accent/90"
             >
               <Plus className="w-4 h-4" />
               New Workspace
@@ -96,7 +96,7 @@ export function WorkspaceDashboard() {
       {/* Main Content */}
       <main id="main-content" tabIndex={-1} className="max-w-7xl mx-auto px-6 py-8 outline-none">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-2">All Workspaces</h2>
+          <h2 className="text-lg font-bold mb-2">All Workspaces</h2>
           <p className="text-mc-text-secondary">
             Select a cockpit workspace. Project-backed workspaces mirror GitHub Projects into local MCK tasks.
           </p>
@@ -114,7 +114,7 @@ export function WorkspaceDashboard() {
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90"
+              className="px-6 py-3 bg-mc-accent text-mc-accent-ink rounded-lg font-medium hover:bg-mc-accent/90"
             >
               Create Workspace
             </button>
@@ -133,7 +133,7 @@ export function WorkspaceDashboard() {
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="border-2 border-dashed border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-colors flex flex-col items-center justify-center gap-3 min-h-[200px]"
+              className="border-2 border-dashed border-mc-border rounded-xl p-6 hover:border-mc-text-secondary/60 transition-colors flex flex-col items-center justify-center gap-3 min-h-[200px]"
             >
               <div className="w-12 h-12 rounded-full bg-mc-bg-tertiary flex items-center justify-center">
                 <Plus className="w-6 h-6 text-mc-text-secondary" />
@@ -190,12 +190,12 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
   return (
     <>
     <Link href={`/workspace/${workspace.slug}`}>
-      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-6 hover:border-mc-accent/50 transition-[border-color,box-shadow] hover:shadow-lg cursor-pointer group relative">
+      <div className="bg-mc-bg-secondary border border-mc-border rounded-xl p-6 hover:border-mc-text-secondary/60 transition-[border-color,box-shadow] hover:shadow-lg cursor-pointer group relative">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <EntityEmoji emoji={workspace.icon} kind="workspace" hidden className="text-3xl" />
             <div>
-              <h3 className="font-semibold text-lg group-hover:text-mc-accent transition-colors">
+              <h3 className="font-semibold text-lg group-hover:text-mc-text transition-colors">
                 {workspace.name}
               </h3>
               <p className="text-sm text-mc-text-secondary">/{workspace.slug}</p>
@@ -210,14 +210,14 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
                   e.stopPropagation();
                   setShowDeleteConfirm(true);
                 }}
-                className="p-1.5 rounded hover:bg-mc-accent-red/20 text-mc-text-secondary hover:text-mc-accent-red transition-colors opacity-0 group-hover:opacity-100"
+                className="p-1.5 rounded hover:bg-mc-danger/20 text-mc-text-secondary hover:text-mc-danger transition-colors opacity-0 group-hover:opacity-100"
                 aria-label={`Delete ${workspace.name} workspace`}
                 title="Delete workspace"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            <ArrowRight className="w-5 h-5 text-mc-text-secondary group-hover:text-mc-accent transition-colors" />
+            <ArrowRight className="w-5 h-5 text-mc-text-secondary group-hover:text-mc-text transition-colors" />
           </div>
         </div>
 
@@ -236,7 +236,7 @@ function WorkspaceCard({ workspace, onDelete }: { workspace: WorkspaceStats; onD
         {workspace.github_project_owner && workspace.github_project_number && (
           <div className="mt-4 rounded border border-mc-border/70 bg-mc-bg px-3 py-2 text-xs text-mc-text-secondary">
             <div className="flex items-center gap-2">
-              <Github className="size-3.5 text-mc-accent-cyan" />
+              <Github className="size-3.5 text-mc-text-secondary" />
               <span className="font-medium text-mc-text">
                 GitHub Project #{workspace.github_project_number}
               </span>
@@ -332,8 +332,8 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
                   aria-label={`Select ${workspaceIcon} workspace icon`}
                   className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-colors ${
                     icon === workspaceIcon
-                      ? 'bg-mc-accent/20 border-2 border-mc-accent'
-                      : 'bg-mc-bg border border-mc-border hover:border-mc-accent/50'
+                      ? 'bg-mc-bg-tertiary border-2 border-mc-text'
+                      : 'bg-mc-bg border border-mc-border hover:border-mc-text-secondary/60'
                   }`}
                 >
                   {workspaceIcon}
@@ -356,7 +356,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
           </div>
 
           {error && (
-            <div className="text-mc-accent-red text-sm">{error}</div>
+            <div className="text-mc-danger text-sm">{error}</div>
           )}
 
           <div className="flex justify-end gap-3 pt-4">
@@ -370,7 +370,7 @@ function CreateWorkspaceModal({ onClose, onCreated }: { onClose: () => void; onC
             <button
               type="submit"
               disabled={!name.trim() || isSubmitting}
-              className="px-6 py-2 bg-mc-accent text-mc-bg rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+              className="px-6 py-2 bg-mc-accent text-mc-accent-ink rounded-lg font-medium hover:bg-mc-accent/90 disabled:opacity-50"
             >
               {isSubmitting ? 'Creating...' : 'Create Workspace'}
             </button>

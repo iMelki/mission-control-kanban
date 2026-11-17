@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { ActivityLog } from './ActivityLog';
@@ -24,6 +24,8 @@ import { GitHubIssueDraftPanel } from './task-modal/GitHubIssueDraftPanel';
 import { DispatchContractSection } from './task-modal/DispatchContractSection';
 import { buildManualHandoffPrompt, resolveAgentRuntime } from '@/lib/agent-runtimes';
 import { getMissionControlUrl, getProjectsPath } from '@/lib/config';
+import { readTaskStatus, reportServerTask } from '@/lib/board-move-registry';
+import { planDialogStatus } from '@/lib/task-dialog-save';
 import {
   READINESS_LABELS,
   REVIEW_MODE_LABELS,
@@ -45,6 +47,11 @@ interface TaskModalProps {
   task?: Task;
   onClose: () => void;
   workspaceId?: string;
+  /**
+   * Awaited before saving an existing task. The board passes its move controller's
+   * waitForIdle, so a dialog save never races a drag save of the same card.
+   */
+  beforeSave?: (taskId: string) => Promise<void>;
 }
 
 function joinLines(values?: string[]) {
@@ -83,7 +90,7 @@ function buildTaskFormState(task?: Task) {
   };
 }
 
-export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModalProps) {
+export function TaskModal({ task: initialTask, onClose, workspaceId, beforeSave }: TaskModalProps) {
   type TaskFormState = ReturnType<typeof buildTaskFormState>;
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,6 +100,10 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   // Auto-switch to planning tab if task is in planning status
   const [activeTab, setActiveTab] = useState<TabType>(initialTask?.status === 'planning' ? 'planning' : 'overview');
   const [form, setForm] = useState(() => buildTaskFormState(initialTask));
+  // The card's status when the form was last built from a server copy; the save sends status
+  // only if the user changed it from this. Reset wherever the form is rebuilt from the server.
+  // A ref, not state: only the save handler reads it, so updating it needs no re-render.
+  const openedStatusRef = useRef(form.status);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [handoffCopyState, setHandoffCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [dispatchDryRun, setDispatchDryRun] = useState<Record<string, unknown> | null>(null);
@@ -102,6 +113,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   useEffect(() => {
     setCurrentTask(initialTask);
     setForm(buildTaskFormState(initialTask));
+    openedStatusRef.current = buildTaskFormState(initialTask).status;
     setActiveTab(initialTask?.status === 'planning' ? 'planning' : 'overview');
   }, [initialTask]);
 
@@ -125,10 +137,10 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
   });
 
   const dispatchSummaryClass = dispatchPreview.tone === 'success'
-    ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-100'
+    ? 'border-mc-success/25 bg-mc-success/10 text-mc-text'
     : dispatchPreview.tone === 'warning'
-      ? 'border-amber-500/25 bg-amber-500/10 text-amber-100'
-      : 'border-rose-500/25 bg-rose-500/10 text-rose-100';
+      ? 'border-mc-warn/25 bg-mc-warn/10 text-mc-text'
+      : 'border-mc-danger/25 bg-mc-danger/10 text-mc-text';
   const fieldIdPrefix = currentTask?.id ? `task-modal-${currentTask.id}` : 'task-modal-new';
   const inputId = (name: string) => `${fieldIdPrefix}-${name}`;
   const assignedAgent = agents.find((candidate) => candidate.id === form.assigned_agent_id) || currentTask?.assigned_agent || null;
@@ -215,6 +227,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
     setSubmitError(null);
 
     try {
+      // A drag save of this card may still be in flight; let it settle first.
+      if (currentTask && beforeSave) await beforeSave(currentTask.id);
       const url = currentTask ? `/api/tasks/${currentTask.id}` : '/api/tasks';
       const method = currentTask ? 'PATCH' : 'POST';
 
@@ -233,10 +247,31 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
         safety_rules: splitLines(form.dispatch_safety_rules),
       };
 
-      const payload = {
-        ...form,
+      // Never send a stale status: a new task sends its own; an existing task sends status only
+      // when the user changed it here, and only if the card has not moved since the dialog opened.
+      let statusField: { status?: TaskStatus } = {};
+      if (!currentTask) {
         // If planning mode is enabled for new tasks, override status to 'planning'
-        status: (!currentTask && usePlanningMode) ? 'planning' : form.status,
+        statusField = { status: usePlanningMode ? 'planning' : form.status };
+      } else {
+        const plan = await planDialogStatus({
+          openedStatus: openedStatusRef.current,
+          formStatus: form.status,
+          readServerStatus: async (signal) => (await readTaskStatus(currentTask.id, signal))?.status ?? null,
+          laneName: (status) => status.replace('_', ' '),
+        });
+        if (plan.action === 'refuse') {
+          setSubmitError(plan.message);
+          return;
+        }
+        if (plan.action === 'send') statusField = { status: plan.status };
+      }
+      const { status: _formStatus, ...formWithoutStatus } = form;
+      void _formStatus;
+
+      const payload = {
+        ...formWithoutStatus,
+        ...statusField,
         assigned_agent_id: form.assigned_agent_id || null,
         due_date: form.due_date || null,
         workspace_id: workspaceId || currentTask?.workspace_id || 'default',
@@ -252,6 +287,8 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
       if (res.ok) {
         const savedTask = await res.json();
 
+        // A dialog-save response is a server fact for any board move of this card.
+        reportServerTask(savedTask);
         if (currentTask) {
           setCurrentTask(savedTask);
           updateTask(savedTask);
@@ -380,7 +417,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'text-mc-accent border-b-2 border-mc-accent'
+                    ? 'text-mc-text border-b-2 border-mc-text'
                     : 'text-mc-text-secondary hover:text-mc-text'
                 }`}
               >
@@ -424,34 +461,34 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
           </div>
 
           {submitError && (
-            <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10">
+            <div className="p-3 rounded-lg border border-mc-danger/20 bg-mc-danger/10">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="size-4 text-rose-300 mt-0.5" />
+                <AlertTriangle className="size-4 text-mc-danger mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-rose-200">Task update failed</p>
-                  <p className="mt-1 text-xs text-rose-100">{submitError}</p>
+                  <p className="text-sm font-medium text-mc-text">Task update failed</p>
+                  <p className="mt-1 text-xs text-mc-text">{submitError}</p>
                 </div>
               </div>
             </div>
           )}
 
           {currentTask?.dispatch_blockers && currentTask.dispatch_blockers.length > 0 && (
-            <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10">
+            <div className="p-3 rounded-lg border border-mc-danger/20 bg-mc-danger/10">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="size-4 text-rose-300 mt-0.5" />
+                <AlertTriangle className="size-4 text-mc-danger mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-rose-200">Dispatch is currently blocked</p>
-                  <p className="mt-1 text-xs text-rose-100">
+                  <p className="text-sm font-medium text-mc-text">Dispatch is currently blocked</p>
+                  <p className="mt-1 text-xs text-mc-text">
                     The task can stay in <strong>Inbox</strong>, but moving it into active states like
                     <strong> Assigned</strong>, <strong>In Progress</strong>, <strong>Testing</strong>,
                     <strong> Review</strong>, or <strong>Done</strong> is blocked until the dispatch contract below is complete.
                   </p>
-                  <ul className="mt-1 text-xs text-rose-100 space-y-1 list-disc list-inside">
+                  <ul className="mt-1 text-xs text-mc-text space-y-1 list-disc list-inside">
                     {currentTask.dispatch_blockers.map((blocker) => (
                       <li key={blocker}>{blocker}</li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-xs text-amber-100">
+                  <p className="mt-2 text-xs text-mc-text">
                     Why this exists: imported GitHub tasks should not leave Inbox until scope, tests,
                     impact, and rollback containment are explicit enough for safe execution.
                   </p>
@@ -473,7 +510,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 />
                 <div>
                   <span className="font-medium text-sm flex items-center gap-2">
-                    <ClipboardList className="size-4 text-mc-accent" />
+                    <ClipboardList className="size-4 text-mc-text-secondary" />
                     Enable Planning Mode
                   </span>
                   <p className="text-xs text-mc-text-secondary mt-1">
@@ -543,7 +580,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                   {agent.name} - {agent.role}
                 </option>
               ))}
-              <option value="__add_new__" className="text-mc-accent">
+              <option value="__add_new__">
                 + Add new agent…
               </option>
             </select>
@@ -552,7 +589,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 <span className="font-medium text-mc-text">Runtime: {assignedRuntime.label}</span>
                 {assignedRuntime.reason && (
                   <details className="text-mc-text-secondary">
-                    <summary className="cursor-pointer text-amber-100">Why dispatch is disabled / manual</summary>
+                    <summary className="cursor-pointer text-mc-text">Why dispatch is disabled / manual</summary>
                     <p className="mt-1 max-w-xl">{assignedRuntime.reason}. Assignment still tracks ownership; use Copy handoff unless this agent is configured for OpenClaw/webhook dispatch and auto-dispatch is enabled.</p>
                   </details>
                 )}
@@ -614,6 +651,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 onTaskUpdated={(updatedTask) => {
                   setCurrentTask(updatedTask);
                   setForm(buildTaskFormState(updatedTask));
+                  openedStatusRef.current = buildTaskFormState(updatedTask).status;
                   updateTask(updatedTask);
                 }}
               />
@@ -664,7 +702,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                   trigger={
                     <button
                       type="button"
-                      className="flex items-center gap-2 px-3 py-2 text-mc-accent-red hover:bg-mc-accent-red/10 rounded text-sm"
+                      className="flex items-center gap-2 px-3 py-2 text-mc-danger hover:bg-mc-danger/10 rounded text-sm"
                     >
                       <Trash2 className="size-4" />
                       Delete
@@ -694,7 +732,7 @@ export function TaskModal({ task: initialTask, onClose, workspaceId }: TaskModal
                 type="submit"
                 form={`${fieldIdPrefix}-form`}
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-mc-accent text-mc-accent-ink rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
               >
                 <Save className="size-4" />
                 {isSubmitting ? 'Saving…' : 'Save'}
