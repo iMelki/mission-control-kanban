@@ -650,6 +650,47 @@ test('two clients: another client moves the card to the target and on while this
   await view.unmount();
 });
 
+test('a lost answer with the card in its target lane is announced neutrally ("is in"), with no move feed event and no alert', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  m.store.useMissionControl.getState().setEvents([]);
+  stubFetch(async (url, init) => {
+    if (init?.method === 'PATCH') return Promise.reject(new TypeError('Failed to fetch'));
+    if (url.endsWith('/api/tasks/a')) return json(card('a', 'Alpha', 'assigned', { updated_at: '2026-11-15T10:00:01.000Z' }));
+    return undefined;
+  });
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); });
+  assert.equal(statusOf('a'), 'assigned');
+  assert.equal(alerts(view.container).length, 0);
+  const spoken = [...view.container.querySelectorAll('[data-move-announcements] > *')].map((node) => node.textContent);
+  assert.deepEqual(spoken, ['Alpha is in Assigned.']);
+  assert.deepEqual(m.store.useMissionControl.getState().events.filter((event) => event.task_id === 'a'), [], 'no feed event claims the move');
+  await view.unmount();
+});
+
+test('a refused save while another client put the card in its target: neutral text, a quiet (non-live) record with the server error, no feed event', async () => {
+  seedBoard([card('a', 'Alpha', 'inbox')]);
+  m.store.useMissionControl.getState().setEvents([]);
+  stubFetch(async (url, init) => {
+    if (init?.method === 'PATCH') return json({ error: 'Validation failed' }, 400);
+    if (url.endsWith('/api/tasks/a')) return json(card('a', 'Alpha', 'assigned', { updated_at: '2026-11-15T10:00:01.000Z' }));
+    return undefined;
+  });
+  const view = await mount(m.React.createElement(m.MissionQueue, { workspaceId: WS }));
+  await m.React.act(async () => { await moveCard('a', 'assigned'); });
+  await m.React.act(async () => { await wait(20); });
+  assert.equal(statusOf('a'), 'assigned');
+  const spoken = [...view.container.querySelectorAll('[data-move-announcements] > *')].map((node) => node.textContent);
+  assert.deepEqual(spoken, ['Alpha is in Assigned.']);
+  assert.equal(liveAlerts(view.container).length, 0, 'not an alert: the card is where the user wanted it');
+  const notes = alerts(view.container);
+  assert.equal(notes.length, 1, 'the refusal is recorded');
+  assert.match(notes[0].textContent ?? '', /Validation failed/);
+  assert.equal(button(notes[0], 'Retry move'), undefined);
+  assert.deepEqual(m.store.useMissionControl.getState().events.filter((event) => event.task_id === 'a'), [], 'no feed event');
+  await view.unmount();
+});
+
 test('each alert\'s buttons are named for their card (WCAG 2.4.6), keeping the visible words first (2.5.3)', async () => {
   seedBoard([card('a', 'Alpha', 'inbox'), card('b', 'Beta', 'inbox')]);
   failingFetch(['a', 'b']);

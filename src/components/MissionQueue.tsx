@@ -314,6 +314,13 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
       });
       return;
     }
+    if (outcome.kind === 'in-target') {
+      // The card is where the user wanted it, but this save's answer was lost or refused, so
+      // another client may have put it there: no claim, no feed event, no alert. A refusal is
+      // kept by the controller as a quiet (non-live) record with the server's error.
+      announceMove(`${outcome.title} is in ${laneName(outcome.target)}.`);
+      return;
+    }
     if (outcome.kind === 'superseded' && !outcome.ownSave) {
       // The save's answer was lost, but the server reported the card in the target before moving
       // it on. That may have been another client's write, so neither the announcement nor the
@@ -589,17 +596,21 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
           key={failure.taskId}
           data-drop-error="save-failed"
           data-save-failure={failure.taskId}
-          className="mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ring-mc-danger/60"
+          data-save-failure-quiet={failure.quiet ? '' : undefined}
+          className={`mx-3 mt-3 rounded-lg bg-mc-bg-secondary px-3 py-2 text-sm text-mc-text ring-1 ring-inset ${failure.quiet ? 'ring-mc-border' : 'ring-mc-danger/60'}`}
         >
           <div className="flex items-start gap-2">
-            <AlertTriangle aria-hidden="true" className="size-4 mt-0.5 text-mc-danger" />
+            <AlertTriangle aria-hidden="true" className={`size-4 mt-0.5 ${failure.quiet ? 'text-mc-text-secondary' : 'text-mc-danger'}`} />
             <div className="min-w-0">
               {/* A failed save is spoken here only, once per card. The live node's text is fixed at
-                  failure time, so a later change (the card's lane) cannot make it re-read. */}
-              <div role={quietFailures.has(failure) ? undefined : 'alert'} data-save-failure-message>
-                <p className="font-medium">Move not saved</p>
+                  failure time, so a later change (the card's lane) cannot make it re-read. A quiet
+                  record (a refused save whose card is in the target anyway) is never live. */}
+              <div role={failure.quiet || quietFailures.has(failure) ? undefined : 'alert'} data-save-failure-message>
+                <p className="font-medium">{failure.quiet ? 'Move refused' : 'Move not saved'}</p>
                 <p className="mt-1 text-xs text-mc-text [overflow-wrap:anywhere]">
-                  {failure.retryable
+                  {failure.quiet
+                    ? `${failure.error}. The server refused this move of ${failure.title} to ${laneName(failure.target)}.`
+                    : failure.retryable
                     ? `${failure.error}. The server could not confirm the move of ${failure.title} to ${laneName(failure.target)}, so the board shows the last saved lane.`
                     : `${failure.error}. ${failure.title} was not moved to ${laneName(failure.target)}.`}
                 </p>
@@ -624,7 +635,7 @@ export function MissionQueue({ workspaceId }: MissionQueueProps) {
                 <button
                   type="button"
                   onClick={() => removeSaveFailures([failure.taskId])}
-                  aria-label={`Dismiss alert for ${failure.title}`}
+                  aria-label={`Dismiss ${failure.quiet ? 'note' : 'alert'} for ${failure.title}`}
                   className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-mc-text-secondary hover:bg-mc-bg-tertiary hover:text-mc-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mc-accent focus-visible:ring-offset-2 focus-visible:ring-offset-mc-bg"
                 >
                   Dismiss

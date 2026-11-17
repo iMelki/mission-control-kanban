@@ -257,6 +257,8 @@ export interface SettleableFailure {
   taskId: string;
   target: TaskStatus;
   retryable: boolean;
+  /** A quiet refusal record: its card is in the target by definition, so that does not settle it. */
+  quiet?: boolean;
 }
 
 /**
@@ -275,7 +277,10 @@ export function settledSaveFailureIds(
     const status = statusById.get(failure.taskId);
     // Any failure is moot once the card reached its target ("not moved to X. It is in X.").
     // A missing card clears only retryable alerts, and only once the board has loaded.
-    const moot = status !== undefined ? status === failure.target : failure.retryable && boardLoaded;
+    // A quiet refusal record stays until dismissed, the card moves again, or the card is gone.
+    const moot = status !== undefined
+      ? !failure.quiet && status === failure.target
+      : (failure.retryable || failure.quiet === true) && boardLoaded;
     if (moot) settled.push(failure.taskId);
   }
   return settled;

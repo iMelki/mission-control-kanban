@@ -42,7 +42,7 @@
     "test:paperclip-bridge": "npm --prefix integrations/paperclip-bridge test",
     "test:paperclip-host-migrations": "npx tsx integrations/paperclip-bridge/scripts/validate-paperclip-host-migrations.ts",
     "test:webhook-health": "node --import tsx --test tests/webhook-health.test.ts",
-    "test:runtime-operations": "node --import tsx --test tests/runtime-operations.test.ts",
+    "test:runtime-operations": "node --import tsx --test tests/runtime-operations.test.ts tests/runtime-ops-settings.test.ts",
     "test:task-dependencies": "node --import tsx --test tests/task-dependencies.test.ts",
     "test:fetch-budget": "node --import tsx --test tests/fetch-budget.test.ts",
     "test:openclaw-protocol": "node --import tsx --test tests/openclaw-client-protocol.test.ts tests/openclaw-status.test.ts",

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Activity, Clock, DatabaseZap, Download, RefreshCw, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { RuntimeConfigTemplateGallery } from '@/components/runtime/RuntimeConfigTemplateGallery';
+import { readActionResult } from '@/lib/action-result';
 
 interface CallbackDeliveryRow {
   id: string;
@@ -167,19 +168,6 @@ function RuntimeFailureRateCards({ points }: { points: RuntimeFailureRateTrendPo
       })}
     </div>
   );
-}
-
-/**
- * A maintenance action's answer for its result panel. The status is checked before the body is
- * read: a non-OK answer shows the server's error (or its HTTP status), never an error body as if
- * it were the action's result.
- */
-async function readActionResult(response: Response): Promise<Record<string, unknown>> {
-  if (!response.ok) {
-    const failure = await response.json().catch(() => null);
-    return { error: typeof failure?.error === 'string' && failure.error ? failure.error : `The server answered HTTP ${response.status}` };
-  }
-  return response.json();
 }
 
 export function RuntimeOpsSettings() {

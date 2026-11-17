@@ -77,6 +77,11 @@ picks. Spec: `../direction.md` § Direction B, with `../brief.md` and
         Assigned, then the board moved it to In progress." That report may
         come from another client, so the board does not claim the move and
         logs no feed event for it.
+    - If the save's answer was lost or refused but the card is in the target
+      lane, that region says only "<title> is in Assigned." Another client
+      may have put it there, so the board claims no move and logs no feed
+      event. A refused save also leaves a quiet "Move refused" note with the
+      server's error. It is not a live region, so it is not spoken.
     - If the save fails or the server keeps another lane, the polite regions
       say nothing more. Each failed card gets its own "Move not saved" alert
       (`role="alert"`), spoken once. It names the target lane, and a

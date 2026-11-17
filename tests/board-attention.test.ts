@@ -504,7 +504,7 @@ test('a stale server report (older updated_at) does not override a newer confirm
   patch.reject(new Error('connection reset'));
   await run;
   assert.equal(b.card.status, 'assigned');
-  assert.equal(b.outcomes[0].kind, 'saved');
+  assert.equal(b.outcomes[0].kind, 'in-target'); // the answer was lost: in the target, not claimed
 });
 
 test('the re-read does not overwrite a newer SSE status that arrived while it was in flight', async () => {
@@ -628,7 +628,8 @@ test('real wiring: the save commits, its SSE echo carries the target (same as th
     patch.reject(new TypeError('Failed to fetch')); // the PATCH response is lost
     await run;
     assert.equal(useMissionControl.getState().tasks[0].status, 'assigned');
-    assert.equal(outcomes[0].kind, 'saved');
+    // In the target, but the lost answer cannot prove it was this save (r12): no "saved" claim.
+    assert.equal(outcomes[0].kind, 'in-target');
   }, async () => { throw new TypeError('Failed to fetch'); });
 });
 
@@ -968,6 +969,49 @@ test('a server error answer is not a save, even if the server reported the targe
   }
 });
 
+test('a lost PATCH answer never yields the confident "saved": the card in the target lane is a neutral "in-target"', async () => {
+  // Re-read says Assigned; and, separately, the re-read fails but the server reported Assigned.
+  // Either may be another client's write, so neither proves this client's save.
+  const cases: { read: () => Promise<ServerStatus | null>; push?: TaskStatus }[] = [
+    { read: async () => ({ status: 'assigned', updatedAt: T1 }) },
+    { read: async () => { throw new Error('offline'); }, push: 'assigned' },
+  ];
+  for (const { read, push } of cases) {
+    const patch = deferred<PatchStatusResult>();
+    const b = board('inbox', { patch: () => patch.promise, read });
+    const run = b.controller.start(b.card, 'assigned');
+    if (push) b.serverPush(push, T1);
+    patch.reject(new TypeError('Failed to fetch'));
+    await run;
+    assert.equal(b.card.status, 'assigned');
+    assert.deepEqual(b.outcomes[0], { kind: 'in-target', taskId: 'a', title: 'A', status: 'assigned', target: 'assigned', error: null });
+    assert.deepEqual(b.controller.getFailuresSnapshot(), [], 'nothing failed that the client knows of: no record');
+  }
+});
+
+test('a refused PATCH never yields "saved" when another client put the card in the target: neutral "in-target", a quiet record with the server error', async () => {
+  for (const read of [async () => ({ status: 'assigned' as const, updatedAt: T1 }), async () => { throw new Error('offline'); }]) {
+    const patch = deferred<PatchStatusResult>();
+    const b = board('inbox', { patch: () => patch.promise, read });
+    const run = b.controller.start(b.card, 'assigned');
+    b.serverPush('assigned', T1); // client B moved it to Assigned
+    patch.resolve({ ok: false, error: 'Validation failed' }); // this client's save was refused
+    await run;
+    assert.equal(b.card.status, 'assigned');
+    assert.deepEqual(b.outcomes[0], { kind: 'in-target', taskId: 'a', title: 'A', status: 'assigned', target: 'assigned', error: 'Validation failed' });
+    assert.deepEqual(b.controller.getFailuresSnapshot(), [
+      { taskId: 'a', title: 'A', status: 'assigned', target: 'assigned', error: 'Validation failed', retryable: false, quiet: true },
+    ]);
+  }
+});
+
+test('a quiet refusal record is not auto-cleared because the card is in its target (that is where it is by definition)', () => {
+  const quiet = { taskId: 'a', target: 'assigned' as TaskStatus, retryable: false, quiet: true };
+  assert.deepEqual(settledSaveFailureIds([quiet], [{ id: 'a', status: 'assigned' }], true), []);
+  assert.deepEqual(settledSaveFailureIds([quiet], [], false), [], 'still loading: kept');
+  assert.deepEqual(settledSaveFailureIds([quiet], [], true), ['a'], 'the card is gone: cleared');
+});
+
 test('a lost PATCH response with no confirmation of the target is still "not-saved" when the server reports another lane', async () => {
   const patch = deferred<PatchStatusResult>();
   const b = board('inbox', { patch: () => patch.promise, read: async () => { throw new Error('offline'); } });
@@ -1036,6 +1080,7 @@ test('the mck-b studio note describes the current move announcements (no role="a
   assert.match(note, /If the save succeeded but the board then moved the card on, that same polite region says "Moved <title> to Assigned, then the board moved it to In progress\." This is not a failure, so there is no alert\./);
   assert.match(note, /If the board moved the card on and the order cannot be proven, it says "Moved <title> to Assigned\. Its lane changed after that and could not be confirmed\. It shows in In progress\."/);
   assert.match(note, /If the save's answer was lost but the server reported the card in the target lane before moving it on, it says "<title> reached Assigned, then the board moved it to In progress\." That report may come from another client, so the board does not claim the move and logs no feed event for it\./);
+  assert.match(note, /If the save's answer was lost or refused but the card is in the target lane, that region says only "<title> is in Assigned\." Another client may have put it there, so the board claims no move and logs no feed event\. A refused save also leaves a quiet "Move refused" note with the server's error\. It is not a live region, so it is not spoken\./);
   assert.match(note, /"Move not saved" alert \(`role="alert"`\)/);
   assert.match(note, /gated-move banner is not a live region/);
   const queue = source('src/components/MissionQueue.tsx');
@@ -1044,5 +1089,7 @@ test('the mck-b studio note describes the current move announcements (no role="a
   assert.match(queue, /data-drop-error="save-failed"/);
   assert.match(queue, /`Moved \$\{outcome\.title\} to \$\{laneName\(outcome\.target\)\}, then the board moved it to \$\{laneName\(outcome\.status\)\}\.`/, 'the superseded announcement the note quotes');
   assert.match(queue, /`Moved \$\{outcome\.title\} to \$\{laneName\(outcome\.target\)\}\. Its lane changed after that and could not be confirmed\. It shows in \$\{laneName\(outcome\.status\)\}\.`/, 'the unconfirmed superseded announcement the note quotes');
+  assert.match(queue, /`\$\{outcome\.title\} is in \$\{laneName\(outcome\.target\)\}\.`/, 'the in-target announcement the note quotes');
+  assert.match(queue, /failure\.quiet \? 'Move refused' : 'Move not saved'/, 'the quiet refusal note the note quotes');
   assert.match(queue, /`\$\{outcome\.title\} reached \$\{laneName\(outcome\.target\)\}, then the board moved it to \$\{laneName\(outcome\.status\)\}\.`/, 'the neutral announcement the note quotes');
 });

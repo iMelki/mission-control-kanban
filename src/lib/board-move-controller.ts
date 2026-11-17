@@ -14,7 +14,9 @@
  *   network error or a timeout re-reads the task and adopts the server's status,
  *   unless a newer server status arrived while the read was in flight. If the read
  *   fails, the card shows the newest server-confirmed status and the outcome is:
- *   "saved" when that is the target; "superseded" when the card reached the target
+ *   "saved" only when this save's own OK answer put the card in the target, and
+ *   "in-target" when the card is in the target without that proof (a lost or refused
+ *   answer: another client may have put it there); "superseded" when the card reached the target
  *   and a later lane followed (ownSave when this save's OK answer says so; for a lost
  *   answer the server only reported the target, which may be another client's write,
  *   so ownSave is false); "not-saved" when the server reported another lane and never
@@ -45,8 +47,16 @@ export interface ServerStatus {
 export type PatchStatusResult = { ok: true; status: TaskStatus | null; updatedAt?: string | null } | { ok: false; error: string };
 
 export type MoveOutcome =
-  /** The server has the card in the target lane (PATCH OK, or the re-read / an SSE update says so). */
+  /** This save's PATCH answered OK with the target lane: this client moved the card there. */
   | { kind: 'saved'; taskId: string; title: string; status: TaskStatus }
+  /**
+   * The card is in the target lane, but this save's own OK answer does not say so: its answer
+   * was lost, refused (non-OK), or named another lane, and the server (re-read or a report) has
+   * the card in the target. Another client may have put it there; with no request id or version
+   * the board cannot tell, so it never claims the move. `error` is the server's refusal when the
+   * PATCH answered non-OK (recorded quietly: the card is where the user wanted), else null.
+   */
+  | { kind: 'in-target'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; error: string | null }
   /** The server answered and the card is not in the target lane. */
   | { kind: 'not-saved'; taskId: string; title: string; status: TaskStatus; target: TaskStatus; error: string }
   /** The save failed and the re-read failed too: the card shows the last confirmed status. */
@@ -137,6 +147,11 @@ export interface SaveFailure {
   error: string;
   /** The outcome was unknown (no server answer): the move can be retried. */
   retryable: boolean;
+  /**
+   * A refused save whose card is in the target anyway (another client's write): a quiet record,
+   * shown without role="alert" and not cleared for being in the target lane.
+   */
+  quiet: boolean;
 }
 
 export type MoveController = ReturnType<typeof createMoveController>;
@@ -184,7 +199,17 @@ export function createMoveController(deps: MoveControllerDeps) {
   const report = (outcome: MoveOutcome) => {
     // Record the failure first (or clear it on success), whether or not a board is listening.
     const others = failures.filter((failure) => failure.taskId !== outcome.taskId);
-    if (outcome.kind === 'saved' || outcome.kind === 'superseded') {
+    if (outcome.kind === 'in-target' && outcome.error !== null) {
+      setFailures([...others, {
+        taskId: outcome.taskId,
+        title: outcome.title,
+        status: outcome.status,
+        target: outcome.target,
+        error: outcome.error,
+        retryable: false,
+        quiet: true,
+      }]);
+    } else if (outcome.kind === 'saved' || outcome.kind === 'superseded' || outcome.kind === 'in-target') {
       if (others.length !== failures.length) setFailures(others);
     } else {
       setFailures([...others, {
@@ -194,6 +219,7 @@ export function createMoveController(deps: MoveControllerDeps) {
         target: outcome.target,
         error: outcome.error,
         retryable: outcome.kind === 'unknown',
+        quiet: false,
       }]);
     }
     if (outcomeListener) outcomeListener(outcome); else undelivered.push({ outcome, at: Date.now() });
@@ -214,6 +240,8 @@ export function createMoveController(deps: MoveControllerDeps) {
     fallback: ServerStatus | null = null,
     /** The PATCH gave no answer (network error, timeout), so the server may have saved it anyway. */
     answerLost = false,
+    /** The PATCH answered non-OK: `error` is the server's refusal. */
+    refused = false,
   ): Promise<MoveOutcome> {
     const seqBefore = serverSeq.get(task.id) ?? 0;
     let server: ServerStatus | null = null;
@@ -233,11 +261,15 @@ export function createMoveController(deps: MoveControllerDeps) {
     // (Read after the re-read, so a report of the target that arrived during it counts too.)
     const targetSeen = !ownSave && answerLost ? (targetSeenDuringSave.get(task.id) ?? null) : null;
     const reached = { kind: 'superseded', taskId: task.id, title: task.title, target, confirmed: false, ownSave: false } as const;
+    // The card is in the target lane. Only this save's own OK answer lets the board claim it.
+    const inTarget = (): MoveOutcome => (ownSave
+      ? { kind: 'saved', taskId: task.id, title: task.title, status: target }
+      : { kind: 'in-target', taskId: task.id, title: task.title, status: target, target, error: refused ? error : null });
     // A server status that arrived during the read wins unless the read is provably newer.
     if (server && (!newerArrived || timeOf(server.updatedAt) > latest.time)) {
       confirm(task.id, server.status, server.updatedAt);
       deps.setStatus(task.id, server.status, server.updatedAt);
-      if (server.status === target) return { kind: 'saved', taskId: task.id, title: task.title, status: server.status };
+      if (server.status === target) return inTarget();
       // The read left after the PATCH answered, so its lane is the one that followed the save.
       if (ownSave) return { kind: 'superseded', taskId: task.id, title: task.title, status: server.status, target, confirmed: true, ownSave: true };
       if (targetSeen) return { ...reached, status: server.status };
@@ -253,7 +285,7 @@ export function createMoveController(deps: MoveControllerDeps) {
     if (fallbackWins) confirm(task.id, fallback.status, fallback.updatedAt);
     if (fallbackWins) deps.setStatus(task.id, keep, fallback.updatedAt);
     else if (deps.getStatus(task.id) !== keep) deps.setStatus(task.id, keep);
-    if (keep === target) return { kind: 'saved', taskId: task.id, title: task.title, status: keep };
+    if (keep === target) return inTarget();
     if (ownSave) {
       // The save happened; the card shows a server status from elsewhere. Only an updated_at
       // provably newer than the save's own answer says that status came after the save.
@@ -400,7 +432,7 @@ export function createMoveController(deps: MoveControllerDeps) {
               ? { kind: 'saved', taskId: task.id, title: task.title, status }
               : { kind: 'not-saved', taskId: task.id, title: task.title, status, target, error: 'The server kept a different status' };
           } else {
-            outcome = await reconcile(task, target, result.error);
+            outcome = await reconcile(task, target, result.error, null, false, true);
           }
         } catch (error) {
           outcome = await reconcile(task, target, messageOf(error), null, true);
