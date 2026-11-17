@@ -63,7 +63,7 @@ require `status=aligned`. Do not enable the schedule until that gate passes.
 
 CTO decision: run n8n **on the host** with
 `MCK_N8N_BASE_URL=http://127.0.0.1:3021`. Do not apply these steps from an
-agent unless Ilan (or CTO for operational work) says yes.
+agent unless Captain (or CTO for operational work) says yes.
 
 1. **Run n8n on the host**, not in Docker. Set
    `MCK_N8N_BASE_URL=http://127.0.0.1:3021` in the host n8n environment.
