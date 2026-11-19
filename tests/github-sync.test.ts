@@ -882,6 +882,61 @@ test('GitHub refresh keeps allowed_file_scope, safety_rules and review_mode loca
   assert.equal(validateDispatchMetadata(patch.dispatch_metadata).canDispatch, true);
 });
 
+test('local docs and scripts file scopes survive an upstream **/* refresh', () => {
+  const baseLocal = {
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'local-stream',
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:github-sync'],
+    risk_level: 'high' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Local impact stays',
+    rollback_plan: 'Revert the local change.',
+    safety_rules: ['Do not widen factory allowed paths from GitHub'],
+  };
+
+  for (const scope of [['docs'], ['scripts']] as const) {
+    const local = {
+      ...baseLocal,
+      allowed_file_scope: [...scope],
+    };
+    const merged = mergeDispatchMetadataFromUpstream(local, {
+      allowed_file_scope: ['**/*'],
+    });
+    assert.deepEqual(merged?.allowed_file_scope, [...scope]);
+    assert.equal(validateDispatchMetadata(merged).canDispatch, true);
+  }
+
+  assert.equal(isGenericSyncPlaceholder('docs'), false);
+  assert.equal(isGenericSyncPlaceholder('scripts'), false);
+});
+
+test('a genuine allowed_file_scope placeholder may still be filled from upstream', () => {
+  const genuinePlaceholder = 'Owning repo issue, docs, scripts, and tests named by the task.';
+  assert.equal(isGenericSyncPlaceholder(genuinePlaceholder), true);
+
+  const filled = mergeDispatchMetadataFromUpstream(
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'local-stream',
+      allowed_file_scope: [genuinePlaceholder],
+      acceptance_criteria: ['Local acceptance criterion stays'],
+      test_requirements: ['npm run test:github-sync'],
+      risk_level: 'high',
+      readiness: 'ready_for_agent',
+      review_mode: 'human_required',
+      impact: 'Local impact stays',
+      rollback_plan: 'Revert the local change.',
+    },
+    {
+      allowed_file_scope: ['**/*'],
+    },
+  );
+
+  assert.deepEqual(filled?.allowed_file_scope, ['**/*']);
+});
+
 test('GitHub refresh patch keeps canDispatch false when a required contract field is missing locally and upstream', () => {
   const incompleteLocal = {
     source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
@@ -1171,8 +1226,10 @@ test('#114 first-item-only shape is not dispatchable', () => {
   assert.ok(result.missingFields.includes('impact'));
   assert.ok(result.missingFields.includes('rollback/fallback plan'));
 
-  // After MCK splits the scope default on commas, the four pieces are
-  // also placeholders, so the field stays missing.
+  // After MCK splits the scope default on commas, the non-scope pieces
+  // stay placeholders, but bare 'docs' and 'scripts' are real scopes, so
+  // the field is present and other placeholder-only required keys still
+  // keep the card from being dispatch-ready.
   const commaSplitScope = validateDispatchMetadata({
     ...firstItemOnly,
     allowed_file_scope: [
@@ -1183,12 +1240,13 @@ test('#114 first-item-only shape is not dispatchable', () => {
     ],
   });
   assert.equal(commaSplitScope.canDispatch, false);
-  assert.ok(commaSplitScope.missingFields.includes('allowed file scope'));
+  assert.ok(!commaSplitScope.missingFields.includes('allowed file scope'));
+  assert.ok(commaSplitScope.missingFields.includes('acceptance criteria'));
 
   assert.equal(isGenericSyncPlaceholder('Issue is present on the mapped GitHub Project.'), true);
   assert.equal(isGenericSyncPlaceholder('Owning repo issue'), true);
-  assert.equal(isGenericSyncPlaceholder('docs'), true);
-  assert.equal(isGenericSyncPlaceholder('scripts'), true);
+  assert.equal(isGenericSyncPlaceholder('docs'), false);
+  assert.equal(isGenericSyncPlaceholder('scripts'), false);
   assert.equal(isGenericSyncPlaceholder('and tests named by the task.'), true);
   assert.equal(isGenericSyncPlaceholder('Do not mutate external upstream repos from portfolio repair.'), true);
 });

@@ -110,10 +110,10 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
   // Ensure-RepoIssueProjectVisibility.ps1:36 and Invoke-GitHubProjectMutation.ps1:50 (Allowed File Scope)
   'Owning repo issue, docs, scripts, and tests named by the task.',
-  // Comma-split pieces of that scope default (normalizeStringArray splits on commas)
+  // Comma-split pieces of that scope default that are not themselves real
+  // file scopes. Bare 'docs' and 'scripts' are real local scopes, so they
+  // stay off this list.
   'Owning repo issue',
-  'docs',
-  'scripts',
   'and tests named by the task.',
   // Ensure-RepoIssueProjectVisibility.ps1:38 and Invoke-GitHubProjectMutation.ps1:52 (Acceptance Criteria)
   'Issue is present on the mapped GitHub Project.',
