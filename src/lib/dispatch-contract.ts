@@ -247,23 +247,27 @@ export function isPlaceholderOnlyContract(metadata: DispatchMetadata | undefined
   return sawPlaceholder;
 }
 
-export const PLACEHOLDER_DONE_READINESS_REASON =
-  'Done card with a placeholder-only dispatch contract: readiness Ready for Agent does not apply, set to Needs Grooming';
+export const PLACEHOLDER_DONE_DRIFT_REASON =
+  'Done card with a placeholder-only dispatch contract: the contract holds only generic sync placeholders. Sync does not change readiness on Done cards; groom or confirm the contract by hand.';
 
 /**
- * A Done card whose contract is placeholder-only must not read Ready for
- * Agent. Sync applies this after the per-field merge on every run, so an
- * upstream "Ready for Agent" cannot write it back while the card is Done and
- * its contract is still placeholder-only.
+ * A short, stable fingerprint of the contract content keys, or undefined when
+ * the contract is not placeholder-only. Sync stores it in `sync_flags` so a
+ * placeholder-only Done card is logged once, and again only when its contract
+ * changes. FNV-1a keeps this free of Node-only modules (this file is also
+ * bundled for the browser).
  */
-export function demoteReadinessForPlaceholderOnlyDone(
-  metadata: DispatchMetadata | undefined,
-  status: string | undefined,
-): { metadata: DispatchMetadata | undefined; demoted: boolean } {
-  if (status !== 'done' || metadata?.readiness !== 'ready_for_agent' || !isPlaceholderOnlyContract(metadata)) {
-    return { metadata, demoted: false };
+export function placeholderOnlyContractFingerprint(metadata: DispatchMetadata | undefined): string | undefined {
+  if (!isPlaceholderOnlyContract(metadata)) {
+    return undefined;
   }
-  return { metadata: { ...metadata, readiness: 'needs_grooming' }, demoted: true };
+  const canonical = JSON.stringify(CONTRACT_CONTENT_KEYS.map((key) => [key, metadata?.[key] ?? null]));
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < canonical.length; index += 1) {
+    hash ^= canonical.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
 }
 
 /**

@@ -150,6 +150,11 @@ export interface TaskSyncFlags {
   drift?: Array<{ field: string; reason: string }>;
   /** The Project item was missing from two consecutive complete reads. */
   removed_from_project?: string;
+  /**
+   * A Done card whose contract is placeholder-only. Logged once per contract
+   * fingerprint; a changed contract is logged again.
+   */
+  placeholder_contract?: { fingerprint: string; reason: string; flagged_at: string };
   sync_run_id?: string;
   flagged_at?: string;
 }

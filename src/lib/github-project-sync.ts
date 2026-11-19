@@ -3,9 +3,9 @@ import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
 import {
   buildSyncImportDispatchMetadata,
-  demoteReadinessForPlaceholderOnlyDone,
   parseDispatchMetadata,
-  PLACEHOLDER_DONE_READINESS_REASON,
+  PLACEHOLDER_DONE_DRIFT_REASON,
+  placeholderOnlyContractFingerprint,
   serializeDispatchMetadata,
 } from './dispatch-contract';
 import { queryAll, queryOne, run, transaction } from './db';
@@ -180,6 +180,7 @@ interface ExistingTaskRow extends Pick<Task, 'id' | 'title' | 'description' | 's
   source_issue_url?: string | null;
   source_project_item_id?: string | null;
   github_last_read_at?: string | null;
+  sync_flags?: string | null;
 }
 
 /**
@@ -211,8 +212,8 @@ export interface GitHubProjectWorkspaceSyncResult {
   upstream_drift_warnings: number;
   /** Cards that stayed put because Done or Review lacked evidence. */
   needs_evidence: number;
-  /** Done cards with a placeholder-only contract set from Ready for Agent to Needs Grooming. */
-  readiness_reset: number;
+  /** Done cards newly flagged for a placeholder-only contract (once per contract fingerprint). */
+  placeholder_contract_drift: number;
   /** Tombstones written (apply) or that would be written (dry run). */
   tombstones: number;
   /** Id stamped on every tombstone this run writes. */
@@ -490,7 +491,7 @@ function findExistingTask(
   return queryOne<ExistingTaskRow>(
     `SELECT id, title, description, status, priority, workspace_id, business_id, dispatch_metadata,
             source_repo_owner, source_repo_name, source_issue_number, source_issue_url, source_project_item_id,
-            github_last_read_at
+            github_last_read_at, sync_flags
      FROM tasks
      WHERE (source_project_item_id IS NOT NULL AND source_project_item_id = ?)
         OR (workspace_id = ? AND source_repo_owner = ? AND source_repo_name = ? AND source_issue_number = ?)`,
@@ -654,8 +655,9 @@ export function reconcileGitHubProjectStatus(input: {
   const base = reconcileFromProjectStatus(current, upstreamStatus, input.projectStatus);
   if (input.issueClosed && current !== 'done') {
     const warning = `${NEEDS_EVIDENCE_PREFIX} GitHub issue is closed but there is no main merge or closing evidence; the card is not moved to Done.`;
+    // An unevidenced close keeps the card in its column: no local_status.
     return {
-      ...base,
+      upstream_status: base.upstream_status,
       needs_evidence: true,
       drift_warning: base.drift_warning ? `${warning} ${base.drift_warning}` : warning,
     };
@@ -727,7 +729,9 @@ export function buildImportDispatchMetadata(metadata: GitHubImportPreviewTask['d
 }
 
 function serializeSyncFlags(flags: TaskSyncFlags): string | null {
-  const hasFlag = Boolean(flags.needs_evidence || flags.removed_from_project || (flags.drift && flags.drift.length > 0));
+  const hasFlag = Boolean(
+    flags.needs_evidence || flags.removed_from_project || flags.placeholder_contract || (flags.drift && flags.drift.length > 0)
+  );
   return hasFlag ? JSON.stringify(flags) : null;
 }
 
@@ -850,17 +854,54 @@ function existingTaskSnapshot(existing: ExistingTaskRow) {
   };
 }
 
+interface PlaceholderContractCheck {
+  /** The flag to store, or undefined when the card is not a placeholder-only Done card. */
+  flag?: NonNullable<TaskSyncFlags['placeholder_contract']>;
+  /** True the first time this contract fingerprint is seen on the card. */
+  newlyFlagged: boolean;
+}
+
 function planExistingTaskRefresh(
   existing: ExistingTaskRow,
   preview: GitHubImportPreviewTask,
   reconciledStatus: string,
-): { plan: GitHubTaskRefreshPlan; before: TaskFieldSnapshot; after: TaskFieldSnapshot; readinessReset: boolean } {
+  now: string,
+): {
+  plan: GitHubTaskRefreshPlan;
+  before: TaskFieldSnapshot;
+  after: TaskFieldSnapshot;
+  placeholderContract: PlaceholderContractCheck;
+} {
   const current = existingTaskSnapshot(existing);
   const plan = buildTaskRefreshPlanFromGitHubPreview(current, preview);
-  const demotion = demoteReadinessForPlaceholderOnlyDone(plan.update.dispatch_metadata, reconciledStatus);
-  plan.update.dispatch_metadata = demotion.metadata;
+  const isDone = existing.status === 'done' || reconciledStatus === 'done';
+  const placeholderContract: PlaceholderContractCheck = { newlyFlagged: false };
+
+  if (isDone && plan.update.dispatch_metadata) {
+    // CTO ruling (#232): sync makes no readiness writes on Done cards. The
+    // stored readiness stays as it is, whatever upstream says.
+    const merged = { ...plan.update.dispatch_metadata };
+    const localReadiness = current.dispatch_metadata?.readiness;
+    if (localReadiness) {
+      merged.readiness = localReadiness;
+    } else {
+      delete merged.readiness;
+    }
+    plan.update.dispatch_metadata = merged;
+
+    const fingerprint = placeholderOnlyContractFingerprint(merged);
+    if (fingerprint) {
+      const previous = parseSyncFlags(existing.sync_flags)?.placeholder_contract;
+      const seen = previous?.fingerprint === fingerprint;
+      placeholderContract.flag = seen && previous
+        ? previous
+        : { fingerprint, reason: PLACEHOLDER_DONE_DRIFT_REASON, flagged_at: now };
+      placeholderContract.newlyFlagged = !seen;
+    }
+  }
+
   return {
-    readinessReset: demotion.demoted,
+    placeholderContract,
     plan,
     before: {
       description: current.description,
@@ -875,22 +916,23 @@ function planExistingTaskRefresh(
   };
 }
 
-function pushReadinessReset(
+function pushPlaceholderContractDrift(
   result: GitHubProjectWorkspaceSyncResult,
   issueRef: string,
   taskId: string,
-  readinessReset: boolean,
+  check: PlaceholderContractCheck,
 ): void {
-  if (!readinessReset) {
+  if (!check.newlyFlagged || !check.flag) {
     return;
   }
-  result.readiness_reset += 1;
+  result.placeholder_contract_drift += 1;
+  result.upstream_drift_warnings += 1;
   result.details.push({
-    action: 'status_reconcile',
+    action: 'drift',
     issue: issueRef,
     task_id: taskId,
-    field: 'dispatch_metadata.readiness',
-    reason: PLACEHOLDER_DONE_READINESS_REASON,
+    field: 'dispatch_metadata',
+    reason: `${check.flag.reason} (contract ${check.flag.fingerprint})`,
   });
 }
 
@@ -1014,7 +1056,7 @@ export async function syncLoadedGitHubProjectWorkspace(
     status_reconciled: 0,
     upstream_drift_warnings: 0,
     needs_evidence: 0,
-    readiness_reset: 0,
+    placeholder_contract_drift: 0,
     tombstones: 0,
     sync_run_id: options.syncRunId?.trim() || uuidv4(),
     read_at: options.readAt?.trim() || new Date().toISOString(),
@@ -1038,6 +1080,21 @@ export async function syncLoadedGitHubProjectWorkspace(
     return result;
   }
 
+  // A 403 or permission-redacted item anywhere in the snapshot (not only in
+  // the selected items) makes the read incomplete: its repo is unknown, so no
+  // card on the board is changed and every repo is STALE (section 3.2, T17).
+  const redactedItems = project.allItems.filter((item) => !item.isArchived && !item.content).length;
+  if (redactedItems > 0) {
+    result.read_complete = false;
+    result.stale_repos = listWorkspaceRepos(workspace.id, project.allItems);
+    result.skipped += selectedItems.length;
+    result.details.push({
+      action: 'skip',
+      reason: `${redactedItems} redacted or inaccessible Project item(s) (403); no card was changed and the board is marked Sync STALE`,
+    });
+    return result;
+  }
+
   const pullRequestEvidence = collectPullRequestEvidence(project.allItems);
   const seenProjectItemIds = new Set<string>();
   // Cards matched to an item in this read, by any key (item id or repo/issue).
@@ -1046,18 +1103,6 @@ export async function syncLoadedGitHubProjectWorkspace(
   for (const item of selectedItems) {
     const itemContent = item.content;
     const isArchived = item.isArchived;
-    if (!isArchived && !itemContent) {
-      // A 403 or permission-redacted item: its repo is unknown, so the read is
-      // not complete for any repo on this board.
-      result.read_complete = false;
-      result.stale_repos = listWorkspaceRepos(workspace.id, project.allItems);
-      result.skipped += 1;
-      result.details.push({
-        action: 'skip',
-        reason: 'redacted or inaccessible Project item (403); no card changed and the board is marked Sync STALE',
-      });
-      continue;
-    }
     const typename = itemContent?.__typename;
     if (!isArchived && typename === 'Issue' && item.id) {
       seenProjectItemIds.add(item.id);
@@ -1166,7 +1211,7 @@ export async function syncLoadedGitHubProjectWorkspace(
           projectStatus,
           evidence: closeEvidence,
         });
-        const refresh = planExistingTaskRefresh(existing, preview, reconciliation.local_status ?? existing.status);
+        const refresh = planExistingTaskRefresh(existing, preview, reconciliation.local_status ?? existing.status, new Date().toISOString());
         let wouldTombstone;
         try {
           wouldTombstone = recordFieldClears({
@@ -1221,7 +1266,7 @@ export async function syncLoadedGitHubProjectWorkspace(
           });
         }
         pushLocalOwnedDrift(result, issueRef, existing.id, refresh.plan);
-        pushReadinessReset(result, issueRef, existing.id, refresh.readinessReset);
+        pushPlaceholderContractDrift(result, issueRef, existing.id, refresh.placeholderContract);
         for (const tombstone of wouldTombstone) {
           result.tombstones += 1;
           result.details.push({
@@ -1252,7 +1297,7 @@ export async function syncLoadedGitHubProjectWorkspace(
           });
           const reconciledStatus = reconciliation.local_status ?? existing.status;
           const reconciledStatusChanged = reconciledStatus !== existing.status;
-          const refresh = planExistingTaskRefresh(existing, preview, reconciledStatus);
+          const refresh = planExistingTaskRefresh(existing, preview, reconciledStatus, now);
           const patch = refresh.plan.update;
           // Merged identity: an upstream item without a Project Item ID must
           // not null out the stored one (section 3, rule 2).
@@ -1303,6 +1348,7 @@ export async function syncLoadedGitHubProjectWorkspace(
               serializeSyncFlags({
                 needs_evidence: reconciliation.needs_evidence ? reconciliation.drift_warning : undefined,
                 drift: refresh.plan.local_owned_drift.length > 0 ? refresh.plan.local_owned_drift : undefined,
+                placeholder_contract: refresh.placeholderContract.flag,
                 sync_run_id: result.sync_run_id,
                 flagged_at: now,
               }),
@@ -1311,6 +1357,25 @@ export async function syncLoadedGitHubProjectWorkspace(
               existing.id,
             ]
           );
+
+          if (refresh.placeholderContract.newlyFlagged && refresh.placeholderContract.flag) {
+            run(
+              `INSERT INTO events (id, type, task_id, message, metadata, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [
+                uuidv4(),
+                'task_placeholder_contract',
+                existing.id,
+                `GitHub Project sync: ${issueRef} is Done with a placeholder-only dispatch contract; readiness left unchanged.`,
+                JSON.stringify({
+                  source: issueRef,
+                  fingerprint: refresh.placeholderContract.flag.fingerprint,
+                  sync_run_id: result.sync_run_id,
+                }),
+                now,
+              ]
+            );
+          }
 
           if (reconciledStatusChanged) {
             run(
@@ -1380,7 +1445,7 @@ export async function syncLoadedGitHubProjectWorkspace(
             });
           }
           pushLocalOwnedDrift(result, issueRef, existing.id, refresh.plan);
-          pushReadinessReset(result, issueRef, existing.id, refresh.readinessReset);
+          pushPlaceholderContractDrift(result, issueRef, existing.id, refresh.placeholderContract);
           for (const tombstone of tombstones) {
             result.tombstones += 1;
             result.details.push({

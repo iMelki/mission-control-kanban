@@ -912,52 +912,120 @@ test('T21 target_repo and project_workstream: an empty local value is filled fro
 
 // ---------------------------------------------------------------- MemSys: Done + placeholder-only contract
 
-test('Done card with a placeholder-only contract never stays Ready for Agent, and the next sync does not write it back (memsys#114, #561)', async () => {
-  const placeholderContract = {
-    ...LOCAL_CONTRACT,
-    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
-    acceptance_criteria: ['Issue is present on the mapped GitHub Project.'],
-    test_requirements: ['Run this script in -DryRun mode before broad repair.'],
-    rollback_plan:
-      'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.',
-    safety_rules: undefined,
-    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
-    readiness: 'ready_for_agent',
-  };
-  assert.equal(contract.isPlaceholderOnlyContract(placeholderContract as never), true);
+function placeholderEvents(): number {
+  return db.queryOne<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM events WHERE type = 'task_placeholder_contract' AND task_id = 'task-existing'",
+  )?.n ?? 0;
+}
 
-  seed({ status: 'done', metadata: placeholderContract });
+function syncFlags() {
+  return JSON.parse(db.queryOne<{ sync_flags: string | null }>("SELECT sync_flags FROM tasks WHERE id = 'task-existing'")?.sync_flags ?? '{}');
+}
+
+const PLACEHOLDER_CONTRACT = {
+  ...LOCAL_CONTRACT,
+  allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+  acceptance_criteria: ['Issue is present on the mapped GitHub Project.'],
+  test_requirements: ['Run this script in -DryRun mode before broad repair.'],
+  rollback_plan:
+    'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.',
+  safety_rules: undefined,
+  impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+  readiness: 'ready_for_agent',
+};
+
+test('Done card with a placeholder-only contract: two syncs make zero readiness writes and exactly one log entry; a changed contract logs one more (memsys#114, #561)', async () => {
+  assert.equal(contract.isPlaceholderOnlyContract(PLACEHOLDER_CONTRACT as never), true);
+
+  seed({ status: 'done', metadata: PLACEHOLDER_CONTRACT });
+  // Upstream says a different readiness; sync must not write it on a Done card.
   const upstream = issueItem({
     closed: true,
-    fields: [{ name: 'Done', field: 'Status' }, { name: 'Ready for Agent', field: 'Readiness' }],
+    fields: [{ name: 'Done', field: 'Status' }, { name: 'Needs Human', field: 'Readiness' }],
   });
 
   const dry = await runSync([upstream], { dryRun: true });
-  assert.equal(dry.readiness_reset, 1);
-  assert.equal(storedMetadata()?.readiness, 'ready_for_agent', 'dry run persists nothing');
+  assert.equal(dry.placeholder_contract_drift, 1);
+  assert.equal(placeholderEvents(), 0, 'dry run logs nothing');
 
   const first = await runSync([upstream]);
   assert.deepEqual(first.errors, []);
-  assert.equal(first.readiness_reset, 1);
-  assert.ok(first.details.some((detail) => detail.field === 'dispatch_metadata.readiness' && detail.action === 'status_reconcile'));
   assert.equal(taskRow()?.status, 'done');
-  assert.equal(storedMetadata()?.readiness, 'needs_grooming');
-  assert.equal(contract.validateDispatchMetadata(storedMetadata()).canDispatch, false);
-  assert.equal(tombstoneCount(), 0, 'a readiness change is not a clear');
+  assert.equal(storedMetadata()?.readiness, 'ready_for_agent', 'no readiness write on a Done card');
+  assert.equal(first.placeholder_contract_drift, 1);
+  assert.equal(first.details.filter((detail) => detail.action === 'drift' && detail.field === 'dispatch_metadata').length, 1);
+  assert.equal(placeholderEvents(), 1);
+  const fingerprint = syncFlags().placeholder_contract?.fingerprint;
+  assert.match(fingerprint ?? '', /^fnv1a32:[0-9a-f]{8}$/);
 
-  // Upstream still says Ready for Agent: the next sync keeps Needs Grooming.
-  await runSync([upstream]);
-  assert.equal(storedMetadata()?.readiness, 'needs_grooming');
+  const second = await runSync([upstream]);
+  assert.deepEqual(second.errors, []);
+  assert.equal(storedMetadata()?.readiness, 'ready_for_agent', 'still no readiness write');
+  assert.equal(second.placeholder_contract_drift, 0, 'not repeated');
+  assert.equal(second.details.filter((detail) => detail.field === 'dispatch_metadata').length, 0);
+  assert.equal(placeholderEvents(), 1, 'exactly one log entry across two syncs');
+  assert.equal(syncFlags().placeholder_contract?.fingerprint, fingerprint);
+  assert.equal(tombstoneCount(), 0);
 
-  // Not applied to a Done card with a real contract, or to a card that is not Done.
-  seed({ status: 'done' });
-  const real = await runSync([upstream]);
-  assert.equal(real.readiness_reset, 0);
+  // The contract changes (a local edit to another placeholder-only contract;
+  // an upstream placeholder never overwrites, section 4 rule 1): one new
+  // entry, then quiet again.
+  await patchTask({
+    dispatch_metadata: { ...PLACEHOLDER_CONTRACT, acceptance_criteria: ['Required dispatch fields are populated for MCK import.'] },
+  });
+  const changed = await runSync([upstream]);
+  assert.deepEqual(changed.errors, []);
+  assert.equal(changed.placeholder_contract_drift, 1);
+  assert.equal(placeholderEvents(), 2);
+  assert.notEqual(syncFlags().placeholder_contract?.fingerprint, fingerprint);
   assert.equal(storedMetadata()?.readiness, 'ready_for_agent');
 
-  seed({ status: 'in_progress', metadata: placeholderContract });
-  const open = await runSync([issueItem({ fields: [{ name: 'In Progress', field: 'Status' }, { name: 'Ready for Agent', field: 'Readiness' }] })]);
-  assert.equal(open.readiness_reset, 0);
-  assert.equal(storedMetadata()?.readiness, 'ready_for_agent');
+  const again = await runSync([upstream]);
+  assert.equal(again.placeholder_contract_drift, 0);
+  assert.equal(placeholderEvents(), 2);
+});
+
+test('Done cards: sync never writes readiness, and a real contract or a card that is not Done is not flagged', async () => {
+  // Done card with a real contract and no readiness: upstream Ready for Agent is not written.
+  seed({ status: 'done', metadata: { ...LOCAL_CONTRACT, readiness: undefined } });
+  const doneUpstream = issueItem({ closed: true, fields: [{ name: 'Done', field: 'Status' }, { name: 'Ready for Agent', field: 'Readiness' }] });
+  const real = await runSync([doneUpstream]);
+  assert.deepEqual(real.errors, []);
+  assert.equal(storedMetadata()?.readiness, undefined);
+  assert.equal(real.placeholder_contract_drift, 0);
+  assert.equal(placeholderEvents(), 0);
+
+  // Not Done: readiness still follows upstream (doc section 7), and no placeholder flag.
+  seed({ status: 'in_progress', metadata: PLACEHOLDER_CONTRACT });
+  const open = await runSync([issueItem({ fields: [{ name: 'In Progress', field: 'Status' }, { name: 'Needs Human', field: 'Readiness' }] })]);
+  assert.equal(open.placeholder_contract_drift, 0);
+  assert.equal(storedMetadata()?.readiness, 'needs_human');
+  assert.equal(placeholderEvents(), 0);
   assert.equal(contract.validateDispatchMetadata(storedMetadata()).canDispatch, false, 'section 4 rule 3 still blocks dispatch');
+});
+
+test('T17 a redacted item anywhere in the snapshot stops every write, including sibling issues', async () => {
+  seed();
+  const before = taskRow();
+  const result = await runSync([
+    issueItem({ body: '## Impact\nShould not be applied', fields: [{ name: 'Review', field: 'Status' }] }),
+    issueItem({ id: 'PVTI_sibling', number: 95 }),
+    { id: 'PVTI_redacted', isArchived: false, content: null, fieldValues: { nodes: [] } },
+  ]);
+  assert.equal(result.read_complete, false);
+  assert.equal(result.imported + result.updated, 0);
+  assert.deepEqual(taskRow(), before);
+  assert.equal(db.queryOne<{ n: number }>('SELECT COUNT(*) AS n FROM tasks')?.n, 1);
+  assert.equal(tombstoneCount(), 0);
+});
+
+test('T11 an unevidenced close keeps the card in its column even when Project Status maps elsewhere', () => {
+  const reconciled = sync.reconcileGitHubProjectStatus({
+    currentStatus: 'planning',
+    issueClosed: true,
+    projectStatus: 'Ready',
+    evidence: [],
+  });
+  assert.equal(reconciled.local_status, undefined);
+  assert.equal(reconciled.needs_evidence, true);
 });
