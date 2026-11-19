@@ -1480,10 +1480,10 @@ test('#114 first-item-only shape is not dispatchable', () => {
   assert.ok(result.missingFields.includes('impact'));
   assert.ok(result.missingFields.includes('rollback/fallback plan'));
 
-  // After MCK splits the scope default on commas, the non-scope pieces
-  // stay placeholders, but bare 'docs' and 'scripts' are real scopes, so
-  // the field is present and other placeholder-only required keys still
-  // keep the card from being dispatch-ready.
+  // A stored row that already holds the scope default split on commas is
+  // the same generated default as a contiguous item sequence, so the array
+  // path strips the whole sequence and the field is missing. Bare 'docs'
+  // and 'scripts' on their own stay real scopes (see below).
   const commaSplitScope = validateDispatchMetadata({
     ...firstItemOnly,
     allowed_file_scope: [
@@ -1494,7 +1494,7 @@ test('#114 first-item-only shape is not dispatchable', () => {
     ],
   });
   assert.equal(commaSplitScope.canDispatch, false);
-  assert.ok(!commaSplitScope.missingFields.includes('allowed file scope'));
+  assert.ok(commaSplitScope.missingFields.includes('allowed file scope'));
   assert.ok(commaSplitScope.missingFields.includes('acceptance criteria'));
 
   assert.equal(isGenericSyncPlaceholder('Issue is present on the mapped GitHub Project.'), true);

@@ -334,7 +334,15 @@ function normalizeStringArray(value: unknown): string[] | undefined {
       const normalized = normalizeString(item);
       return normalized ? [normalized] : [];
     });
-    return items.length > 0 ? items : undefined;
+    // Same rules as the scalar path below. Stored rows written before the
+    // whole-string fix hold the generated scope default already split into
+    // items ('Owning repo issue', 'docs', 'scripts', ...), so strip that
+    // contiguous sequence first, then drop per-item placeholders (including
+    // a whole MemSys or projects-ops default kept as one item). Filtering
+    // per item first would leave bare 'docs' and 'scripts' behind. A bare
+    // ['docs'] or ['scripts'] array is a real file scope and stays.
+    const kept = stripGeneratedScopePlaceholderTokens(items).filter((item) => !isGenericSyncPlaceholder(item));
+    return kept.length > 0 ? kept : undefined;
   }
 
   if (typeof value === 'string') {
