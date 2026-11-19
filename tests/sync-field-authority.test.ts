@@ -1396,3 +1396,61 @@ test('an open GitHub issue is imported and kept even when Project Status is Done
   assert.ok(existing.details.some((detail) => /Needs evidence/.test(detail.reason ?? '')));
   assert.equal(tombstoneCount(), 0);
 });
+
+test('stale complete reads older than github_last_read_at do not count toward unlink', async () => {
+  seed();
+  const other = issueItem({ id: 'PVTI_other', number: 91 });
+
+  // The card is seen in a complete read at 12:30.
+  await runSync([issueItem(), other], { syncRunId: 'run-seen', readAt: '2026-11-19T12:30:00.000Z' });
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+  const lastRead = db.queryOne<{ github_last_read_at: string | null }>(
+    "SELECT github_last_read_at FROM tasks WHERE id = 'task-existing'",
+  );
+  assert.equal(lastRead?.github_last_read_at, '2026-11-19T12:30:00.000Z');
+
+  // Two delayed complete reads, each with a new run id, stamped 12:00 and 12:10.
+  const firstStale = await runSync([other], { syncRunId: 'run-stale-1', readAt: '2026-11-19T12:00:00.000Z' });
+  assert.equal(firstStale.removed_from_project, 0);
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+  assert.equal(missingReadState()?.github_missing_reads ?? 0, 0);
+  assert.ok(firstStale.details.some((detail) => detail.action === 'skip' && /stale read/.test(detail.reason ?? '')));
+
+  const secondStale = await runSync([other], { syncRunId: 'run-stale-2', readAt: '2026-11-19T12:10:00.000Z' });
+  assert.equal(secondStale.removed_from_project, 0);
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+  assert.equal(tombstoneCount(), 0);
+  assert.equal(missingReadState()?.github_missing_reads ?? 0, 0);
+  assert.ok(secondStale.details.some((detail) => detail.action === 'skip' && /stale read/.test(detail.reason ?? '')));
+});
+
+test('a reopened GitHub issue with local Done and Project Status Done warns and does not move', async () => {
+  const unit = sync.reconcileGitHubProjectStatus({
+    currentStatus: 'done',
+    issueClosed: false,
+    projectStatus: 'Done',
+  });
+  assert.equal(unit.local_status, undefined);
+  assert.equal(unit.upstream_status, 'done');
+  assert.match(unit.drift_warning ?? '', /open while the local card and GitHub Project Status are both Done/i);
+
+  // A closed, evidenced Done card stays quiet.
+  const closed = sync.reconcileGitHubProjectStatus({
+    currentStatus: 'done',
+    issueClosed: true,
+    projectStatus: 'Done',
+    evidence: [{ kind: 'merged_pr', base_ref: 'main', merged: true }],
+  });
+  assert.equal(closed.local_status, 'done');
+  assert.equal(closed.drift_warning, undefined);
+
+  seed({ status: 'done' });
+  const result = await runSync([
+    issueItem({ closed: false, fields: [{ name: 'Done', field: 'Status' }] }),
+  ], { syncRunId: 'run-reopen', readAt: '2026-11-19T12:30:00.000Z' });
+  assert.equal(taskRow()?.status, 'done');
+  assert.equal(result.status_reconciled, 0);
+  assert.ok(result.details.some((detail) => (
+    detail.action === 'drift' && /open while the local card and GitHub Project Status are both Done/i.test(detail.reason ?? '')
+  )));
+});

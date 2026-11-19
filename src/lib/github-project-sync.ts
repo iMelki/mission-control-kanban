@@ -714,6 +714,12 @@ export function reconcileGitHubProjectStatus(input: {
       };
     }
     if (current === target) {
+      if (target === 'done' && input.issueClosed === false) {
+        return {
+          upstream_status: upstreamStatus,
+          drift_warning: 'GitHub issue is open while the local card and GitHub Project Status are both Done.',
+        };
+      }
       return { upstream_status: upstreamStatus };
     }
     if (evidenced) {
@@ -865,10 +871,11 @@ function applyTwoReadRemoval(
     source_issue_number: number | null;
     github_missing_reads: number | null;
     github_missing_read_ids: string | null;
+    github_last_read_at: string | null;
     sync_flags: string | null;
   }>(
     `SELECT id, source_project_item_id, source_repo_owner, source_repo_name, source_issue_number,
-            github_missing_reads, github_missing_read_ids, sync_flags
+            github_missing_reads, github_missing_read_ids, github_last_read_at, sync_flags
      FROM tasks
      WHERE workspace_id = ? AND source_project_item_id IS NOT NULL AND source_project_item_id != ''`,
     [workspace.id],
@@ -877,6 +884,16 @@ function applyTwoReadRemoval(
 
   for (const card of linked) {
     if (seenProjectItemIds.has(card.source_project_item_id) || seenTaskIds.has(card.id)) {
+      continue;
+    }
+    // The same stale-read rule as the per-card apply path: a complete read
+    // older than the last applied read must not count as a miss or unlink.
+    if (card.github_last_read_at && result.read_at < card.github_last_read_at) {
+      result.details.push({
+        action: 'skip',
+        task_id: card.id,
+        reason: `stale read: read at ${result.read_at} is older than the last applied read ${card.github_last_read_at}; nothing changed`,
+      });
       continue;
     }
     const previousReads = parseMissingCompleteReads(card.github_missing_read_ids);
@@ -932,12 +949,12 @@ function applyTwoReadRemoval(
     try {
       unlinked = transaction(() => {
         githubProjectSyncTestHooks.beforeTombstoneUnlinkIdentityCheck?.();
-        const current = queryOne<TaskGitHubSourceIdentity>(
-          `SELECT id, source_project_item_id, source_repo_owner, source_repo_name, source_issue_number
+        const current = queryOne<TaskGitHubSourceIdentity & { sync_flags: string | null }>(
+          `SELECT id, source_project_item_id, source_repo_owner, source_repo_name, source_issue_number, sync_flags
            FROM tasks WHERE id = ?`,
           [card.id],
         );
-        if (!sameTaskGitHubSourceIdentity(expectedIdentity, current)) {
+        if (!current || !sameTaskGitHubSourceIdentity(expectedIdentity, current)) {
           return false;
         }
         const now = new Date().toISOString();
@@ -948,7 +965,7 @@ function applyTwoReadRemoval(
           source: { source: projectRef, sync_run_id: result.sync_run_id },
           context: `GitHub Project sync two-read removal ${card.id}`,
         });
-        const flags = { ...(parseSyncFlags(card.sync_flags) ?? {}), removed_from_project: reason, sync_run_id: result.sync_run_id, flagged_at: now };
+        const flags = { ...(parseSyncFlags(current.sync_flags) ?? {}), removed_from_project: reason, sync_run_id: result.sync_run_id, flagged_at: now };
         const updated = run(
           `UPDATE tasks
            SET source_project_item_id = NULL, github_missing_reads = 0, github_missing_read_ids = NULL, sync_flags = ?, updated_at = ?
