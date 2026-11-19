@@ -20,6 +20,8 @@ type ContractModule = typeof import('../src/lib/dispatch-contract');
 type TombstoneModule = typeof import('../src/lib/field-tombstones');
 type WritebackModule = typeof import('../src/lib/github-writeback');
 type TaskRouteModule = typeof import('../src/app/api/tasks/[id]/route');
+type WritebackRouteModule = typeof import('../src/app/api/tasks/[id]/github-writeback/route');
+type TaskImportModule = typeof import('../src/lib/github-task-import');
 
 let db: DbModule;
 let sync: SyncModule;
@@ -27,6 +29,8 @@ let contract: ContractModule;
 let tombstones: TombstoneModule;
 let writeback: WritebackModule;
 let taskRoute: TaskRouteModule;
+let writebackRoute: WritebackRouteModule;
+let taskImport: TaskImportModule;
 
 const ISSUE_URL = 'https://github.com/iMelki/mission-control-kanban/issues/34';
 const ISSUE_REF = 'iMelki/mission-control-kanban#34';
@@ -61,6 +65,8 @@ test.before(async () => {
   tombstones = await import('../src/lib/field-tombstones');
   writeback = await import('../src/lib/github-writeback');
   taskRoute = await import('../src/app/api/tasks/[id]/route');
+  writebackRoute = await import('../src/app/api/tasks/[id]/github-writeback/route');
+  taskImport = await import('../src/lib/github-task-import');
 });
 
 test.after(() => {
@@ -401,7 +407,12 @@ interface RecordedCall {
   body: string;
 }
 
-async function withMockedGitHub<T>(fn: (calls: RecordedCall[]) => Promise<T>): Promise<T> {
+type EvidenceNode = { url?: string; merged?: boolean; baseRefName?: string };
+
+async function withMockedGitHub<T>(
+  fn: (calls: RecordedCall[]) => Promise<T>,
+  options: { evidenceNodes?: EvidenceNode[] } = {},
+): Promise<T> {
   const previousFetch = globalThis.fetch;
   const previousToken = process.env.GH_GENERAL_TOKEN;
   process.env.GH_GENERAL_TOKEN = 'test-token-not-a-secret';
@@ -412,6 +423,9 @@ async function withMockedGitHub<T>(fn: (calls: RecordedCall[]) => Promise<T>): P
     calls.push({ url, method: (init?.method ?? 'GET').toUpperCase(), body });
     const json = (data: unknown) => new Response(JSON.stringify(data), { status: 200, headers: { 'content-type': 'application/json' } });
     if (url.endsWith('/graphql')) {
+      if (body.includes('WritebackStatusEvidence')) {
+        return json({ data: { repository: { issue: { closedByPullRequestsReferences: { nodes: options.evidenceNodes ?? [] } } } } });
+      }
       if (body.includes('ResolveProjectItem')) {
         return json({
           data: {
@@ -1028,4 +1042,218 @@ test('T11 an unevidenced close keeps the card in its column even when Project St
   });
   assert.equal(reconciled.local_status, undefined);
   assert.equal(reconciled.needs_evidence, true);
+});
+
+// ------------------------------------------- kanban#232 CTO review, Medium 1
+// docs/SYNC_FIELD_AUTHORITY.md section 5, rules 2 and 6: a mixed upstream
+// value keeps its non-placeholder parts. For the scalar keys `impact` and
+// `rollback_plan` those parts stay a string, so real text is never dropped.
+
+const IMPACT_PLACEHOLDER = 'Keeps repository work visible in the mapped operator cockpit and MCK sync.';
+const ROLLBACK_PLACEHOLDER = 'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.';
+const MIXED_IMPACT = `${IMPACT_PLACEHOLDER.toUpperCase()}; Captures failed deployment attempts.`;
+const MIXED_ROLLBACK = `${ROLLBACK_PLACEHOLDER}\nRevert the deploy-attempt capture commit.`;
+
+function mixedContractItem(id = 'PVTI_existing') {
+  return issueItem({
+    id,
+    body: `## Rollback / Fallback Plan\n${MIXED_ROLLBACK}`,
+    fields: [
+      { name: 'In Progress', field: 'Status' },
+      { name: MIXED_IMPACT, field: 'Impact' },
+    ],
+  });
+}
+
+function seedSecondCard(itemId: string, number: number) {
+  const now = '2026-11-19T10:00:00.000Z';
+  db.run(
+    `INSERT INTO tasks (
+       id, title, description, status, priority, workspace_id, business_id,
+       source_repo_owner, source_repo_name, source_issue_number, source_issue_url,
+       source_project_item_id, dispatch_metadata, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['task-gone', 'Card whose item left the Project', 'Local description', 'in_progress', 'normal', 'assistants', 'default',
+      'iMelki', 'mission-control-kanban', number, `https://github.com/iMelki/mission-control-kanban/issues/${number}`,
+      itemId, JSON.stringify(LOCAL_CONTRACT), now, now],
+  );
+}
+
+test('kanban#232 M1 mixed placeholder plus real text in impact and rollback_plan keeps the real text (merge helper)', () => {
+  const result = contract.mergeDispatchMetadataFromUpstreamDetailed(
+    LOCAL_CONTRACT as never,
+    { impact: MIXED_IMPACT, rollback_plan: MIXED_ROLLBACK } as never,
+  );
+  assert.equal(result.merged?.impact, 'Captures failed deployment attempts.');
+  assert.equal(result.merged?.rollback_plan, 'Revert the deploy-attempt capture commit.');
+  assert.deepEqual(result.explicit_clears, []);
+  // Every other key is untouched.
+  assert.deepEqual(result.merged?.acceptance_criteria, LOCAL_CONTRACT.acceptance_criteria);
+
+  // Placeholder-only still never overwrites, and list keys still split.
+  const placeholderOnly = contract.mergeDispatchMetadataFromUpstream(
+    LOCAL_CONTRACT as never,
+    { impact: IMPACT_PLACEHOLDER.toUpperCase(), rollback_plan: ` ${ROLLBACK_PLACEHOLDER} ` } as never,
+  );
+  assert.equal(placeholderOnly?.impact, LOCAL_CONTRACT.impact);
+  assert.equal(placeholderOnly?.rollback_plan, LOCAL_CONTRACT.rollback_plan);
+  assert.deepEqual(
+    contract.stripGenericSyncPlaceholdersForKey('acceptance_criteria', 'Issue is present on the mapped GitHub Project.; Real criterion'),
+    ['Real criterion'],
+  );
+  assert.equal(
+    contract.stripGenericSyncPlaceholdersForKey('impact', `A; ${IMPACT_PLACEHOLDER}; B`),
+    'A; B',
+  );
+});
+
+test('kanban#232 M1 Project sync: mixed impact and rollback_plan apply cleanly, no rollback loop across 3 syncs, two-read removal stays on', async () => {
+  seed();
+  seedSecondCard('PVTI_gone', 92);
+
+  const runs = [];
+  for (const runId of ['run-m1-a', 'run-m1-b', 'run-m1-c']) {
+    runs.push(await runSync([mixedContractItem()], { syncRunId: runId }));
+    assert.deepEqual(runs.at(-1)?.errors, [], `${runId}: no per-card error, so no rollback`);
+    assert.ok(!runs.at(-1)?.details.some((detail) => detail.action === 'error'), `${runId}: no error detail`);
+    const metadata = storedMetadata();
+    assert.equal(metadata?.impact, 'Captures failed deployment attempts.', `${runId}: impact`);
+    assert.equal(metadata?.rollback_plan, 'Revert the deploy-attempt capture commit.', `${runId}: rollback_plan`);
+    assert.deepEqual(metadata?.acceptance_criteria, LOCAL_CONTRACT.acceptance_criteria, `${runId}: other keys kept`);
+  }
+  assert.equal(runs[0].updated, 1, 'the first sync applies the card update');
+
+  // No field on the mixed card was cleared or tombstoned.
+  assert.deepEqual(tombstones.listTaskFieldTombstones('task-existing'), []);
+
+  // Two-read removal stayed enabled: the second complete clean read removes
+  // the card whose item is gone, which never happens while errors is non-empty.
+  assert.equal(runs[0].removed_from_project, 0);
+  assert.equal(runs[1].removed_from_project, 1);
+  const goneItem = db.queryOne<{ source_project_item_id: string | null }>(
+    "SELECT source_project_item_id FROM tasks WHERE id = 'task-gone'",
+  );
+  assert.equal(goneItem?.source_project_item_id, null);
+});
+
+test('kanban#232 M1 Refresh From GitHub: mixed impact and rollback_plan PATCH writes no mck:user clear', async () => {
+  seed();
+  const patch = taskImport.buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Existing card',
+      description: 'Local description',
+      priority: 'normal',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'mission-control-kanban',
+        issue_number: 34,
+        issue_url: ISSUE_URL,
+        project_item_id: 'PVTI_existing',
+      },
+      dispatch_metadata: LOCAL_CONTRACT as never,
+    },
+    {
+      title: 'Existing card',
+      description: 'Local description',
+      priority: 'normal',
+      status: 'in_progress',
+      workspace_id: 'assistants',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'mission-control-kanban',
+        issue_number: 34,
+        issue_url: ISSUE_URL,
+        project_item_id: 'PVTI_existing',
+      },
+      dispatch_metadata: { source_issue_url: ISSUE_URL, impact: MIXED_IMPACT, rollback_plan: MIXED_ROLLBACK },
+    } as never,
+  );
+  const response = await patchTask(patch as never);
+  assert.equal(response.status, 200);
+  const rows = tombstones.listTaskFieldTombstones('task-existing');
+  assert.deepEqual(rows.filter((row) => row.source === 'mck:user').map((row) => row.field), [], 'no mck:user clear');
+  assert.equal(rows.length, 0);
+  assert.equal(patch.dispatch_metadata?.impact, 'Captures failed deployment attempts.');
+  assert.equal(patch.dispatch_metadata?.rollback_plan, 'Revert the deploy-attempt capture commit.');
+  assert.equal(storedMetadata()?.impact, 'Captures failed deployment attempts.');
+  assert.equal(storedMetadata()?.rollback_plan, 'Revert the deploy-attempt capture commit.');
+});
+
+// ------------------------------------------- kanban#232 CTO review, Medium 2
+// The write-back route loads status_evidence on the server from the issue's
+// closedByPullRequestsReferences (the same source Project sync uses).
+
+async function postWriteback(body: Record<string, unknown>) {
+  const { NextRequest } = await import('next/server');
+  const response = await writebackRoute.POST(
+    new NextRequest('http://mck.test/api/tasks/task-existing/github-writeback', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'content-type': 'application/json' },
+    }),
+    { params: Promise.resolve({ id: 'task-existing' }) },
+  );
+  return {
+    status: response.status,
+    payload: await response.json() as {
+      status: string;
+      project_updates: Array<{ field_name: string; value: string; skipped?: boolean; reason?: string; option_id?: string }>;
+    },
+  };
+}
+
+test('kanban#232 M2 Done and Review write-back passes with a linked main merge loaded on the server', async () => {
+  for (const status of ['done', 'review'] as const) {
+    seed({ status });
+    await withMockedGitHub(async (calls) => {
+      const dry = await postWriteback({});
+      assert.equal(dry.status, 200);
+      const statusUpdate = dry.payload.project_updates.find((update) => update.field_name === 'Status');
+      assert.equal(statusUpdate?.skipped, undefined, `${status}: Status not refused`);
+      assert.equal(statusUpdate?.option_id, status === 'done' ? 'OPT_done' : 'OPT_review');
+      assert.ok(calls.some((call) => call.body.includes('WritebackStatusEvidence')), `${status}: evidence read on the server`);
+      assert.deepEqual(statusMutations(calls), [], `${status}: dry run sends no mutation`);
+
+      calls.length = 0;
+      const applied = await postWriteback({ dry_run: false });
+      assert.equal(applied.payload.status, 'applied');
+      assert.deepEqual(statusMutations(calls), [status === 'done' ? 'OPT_done' : 'OPT_review'], `${status}: Status written`);
+    }, { evidenceNodes: [{ url: 'https://github.com/iMelki/mission-control-kanban/pull/500', merged: true, baseRefName: 'main' }] });
+  }
+});
+
+test('kanban#232 M2 Done and Review write-back is refused without evidence, with a dev merge, with an unmerged main PR, and ignores client-sent evidence', async () => {
+  const cases: Array<{ name: string; nodes: EvidenceNode[] }> = [
+    { name: 'no linked PR', nodes: [] },
+    { name: 'dev merge only', nodes: [{ merged: true, baseRefName: 'dev' }] },
+    { name: 'open PR into main', nodes: [{ merged: false, baseRefName: 'main' }] },
+  ];
+  for (const status of ['done', 'review'] as const) {
+    for (const entry of cases) {
+      seed({ status });
+      await withMockedGitHub(async (calls) => {
+        const dry = await postWriteback({
+          // The route never trusts caller evidence.
+          status_evidence: [{ kind: 'merged_pr', base_ref: 'main', merged: true }],
+        });
+        const statusUpdate = dry.payload.project_updates.find((update) => update.field_name === 'Status');
+        assert.equal(statusUpdate?.skipped, true, `${status} / ${entry.name}: refused`);
+        assert.equal(statusUpdate?.reason, writeback.WRITEBACK_STATUS_REFUSAL_REASON);
+
+        calls.length = 0;
+        await postWriteback({ dry_run: false });
+        assert.deepEqual(statusMutations(calls), [], `${status} / ${entry.name}: no Status mutation`);
+      }, { evidenceNodes: entry.nodes });
+    }
+  }
+
+  // A card that does not promote never reads evidence.
+  seed({ status: 'in_progress' });
+  await withMockedGitHub(async (calls) => {
+    const dry = await postWriteback({});
+    const statusUpdate = dry.payload.project_updates.find((update) => update.field_name === 'Status');
+    assert.equal(statusUpdate?.skipped, undefined);
+    assert.ok(!calls.some((call) => call.body.includes('WritebackStatusEvidence')));
+  });
 });

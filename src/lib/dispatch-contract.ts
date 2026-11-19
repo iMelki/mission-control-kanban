@@ -313,6 +313,33 @@ export function stripGenericSyncPlaceholders(value: unknown): unknown {
   return value;
 }
 
+/** Dispatch keys stored as string lists; every other key is a scalar string. */
+const LIST_DISPATCH_KEY_SET: ReadonlySet<string> = new Set([
+  'allowed_file_scope',
+  'acceptance_criteria',
+  'test_requirements',
+  'safety_rules',
+]);
+
+/**
+ * `stripGenericSyncPlaceholders` for one dispatch key. A mixed join keeps its
+ * non-placeholder parts (docs/SYNC_FIELD_AUTHORITY.md section 5, rule 2), and
+ * for a scalar key (`impact`, `rollback_plan`, ...) those parts are joined
+ * back into one string. Returning the token array for a scalar key made
+ * `normalizeDispatchMetadata` drop the value, so the merge silently cleared
+ * real local text (kanban#232 review, CodeRabbit 4629945720).
+ */
+export function stripGenericSyncPlaceholdersForKey(key: string, value: unknown): unknown {
+  const stripped = stripGenericSyncPlaceholders(value);
+  if (LIST_DISPATCH_KEY_SET.has(key) || !Array.isArray(stripped)) {
+    return stripped;
+  }
+  const joined = stripped
+    .flatMap((item) => (typeof item === 'string' && item.trim().length > 0 ? [item.trim()] : []))
+    .join('; ');
+  return joined.length > 0 ? joined : undefined;
+}
+
 export function requiresDispatchContractBeforeWorkStarts(status: string | undefined): boolean {
   return typeof status === 'string' && ACTIVE_WORK_STATUSES.has(status);
 }
@@ -504,10 +531,10 @@ export function mergeDispatchMetadataFromUpstreamDetailed(
 
   for (const [key, value] of Object.entries(upstreamRecord)) {
     const localValue = localRecord[key];
-    const localHasValue = isNonEmptyDispatchValue(stripGenericSyncPlaceholders(localValue));
+    const localHasValue = isNonEmptyDispatchValue(stripGenericSyncPlaceholdersForKey(key, localValue));
 
     if (LOCAL_OWNED_DISPATCH_KEY_SET.has(key)) {
-      const substantive = isExplicitUpstreamClear(value) ? undefined : stripGenericSyncPlaceholders(value);
+      const substantive = isExplicitUpstreamClear(value) ? undefined : stripGenericSyncPlaceholdersForKey(key, value);
       const upstreamValue = isNonEmptyDispatchValue(substantive)
         ? (normalizeDispatchMetadata({ [key]: substantive }) as Record<string, unknown> | undefined)?.[key]
         : undefined;
@@ -531,7 +558,7 @@ export function mergeDispatchMetadataFromUpstreamDetailed(
       continue;
     }
 
-    const substantive = stripGenericSyncPlaceholders(value);
+    const substantive = stripGenericSyncPlaceholdersForKey(key, value);
     if (!isNonEmptyDispatchValue(substantive)) {
       continue;
     }

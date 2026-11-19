@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db';
 import { parseDispatchMetadata, validateDispatchMetadata } from '@/lib/dispatch-contract';
 import {
   applyGitHubWriteback,
+  attachServerStatusEvidence,
   buildWritebackActivityMessage,
   planGitHubWriteback,
   type GitHubWritebackTaskSnapshot,
@@ -126,12 +127,17 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const snapshot = buildTaskSnapshot(task);
-    if (!snapshot) {
+    const linkedSnapshot = buildTaskSnapshot(task);
+    if (!linkedSnapshot) {
       return NextResponse.json({ error: 'Task is not linked to a GitHub issue' }, { status: 400 });
     }
 
-    const plan = await planGitHubWriteback(snapshot);
+    // Status Done or Review write-back needs evidence loaded here on the
+    // server (docs/SYNC_FIELD_AUTHORITY.md section 6, rule 6). Without it the
+    // planner refuses the Status update.
+    const { task: snapshot, warnings: evidenceWarnings } = await attachServerStatusEvidence(linkedSnapshot);
+    const plannedWriteback = await planGitHubWriteback(snapshot);
+    const plan = { ...plannedWriteback, warnings: [...plannedWriteback.warnings, ...evidenceWarnings] };
     const repoRef = `${snapshot.github_source.repo_owner}/${snapshot.github_source.repo_name}#${snapshot.github_source.issue_number}`;
     const existingApplied = dryRun
       ? undefined
