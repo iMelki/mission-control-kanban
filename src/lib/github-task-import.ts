@@ -95,10 +95,23 @@ function normalizeListValue(value: unknown): string[] | undefined {
     return undefined;
   }
 
-  return normalized.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
+  // Recognize a generated or generic placeholder on the unsplit GitHub
+  // Project field first. Splitting on ';' or ',' would otherwise turn
+  // "Owning repo issue; docs; scripts; and tests named by the task" into
+  // bare "docs" and "scripts", which are real allowed file scopes.
+  if (isGenericSyncPlaceholder(normalized)) {
+    return undefined;
+  }
+
+  const items = normalized.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
     const normalizedItem = item.replace(/^(?:\s*[-*]\s*\[[ xX]\]\s*|\s*[-*]\s*|\s*\d+\.\s*)/, '').trim();
-    return normalizedItem ? [normalizedItem] : [];
+    if (!normalizedItem || isGenericSyncPlaceholder(normalizedItem)) {
+      return [];
+    }
+    return [normalizedItem];
   });
+
+  return items.length > 0 ? items : undefined;
 }
 
 function normalizeScalarSection(value: string | undefined): string | undefined {

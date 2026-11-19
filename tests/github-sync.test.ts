@@ -450,6 +450,82 @@ test('GitHub import preview can normalize required dispatch sections from GitHub
   assert.equal(response.dispatch_ready, true);
 });
 
+test('GitHub import preview treats a generated Allowed File Scope project field as empty', () => {
+  const otherwiseValidProjectFields = {
+    Repo: 'iMelki/mission-control-kanban',
+    Project: 'GitHub-native pipeline',
+    Readiness: 'Ready for Agent',
+    'Review Mode': 'Human Required',
+    Risk: 'Medium',
+    Impact: 'operator UX stays specific and non-placeholder',
+    'Project Item ID': 'PVTI_mock_scope_placeholder',
+    'Acceptance Criteria': '- Import preview is available in the UI\n- Operators can create a local task from it',
+    'Test Requirements': 'npm run test:github-sync\nManual import against localhost',
+    'Rollback / Fallback Plan': 'Disable the new modal and keep API routes intact.',
+    'Safety Rules': '- Do not write back to GitHub before the operator reviews the plan',
+  };
+
+  const issue = {
+    number: 31,
+    title: 'Backfill operator onboarding in MCK',
+    body: '## Goal\nMake the import flow usable for first-time operators.',
+    html_url: 'https://github.com/iMelki/mission-control-kanban/issues/31',
+  };
+  const repository = {
+    full_name: 'iMelki/mission-control-kanban',
+    name: 'mission-control-kanban',
+    owner: { login: 'iMelki' },
+  };
+
+  const generatedScopes = [
+    'Owning repo issue; docs; scripts; and tests named by the task',
+    'Owning repo issue, docs, scripts, and tests named by the task.',
+    '  OWNING  REPO  ISSUE;  DOCS;  SCRIPTS;  AND  TESTS  NAMED  BY  THE  TASK  ',
+  ];
+
+  for (const generatedScope of generatedScopes) {
+    const response = buildGitHubImportPreviewResponse({
+      request: {
+        issue,
+        repository,
+        project_fields: {
+          ...otherwiseValidProjectFields,
+          'Allowed File Scope': generatedScope,
+        },
+      },
+    });
+
+    assert.equal(
+      response.preview.dispatch_metadata?.allowed_file_scope,
+      undefined,
+      `generated scope ${JSON.stringify(generatedScope)} must not be stored as real file scope`,
+    );
+    assert.equal(response.dispatch_ready, false);
+    assert.ok(
+      response.dispatch_blockers.some((blocker) => /allowed file scope/i.test(blocker)),
+      'the unsplit generated scope must be treated as missing, not dispatchable',
+    );
+    assert.deepEqual(response.preview.dispatch_metadata?.acceptance_criteria, [
+      'Import preview is available in the UI',
+      'Operators can create a local task from it',
+    ]);
+  }
+
+  const realDocs = buildGitHubImportPreviewResponse({
+    request: {
+      issue,
+      repository,
+      project_fields: {
+        ...otherwiseValidProjectFields,
+        'Allowed File Scope': 'docs',
+      },
+    },
+  });
+  assert.deepEqual(realDocs.preview.dispatch_metadata?.allowed_file_scope, ['docs']);
+  assert.equal(realDocs.dispatch_ready, true);
+  assert.deepEqual(realDocs.dispatch_blockers, []);
+});
+
 test('GitHub import preview hydrates dispatch metadata from issue body headings', () => {
   const response = buildGitHubImportPreviewResponse({
     request: {
