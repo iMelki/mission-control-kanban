@@ -40,12 +40,12 @@ Code references are to `dev` at `43820e9`. #212 merged to `dev` as
 
 | Field | Owner | MCK storage | Rule |
 | --- | --- | --- | --- |
-| Title | GitHub issue | `tasks.title` | Refreshed from the issue. |
-| Body | GitHub issue | `tasks.description` | Refreshed from the issue. An empty body keeps the local value (`description: issueBody \|\| undefined`, then `preview.description ?? currentTask.description`). |
+| Title | GitHub issue | `tasks.title` | Refreshed from the issue. A default title (`'Untitled GitHub issue'` in the sync, `'Untitled GitHub issue import'` in the preview) is a placeholder and never replaces a real title (section 5, rule 7). |
+| Body | GitHub issue | `tasks.description` | Refreshed from the issue. An empty body keeps the local value (`description: issueBody \|\| undefined`, then `preview.description ?? currentTask.description`). A placeholder-only body is treated like an empty one (section 5, rule 7). |
 | State (open or closed) | GitHub issue | Not stored as a field. Feeds status reconciliation only. | See section 6. |
 | Labels | GitHub issue | Not stored as a field. `priority:`, `readiness:` and `risk:` labels feed `priority`, `dispatch_metadata.readiness` and `dispatch_metadata.risk_level` as a fallback after Project fields and body sections. | MCK never writes labels. |
 | Status | GitHub Project (`Status` field) | `tasks.status` (the MCK column) | The column follows Project Status, except Done and Review, which need evidence. See section 6. |
-| Dispatch contract (`dispatch_metadata.*`) | Merged per field | `tasks.dispatch_metadata` (JSON) | See sections 3 to 5 and 7. |
+| Dispatch contract (`dispatch_metadata.*`) | Merged per field, owner per key in section 7 | `tasks.dispatch_metadata` (JSON) | See sections 3 to 5 and 7. |
 | Source identity (`github_source.*`) | GitHub | `tasks.source_repo_owner`, `source_repo_name`, `source_issue_number`, `source_issue_url`, `source_project_item_id` | **Gap.** See below. |
 | `business_id` | Mapped workspace (intended) | `tasks.business_id` | **Gap.** Hard-coded `'default'`. See below. |
 | `dispatch_ready` | Derived, never stored | Recomputed by `validateDispatchMetadata` | Never synced in either direction. |
@@ -90,6 +90,43 @@ Rules:
 3. A non-empty, non-placeholder upstream value refreshes the local value,
    subject to section 7 for the three security-sensitive keys.
 4. The only way a local value becomes empty is a tombstone (section 4).
+5. **Project field beats body.** When a GitHub Project field and a parsed
+   issue-body section both give a value for the same key, the explicit Project
+   field wins. A body-parsed value only fills a key whose Project field is
+   empty. **Current code differs:** `buildGitHubImportPreview` lets body
+   sections win over Project fields for `allowed_file_scope`,
+   `acceptance_criteria`, `test_requirements`, `rollback_plan` and
+   `safety_rules`, while Project fields already win for repo, readiness, review
+   mode, risk, workstream and impact. TODO for Step 2 (test T19).
+
+### 3.1 Concurrent edits and ordering
+
+1. The winner of a conflict is decided per field by the owner in this contract,
+   never by timestamp alone.
+2. For a local-owned field (section 7), a local edit made after the last sync
+   read always wins. Sync never writes local-owned fields in any case.
+3. For a GitHub-owned field, the upstream value from a complete read wins. A
+   local edit to a GitHub-owned field is shown as drift until GitHub matches.
+4. Sync writes are idempotent (running the same read twice gives the same
+   card) and ordered per card (one sync write per card at a time, applied in
+   read order; an older read never overwrites a newer one for the same card).
+5. **Current code** compares no timestamps or row versions. TODO for Step 2
+   (test T16).
+
+### 3.2 Failed or partial reads
+
+1. A failed or partial read never blanks, clears or tombstones anything. This
+   covers HTTP 403 or permission-redacted items, a truncated or failed page in
+   pagination, a missing Project field set, and items removed from or archived
+   on the Project.
+2. On such a read, sync skips the affected card, logs the skip with the reason,
+   and marks Sync STALE for that repo. The run is not complete for that repo
+   and does not stamp its freshness (section 8.3).
+3. An item that disappears from the Project is tombstoned only after two
+   consecutive complete reads that both lack it.
+4. **Current code:** a redacted item is counted as `skipped` ("not a GitHub
+   issue", L634-636) and the run still reports complete. TODO for Step 2
+   (test T17, T18).
 
 ## 4. Clears are tombstones, never silent deletes
 
@@ -132,11 +169,15 @@ with no record:
 **Current code (holds, keep it).** `GENERIC_SYNC_PLACEHOLDER_STRINGS` in
 `src/lib/dispatch-contract.ts` (L108) is the trimmed denylist from the
 projects-ops scripts `scripts/Ensure-RepoIssueProjectVisibility.ps1` and
-`scripts/Invoke-GitHubProjectMutation.ps1`, plus the live MemSys variants
-added in #212 (the Safety Rules strings and the comma-split Allowed File Scope
-pieces). `isGenericSyncPlaceholder` matches each item exactly after trim,
+`scripts/Invoke-GitHubProjectMutation.ps1`, plus the comma-split pieces of the
+Allowed File Scope default. Every entry, including the Safety Rules strings, is
+cited to those projects-ops scripts. MemSys's live variants did **not** land in
+#212: the code comment says "MemSys-sourced strings, if they differ, are a
+follow-up", and the 44 MemSys placeholder cards wait on that follow-up.
+`isGenericSyncPlaceholder` matches each item exactly after trim,
 case-sensitive, and also matches any `;`, LF or CRLF join or subset of items.
-Commas are not separators for matching.
+Commas are not separators for matching. Only `dispatch_metadata` goes through
+this check today; the title and body do not.
 
 Rules:
 
@@ -148,16 +189,29 @@ Rules:
    dispatchable, whatever its Readiness, Review Mode or Risk say.
 4. A placeholder is never a clear and never produces a tombstone.
 5. New placeholder strings are added to the exported list only, with a source
-   citation, and a test.
+   citation, and a test. The MemSys variants are a follow-up PR on that list.
+6. **Matching rule (Required).** Both the candidate value (and each token
+   after the `;`, LF or CRLF split) and every denylist entry are normalized the
+   same way before comparing: Unicode NFKC, then casefold, then trim and
+   collapse internal whitespace to one space, then strip leading and trailing
+   punctuation (including bullets and a trailing period or comma). Equal after
+   normalization means placeholder. Current code is exact and case-sensitive.
+   TODO for Step 2 (test T15).
+7. **Title and body get the same check (Required).** A title or body that is
+   empty or placeholder-only after the rule 6 normalization never replaces the
+   local value. The default titles `'Untitled GitHub issue'` (sync, L677) and
+   `'Untitled GitHub issue import'` (preview) count as placeholders. Current
+   code writes both defaults and a placeholder-only body straight through
+   `buildTaskRefreshUpdateFromGitHubPreview`. TODO for Step 2 (test T20).
 
 **Note on bare `docs` and `scripts`.** These two are exact denylist entries
 (L115-116, the comma-split pieces of the scope default). So a real scope that
 lists them as items is narrowed: an upstream `allowed_file_scope` of
 `docs; src/x` is stripped to `[src/x]`, and `docs` alone counts as empty.
-Interaction with section 7: the strip happens before the change is compared,
-so stripping can only narrow a scope, never widen it. A narrowed upstream scope
-that differs from the local value is still an upstream change to
-`allowed_file_scope` and resets readiness under section 7. An operator who
+Interaction with section 7: `allowed_file_scope` is local-owned, so sync never
+writes it and the strip only affects what is shown as drift and what a new card
+would have shown. Stripping can only narrow a scope, never widen it. Under the
+rule 6 normalization the same applies to `Docs` or `scripts.`. An operator who
 really means the whole `docs/` tree should write `docs/` or `docs/**`.
 
 ## 6. Status, Done and Review
@@ -182,6 +236,11 @@ really means the whole `docs/` tree should write `docs/` or `docs/**`.
   L219-222) always sends `Status = STATUS_LABELS[task.status]`, Done and
   Review included, with no evidence check. No code path closes an issue
   (write-back only comments and sets Project fields).
+
+**Gap, fixed by Step 2.** The current code moves cards to Done and Review
+without evidence: on Project Status Done, on Project Status Review, and on a
+closed issue. The rules below are what Dev's Step 2 PR must make true; until it
+merges, a Done or Review column on MCK is not proof that anything shipped.
 
 **Required rules (CTO ruling).**
 
@@ -227,23 +286,27 @@ What reliably stays local on refresh today:
   `workspace_id` is set from the mapped workspace and `business_id` to
   `'default'` on every refresh, see G2.)
 
-**Decided: accept but reset readiness.** The #212 Security Reviewer raised a
-Medium finding on `src/lib/dispatch-contract.ts`: because the merge is per key,
-anyone who can edit the issue body or Project fields can replace
-`allowed_file_scope` (which becomes the factory `allowedPaths`),
-`safety_rules` or `review_mode`, and the card stays dispatch-ready. CTO choice:
+**Decided: owner per key (Required).**
 
-1. An upstream change to `allowed_file_scope`, `safety_rules` or `review_mode`
-   is accepted (the merged value is stored).
-2. The same write sets `readiness = needs_grooming`, so `validateDispatchMetadata`
-   blocks dispatch until an operator re-grooms the card and sets
-   `ready_for_agent` again.
-3. "Change" means the merged value differs from the stored value after
-   placeholder stripping. An empty or placeholder-only upstream value is not a
-   change (section 3).
-4. The reset is logged on the card with the field, old and new value, and
-   source, like a tombstone entry.
-5. Dev implements this in the Step 2 PR with test T12.
+| Key | Owner | Sync behaviour |
+| --- | --- | --- |
+| `allowed_file_scope`, `safety_rules`, `review_mode` | Local: the card owner or CTO | Sync never writes them, on update or on import. An upstream value that differs is shown on the card as drift and logged, and changes nothing. |
+| `target_repo`, `project_workstream` | Local once set | Upstream fills them only when the local value is empty. A non-empty local value is never replaced. |
+| `source_issue_url` | GitHub | Refreshed from a complete read (subject to G1). |
+| `acceptance_criteria`, `test_requirements`, `rollback_plan`, `impact`, `risk_level`, `readiness` | GitHub, merged per field | Sections 3 and 5 apply. Sync may also set `readiness = needs_grooming` under section 8.1. |
+
+Why: the #212 Security Reviewer raised a Medium finding on
+`src/lib/dispatch-contract.ts`. With a per-key merge, anyone who can edit the
+issue body or Project fields could replace `allowed_file_scope` (which becomes
+the factory `allowedPaths`), `safety_rules` or `review_mode` and keep the card
+dispatch-ready. Making those keys local-owned removes that path. This
+supersedes the earlier "accept but reset readiness" option.
+
+**Current code differs on `target_repo` and `project_workstream`:**
+`normalizeProjectFields` (L308-316) always injects `Repo` (the issue repo) and
+`Project` (the Project title), so upstream is never empty for these two and a
+local value is replaced on every refresh, `project_workstream` by the Project
+title. TODO for Step 2 (tests T12, T21).
 
 ## 8. Coverage, PRs, freshness and alerts
 
@@ -291,13 +354,23 @@ per-repo coverage.
    whole-workspace stamp does not prove any one repo.
 3. An alert fires when any repo's last completed sync is older than 32 hours.
    The watchdog that raises it runs independently of n8n.
+4. A mapped repo that has never completed a sync shows Coverage UNKNOWN and
+   raises a warning on every check until its first completed sync. It never
+   shows as covered or fresh.
+5. Freshness uses the MCK server's receive time, not a producer timestamp. A
+   report dated in the future is not fresh, and a late old report never becomes
+   the latest. Today `received_at` comes from the payload and `latest` is chosen
+   by arrival order (`src/lib/n8n-sync-status.ts`).
+6. A run whose summary carries any errors (a count or a non-empty `errors`
+   array) is not complete. Today `asNumber(summary.errors)` turns an array into
+   0 (`src/lib/n8n-sync-status.ts` L177).
 
 ## 9. Dry run versus apply
 
 1. Manual webhook calls and scheduled runs are dry-run by default
    (`docs/N8N_SCHEDULED_SYNC.md`).
 2. Switching scheduled sync to apply (`scheduledNonDryRunApproved = true` in
-   the projects-ops schedule artifact) requires Captain's explicit yes, and
+   the projects-ops schedule artifact) requires the repo owner's explicit yes, and
    only after a clean scheduled dry run is recorded.
 3. Dry-run and apply results are reported separately.
 4. A dry run never writes tombstones, flags or cards. It reports what it would
@@ -332,19 +405,36 @@ may follow in a named follow-up PR.
 | T9 | No | dry run writes nothing | A dry-run sync reports would-be tombstones, flags and new cards and persists none. |
 | T10 | Yes | Done or Review write-back without evidence is refused | A card in `done` or `review` with no rule 2 evidence produces a write-back plan where the `Status` update is refused or skipped with a reason (`buildDesiredProjectUpdates` today always sends it). |
 | T11 | Yes | Done or Review without evidence never moves the card | Project Status Done, Project Status Review, and a closed issue, each without evidence: the card keeps its column, gets `needs evidence`, and a reconcile log entry is written. With a linked `main` merge the card moves. |
-| T12 | Yes | security field change resets readiness | An upstream change to `allowed_file_scope`, `safety_rules` or `review_mode` on a `ready_for_agent` card stores the new value, sets `readiness = needs_grooming`, and `canDispatch` is false. An empty or placeholder upstream value does not reset. |
+| T12 | Yes | sync never writes local-owned security keys | An upstream value for `allowed_file_scope`, `safety_rules` or `review_mode` that differs from local leaves the local value, keeps `canDispatch` unchanged, and logs drift; on import the keys are not taken from upstream. |
 | T13 | Yes | missing upstream project_item_id never blanks local | A sync where the Project item id is missing or empty keeps `source_project_item_id`, through the persisted sync `UPDATE`. |
 | T14 | Yes | open Project item with no card is imported as needs_grooming | An open issue on a mapped Project with no card is created on sync with `readiness = needs_grooming` and `canDispatch = false`, even when upstream says Ready for Agent. |
+| T15 | Yes | normalized placeholder variants | Case, extra or Unicode-compatible whitespace, NFKC-equivalent characters, bullets and trailing punctuation around a denylisted string are all treated as placeholders and never overwrite. |
+| T16 | Yes | concurrent edit and ordering | A local edit to a local-owned field after the last sync read survives the sync; an older upstream read applied after a newer one for the same card changes nothing; running the same read twice is idempotent. |
+| T17 | Yes | failed or partial read changes nothing | A 403 or redacted item, a truncated page set, and a failed page each leave every card unchanged, write no tombstone, log the skip, and mark that repo Sync STALE. |
+| T18 | No | removed item needs two complete reads | An item missing from one complete read is not tombstoned; missing from two consecutive complete reads, it is. |
+| T19 | No | Project field beats body | When a Project field and a body section disagree, the Project field wins; the body only fills an empty key. |
+| T20 | Yes | placeholder title or body never replaces local | `'Untitled GitHub issue'`, `'Untitled GitHub issue import'`, an empty title, and a placeholder-only body each leave the local title or description unchanged. |
+| T21 | Yes | target_repo and project_workstream fill only when empty | A non-empty local `target_repo` or `project_workstream` survives a sync where the injected `Repo` or `Project` value differs; an empty local value is filled. |
 
 Step 7 adds: failed run does not stamp freshness, per-repo coverage (cards
-over open Project items), and the 32 hour alert.
+over open Project items), the 32 hour alert, the never-synced Coverage UNKNOWN
+warning, server receive time, and error-array counting. Restart and retry
+fault cases are covered by the S4 fault-injection plan.
 
 ## 11. Open TODOs for Dev
 
 - [ ] Tombstone storage, UI and API, enforced in the sync `UPDATE` and
       `PATCH /api/tasks/[id]` (section 4) with T1 to T4 and T9.
 - [ ] Explicit upstream clear signal (section 4, rule 5).
-- [ ] Security decision: accept but reset readiness (section 7) with T12.
+- [ ] Owner per key: sync never writes `allowed_file_scope`, `safety_rules`,
+      `review_mode`; `target_repo` and `project_workstream` fill only when empty
+      (section 7) with T12 and T21.
+- [ ] Placeholder normalization and title and body check (section 5, rules 6
+      and 7) with T15 and T20. MemSys variants as a follow-up on the list.
+- [ ] Concurrency and ordering (section 3.1) with T16.
+- [ ] Failed or partial reads and two-read removal (section 3.2) with T17 and
+      T18.
+- [ ] Project field beats body (section 3, rule 5) with T19.
 - [ ] Done and Review evidence rule, `needs evidence` flag and reconcile log,
       closed issues included (section 6, rules 1 to 4) with T8 and T11.
 - [ ] Refuse write-back of Status Done or Review without evidence (section 6,
@@ -356,4 +446,5 @@ over open Project items), and the 32 hour alert.
       with T14.
 - [ ] Link PR evidence to cards (section 8.2), Step 2 for the Done and Review
       gate, Step 7 for coverage.
-- [ ] Completion-only freshness, per-repo coverage, 32 hour alert (section 8.3).
+- [ ] Completion-only freshness, per-repo coverage, 32 hour alert, never-synced
+      warning, server receive time, error counting (section 8.3).
