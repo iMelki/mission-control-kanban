@@ -99,11 +99,13 @@ export const RISK_LEVEL_LABELS: Record<DispatchRiskLevel, string> = {
 
 /**
  * Generic portfolio-repair default strings from iMelki/projects-ops (dev).
- * Matched EXACTLY after trim: no fuzzy matching, regex, or case folding.
- * Sources (file:line on projects-ops `dev`):
+ * Projects-ops entries are matched EXACTLY after trim: no fuzzy matching,
+ * regex, or case folding. Sources (file:line on projects-ops `dev`):
  *   scripts/Ensure-RepoIssueProjectVisibility.ps1
  *   scripts/Invoke-GitHubProjectMutation.ps1
- * MemSys-sourced strings, if they differ, are a follow-up.
+ * The MemSys default Allowed File Scope is on the exported list too, and is
+ * matched only as a whole string after NFKC, casefold, trim, and collapsed
+ * whitespace, never as split tokens.
  */
 export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   // Ensure-RepoIssueProjectVisibility.ps1:35 and Invoke-GitHubProjectMutation.ps1:49 (Impact)
@@ -115,6 +117,11 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   // stay off this list.
   'Owning repo issue',
   'and tests named by the task.',
+  // MemSys default Allowed File Scope. Added to this exported list under
+  // section 5, rule 5 of docs/SYNC_FIELD_AUTHORITY.md. Matched only as a
+  // whole string after NFKC, casefold, trim, and collapsed whitespace,
+  // never as split tokens, so bare 'docs' and 'scripts' stay real scopes.
+  'Owning repo issue; docs; scripts; and tests named by the task',
   // Ensure-RepoIssueProjectVisibility.ps1:38 and Invoke-GitHubProjectMutation.ps1:52 (Acceptance Criteria)
   'Issue is present on the mapped GitHub Project.',
   // Ensure-RepoIssueProjectVisibility.ps1:39 and Invoke-GitHubProjectMutation.ps1:53
@@ -146,6 +153,32 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
 const GENERIC_SYNC_PLACEHOLDER_SET: ReadonlySet<string> = new Set(GENERIC_SYNC_PLACEHOLDER_STRINGS);
 
 /**
+ * MemSys default scope. Compared only as a whole string after
+ * `normalizeGenericSyncPlaceholderText`. Never tokenized, so bare 'docs'
+ * and 'scripts' stay real scopes.
+ */
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS = [
+  'Owning repo issue; docs; scripts; and tests named by the task',
+] as const;
+
+/**
+ * Unicode NFKC, then casefold, then trim and collapse internal whitespace
+ * (including space around `;`) to a single canonical space or `; `.
+ */
+export function normalizeGenericSyncPlaceholderText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\s*;\s*/g, '; ')
+    .trim();
+}
+
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_NORMALIZED: ReadonlySet<string> = new Set(
+  GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS.map(normalizeGenericSyncPlaceholderText),
+);
+
+/**
  * Split a dispatch string on the list separators used by portfolio-repair
  * joins (`; `, `;`, LF, CRLF), trimming each piece. Does not split on commas,
  * so the full Allowed File Scope default stays one token and is matched
@@ -160,9 +193,11 @@ export function splitGenericSyncPlaceholderTokens(value: string): string[] {
 
 /**
  * True when `value` is a known generic sync placeholder: an exact trimmed
- * item, or a `;` / LF / CRLF join whose every non-empty token is such an
- * item (any join or subset). Case is significant. Whitespace around
- * separators is ignored.
+ * item, a whole-string MemSys default after NFKC / case / whitespace
+ * normalization, or a `;` / LF / CRLF join whose every non-empty token is
+ * an exact list item (any join or subset). Token matching stays
+ * case-sensitive and does not treat bare 'docs' or 'scripts' as
+ * placeholders.
  */
 export function isGenericSyncPlaceholder(value: unknown): boolean {
   if (typeof value !== 'string') {
@@ -174,6 +209,9 @@ export function isGenericSyncPlaceholder(value: unknown): boolean {
     return false;
   }
   if (GENERIC_SYNC_PLACEHOLDER_SET.has(trimmed)) {
+    return true;
+  }
+  if (GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_NORMALIZED.has(normalizeGenericSyncPlaceholderText(trimmed))) {
     return true;
   }
 

@@ -937,6 +937,40 @@ test('a genuine allowed_file_scope placeholder may still be filled from upstream
   assert.deepEqual(filled?.allowed_file_scope, ['**/*']);
 });
 
+test('the MemSys default allowed_file_scope string is a whole-string placeholder', () => {
+  const memsysDefault = 'Owning repo issue; docs; scripts; and tests named by the task';
+  assert.equal(GENERIC_SYNC_PLACEHOLDER_STRINGS.includes(memsysDefault), true);
+  assert.equal(isGenericSyncPlaceholder(memsysDefault), true);
+  assert.equal(isGenericSyncPlaceholder(memsysDefault.toLowerCase()), true);
+  assert.equal(isGenericSyncPlaceholder(memsysDefault.toUpperCase()), true);
+  assert.equal(
+    isGenericSyncPlaceholder('  Owning  repo  issue;  docs;  scripts;  and  tests  named  by  the  task  '),
+    true,
+  );
+  assert.equal(
+    isGenericSyncPlaceholder('Owning repo issue;docs;scripts;and tests named by the task'),
+    true,
+  );
+  assert.equal(
+    isGenericSyncPlaceholder('Owning repo issue;\u00a0docs; scripts; and tests named by the task'),
+    true,
+  );
+  assert.equal(isGenericSyncPlaceholder('docs'), false);
+  assert.deepEqual(
+    mergeDispatchMetadataFromUpstream(
+      { allowed_file_scope: ['docs'] },
+      { allowed_file_scope: ['**/*'] },
+    )?.allowed_file_scope,
+    ['docs'],
+  );
+
+  const filled = mergeDispatchMetadataFromUpstream(
+    { allowed_file_scope: [memsysDefault.toUpperCase()] },
+    { allowed_file_scope: ['**/*'] },
+  );
+  assert.deepEqual(filled?.allowed_file_scope, ['**/*']);
+});
+
 test('GitHub refresh patch keeps canDispatch false when a required contract field is missing locally and upstream', () => {
   const incompleteLocal = {
     source_issue_url: 'https://github.com/iMelki/memsys/issues/991',
