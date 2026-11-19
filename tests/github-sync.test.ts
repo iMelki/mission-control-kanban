@@ -11,7 +11,7 @@ import {
   normalizeGitHubProjectStatus,
   reconcileGitHubProjectStatus,
 } from '../src/lib/github-project-sync';
-import { GENERIC_SYNC_PLACEHOLDER_STRINGS, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
+import { GENERIC_SYNC_PLACEHOLDER_STRINGS, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, requiresDispatchContractBeforeWorkStarts, stripGenericSyncPlaceholders, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
   planGitHubWriteback,
@@ -1063,8 +1063,9 @@ test('#114 first-item-only shape is not dispatchable', () => {
   assert.ok(result.missingFields.includes('impact'));
   assert.ok(result.missingFields.includes('rollback/fallback plan'));
 
-  // After MCK splits the scope default on commas, the four pieces are
-  // also placeholders, so the field stays missing.
+  // After MCK splits the scope default on commas, 'Owning repo issue' and
+  // 'and tests named by the task.' are placeholders, but 'docs' and 'scripts'
+  // are real scopes (kanban#227) and are kept.
   const commaSplitScope = validateDispatchMetadata({
     ...firstItemOnly,
     allowed_file_scope: [
@@ -1075,12 +1076,13 @@ test('#114 first-item-only shape is not dispatchable', () => {
     ],
   });
   assert.equal(commaSplitScope.canDispatch, false);
-  assert.ok(commaSplitScope.missingFields.includes('allowed file scope'));
+  assert.ok(!commaSplitScope.missingFields.includes('allowed file scope'));
+  assert.deepEqual(stripGenericSyncPlaceholders(['Owning repo issue', 'docs', 'scripts', 'and tests named by the task.']), ['docs', 'scripts']);
 
   assert.equal(isGenericSyncPlaceholder('Issue is present on the mapped GitHub Project.'), true);
   assert.equal(isGenericSyncPlaceholder('Owning repo issue'), true);
-  assert.equal(isGenericSyncPlaceholder('docs'), true);
-  assert.equal(isGenericSyncPlaceholder('scripts'), true);
+  assert.equal(isGenericSyncPlaceholder('docs'), false);
+  assert.equal(isGenericSyncPlaceholder('scripts'), false);
   assert.equal(isGenericSyncPlaceholder('and tests named by the task.'), true);
   assert.equal(isGenericSyncPlaceholder('Do not mutate external upstream repos from portfolio repair.'), true);
 });

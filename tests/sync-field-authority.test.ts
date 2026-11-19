@@ -387,7 +387,7 @@ test('T5 placeholder never overwrites: every placeholder shape leaves the local 
 });
 
 test('T6 placeholder-only is not dispatchable on a persisted card', () => {
-  seed({ metadata: { ...LOCAL_CONTRACT, allowed_file_scope: ['Owning repo issue', 'docs', 'scripts', 'and tests named by the task.'] } });
+  seed({ metadata: { ...LOCAL_CONTRACT, allowed_file_scope: ['Owning repo issue', 'and tests named by the task.'] } });
   const validation = contract.validateDispatchMetadata(storedMetadata());
   assert.equal(validation.canDispatch, false);
   assert.ok(validation.missingFields.includes('allowed file scope'));
@@ -735,8 +735,10 @@ test('T15 normalized placeholder variants never overwrite', async () => {
   for (const variant of variants) {
     assert.equal(contract.isGenericSyncPlaceholder(variant), true, JSON.stringify(variant));
   }
-  assert.equal(contract.isGenericSyncPlaceholder('Docs'), true);
-  assert.equal(contract.isGenericSyncPlaceholder('scripts.'), true);
+  // 'docs' and 'scripts' are real scopes, not placeholders (kanban#227).
+  assert.equal(contract.isGenericSyncPlaceholder('Docs'), false);
+  assert.equal(contract.isGenericSyncPlaceholder('scripts.'), false);
+  assert.equal(contract.isGenericSyncPlaceholder('OWNING REPO ISSUE.'), true);
   // Real scopes survive: path characters are not punctuation to strip.
   assert.equal(contract.isGenericSyncPlaceholder('docs/'), false);
   assert.equal(contract.isGenericSyncPlaceholder('docs/**'), false);
@@ -913,7 +915,7 @@ test('T21 target_repo and project_workstream: an empty local value is filled fro
 test('Done card with a placeholder-only contract never stays Ready for Agent, and the next sync does not write it back (memsys#114, #561)', async () => {
   const placeholderContract = {
     ...LOCAL_CONTRACT,
-    allowed_file_scope: ['Owning repo issue; docs; scripts; and tests named by the task'],
+    allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
     acceptance_criteria: ['Issue is present on the mapped GitHub Project.'],
     test_requirements: ['Run this script in -DryRun mode before broad repair.'],
     rollback_plan:
