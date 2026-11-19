@@ -2,6 +2,7 @@ import {
   isGenericSyncPlaceholder,
   mergeDispatchMetadataFromUpstream,
   normalizeDispatchMetadata,
+  stripGeneratedScopePlaceholderTokens,
   type DispatchMetadata,
   type DispatchReadiness,
   type DispatchReviewMode,
@@ -105,13 +106,14 @@ function normalizeListValue(value: unknown): string[] | undefined {
 
   const items = normalized.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
     const normalizedItem = item.replace(/^(?:\s*[-*]\s*\[[ xX]\]\s*|\s*[-*]\s*|\s*\d+\.\s*)/, '').trim();
-    if (!normalizedItem || isGenericSyncPlaceholder(normalizedItem)) {
-      return [];
-    }
-    return [normalizedItem];
+    return normalizedItem ? [normalizedItem] : [];
   });
 
-  return items.length > 0 ? items : undefined;
+  // Strip the generated default as a contiguous sequence first. Filtering
+  // placeholder tokens beforehand would drop "Owning repo issue" and leave
+  // bare "docs" and "scripts" behind.
+  const kept = stripGeneratedScopePlaceholderTokens(items).filter((item) => !isGenericSyncPlaceholder(item));
+  return kept.length > 0 ? kept : undefined;
 }
 
 function normalizeScalarSection(value: string | undefined): string | undefined {

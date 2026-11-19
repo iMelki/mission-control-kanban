@@ -103,9 +103,10 @@ export const RISK_LEVEL_LABELS: Record<DispatchRiskLevel, string> = {
  * regex, or case folding. Sources (file:line on projects-ops `dev`):
  *   scripts/Ensure-RepoIssueProjectVisibility.ps1
  *   scripts/Invoke-GitHubProjectMutation.ps1
- * The MemSys default Allowed File Scope is on the exported list too, and is
- * matched only as a whole string after NFKC, casefold, trim, and collapsed
- * whitespace, never as split tokens.
+ * The two generated Allowed File Scope defaults (projects-ops comma form and
+ * MemSys semicolon form) are also on the exported list, and are matched as
+ * a whole string after NFKC, case-fold, collapsed whitespace, and an optional
+ * trailing period, never as split tokens.
  */
 export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   // Ensure-RepoIssueProjectVisibility.ps1:35 and Invoke-GitHubProjectMutation.ps1:49 (Impact)
@@ -118,9 +119,10 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   'Owning repo issue',
   'and tests named by the task.',
   // MemSys default Allowed File Scope. Added to this exported list under
-  // section 5, rule 5 of docs/SYNC_FIELD_AUTHORITY.md. Matched only as a
-  // whole string after NFKC, casefold, trim, and collapsed whitespace,
-  // never as split tokens, so bare 'docs' and 'scripts' stay real scopes.
+  // section 5, rule 5 of docs/SYNC_FIELD_AUTHORITY.md. Both generated
+  // scope defaults are matched as a whole string after NFKC, case-fold,
+  // collapsed whitespace, and an optional trailing period, never as split
+  // tokens, so bare 'docs' and 'scripts' stay real scopes.
   'Owning repo issue; docs; scripts; and tests named by the task',
   // Ensure-RepoIssueProjectVisibility.ps1:38 and Invoke-GitHubProjectMutation.ps1:52 (Acceptance Criteria)
   'Issue is present on the mapped GitHub Project.',
@@ -153,17 +155,20 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
 const GENERIC_SYNC_PLACEHOLDER_SET: ReadonlySet<string> = new Set(GENERIC_SYNC_PLACEHOLDER_STRINGS);
 
 /**
- * MemSys default scope. Compared only as a whole string after
+ * Generated Allowed File Scope defaults (MemSys semicolon form and
+ * projects-ops comma form). Compared only as a whole string after
  * `normalizeGenericSyncPlaceholderText`. Never tokenized, so bare 'docs'
  * and 'scripts' stay real scopes.
  */
 const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS = [
   'Owning repo issue; docs; scripts; and tests named by the task',
+  'Owning repo issue, docs, scripts, and tests named by the task.',
 ] as const;
 
 /**
- * Unicode NFKC, then casefold, then trim and collapse internal whitespace
- * (including space around `;`) to a single canonical space or `; `.
+ * Unicode NFKC, then case-fold, then trim and collapse internal whitespace
+ * (including space around `;` or `,`) to a single canonical space or
+ * separator. A trailing period is optional.
  */
 export function normalizeGenericSyncPlaceholderText(value: string): string {
   return value
@@ -171,12 +176,50 @@ export function normalizeGenericSyncPlaceholderText(value: string): string {
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .replace(/\s*;\s*/g, '; ')
-    .trim();
+    .replace(/\s*,\s*/g, ', ')
+    .trim()
+    .replace(/\.+$/, '');
 }
 
 const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_NORMALIZED: ReadonlySet<string> = new Set(
   GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS.map(normalizeGenericSyncPlaceholderText),
 );
+
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_SEQUENCES: readonly string[][] = Array.from(
+  new Map(
+    GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS.map((placeholder) => {
+      const tokens = normalizeGenericSyncPlaceholderText(placeholder)
+        .split(/[;,]/)
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0);
+      return [tokens.join('\0'), tokens] as const;
+    }),
+  ).values(),
+);
+
+/**
+ * Drop a generated Allowed File Scope default when it appears as a
+ * contiguous token sequence, including a superstring such as the MemSys
+ * default plus `; src/**`. Bare 'docs', 'scripts', and 'docs/**' stay.
+ */
+export function stripGeneratedScopePlaceholderTokens(items: readonly string[]): string[] {
+  const remaining = [...items];
+  const normalized = remaining.map((item) => normalizeGenericSyncPlaceholderText(item));
+
+  for (const sequence of GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_SEQUENCES) {
+    let index = 0;
+    while (index <= normalized.length - sequence.length) {
+      if (sequence.every((token, offset) => normalized[index + offset] === token)) {
+        remaining.splice(index, sequence.length);
+        normalized.splice(index, sequence.length);
+        continue;
+      }
+      index += 1;
+    }
+  }
+
+  return remaining;
+}
 
 /**
  * Split a dispatch string on the list separators used by portfolio-repair
@@ -193,11 +236,11 @@ export function splitGenericSyncPlaceholderTokens(value: string): string[] {
 
 /**
  * True when `value` is a known generic sync placeholder: an exact trimmed
- * item, a whole-string MemSys default after NFKC / case / whitespace
- * normalization, or a `;` / LF / CRLF join whose every non-empty token is
- * an exact list item (any join or subset). Token matching stays
- * case-sensitive and does not treat bare 'docs' or 'scripts' as
- * placeholders.
+ * item, a whole-string generated Allowed File Scope default after NFKC /
+ * case-fold / whitespace normalization with an optional trailing period,
+ * or a `;` / LF / CRLF join whose every non-empty token is an exact list
+ * item (any join or subset). Token matching stays case-sensitive and does
+ * not treat bare 'docs' or 'scripts' as placeholders.
  */
 export function isGenericSyncPlaceholder(value: unknown): boolean {
   if (typeof value !== 'string') {
@@ -231,6 +274,16 @@ export function stripGenericSyncPlaceholders(value: unknown): unknown {
     const trimmed = value.trim();
     if (trimmed.length === 0 || isGenericSyncPlaceholder(trimmed)) {
       return undefined;
+    }
+
+    const listItems = trimmed.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
+      const itemTrimmed = item.trim();
+      return itemTrimmed ? [itemTrimmed] : [];
+    });
+    const withoutGeneratedScope = stripGeneratedScopePlaceholderTokens(listItems);
+    if (withoutGeneratedScope.length !== listItems.length) {
+      const keptScope = withoutGeneratedScope.filter((item) => !isGenericSyncPlaceholder(item));
+      return keptScope.length > 0 ? keptScope : undefined;
     }
 
     const tokens = splitGenericSyncPlaceholderTokens(trimmed);
@@ -285,11 +338,24 @@ function normalizeStringArray(value: unknown): string[] | undefined {
   }
 
   if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    // Recognize a generated scope placeholder on the unsplit string first.
+    // Splitting on ';' or ',' would otherwise turn the MemSys or projects-ops
+    // default into bare 'docs' and 'scripts', which are real file scopes.
+    if (isGenericSyncPlaceholder(trimmed)) {
+      return undefined;
+    }
+
     const items = value.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
-      const trimmed = item.trim();
-      return trimmed ? [trimmed] : [];
+      const itemTrimmed = item.trim();
+      return itemTrimmed ? [itemTrimmed] : [];
     });
-    return items.length > 0 ? items : undefined;
+    const kept = stripGeneratedScopePlaceholderTokens(items).filter((item) => !isGenericSyncPlaceholder(item));
+    return kept.length > 0 ? kept : undefined;
   }
 
   return undefined;

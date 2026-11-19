@@ -11,7 +11,7 @@ import {
   normalizeGitHubProjectStatus,
   reconcileGitHubProjectStatus,
 } from '../src/lib/github-project-sync';
-import { GENERIC_SYNC_PLACEHOLDER_STRINGS, LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
+import { GENERIC_SYNC_PLACEHOLDER_STRINGS, LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, normalizeDispatchMetadata, parseDispatchMetadata, requiresDispatchContractBeforeWorkStarts, serializeDispatchMetadata, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
   planGitHubWriteback,
@@ -524,6 +524,150 @@ test('GitHub import preview treats a generated Allowed File Scope project field 
   assert.deepEqual(realDocs.preview.dispatch_metadata?.allowed_file_scope, ['docs']);
   assert.equal(realDocs.dispatch_ready, true);
   assert.deepEqual(realDocs.dispatch_blockers, []);
+});
+
+const OTHERWISE_VALID_SCOPE_PROJECT_FIELDS = {
+  Repo: 'iMelki/mission-control-kanban',
+  Project: 'GitHub-native pipeline',
+  Readiness: 'Ready for Agent',
+  'Review Mode': 'Human Required',
+  Risk: 'Medium',
+  Impact: 'operator UX stays specific and non-placeholder',
+  'Project Item ID': 'PVTI_mock_scope_placeholder',
+  'Acceptance Criteria': '- Import preview is available in the UI\n- Operators can create a local task from it',
+  'Test Requirements': 'npm run test:github-sync\nManual import against localhost',
+  'Rollback / Fallback Plan': 'Disable the new modal and keep API routes intact.',
+  'Safety Rules': '- Do not write back to GitHub before the operator reviews the plan',
+};
+
+const OTHERWISE_VALID_SCOPE_ISSUE = {
+  number: 31,
+  title: 'Backfill operator onboarding in MCK',
+  body: '## Goal\nMake the import flow usable for first-time operators.',
+  html_url: 'https://github.com/iMelki/mission-control-kanban/issues/31',
+};
+
+const OTHERWISE_VALID_SCOPE_REPOSITORY = {
+  full_name: 'iMelki/mission-control-kanban',
+  name: 'mission-control-kanban',
+  owner: { login: 'iMelki' },
+};
+
+const OTHERWISE_COMPLETE_DISPATCH_CONTRACT = {
+  target_repo: 'iMelki/mission-control-kanban',
+  project_workstream: 'GitHub-native pipeline',
+  acceptance_criteria: ['Import preview is available in the UI', 'Operators can create a local task from it'],
+  test_requirements: ['npm run test:github-sync', 'Manual import against localhost'],
+  risk_level: 'medium' as const,
+  readiness: 'ready_for_agent' as const,
+  review_mode: 'human_required' as const,
+  impact: 'operator UX stays specific and non-placeholder',
+  rollback_plan: 'Disable the new modal and keep API routes intact.',
+  safety_rules: ['Do not write back to GitHub before the operator reviews the plan'],
+};
+
+function importPreviewForAllowedFileScope(scope: string) {
+  return buildGitHubImportPreviewResponse({
+    request: {
+      issue: OTHERWISE_VALID_SCOPE_ISSUE,
+      repository: OTHERWISE_VALID_SCOPE_REPOSITORY,
+      project_fields: {
+        ...OTHERWISE_VALID_SCOPE_PROJECT_FIELDS,
+        'Allowed File Scope': scope,
+      },
+    },
+  });
+}
+
+function contractFromAllowedFileScopeString(scope: string) {
+  return normalizeDispatchMetadata({
+    ...OTHERWISE_COMPLETE_DISPATCH_CONTRACT,
+    allowed_file_scope: scope,
+  });
+}
+
+const GENERATED_SCOPE_VARIANT_CASES = [
+  [
+    'a comma form with internal spaces or uppercase',
+    '  OWNING  REPO  ISSUE,  DOCS,  SCRIPTS,  AND  TESTS  NAMED  BY  THE  TASK.  ',
+  ],
+  [
+    'a comma form without a trailing period',
+    'Owning repo issue, docs, scripts, and tests named by the task',
+  ],
+  [
+    'a MemSys form with a trailing period',
+    'Owning repo issue; docs; scripts; and tests named by the task.',
+  ],
+] as const;
+
+for (const [label, scope] of GENERATED_SCOPE_VARIANT_CASES) {
+  test(`GitHub import preview treats ${label} as empty and not dispatchable`, () => {
+    const response = importPreviewForAllowedFileScope(scope);
+    assert.equal(response.preview.dispatch_metadata?.allowed_file_scope, undefined);
+    assert.equal(response.dispatch_ready, false);
+    assert.ok(response.dispatch_blockers.some((blocker) => /allowed file scope/i.test(blocker)));
+  });
+
+  test(`normalizeDispatchMetadata treats ${label} as empty and not dispatchable`, () => {
+    const normalized = contractFromAllowedFileScopeString(scope);
+    assert.equal(normalized?.allowed_file_scope, undefined);
+    const result = validateDispatchMetadata(normalized);
+    assert.equal(result.canDispatch, false);
+    assert.ok(result.missingFields.includes('allowed file scope'));
+  });
+}
+
+test('GitHub import preview keeps only src/** from a MemSys scope superstring', () => {
+  const response = importPreviewForAllowedFileScope(
+    'Owning repo issue; docs; scripts; and tests named by the task; src/**',
+  );
+  assert.deepEqual(response.preview.dispatch_metadata?.allowed_file_scope, ['src/**']);
+  assert.equal(response.dispatch_ready, true);
+  assert.deepEqual(response.dispatch_blockers, []);
+});
+
+test('normalizeDispatchMetadata keeps only src/** from a MemSys scope superstring', () => {
+  const normalized = contractFromAllowedFileScopeString(
+    'Owning repo issue; docs; scripts; and tests named by the task; src/**',
+  );
+  assert.deepEqual(normalized?.allowed_file_scope, ['src/**']);
+  assert.equal(validateDispatchMetadata(normalized).canDispatch, true);
+});
+
+test('GitHub import preview treats docs/** as a real file scope', () => {
+  const response = importPreviewForAllowedFileScope('docs/**');
+  assert.deepEqual(response.preview.dispatch_metadata?.allowed_file_scope, ['docs/**']);
+  assert.equal(response.dispatch_ready, true);
+  assert.deepEqual(response.dispatch_blockers, []);
+});
+
+test('normalizeDispatchMetadata treats docs/** as a real file scope', () => {
+  const normalized = contractFromAllowedFileScopeString('docs/**');
+  assert.deepEqual(normalized?.allowed_file_scope, ['docs/**']);
+  assert.equal(validateDispatchMetadata(normalized).canDispatch, true);
+});
+
+test('normalizeDispatchMetadata treats an exact MemSys scope string as empty', () => {
+  const memsysDefault = 'Owning repo issue; docs; scripts; and tests named by the task';
+  const normalized = contractFromAllowedFileScopeString(memsysDefault);
+  assert.equal(normalized?.allowed_file_scope, undefined);
+  const result = validateDispatchMetadata(normalized);
+  assert.equal(result.canDispatch, false);
+  assert.ok(result.missingFields.includes('allowed file scope'));
+
+  const rawContract = {
+    ...OTHERWISE_COMPLETE_DISPATCH_CONTRACT,
+    allowed_file_scope: memsysDefault,
+  };
+  const parsed = parseDispatchMetadata(rawContract);
+  assert.equal(parsed?.allowed_file_scope, undefined);
+  assert.equal(validateDispatchMetadata(parsed).canDispatch, false);
+
+  const serialized = serializeDispatchMetadata(rawContract as never);
+  assert.ok(serialized);
+  const reparsed = JSON.parse(serialized);
+  assert.equal(reparsed.allowed_file_scope, undefined);
 });
 
 test('GitHub import preview hydrates dispatch metadata from issue body headings', () => {
