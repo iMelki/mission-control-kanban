@@ -100,6 +100,7 @@ async function main() {
         would_update: result.updated,
         would_reconcile_status: result.status_reconciled,
         needs_evidence: result.needs_evidence,
+        readiness_reset: result.readiness_reset,
         drift_warnings: result.upstream_drift_warnings,
         would_write_tombstones: result.tombstones,
         silent_deletes: refused.length,

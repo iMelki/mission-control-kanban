@@ -1,7 +1,13 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
-import { buildSyncImportDispatchMetadata, parseDispatchMetadata, serializeDispatchMetadata } from './dispatch-contract';
+import {
+  buildSyncImportDispatchMetadata,
+  demoteReadinessForPlaceholderOnlyDone,
+  parseDispatchMetadata,
+  PLACEHOLDER_DONE_READINESS_REASON,
+  serializeDispatchMetadata,
+} from './dispatch-contract';
 import { queryAll, queryOne, run, transaction } from './db';
 import {
   recordFieldClears,
@@ -205,6 +211,8 @@ export interface GitHubProjectWorkspaceSyncResult {
   upstream_drift_warnings: number;
   /** Cards that stayed put because Done or Review lacked evidence. */
   needs_evidence: number;
+  /** Done cards with a placeholder-only contract set from Ready for Agent to Needs Grooming. */
+  readiness_reset: number;
   /** Tombstones written (apply) or that would be written (dry run). */
   tombstones: number;
   /** Id stamped on every tombstone this run writes. */
@@ -845,10 +853,14 @@ function existingTaskSnapshot(existing: ExistingTaskRow) {
 function planExistingTaskRefresh(
   existing: ExistingTaskRow,
   preview: GitHubImportPreviewTask,
-): { plan: GitHubTaskRefreshPlan; before: TaskFieldSnapshot; after: TaskFieldSnapshot } {
+  reconciledStatus: string,
+): { plan: GitHubTaskRefreshPlan; before: TaskFieldSnapshot; after: TaskFieldSnapshot; readinessReset: boolean } {
   const current = existingTaskSnapshot(existing);
   const plan = buildTaskRefreshPlanFromGitHubPreview(current, preview);
+  const demotion = demoteReadinessForPlaceholderOnlyDone(plan.update.dispatch_metadata, reconciledStatus);
+  plan.update.dispatch_metadata = demotion.metadata;
   return {
+    readinessReset: demotion.demoted,
     plan,
     before: {
       description: current.description,
@@ -861,6 +873,25 @@ function planExistingTaskRefresh(
       github_source: plan.update.github_source,
     },
   };
+}
+
+function pushReadinessReset(
+  result: GitHubProjectWorkspaceSyncResult,
+  issueRef: string,
+  taskId: string,
+  readinessReset: boolean,
+): void {
+  if (!readinessReset) {
+    return;
+  }
+  result.readiness_reset += 1;
+  result.details.push({
+    action: 'status_reconcile',
+    issue: issueRef,
+    task_id: taskId,
+    field: 'dispatch_metadata.readiness',
+    reason: PLACEHOLDER_DONE_READINESS_REASON,
+  });
 }
 
 function pushLocalOwnedDrift(
@@ -983,6 +1014,7 @@ export async function syncLoadedGitHubProjectWorkspace(
     status_reconciled: 0,
     upstream_drift_warnings: 0,
     needs_evidence: 0,
+    readiness_reset: 0,
     tombstones: 0,
     sync_run_id: options.syncRunId?.trim() || uuidv4(),
     read_at: options.readAt?.trim() || new Date().toISOString(),
@@ -1134,7 +1166,7 @@ export async function syncLoadedGitHubProjectWorkspace(
           projectStatus,
           evidence: closeEvidence,
         });
-        const refresh = planExistingTaskRefresh(existing, preview);
+        const refresh = planExistingTaskRefresh(existing, preview, reconciliation.local_status ?? existing.status);
         let wouldTombstone;
         try {
           wouldTombstone = recordFieldClears({
@@ -1189,6 +1221,7 @@ export async function syncLoadedGitHubProjectWorkspace(
           });
         }
         pushLocalOwnedDrift(result, issueRef, existing.id, refresh.plan);
+        pushReadinessReset(result, issueRef, existing.id, refresh.readinessReset);
         for (const tombstone of wouldTombstone) {
           result.tombstones += 1;
           result.details.push({
@@ -1219,7 +1252,7 @@ export async function syncLoadedGitHubProjectWorkspace(
           });
           const reconciledStatus = reconciliation.local_status ?? existing.status;
           const reconciledStatusChanged = reconciledStatus !== existing.status;
-          const refresh = planExistingTaskRefresh(existing, preview);
+          const refresh = planExistingTaskRefresh(existing, preview, reconciledStatus);
           const patch = refresh.plan.update;
           // Merged identity: an upstream item without a Project Item ID must
           // not null out the stored one (section 3, rule 2).
@@ -1347,6 +1380,7 @@ export async function syncLoadedGitHubProjectWorkspace(
             });
           }
           pushLocalOwnedDrift(result, issueRef, existing.id, refresh.plan);
+          pushReadinessReset(result, issueRef, existing.id, refresh.readinessReset);
           for (const tombstone of tombstones) {
             result.tombstones += 1;
             result.details.push({

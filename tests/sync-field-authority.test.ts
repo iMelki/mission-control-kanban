@@ -907,3 +907,55 @@ test('T21 target_repo and project_workstream: an empty local value is filled fro
   assert.equal(metadata?.target_repo, 'iMelki/mission-control-kanban');
   assert.equal(metadata?.project_workstream, 'Assistants');
 });
+
+// ---------------------------------------------------------------- MemSys: Done + placeholder-only contract
+
+test('Done card with a placeholder-only contract never stays Ready for Agent, and the next sync does not write it back (memsys#114, #561)', async () => {
+  const placeholderContract = {
+    ...LOCAL_CONTRACT,
+    allowed_file_scope: ['Owning repo issue; docs; scripts; and tests named by the task'],
+    acceptance_criteria: ['Issue is present on the mapped GitHub Project.'],
+    test_requirements: ['Run this script in -DryRun mode before broad repair.'],
+    rollback_plan:
+      'Remove the Project item from the mapped board or set Status=Done if this issue should not be visible in MCK.',
+    safety_rules: undefined,
+    impact: 'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
+    readiness: 'ready_for_agent',
+  };
+  assert.equal(contract.isPlaceholderOnlyContract(placeholderContract as never), true);
+
+  seed({ status: 'done', metadata: placeholderContract });
+  const upstream = issueItem({
+    closed: true,
+    fields: [{ name: 'Done', field: 'Status' }, { name: 'Ready for Agent', field: 'Readiness' }],
+  });
+
+  const dry = await runSync([upstream], { dryRun: true });
+  assert.equal(dry.readiness_reset, 1);
+  assert.equal(storedMetadata()?.readiness, 'ready_for_agent', 'dry run persists nothing');
+
+  const first = await runSync([upstream]);
+  assert.deepEqual(first.errors, []);
+  assert.equal(first.readiness_reset, 1);
+  assert.ok(first.details.some((detail) => detail.field === 'dispatch_metadata.readiness' && detail.action === 'status_reconcile'));
+  assert.equal(taskRow()?.status, 'done');
+  assert.equal(storedMetadata()?.readiness, 'needs_grooming');
+  assert.equal(contract.validateDispatchMetadata(storedMetadata()).canDispatch, false);
+  assert.equal(tombstoneCount(), 0, 'a readiness change is not a clear');
+
+  // Upstream still says Ready for Agent: the next sync keeps Needs Grooming.
+  await runSync([upstream]);
+  assert.equal(storedMetadata()?.readiness, 'needs_grooming');
+
+  // Not applied to a Done card with a real contract, or to a card that is not Done.
+  seed({ status: 'done' });
+  const real = await runSync([upstream]);
+  assert.equal(real.readiness_reset, 0);
+  assert.equal(storedMetadata()?.readiness, 'ready_for_agent');
+
+  seed({ status: 'in_progress', metadata: placeholderContract });
+  const open = await runSync([issueItem({ fields: [{ name: 'In Progress', field: 'Status' }, { name: 'Ready for Agent', field: 'Readiness' }] })]);
+  assert.equal(open.readiness_reset, 0);
+  assert.equal(storedMetadata()?.readiness, 'ready_for_agent');
+  assert.equal(contract.validateDispatchMetadata(storedMetadata()).canDispatch, false, 'section 4 rule 3 still blocks dispatch');
+});

@@ -208,6 +208,65 @@ export function isGenericSyncPlaceholder(value: unknown): boolean {
   return tokens.length > 0 && tokens.every((token) => isPlaceholderToken(token));
 }
 
+/** Contract content keys a groomed card fills in by hand. */
+const CONTRACT_CONTENT_KEYS = [
+  'allowed_file_scope',
+  'acceptance_criteria',
+  'test_requirements',
+  'rollback_plan',
+  'safety_rules',
+  'impact',
+] as const satisfies ReadonlyArray<keyof DispatchMetadata>;
+
+function hasContent(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) => typeof item === 'string' && item.trim().length > 0);
+  }
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * True when the contract holds generic placeholder text and nothing else:
+ * at least one content key carries a placeholder, and no content key has a
+ * substantive value once placeholders are stripped (section 4, rule 3).
+ */
+export function isPlaceholderOnlyContract(metadata: DispatchMetadata | undefined): boolean {
+  if (!metadata) {
+    return false;
+  }
+  let sawPlaceholder = false;
+  for (const key of CONTRACT_CONTENT_KEYS) {
+    const value = metadata[key];
+    if (!hasContent(value)) {
+      continue;
+    }
+    if (hasContent(stripGenericSyncPlaceholders(value))) {
+      return false;
+    }
+    sawPlaceholder = true;
+  }
+  return sawPlaceholder;
+}
+
+export const PLACEHOLDER_DONE_READINESS_REASON =
+  'Done card with a placeholder-only dispatch contract: readiness Ready for Agent does not apply, set to Needs Grooming';
+
+/**
+ * A Done card whose contract is placeholder-only must not read Ready for
+ * Agent. Sync applies this after the per-field merge on every run, so an
+ * upstream "Ready for Agent" cannot write it back while the card is Done and
+ * its contract is still placeholder-only.
+ */
+export function demoteReadinessForPlaceholderOnlyDone(
+  metadata: DispatchMetadata | undefined,
+  status: string | undefined,
+): { metadata: DispatchMetadata | undefined; demoted: boolean } {
+  if (status !== 'done' || metadata?.readiness !== 'ready_for_agent' || !isPlaceholderOnlyContract(metadata)) {
+    return { metadata, demoted: false };
+  }
+  return { metadata: { ...metadata, readiness: 'needs_grooming' }, demoted: true };
+}
+
 /**
  * Drop generic placeholder items (and empty strings) from a dispatch value.
  * A string that is itself a placeholder, or a join/subset of only
