@@ -330,17 +330,43 @@ function isNonEmptyDispatchValue(value: unknown): boolean {
 }
 
 /**
+ * Sandbox and review controls that GitHub refresh must not overwrite once a
+ * local non-empty, non-placeholder value exists. A later issue-body or
+ * project-field edit must not widen factory allowed paths, replace safety
+ * rules, or switch review mode while other required keys stay in place and
+ * `canDispatch` remains true. Missing, empty, or placeholder-only local
+ * values may still be filled from a repaired upstream body.
+ */
+export const LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH = [
+  'allowed_file_scope',
+  'safety_rules',
+  'review_mode',
+] as const satisfies ReadonlyArray<keyof DispatchMetadata>;
+
+function isLocalOnlyDispatchFieldOnRefresh(key: string): boolean {
+  return (LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH as readonly string[]).includes(key);
+}
+
+function hasSubstantiveLocalDispatchValue(value: unknown): boolean {
+  return isNonEmptyDispatchValue(stripGenericSyncPlaceholders(value));
+}
+
+/**
  * Key-level merge of upstream-derived dispatch metadata into a locally stored
- * contract.
+ * contract during GitHub refresh.
  *
  * Precedence: local edits win unless upstream explicitly provides a non-empty,
  * non-placeholder value. A value is non-empty when a trimmed string has length
  * and is not a known generic sync placeholder, an array has at least one
  * non-empty non-placeholder item (placeholder items are dropped first), or any
  * other non-null scalar is present. Missing, empty, or placeholder-only
- * upstream keys leave the local key unchanged. This applies to every key,
- * including locally authored contract fields such as `allowed_file_scope`,
- * `test_requirements`, and `rollback_plan`. `dispatch_ready` is not stored on
+ * upstream keys leave the local key unchanged.
+ *
+ * Sandbox and review controls listed in
+ * `LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH` are not overwritten when the local
+ * key already has a non-empty, non-placeholder value. If the local key is
+ * missing, empty, or placeholder-only, a substantive upstream value may still
+ * fill it (the repaired-issue-body path). `dispatch_ready` is not stored on
  * this object; callers recompute it from the merged result via
  * `validateDispatchMetadata`.
  */
@@ -357,6 +383,12 @@ export function mergeDispatchMetadataFromUpstream(
 
   const merged: Record<string, unknown> = { ...localRecord };
   for (const [key, value] of Object.entries(upstreamRecord)) {
+    if (
+      isLocalOnlyDispatchFieldOnRefresh(key)
+      && hasSubstantiveLocalDispatchValue(localRecord[key])
+    ) {
+      continue;
+    }
     const substantive = stripGenericSyncPlaceholders(value);
     if (isNonEmptyDispatchValue(substantive)) {
       merged[key] = substantive;

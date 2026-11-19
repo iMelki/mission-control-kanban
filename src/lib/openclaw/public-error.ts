@@ -5,7 +5,7 @@ const REDACTED = '[redacted]';
 const SENSITIVE_QUERY = /([?&](?:token|access_token|refresh_token|secret|api[_-]?key|password|authorization)=)[^&\s#]+/gi;
 const BEARER = /(bearer\s+)\S+/gi;
 const HEADER_PAIR = /((?:authorization|x-[\w-]*?(?:token|secret|key|authorization))\s*[:=]\s*)(?:bearer\s+)?\S+/gi;
-const JSON_SECRET_FIELDS = /("(?:token|access_token|refresh_token|secret|authorization|api[_-]?key|password|x-[\w-]*token)"\s*:\s*")[^"]*(")/gi;
+const JSON_SECRET_FIELDS = /("(?:token|access_token|refresh_token|secret|authorization|api[_-]?key|password|x-[\w-]*?(?:token|secret|key|authorization))"\s*:\s*")[^"]*(")/gi;
 const ENV_ASSIGN = /((?:OPENCLAW_GATEWAY_TOKEN|MCK_WEBHOOK_CALLBACK_SIGNATURE_SECRET|MCK_WEBHOOK_SIGNATURE_SECRET)\s*[=:]\s*)\S+/g;
 
 export function redactGatewayErrorText(text: string): string {

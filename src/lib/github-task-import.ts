@@ -499,8 +499,11 @@ export function buildTaskRefreshUpdateFromGitHubPreview(
       currentTask.github_source,
       preview.github_source,
     ) ?? null,
-    // Key-level merge: upstream non-empty non-placeholder keys refresh,
-    // local-only keys stay. See mergeDispatchMetadataFromUpstream.
+    // Key-level merge: upstream non-empty non-placeholder keys refresh.
+    // Sandbox and review controls (allowed_file_scope, safety_rules,
+    // review_mode) stay local-only when a substantive local value already
+    // exists; a missing or placeholder local key may still be filled.
+    // See mergeDispatchMetadataFromUpstream.
     dispatch_metadata: mergeDispatchMetadataFromUpstream(
       currentTask.dispatch_metadata,
       preview.dispatch_metadata,

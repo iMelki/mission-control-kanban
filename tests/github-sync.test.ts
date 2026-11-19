@@ -11,7 +11,7 @@ import {
   normalizeGitHubProjectStatus,
   reconcileGitHubProjectStatus,
 } from '../src/lib/github-project-sync';
-import { GENERIC_SYNC_PLACEHOLDER_STRINGS, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
+import { GENERIC_SYNC_PLACEHOLDER_STRINGS, LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, requiresDispatchContractBeforeWorkStarts, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
   planGitHubWriteback,
@@ -658,6 +658,7 @@ test('GitHub refresh patch updates imported task metadata without forcing status
         target_repo: 'iMelki/projects-ops',
         project_workstream: 'GitHub-native pipeline',
         allowed_file_scope: ['projects-ops/docs/**'],
+        test_requirements: ['npm run test:github-sync'],
       },
     }
   );
@@ -666,6 +667,9 @@ test('GitHub refresh patch updates imported task metadata without forcing status
   assert.equal(patch.description, 'Refreshed description');
   assert.equal(patch.priority, 'high');
   assert.equal(patch.github_source?.project_item_id, 'PVTI_refresh_1');
+  assert.equal(patch.dispatch_metadata?.project_workstream, 'GitHub-native pipeline');
+  assert.deepEqual(patch.dispatch_metadata?.test_requirements, ['npm run test:github-sync']);
+  // Local allowed_file_scope was missing, so a repaired upstream value may fill it.
   assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, ['projects-ops/docs/**']);
   assert.equal('status' in patch, false);
 });
@@ -761,11 +765,121 @@ test('GitHub refresh patch applies non-empty upstream contract values and ignore
   );
 
   assert.equal(merged?.project_workstream, 'upstream-stream');
-  assert.deepEqual(merged?.allowed_file_scope, ['src/upstream.ts', 'tests/upstream.test.ts']);
+  // allowed_file_scope is local-only: a non-empty upstream value must not overwrite it.
+  assert.deepEqual(merged?.allowed_file_scope, ['src/local.ts']);
   assert.deepEqual(merged?.test_requirements, ['npm test']);
   assert.equal(merged?.rollback_plan, 'Revert the local change.');
   assert.equal(merged?.readiness, 'ready_for_agent');
   assert.equal(merged?.impact, 'Upstream impact is non-empty so it is applied');
+});
+
+test('GitHub refresh keeps allowed_file_scope, safety_rules and review_mode local-only', () => {
+  assert.deepEqual(
+    [...LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH],
+    ['allowed_file_scope', 'safety_rules', 'review_mode'],
+  );
+
+  const local = {
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'local-stream',
+    allowed_file_scope: ['src/lib/dispatch-contract.ts'],
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:github-sync'],
+    risk_level: 'high' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Local impact stays',
+    rollback_plan: 'Revert the local change.',
+    safety_rules: ['Do not widen factory allowed paths from GitHub'],
+  };
+
+  const before = validateDispatchMetadata(local);
+  assert.equal(before.canDispatch, true);
+
+  const overwritten = mergeDispatchMetadataFromUpstream(local, {
+    project_workstream: 'upstream-stream',
+    allowed_file_scope: ['**/*'],
+    safety_rules: ['none'],
+    review_mode: 'auto_checks_only',
+    impact: 'Upstream impact is applied',
+  });
+
+  assert.equal(overwritten?.project_workstream, 'upstream-stream');
+  assert.equal(overwritten?.impact, 'Upstream impact is applied');
+  assert.deepEqual(overwritten?.allowed_file_scope, local.allowed_file_scope);
+  assert.deepEqual(overwritten?.safety_rules, local.safety_rules);
+  assert.equal(overwritten?.review_mode, 'human_required');
+  const afterOverwrite = validateDispatchMetadata(overwritten);
+  assert.equal(afterOverwrite.canDispatch, true);
+
+  // A missing or placeholder-only local key may still be filled from a repaired body.
+  const filled = mergeDispatchMetadataFromUpstream(
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'local-stream',
+      allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+      acceptance_criteria: ['Local acceptance criterion stays'],
+      test_requirements: ['npm run test:github-sync'],
+      risk_level: 'high',
+      readiness: 'ready_for_agent',
+      impact: 'Local impact stays',
+      rollback_plan: 'Revert the local change.',
+    },
+    {
+      allowed_file_scope: ['src/lib/dispatch-contract.ts'],
+      safety_rules: ['Do not mutate GitHub in this test'],
+      review_mode: 'human_required',
+    },
+  );
+
+  assert.deepEqual(filled?.allowed_file_scope, ['src/lib/dispatch-contract.ts']);
+  assert.deepEqual(filled?.safety_rules, ['Do not mutate GitHub in this test']);
+  assert.equal(filled?.review_mode, 'human_required');
+  const afterFill = validateDispatchMetadata(filled);
+  assert.equal(afterFill.canDispatch, true);
+
+  const patch = buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Old title',
+      description: 'Old description',
+      priority: 'normal',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+      },
+      dispatch_metadata: local,
+    },
+    {
+      title: 'Refreshed memsys#991 title',
+      description: 'Issue body with widened sandbox and review controls.',
+      priority: 'high',
+      status: 'inbox',
+      workspace_id: 'default',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        project_item_id: 'PVTI_local_only_controls',
+      },
+      dispatch_metadata: {
+        target_repo: 'iMelki/memsys',
+        project_workstream: 'upstream-stream',
+        allowed_file_scope: ['**/*'],
+        safety_rules: ['none'],
+        review_mode: 'auto_checks_only',
+      },
+    },
+  );
+
+  assert.equal(patch.dispatch_metadata?.project_workstream, 'upstream-stream');
+  assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, local.allowed_file_scope);
+  assert.deepEqual(patch.dispatch_metadata?.safety_rules, local.safety_rules);
+  assert.equal(patch.dispatch_metadata?.review_mode, 'human_required');
+  assert.equal(validateDispatchMetadata(patch.dispatch_metadata).canDispatch, true);
 });
 
 test('GitHub refresh patch keeps canDispatch false when a required contract field is missing locally and upstream', () => {

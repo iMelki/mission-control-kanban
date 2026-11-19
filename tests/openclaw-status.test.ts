@@ -23,6 +23,14 @@ test('toPublicGatewayError keeps a plain missing-scope message and numeric code'
   });
 });
 
+test('toPublicGatewayError keeps a string gateway error.code', () => {
+  const err = Object.assign(new Error('missing scope: operator.read'), { code: 'FORBIDDEN' });
+  assert.deepEqual(toPublicGatewayError(err), {
+    message: 'missing scope: operator.read',
+    code: 'FORBIDDEN',
+  });
+});
+
 test('toPublicGatewayError redacts token, header, and secret values', () => {
   const secret = 'totally-fake-test-secret';
   const token = 'totally-fake-test-token';
@@ -42,6 +50,14 @@ test('toPublicGatewayError redacts token, header, and secret values', () => {
   assert.match(publicError.message, /X-Gateway-Token:\s*\[redacted\]/);
   assert.match(publicError.message, /"token":"\[redacted\]"/);
   assert.match(publicError.message, /OPENCLAW_GATEWAY_TOKEN=\[redacted\]/);
+
+  const jsonHeaders = toPublicGatewayError(new Error(
+    '{"x-api-key":"' + secret + '","authorization":"' + token + '"}',
+  ));
+  assert.equal(jsonHeaders.message.includes(secret), false);
+  assert.equal(jsonHeaders.message.includes(token), false);
+  assert.match(jsonHeaders.message, /"x-api-key":"\[redacted\]"/);
+  assert.match(jsonHeaders.message, /"authorization":"\[redacted\]"/);
 
   const standalone = toPublicGatewayError(new Error('rejected Bearer ' + token));
   assert.equal(standalone.message.includes(token), false);
@@ -68,6 +84,21 @@ test('list-sessions failure returns the gateway error message and code', async (
   assert.equal(body.error, 'missing scope: operator.read');
   assert.equal(body.error_code, 401);
   assert.equal(body.error === 'Connected but failed to list sessions', false);
+});
+
+test('list-sessions failure returns a string gateway error.code', async () => {
+  const err = Object.assign(new Error('missing scope: operator.read'), { code: 'FORBIDDEN' });
+  const response = await getOpenClawStatus(fakeClient({
+    listSessions: async () => {
+      throw err;
+    },
+  }));
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.connected, true);
+  assert.equal(body.error, 'missing scope: operator.read');
+  assert.equal(body.error_code, 'FORBIDDEN');
 });
 
 test('list-sessions failure redacts token, header, and secret values from the response', async () => {
