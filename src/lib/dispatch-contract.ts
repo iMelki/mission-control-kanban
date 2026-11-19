@@ -354,6 +354,12 @@ function normalizeString(value: unknown): string | undefined {
 }
 
 function normalizeStringArray(value: unknown): string[] | undefined {
+  // An explicit clear must be recognized on the raw value before any list
+  // parse. Empty, missing, or unparsable input is not a clear.
+  if (isExplicitUpstreamListClear(value)) {
+    return [UPSTREAM_CLEAR_SIGNAL];
+  }
+
   if (Array.isArray(value)) {
     const items = value.flatMap((item) => {
       const normalized = normalizeString(item);
@@ -466,6 +472,37 @@ export function isExplicitUpstreamClear(value: unknown): boolean {
 }
 
 /**
+ * List-field clear check used before any list parse (splitting commas,
+ * bullets, or newlines into items). A clear is only the explicit
+ * `UPSTREAM_CLEAR_SIGNAL` on the raw value, including a single list bullet or
+ * checkbox in front of the token. An empty, missing, or unparsable list is
+ * never a clear.
+ */
+export function isExplicitUpstreamListClear(value: unknown): boolean {
+  if (value == null) {
+    return false;
+  }
+  if (isExplicitUpstreamClear(value)) {
+    return true;
+  }
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const withoutBullet = trimmed.replace(/^(?:[-*]\s*\[[ xX]\]\s*|[-*]\s*|\d+\.\s*)/, '').trim();
+  return isExplicitUpstreamClear(withoutBullet);
+}
+
+function upstreamAsksToClear(key: string, value: unknown): boolean {
+  return LIST_DISPATCH_KEY_SET.has(key)
+    ? isExplicitUpstreamListClear(value)
+    : isExplicitUpstreamClear(value);
+}
+
+/**
  * docs/SYNC_FIELD_AUTHORITY.md section 7 (CTO ruling 2026-11-19 14:49 IST,
  * the #212 Security Medium): these keys are local-owned. Sync never writes
  * them, on update or on import. An upstream value that differs from local is
@@ -534,20 +571,20 @@ export function mergeDispatchMetadataFromUpstreamDetailed(
     const localHasValue = isNonEmptyDispatchValue(stripGenericSyncPlaceholdersForKey(key, localValue));
 
     if (LOCAL_OWNED_DISPATCH_KEY_SET.has(key)) {
-      const substantive = isExplicitUpstreamClear(value) ? undefined : stripGenericSyncPlaceholdersForKey(key, value);
+      const substantive = upstreamAsksToClear(key, value) ? undefined : stripGenericSyncPlaceholdersForKey(key, value);
       const upstreamValue = isNonEmptyDispatchValue(substantive)
         ? (normalizeDispatchMetadata({ [key]: substantive }) as Record<string, unknown> | undefined)?.[key]
         : undefined;
-      if (isExplicitUpstreamClear(value) ? localHasValue : upstreamValue !== undefined && !sameDispatchValue(upstreamValue, localValue)) {
+      if (upstreamAsksToClear(key, value) ? localHasValue : upstreamValue !== undefined && !sameDispatchValue(upstreamValue, localValue)) {
         drift.push({
           field: `dispatch_metadata.${key}`,
-          reason: `Upstream ${isExplicitUpstreamClear(value) ? 'asks to clear' : 'differs on'} local-owned field ${key}; sync never writes it. Change it in MCK if intended.`,
+          reason: `Upstream ${upstreamAsksToClear(key, value) ? 'asks to clear' : 'differs on'} local-owned field ${key}; sync never writes it. Change it in MCK if intended.`,
         });
       }
       continue;
     }
 
-    if (isExplicitUpstreamClear(value)) {
+    if (upstreamAsksToClear(key, value)) {
       if (FILL_ONLY_DISPATCH_KEY_SET.has(key)) {
         continue;
       }
@@ -555,6 +592,21 @@ export function mergeDispatchMetadataFromUpstreamDetailed(
         delete merged[key];
         explicitClears.push(`dispatch_metadata.${key}`);
       }
+      continue;
+    }
+
+    // List fields: parse only after the explicit-clear check. An empty or
+    // unparsable list is not a write and not a clear.
+    if (LIST_DISPATCH_KEY_SET.has(key)) {
+      const parsed = normalizeStringArray(value);
+      if (!parsed) {
+        continue;
+      }
+      const listValue = stripGenericSyncPlaceholdersForKey(key, parsed);
+      if (!isNonEmptyDispatchValue(listValue)) {
+        continue;
+      }
+      merged[key] = listValue;
       continue;
     }
 

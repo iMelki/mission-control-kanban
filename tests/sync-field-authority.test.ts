@@ -1257,3 +1257,142 @@ test('kanban#232 M2 Done and Review write-back is refused without evidence, with
     assert.ok(!calls.some((call) => call.body.includes('WritebackStatusEvidence')));
   });
 });
+
+
+// ------------------------------------------- distinct complete reads, list clear, open+Done
+
+function missingReadState() {
+  return db.queryOne<{ github_missing_reads: number; github_missing_read_ids: string | null }>(
+    "SELECT github_missing_reads, github_missing_read_ids FROM tasks WHERE id = 'task-existing'",
+  );
+}
+
+test('a repeated complete read of the same sync does not count toward unlink', async () => {
+  seed();
+  const other = issueItem({ id: 'PVTI_other', number: 91 });
+
+  const first = await runSync([other], { syncRunId: 'run-same', readAt: '2026-11-19T12:00:00.000Z' });
+  assert.equal(first.removed_from_project, 0);
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+  assert.equal(missingReadState()?.github_missing_reads, 1);
+
+  const replay = await runSync([other], { syncRunId: 'run-same', readAt: '2026-11-19T12:00:00.000Z' });
+  assert.equal(replay.removed_from_project, 0);
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+  assert.equal(tombstoneCount(), 0);
+  assert.equal(missingReadState()?.github_missing_reads, 1);
+
+  // Same sync run id, even with a later timestamp, is still the same sync.
+  const sameRun = await runSync([other], { syncRunId: 'run-same', readAt: '2026-11-19T12:05:00.000Z' });
+  assert.equal(sameRun.removed_from_project, 0);
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+  assert.equal(tombstoneCount(), 0);
+
+  // The same read snapshot under a new run id also does not count again.
+  const sameSnapshot = await runSync([other], { syncRunId: 'run-replay', readAt: '2026-11-19T12:00:00.000Z' });
+  assert.equal(sameSnapshot.removed_from_project, 0);
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+  assert.equal(tombstoneCount(), 0);
+
+  // A partial, paged, or errored read never increments the distinct count.
+  const beforePartial = missingReadState();
+  await sync.syncLoadedGitHubProjectWorkspace('assistants', {
+    title: 'Assistants',
+    allItems: [other] as never,
+    read: { complete: false, reason: 'page 2 failed' },
+  }, { syncRunId: 'run-partial', readAt: '2026-11-19T12:10:00.000Z' });
+  assert.deepEqual(missingReadState(), beforePartial);
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+});
+
+test('unlink re-checks GitHub identity in the same transaction and refuses if it changed', async () => {
+  seed();
+  const other = issueItem({ id: 'PVTI_other', number: 91 });
+  await runSync([other], { syncRunId: 'run-ident-1', readAt: '2026-11-19T12:00:00.000Z' });
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+
+  sync.githubProjectSyncTestHooks.beforeTombstoneUnlinkIdentityCheck = () => {
+    db.run(
+      "UPDATE tasks SET source_project_item_id = 'PVTI_relinked', source_issue_number = 88 WHERE id = 'task-existing'",
+    );
+  };
+  try {
+    const second = await runSync([other], { syncRunId: 'run-ident-2', readAt: '2026-11-19T12:01:00.000Z' });
+    assert.equal(second.removed_from_project, 0);
+    assert.equal(tombstoneCount(), 0);
+    assert.ok(second.details.some((detail) => detail.action === 'skip' && /identity changed before unlink/.test(detail.reason ?? '')));
+    const row = db.queryOne<{ source_project_item_id: string; source_issue_number: number }>(
+      "SELECT source_project_item_id, source_issue_number FROM tasks WHERE id = 'task-existing'",
+    );
+    assert.equal(row?.source_project_item_id, 'PVTI_relinked');
+    assert.equal(row?.source_issue_number, 88);
+  } finally {
+    sync.githubProjectSyncTestHooks.beforeTombstoneUnlinkIdentityCheck = undefined;
+  }
+});
+
+test('an empty, missing or unparsable list is never a clear; only an explicit marker is', () => {
+  for (const upstream of [undefined, null, '', '   ', [], ['', '  '], [null], {}, { items: [] }, ';;;', ' , , ', 123, true]) {
+    const result = contract.mergeDispatchMetadataFromUpstreamDetailed(
+      LOCAL_CONTRACT as never,
+      { acceptance_criteria: upstream, test_requirements: upstream } as never,
+    );
+    assert.deepEqual(result.explicit_clears, [], `clears for ${JSON.stringify(upstream)}`);
+    assert.deepEqual(result.merged?.acceptance_criteria, LOCAL_CONTRACT.acceptance_criteria, `acceptance ${JSON.stringify(upstream)}`);
+    assert.deepEqual(result.merged?.test_requirements, LOCAL_CONTRACT.test_requirements, `tests ${JSON.stringify(upstream)}`);
+  }
+
+  assert.equal(contract.isExplicitUpstreamListClear(undefined), false);
+  assert.equal(contract.isExplicitUpstreamListClear(''), false);
+  assert.equal(contract.isExplicitUpstreamListClear([]), false);
+  assert.equal(contract.isExplicitUpstreamListClear({}), false);
+  assert.equal(contract.isExplicitUpstreamListClear(';;;'), false);
+  assert.equal(contract.isExplicitUpstreamListClear('MCK-CLEAR'), true);
+  assert.equal(contract.isExplicitUpstreamListClear('- MCK-CLEAR'), true);
+  assert.equal(contract.isExplicitUpstreamListClear('- [ ] MCK-CLEAR'), true);
+
+  const cleared = contract.mergeDispatchMetadataFromUpstreamDetailed(
+    LOCAL_CONTRACT as never,
+    { acceptance_criteria: 'MCK-CLEAR' } as never,
+  );
+  assert.deepEqual(cleared.explicit_clears, ['dispatch_metadata.acceptance_criteria']);
+  assert.equal(cleared.merged?.acceptance_criteria, undefined);
+
+  // The raw bulleted token is a clear before any list parse.
+  const bulleted = contract.mergeDispatchMetadataFromUpstreamDetailed(
+    LOCAL_CONTRACT as never,
+    { test_requirements: '- MCK-CLEAR' } as never,
+  );
+  assert.deepEqual(bulleted.explicit_clears, ['dispatch_metadata.test_requirements']);
+  assert.equal(bulleted.merged?.test_requirements, undefined);
+});
+
+test('an open GitHub issue is imported and kept even when Project Status is Done', async () => {
+  seed();
+  const importedResult = await runSync([
+    issueItem(),
+    issueItem({ id: 'PVTI_open_done', number: 80, fields: [{ name: 'Done', field: 'Status' }] }),
+  ]);
+  assert.deepEqual(importedResult.errors, []);
+  assert.equal(importedResult.imported, 1);
+  assert.equal(importedResult.skipped_closed, 0);
+  const imported = db.queryOne<{ status: string; source_project_item_id: string; dispatch_metadata: string }>(
+    'SELECT status, source_project_item_id, dispatch_metadata FROM tasks WHERE source_issue_number = 80',
+  );
+  assert.equal(imported?.source_project_item_id, 'PVTI_open_done');
+  assert.equal(imported?.status, 'inbox');
+  assert.equal(contract.parseDispatchMetadata(imported?.dispatch_metadata)?.readiness, 'needs_grooming');
+  assert.equal(tombstoneCount(), 0);
+
+  // An existing open card with Project Done is not dropped or tombstoned, and
+  // is not moved to Done without evidence.
+  const existing = await runSync([
+    issueItem({ fields: [{ name: 'Done', field: 'Status' }] }),
+    issueItem({ id: 'PVTI_open_done', number: 80, fields: [{ name: 'Done', field: 'Status' }] }),
+  ]);
+  assert.equal(taskRow()?.source_project_item_id, 'PVTI_existing');
+  assert.equal(taskRow()?.status, 'in_progress');
+  assert.equal(existing.removed_from_project, 0);
+  assert.ok(existing.details.some((detail) => /Needs evidence/.test(detail.reason ?? '')));
+  assert.equal(tombstoneCount(), 0);
+});

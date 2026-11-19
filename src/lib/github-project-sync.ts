@@ -26,6 +26,84 @@ import type { Task, TaskPriority, TaskStatus, TaskSyncFlags } from './types';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Test-only hooks. Production callers leave these unset.
+ * `beforeTombstoneUnlinkIdentityCheck` runs inside the unlink transaction,
+ * before the identity re-check, so a test can change the row mid-transaction.
+ */
+export const githubProjectSyncTestHooks: {
+  beforeTombstoneUnlinkIdentityCheck?: () => void;
+} = {};
+
+interface MissingCompleteRead {
+  sync_run_id: string;
+  read_at: string;
+}
+
+function parseMissingCompleteReads(raw: unknown): MissingCompleteRead[] {
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return [];
+      }
+      const record = entry as { sync_run_id?: unknown; read_at?: unknown };
+      const sync_run_id = typeof record.sync_run_id === 'string' ? record.sync_run_id : '';
+      const read_at = typeof record.read_at === 'string' ? record.read_at : '';
+      if (!sync_run_id && !read_at) {
+        return [];
+      }
+      return [{ sync_run_id, read_at }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function alreadyCountedMissingRead(
+  reads: MissingCompleteRead[],
+  syncRunId: string,
+  readAt: string,
+  readAtWasProvided: boolean,
+): boolean {
+  return reads.some((read) => {
+    if (syncRunId && read.sync_run_id === syncRunId) {
+      return true;
+    }
+    // Only an explicit read snapshot is an identity. Auto-generated clocks can
+    // collide in the same millisecond and must not look like the same read.
+    return readAtWasProvided && Boolean(readAt) && read.read_at === readAt;
+  });
+}
+
+export interface TaskGitHubSourceIdentity {
+  id: string;
+  source_project_item_id: string | null;
+  source_repo_owner: string | null;
+  source_repo_name: string | null;
+  source_issue_number: number | null;
+}
+
+export function sameTaskGitHubSourceIdentity(
+  expected: TaskGitHubSourceIdentity,
+  current: TaskGitHubSourceIdentity | undefined,
+): boolean {
+  if (!current || current.id !== expected.id) {
+    return false;
+  }
+  return current.source_project_item_id === expected.source_project_item_id
+    && current.source_repo_owner === expected.source_repo_owner
+    && current.source_repo_name === expected.source_repo_name
+    && Number(current.source_issue_number ?? 0) === Number(expected.source_issue_number ?? 0);
+}
+
+
 export interface GitHubProjectWorkspaceMapping {
   id: string;
   name: string;
@@ -765,9 +843,11 @@ function listWorkspaceRepos(workspaceId: string, items: GitHubProjectItemNode[])
 
 /**
  * Section 3.2, rule 3 (T18): a card whose Project item is missing from one
- * complete read is only counted. Missing from two consecutive complete reads,
+ * complete read is only counted. Missing from two distinct complete reads,
  * its Project item link is cleared with a tombstone and the card is flagged.
- * A dry run reports what it would do and writes nothing.
+ * A repeated read of the same sync or the same read snapshot, and a partial,
+ * paged, or errored read, never counts. A dry run reports what it would do
+ * and writes nothing.
  */
 function applyTwoReadRemoval(
   workspace: WorkspaceProjectRow,
@@ -775,14 +855,21 @@ function applyTwoReadRemoval(
   seenTaskIds: ReadonlySet<string>,
   result: GitHubProjectWorkspaceSyncResult,
   dryRun: boolean,
+  readAtWasProvided: boolean,
 ): void {
   const linked = queryAll<{
     id: string;
     source_project_item_id: string;
+    source_repo_owner: string | null;
+    source_repo_name: string | null;
+    source_issue_number: number | null;
     github_missing_reads: number | null;
+    github_missing_read_ids: string | null;
     sync_flags: string | null;
   }>(
-    `SELECT id, source_project_item_id, github_missing_reads, sync_flags FROM tasks
+    `SELECT id, source_project_item_id, source_repo_owner, source_repo_name, source_issue_number,
+            github_missing_reads, github_missing_read_ids, sync_flags
+     FROM tasks
      WHERE workspace_id = ? AND source_project_item_id IS NOT NULL AND source_project_item_id != ''`,
     [workspace.id],
   );
@@ -792,10 +879,26 @@ function applyTwoReadRemoval(
     if (seenProjectItemIds.has(card.source_project_item_id) || seenTaskIds.has(card.id)) {
       continue;
     }
-    const misses = (card.github_missing_reads ?? 0) + 1;
+    const previousReads = parseMissingCompleteReads(card.github_missing_read_ids);
+    if (alreadyCountedMissingRead(previousReads, result.sync_run_id, result.read_at, readAtWasProvided)) {
+      result.details.push({
+        action: 'skip',
+        task_id: card.id,
+        reason: `Project item ${card.source_project_item_id} already counted for this complete read; nothing cleared`,
+      });
+      continue;
+    }
+    const countedReads: MissingCompleteRead[] = [
+      ...previousReads,
+      { sync_run_id: result.sync_run_id, read_at: result.read_at },
+    ];
+    const misses = countedReads.length;
     if (misses < 2) {
       if (!dryRun) {
-        run('UPDATE tasks SET github_missing_reads = ? WHERE id = ?', [misses, card.id]);
+        run(
+          'UPDATE tasks SET github_missing_reads = ?, github_missing_read_ids = ? WHERE id = ?',
+          [misses, JSON.stringify(countedReads), card.id],
+        );
       }
       result.details.push({
         action: 'skip',
@@ -817,21 +920,71 @@ function applyTwoReadRemoval(
       continue;
     }
 
-    transaction(() => {
-      const now = new Date().toISOString();
-      recordFieldClears({
-        taskId: card.id,
-        before: { github_source: { project_item_id: card.source_project_item_id } },
-        after: { github_source: { project_item_id: undefined } },
-        source: { source: projectRef, sync_run_id: result.sync_run_id },
-        context: `GitHub Project sync two-read removal ${card.id}`,
+    const expectedIdentity: TaskGitHubSourceIdentity = {
+      id: card.id,
+      source_project_item_id: card.source_project_item_id,
+      source_repo_owner: card.source_repo_owner,
+      source_repo_name: card.source_repo_name,
+      source_issue_number: card.source_issue_number,
+    };
+    const identityChanged = new Error('identity changed during Project item unlink; rolled back');
+    let unlinked = false;
+    try {
+      unlinked = transaction(() => {
+        githubProjectSyncTestHooks.beforeTombstoneUnlinkIdentityCheck?.();
+        const current = queryOne<TaskGitHubSourceIdentity>(
+          `SELECT id, source_project_item_id, source_repo_owner, source_repo_name, source_issue_number
+           FROM tasks WHERE id = ?`,
+          [card.id],
+        );
+        if (!sameTaskGitHubSourceIdentity(expectedIdentity, current)) {
+          return false;
+        }
+        const now = new Date().toISOString();
+        recordFieldClears({
+          taskId: card.id,
+          before: { github_source: { project_item_id: card.source_project_item_id } },
+          after: { github_source: { project_item_id: undefined } },
+          source: { source: projectRef, sync_run_id: result.sync_run_id },
+          context: `GitHub Project sync two-read removal ${card.id}`,
+        });
+        const flags = { ...(parseSyncFlags(card.sync_flags) ?? {}), removed_from_project: reason, sync_run_id: result.sync_run_id, flagged_at: now };
+        const updated = run(
+          `UPDATE tasks
+           SET source_project_item_id = NULL, github_missing_reads = 0, github_missing_read_ids = NULL, sync_flags = ?, updated_at = ?
+           WHERE id = ?
+             AND source_project_item_id = ?
+             AND source_repo_owner IS ?
+             AND source_repo_name IS ?
+             AND source_issue_number IS ?`,
+          [
+            serializeSyncFlags(flags),
+            now,
+            card.id,
+            card.source_project_item_id,
+            card.source_repo_owner,
+            card.source_repo_name,
+            card.source_issue_number,
+          ],
+        );
+        if (updated.changes === 0) {
+          throw identityChanged;
+        }
+        return true;
       });
-      const flags = { ...(parseSyncFlags(card.sync_flags) ?? {}), removed_from_project: reason, sync_run_id: result.sync_run_id, flagged_at: now };
-      run(
-        `UPDATE tasks SET source_project_item_id = NULL, github_missing_reads = 0, sync_flags = ?, updated_at = ? WHERE id = ?`,
-        [serializeSyncFlags(flags), now, card.id],
-      );
-    });
+    } catch (error) {
+      if (error !== identityChanged) {
+        throw error;
+      }
+    }
+    if (!unlinked) {
+      result.details.push({
+        action: 'skip',
+        task_id: card.id,
+        reason: `Project item ${card.source_project_item_id} identity changed before unlink; nothing cleared`,
+      });
+      continue;
+    }
     result.tombstones += 1;
     result.removed_from_project += 1;
     result.details.push({ action: 'tombstone', task_id: card.id, field: 'github_source.project_item_id', reason });
@@ -1138,21 +1291,20 @@ export async function syncLoadedGitHubProjectWorkspace(
       ? projectFields['Project Item ID']
       : undefined;
     const projectStatus = projectStatusFieldValue(projectFields);
-    const upstreamStatus = normalizeGitHubProjectStatus(projectStatus);
     const existing = findExistingTask(workspace.id, projectItemId, owner, repo, issueNumber);
     if (existing) {
       seenTaskIds.add(existing.id);
     }
 
-    if ((content.closed || upstreamStatus === 'done') && !existing) {
+    // Closed issues are not imported as new cards. An open issue stays
+    // importable even when Project Status is Done; the issue's open state wins.
+    if (content.closed && !existing) {
       result.skipped += 1;
       result.skipped_closed += 1;
       result.details.push({
         action: 'skip',
         issue: issueRef,
-        reason: content.closed
-          ? 'closed issue is not imported into a fresh workspace'
-          : 'Project Done item is not imported into a fresh workspace',
+        reason: 'closed issue is not imported into a fresh workspace',
       });
       continue;
     }
@@ -1330,6 +1482,7 @@ export async function syncLoadedGitHubProjectWorkspace(
                  sync_flags = ?,
                  github_last_read_at = ?,
                  github_missing_reads = 0,
+                 github_missing_read_ids = NULL,
                  updated_at = ?
              WHERE id = ?`,
             [
@@ -1521,7 +1674,14 @@ export async function syncLoadedGitHubProjectWorkspace(
   }
 
   if (result.selection === 'all' && result.read_complete && result.errors.length === 0) {
-    applyTwoReadRemoval(workspace, seenProjectItemIds, seenTaskIds, result, Boolean(options.dryRun));
+    applyTwoReadRemoval(
+      workspace,
+      seenProjectItemIds,
+      seenTaskIds,
+      result,
+      Boolean(options.dryRun),
+      Boolean(options.readAt?.trim()),
+    );
   }
 
   return result;

@@ -774,6 +774,21 @@ const migrations: Migration[] = [
       }
     }
   },
+  {
+    id: '023',
+    name: 'add_task_github_missing_read_ids',
+    up: (db) => {
+      // Distinct complete Project reads that lacked this card's Project item.
+      // Two-read removal counts unique complete reads, not repeats of the same
+      // sync or read snapshot.
+      const columns = new Set(
+        (db.prepare('PRAGMA table_info(tasks)').all() as Array<{ name: string }>).map((column) => column.name)
+      );
+      if (!columns.has('github_missing_read_ids')) {
+        db.exec('ALTER TABLE tasks ADD COLUMN github_missing_read_ids TEXT');
+      }
+    }
+  },
 ];
 
 /**

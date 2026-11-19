@@ -1,8 +1,10 @@
 import {
   isGenericSyncPlaceholder,
+  isExplicitUpstreamListClear,
   mergeDispatchMetadataFromUpstreamDetailed,
   normalizePlaceholderText,
   stripGenericSyncPlaceholders,
+  UPSTREAM_CLEAR_SIGNAL,
   type DispatchMetadataMergeDrift,
   normalizeDispatchMetadata,
   type DispatchMetadata,
@@ -80,6 +82,9 @@ function normalizeLabel(label: GitHubLabel): string | undefined {
 }
 
 function normalizeListSection(value: string | undefined): string[] | undefined {
+  if (isExplicitUpstreamListClear(value)) {
+    return [UPSTREAM_CLEAR_SIGNAL];
+  }
   if (!value) {
     return undefined;
   }
@@ -93,6 +98,11 @@ function normalizeListSection(value: string | undefined): string[] | undefined {
 }
 
 function normalizeListValue(value: unknown): string[] | undefined {
+  // Recognize an explicit clear on the raw value before splitting on
+  // commas, semicolons, or newlines. Empty or unparsable input is not a clear.
+  if (isExplicitUpstreamListClear(value)) {
+    return [UPSTREAM_CLEAR_SIGNAL];
+  }
   const normalized = normalizeString(typeof value === 'number' ? String(value) : value);
   if (!normalized) {
     return undefined;
