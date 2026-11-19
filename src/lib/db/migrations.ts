@@ -723,6 +723,57 @@ const migrations: Migration[] = [
       );
     }
   },
+  {
+    id: '022',
+    name: 'add_task_field_tombstones',
+    up: (db) => {
+      // docs/SYNC_FIELD_AUTHORITY.md section 4: every clear of a contract
+      // field, github_source subfield or the task body writes one tombstone.
+      // Append-only: no foreign key cascade, and triggers refuse UPDATE and
+      // DELETE so run-history pruning can never remove them.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_field_tombstones (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL,
+          field TEXT NOT NULL,
+          old_value TEXT NOT NULL,
+          source TEXT NOT NULL,
+          sync_run_id TEXT,
+          cleared_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_task_field_tombstones_task
+          ON task_field_tombstones(task_id, cleared_at);
+        CREATE TRIGGER IF NOT EXISTS task_field_tombstones_no_update
+          BEFORE UPDATE ON task_field_tombstones
+          BEGIN
+            SELECT RAISE(ABORT, 'task_field_tombstones is append-only');
+          END;
+        CREATE TRIGGER IF NOT EXISTS task_field_tombstones_no_delete
+          BEFORE DELETE ON task_field_tombstones
+          BEGIN
+            SELECT RAISE(ABORT, 'task_field_tombstones is append-only');
+          END;
+      `);
+
+      // Card flags shown on the card (needs evidence, drift on local-owned
+      // keys, removed from Project), the read time of the last applied sync
+      // (ordering, section 3.1) and consecutive complete reads that lacked the
+      // card's Project item (two-read removal, section 3.2).
+      const columns = new Set(
+        (db.prepare('PRAGMA table_info(tasks)').all() as Array<{ name: string }>).map((column) => column.name)
+      );
+      const additions: Array<[string, string]> = [
+        ['sync_flags', 'ALTER TABLE tasks ADD COLUMN sync_flags TEXT'],
+        ['github_last_read_at', 'ALTER TABLE tasks ADD COLUMN github_last_read_at TEXT'],
+        ['github_missing_reads', 'ALTER TABLE tasks ADD COLUMN github_missing_reads INTEGER NOT NULL DEFAULT 0'],
+      ];
+      for (const [column, statement] of additions) {
+        if (!columns.has(column)) {
+          db.exec(statement);
+        }
+      }
+    }
+  },
 ];
 
 /**

@@ -99,7 +99,8 @@ export const RISK_LEVEL_LABELS: Record<DispatchRiskLevel, string> = {
 
 /**
  * Generic portfolio-repair default strings from iMelki/projects-ops (dev).
- * Matched EXACTLY after trim: no fuzzy matching, regex, or case folding.
+ * Matched after `normalizePlaceholderText` on both sides (NFKC, casefold,
+ * whitespace collapse, bullets and trailing punctuation); no fuzzy matching.
  * Sources (file:line on projects-ops `dev`):
  *   scripts/Ensure-RepoIssueProjectVisibility.ps1
  *   scripts/Invoke-GitHubProjectMutation.ps1
@@ -143,7 +144,34 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   'Do not create MCK-only cards.',
 ] as const;
 
-const GENERIC_SYNC_PLACEHOLDER_SET: ReadonlySet<string> = new Set(GENERIC_SYNC_PLACEHOLDER_STRINGS);
+const LEADING_PLACEHOLDER_PUNCTUATION = /^[\s\-*+>\u2022\u2023\u2043\u00b7\u25e6\u2010-\u2015.,;:!?'"`]+/u;
+const TRAILING_PLACEHOLDER_PUNCTUATION = /[\s.,;:!?'"`\u2026\u3002]+$/u;
+
+/**
+ * docs/SYNC_FIELD_AUTHORITY.md section 5, rule 6: Unicode NFKC, casefold,
+ * trim and collapse internal whitespace, then strip leading bullets and
+ * punctuation and trailing sentence punctuation. Path characters such as `/`
+ * and `*` at the end are kept, so `docs/` and `docs/**` stay real scopes.
+ */
+export function normalizePlaceholderText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .replace(LEADING_PLACEHOLDER_PUNCTUATION, '')
+    .replace(TRAILING_PLACEHOLDER_PUNCTUATION, '')
+    .trim();
+}
+
+const GENERIC_SYNC_PLACEHOLDER_SET: ReadonlySet<string> = new Set(
+  GENERIC_SYNC_PLACEHOLDER_STRINGS.map((entry) => normalizePlaceholderText(entry)),
+);
+
+function isPlaceholderToken(token: string): boolean {
+  const normalized = normalizePlaceholderText(token);
+  return normalized.length > 0 && GENERIC_SYNC_PLACEHOLDER_SET.has(normalized);
+}
 
 /**
  * Split a dispatch string on the list separators used by portfolio-repair
@@ -159,10 +187,9 @@ export function splitGenericSyncPlaceholderTokens(value: string): string[] {
 }
 
 /**
- * True when `value` is a known generic sync placeholder: an exact trimmed
- * item, or a `;` / LF / CRLF join whose every non-empty token is such an
- * item (any join or subset). Case is significant. Whitespace around
- * separators is ignored.
+ * True when `value` is a known generic sync placeholder: an item equal after
+ * `normalizePlaceholderText`, or a `;` / LF / CRLF join whose every non-empty
+ * token is such an item (any join or subset).
  */
 export function isGenericSyncPlaceholder(value: unknown): boolean {
   if (typeof value !== 'string') {
@@ -173,12 +200,12 @@ export function isGenericSyncPlaceholder(value: unknown): boolean {
   if (trimmed.length === 0) {
     return false;
   }
-  if (GENERIC_SYNC_PLACEHOLDER_SET.has(trimmed)) {
+  if (isPlaceholderToken(trimmed)) {
     return true;
   }
 
   const tokens = splitGenericSyncPlaceholderTokens(trimmed);
-  return tokens.length > 0 && tokens.every((token) => GENERIC_SYNC_PLACEHOLDER_SET.has(token));
+  return tokens.length > 0 && tokens.every((token) => isPlaceholderToken(token));
 }
 
 /**
@@ -200,7 +227,7 @@ export function stripGenericSyncPlaceholders(value: unknown): unknown {
       return value;
     }
 
-    const kept = tokens.filter((token) => !GENERIC_SYNC_PLACEHOLDER_SET.has(token));
+    const kept = tokens.filter((token) => !isPlaceholderToken(token));
     if (kept.length === 0) {
       return undefined;
     }
@@ -330,42 +357,174 @@ function isNonEmptyDispatchValue(value: unknown): boolean {
 }
 
 /**
- * Key-level merge of upstream-derived dispatch metadata into a locally stored
- * contract.
- *
- * Precedence: local edits win unless upstream explicitly provides a non-empty,
- * non-placeholder value. A value is non-empty when a trimmed string has length
- * and is not a known generic sync placeholder, an array has at least one
- * non-empty non-placeholder item (placeholder items are dropped first), or any
- * other non-null scalar is present. Missing, empty, or placeholder-only
- * upstream keys leave the local key unchanged. This applies to every key,
- * including locally authored contract fields such as `allowed_file_scope`,
- * `test_requirements`, and `rollback_plan`. `dispatch_ready` is not stored on
- * this object; callers recompute it from the merged result via
- * `validateDispatchMetadata`.
+ * Explicit upstream clear signal (docs/SYNC_FIELD_AUTHORITY.md section 4,
+ * rule 5). An empty value, a missing heading or a placeholder is never a
+ * clear. Only a section or field whose whole trimmed value is exactly this
+ * token (case-sensitive) asks MCK to clear the local value, and MCK then
+ * writes a tombstone for it. Enum fields (`readiness`, `review_mode`,
+ * `risk_level`) cannot carry it because their mappers drop unknown text.
  */
-export function mergeDispatchMetadataFromUpstream(
+export const UPSTREAM_CLEAR_SIGNAL = 'MCK-CLEAR';
+
+export function isExplicitUpstreamClear(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return value.trim() === UPSTREAM_CLEAR_SIGNAL;
+  }
+  if (Array.isArray(value)) {
+    return value.length === 1 && typeof value[0] === 'string' && value[0].trim() === UPSTREAM_CLEAR_SIGNAL;
+  }
+  return false;
+}
+
+/**
+ * docs/SYNC_FIELD_AUTHORITY.md section 7 (CTO ruling 2026-11-19 14:49 IST,
+ * the #212 Security Medium): these keys are local-owned. Sync never writes
+ * them, on update or on import. An upstream value that differs from local is
+ * reported as drift and changes nothing. `allowed_file_scope` becomes the
+ * factory `allowedPaths`, so an issue editor must never be able to change it.
+ */
+export const LOCAL_OWNED_DISPATCH_KEYS = ['allowed_file_scope', 'safety_rules', 'review_mode'] as const;
+export type LocalOwnedDispatchKey = (typeof LOCAL_OWNED_DISPATCH_KEYS)[number];
+const LOCAL_OWNED_DISPATCH_KEY_SET: ReadonlySet<string> = new Set(LOCAL_OWNED_DISPATCH_KEYS);
+
+/**
+ * Local once set (section 7, test T21): upstream fills these only when the
+ * local value is empty and never replaces a non-empty local value.
+ */
+export const FILL_ONLY_DISPATCH_KEYS = ['target_repo', 'project_workstream'] as const;
+const FILL_ONLY_DISPATCH_KEY_SET: ReadonlySet<string> = new Set(FILL_ONLY_DISPATCH_KEYS);
+
+export interface DispatchMetadataMergeDrift {
+  field: string;
+  reason: string;
+}
+
+export interface DispatchMetadataMergeResult {
+  merged: DispatchMetadata | undefined;
+  /** `dispatch_metadata.<key>` names cleared by an explicit upstream signal. */
+  explicit_clears: string[];
+  /** Upstream values for local-owned keys that differ from local; not applied. */
+  local_owned_drift: DispatchMetadataMergeDrift[];
+}
+
+function sameDispatchValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+/**
+ * Key-level merge of upstream-derived dispatch metadata into a locally stored
+ * contract, with the reasons behind every non-default outcome.
+ *
+ * - Missing, empty, or placeholder-only upstream values never change local.
+ * - `UPSTREAM_CLEAR_SIGNAL` clears a GitHub-owned key (caller writes the
+ *   tombstone).
+ * - `LOCAL_OWNED_DISPATCH_KEYS` are never written; a differing upstream value
+ *   is returned as drift.
+ * - `FILL_ONLY_DISPATCH_KEYS` are written only while local is empty.
+ * - Every other key: a non-empty, non-placeholder upstream value refreshes.
+ *
+ * `dispatch_ready` is not stored on this object; callers recompute it from
+ * the merged result via `validateDispatchMetadata`.
+ */
+export function mergeDispatchMetadataFromUpstreamDetailed(
   local: DispatchMetadata | undefined,
   upstream: DispatchMetadata | undefined,
-): DispatchMetadata | undefined {
-  const localRecord = local && typeof local === 'object'
-    ? { ...(local as Record<string, unknown>) }
-    : {};
+): DispatchMetadataMergeResult {
+  const normalizedLocal = normalizeDispatchMetadata(local) as Record<string, unknown> | undefined;
+  const localRecord: Record<string, unknown> = normalizedLocal ? { ...normalizedLocal } : {};
   const upstreamRecord = upstream && typeof upstream === 'object'
     ? { ...(upstream as Record<string, unknown>) }
     : {};
 
   const merged: Record<string, unknown> = { ...localRecord };
+  const explicitClears: string[] = [];
+  const drift: DispatchMetadataMergeDrift[] = [];
+
   for (const [key, value] of Object.entries(upstreamRecord)) {
-    const substantive = stripGenericSyncPlaceholders(value);
-    if (isNonEmptyDispatchValue(substantive)) {
-      merged[key] = substantive;
+    const localValue = localRecord[key];
+    const localHasValue = isNonEmptyDispatchValue(stripGenericSyncPlaceholders(localValue));
+
+    if (LOCAL_OWNED_DISPATCH_KEY_SET.has(key)) {
+      const substantive = isExplicitUpstreamClear(value) ? undefined : stripGenericSyncPlaceholders(value);
+      const upstreamValue = isNonEmptyDispatchValue(substantive)
+        ? (normalizeDispatchMetadata({ [key]: substantive }) as Record<string, unknown> | undefined)?.[key]
+        : undefined;
+      if (isExplicitUpstreamClear(value) ? localHasValue : upstreamValue !== undefined && !sameDispatchValue(upstreamValue, localValue)) {
+        drift.push({
+          field: `dispatch_metadata.${key}`,
+          reason: `Upstream ${isExplicitUpstreamClear(value) ? 'asks to clear' : 'differs on'} local-owned field ${key}; sync never writes it. Change it in MCK if intended.`,
+        });
+      }
+      continue;
     }
+
+    if (isExplicitUpstreamClear(value)) {
+      if (FILL_ONLY_DISPATCH_KEY_SET.has(key)) {
+        continue;
+      }
+      if (isNonEmptyDispatchValue(localValue)) {
+        delete merged[key];
+        explicitClears.push(`dispatch_metadata.${key}`);
+      }
+      continue;
+    }
+
+    const substantive = stripGenericSyncPlaceholders(value);
+    if (!isNonEmptyDispatchValue(substantive)) {
+      continue;
+    }
+
+    if (FILL_ONLY_DISPATCH_KEY_SET.has(key) && localHasValue) {
+      continue;
+    }
+
+    merged[key] = substantive;
   }
 
-  return normalizeDispatchMetadata(merged);
+  return {
+    merged: normalizeDispatchMetadata(merged),
+    explicit_clears: explicitClears,
+    local_owned_drift: drift,
+  };
 }
 
+/**
+ * Contract for a card a sync creates (section 7 and 8.1): local-owned keys
+ * are never taken from upstream, explicit clear signals are dropped, and
+ * readiness is always Needs Grooming.
+ */
+export function buildSyncImportDispatchMetadata(metadata: DispatchMetadata | undefined): DispatchMetadata | undefined {
+  const record: Record<string, unknown> = { ...((metadata ?? {}) as Record<string, unknown>) };
+  for (const key of LOCAL_OWNED_DISPATCH_KEYS) {
+    delete record[key];
+  }
+  return stripExplicitUpstreamClears({ ...(record as DispatchMetadata), readiness: 'needs_grooming' });
+}
+
+/** See `mergeDispatchMetadataFromUpstreamDetailed`; returns the merged value only. */
+export function mergeDispatchMetadataFromUpstream(
+  local: DispatchMetadata | undefined,
+  upstream: DispatchMetadata | undefined,
+): DispatchMetadata | undefined {
+  return mergeDispatchMetadataFromUpstreamDetailed(local, upstream).merged;
+}
+
+/**
+ * Drop explicit clear signals from a fresh import, so a new card never stores
+ * the signal itself as a value.
+ */
+export function stripExplicitUpstreamClears(metadata: DispatchMetadata | undefined): DispatchMetadata | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+  const record: Record<string, unknown> = { ...(metadata as Record<string, unknown>) };
+  for (const [key, value] of Object.entries(record)) {
+    if (isExplicitUpstreamClear(value)) {
+      delete record[key];
+    }
+  }
+  return normalizeDispatchMetadata(record);
+}
 
 /**
  * Pre-validates the fields that become the canonical v2 envelope `work` block.
@@ -431,7 +590,7 @@ export function validateDispatchMetadata(
   const normalized = normalizeDispatchMetadata(metadata);
   const missingFields = REQUIRED_FIELD_LABELS.flatMap(([field, label]) => {
     const value = normalized?.[field];
-    const substantive = stripGenericSyncPlaceholders(value);
+    const substantive = isExplicitUpstreamClear(value) ? undefined : stripGenericSyncPlaceholders(value);
     if (Array.isArray(substantive)) {
       return substantive.length === 0 ? [label] : [];
     }

@@ -140,21 +140,22 @@ test('GitHub Project status mapping reconciles upstream Done without inventing a
   assert.equal(normalizeGitHubProjectStatus('Blocked'), 'blocked');
   assert.equal(normalizeGitHubProjectStatus('Done'), 'done');
 
+  const mainMerge = [{ kind: 'merged_pr' as const, base_ref: 'main', merged: true }];
   assert.deepEqual(
-    reconcileGitHubProjectStatus({ currentStatus: 'inbox', issueClosed: true, projectStatus: 'Ready' }),
+    reconcileGitHubProjectStatus({ currentStatus: 'inbox', issueClosed: true, projectStatus: 'Ready', evidence: mainMerge }),
     {
       upstream_status: 'done',
       local_status: 'done',
-      reason: 'GitHub issue is closed, so the local MCK task should be Done.',
+      reason: 'GitHub issue is closed with evidence (merged PR into main or a closing comment naming what shipped), so the local MCK task should be Done.',
     }
   );
 
   assert.equal(
-    reconcileGitHubProjectStatus({ currentStatus: 'review', projectStatus: 'Done' }).local_status,
+    reconcileGitHubProjectStatus({ currentStatus: 'review', projectStatus: 'Done', evidence: mainMerge }).local_status,
     'done'
   );
   assert.equal(
-    reconcileGitHubProjectStatus({ currentStatus: 'in_progress', projectStatus: 'Review' }).local_status,
+    reconcileGitHubProjectStatus({ currentStatus: 'in_progress', projectStatus: 'Review', evidence: mainMerge }).local_status,
     'review'
   );
   assert.equal(
@@ -666,7 +667,9 @@ test('GitHub refresh patch updates imported task metadata without forcing status
   assert.equal(patch.description, 'Refreshed description');
   assert.equal(patch.priority, 'high');
   assert.equal(patch.github_source?.project_item_id, 'PVTI_refresh_1');
-  assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, ['projects-ops/docs/**']);
+  // Local-owned (T12) and local once set (T21): sync writes neither.
+  assert.equal(patch.dispatch_metadata?.allowed_file_scope, undefined);
+  assert.equal(patch.dispatch_metadata?.project_workstream, 'Old workstream');
   assert.equal('status' in patch, false);
 });
 
@@ -727,7 +730,8 @@ test('GitHub refresh patch preserves local dispatch contract fields when the iss
   assert.equal(patch.github_source?.project_item_id, 'PVTI_fa3cfe1d');
   assert.equal(patch.dispatch_metadata?.source_issue_url, localContract.source_issue_url);
   assert.equal(patch.dispatch_metadata?.target_repo, 'iMelki/memsys');
-  assert.equal(patch.dispatch_metadata?.project_workstream, 'updated-workstream');
+  // Local once set: the upstream workstream never replaces it (T21).
+  assert.equal(patch.dispatch_metadata?.project_workstream, localContract.project_workstream);
   assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, localContract.allowed_file_scope);
   assert.deepEqual(patch.dispatch_metadata?.acceptance_criteria, localContract.acceptance_criteria);
   assert.deepEqual(patch.dispatch_metadata?.test_requirements, localContract.test_requirements);
@@ -760,8 +764,10 @@ test('GitHub refresh patch applies non-empty upstream contract values and ignore
     }
   );
 
-  assert.equal(merged?.project_workstream, 'upstream-stream');
-  assert.deepEqual(merged?.allowed_file_scope, ['src/upstream.ts', 'tests/upstream.test.ts']);
+  // project_workstream is local once set and allowed_file_scope is
+  // local-owned (docs/SYNC_FIELD_AUTHORITY.md section 7, T12 and T21).
+  assert.equal(merged?.project_workstream, 'local-stream');
+  assert.deepEqual(merged?.allowed_file_scope, ['src/local.ts']);
   assert.deepEqual(merged?.test_requirements, ['npm test']);
   assert.equal(merged?.rollback_plan, 'Revert the local change.');
   assert.equal(merged?.readiness, 'ready_for_agent');
@@ -822,7 +828,7 @@ test('GitHub refresh patch keeps canDispatch false when a required contract fiel
   );
 
   assert.equal(patch.title, 'Refreshed memsys#991 title');
-  assert.equal(patch.dispatch_metadata?.project_workstream, 'updated-workstream');
+  assert.equal(patch.dispatch_metadata?.project_workstream, incompleteLocal.project_workstream);
   assert.equal(patch.dispatch_metadata?.rollback_plan, undefined);
   const after = validateDispatchMetadata(patch.dispatch_metadata);
   assert.equal(after.canDispatch, false);
@@ -882,8 +888,8 @@ test('placeholder upstream overwrite refused', () => {
   );
   assert.deepEqual(mixed?.acceptance_criteria, ['A real upstream criterion is kept']);
 
-  // Case or wording changes are not placeholders (exact match after trim only).
-  assert.equal(isGenericSyncPlaceholder('issue is present on the mapped GitHub Project.'), false);
+  // Case changes are placeholders after normalization (section 5, rule 6, T15).
+  assert.equal(isGenericSyncPlaceholder('issue is present on the mapped GitHub Project.'), true);
   assert.equal(
     isGenericSyncPlaceholder('  Issue is present on the mapped GitHub Project.  '),
     true,

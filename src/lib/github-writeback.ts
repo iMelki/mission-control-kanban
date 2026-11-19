@@ -6,6 +6,7 @@ import {
   REVIEW_MODE_LABELS,
   type DispatchMetadata,
 } from './dispatch-contract';
+import { hasDoneOrReviewEvidence, type StatusEvidence } from './status-evidence';
 import type {
   GitHubSourceIdentity,
   GitHubWritebackMode,
@@ -37,7 +38,15 @@ export interface GitHubWritebackTaskSnapshot {
   assigned_agent_name?: string | null;
   dispatch_metadata?: DispatchMetadata;
   dispatch_blockers?: string[];
+  /**
+   * Evidence that the work shipped (merged PR into main, or a closing comment
+   * naming what shipped). Without it, write-back refuses Status Done or Review.
+   */
+  status_evidence?: StatusEvidence[];
 }
+
+export const WRITEBACK_STATUS_REFUSAL_REASON =
+  'Refused: write-back never sets Project Status to Done or Review from the local column without evidence (a merged PR into main or a closing comment naming what shipped). docs/SYNC_FIELD_AUTHORITY.md section 6, rule 6.';
 
 export interface GitHubWritebackProjectUpdate {
   field_name: string;
@@ -216,9 +225,16 @@ function buildCommentBody(task: GitHubWritebackTaskSnapshot): string {
   ].join('\n');
 }
 
-function buildDesiredProjectUpdates(task: GitHubWritebackTaskSnapshot): GitHubWritebackProjectUpdate[] {
+export function buildDesiredProjectUpdates(task: GitHubWritebackTaskSnapshot): GitHubWritebackProjectUpdate[] {
+  // This is the only place write-back sets Project Status. A local Done or
+  // Review can never promote the Project without evidence (section 6, rule 6),
+  // and nothing here or in apply ever closes an issue (rule 2).
+  const promotesProject = task.status === 'done' || task.status === 'review';
+  const statusUpdate: GitHubWritebackProjectUpdate = promotesProject && !hasDoneOrReviewEvidence(task.status_evidence)
+    ? { field_name: 'Status', value: STATUS_LABELS[task.status], skipped: true, reason: WRITEBACK_STATUS_REFUSAL_REASON }
+    : { field_name: 'Status', value: STATUS_LABELS[task.status] };
   const updates: GitHubWritebackProjectUpdate[] = [
-    { field_name: 'Status', value: STATUS_LABELS[task.status] },
+    statusUpdate,
     { field_name: 'Agent', value: normalizeString(task.assigned_agent_name) ?? 'Human' },
   ];
 
@@ -397,6 +413,10 @@ function matchProjectField(
   fields: ProjectFieldNode[],
   desired: GitHubWritebackProjectUpdate
 ): GitHubWritebackProjectUpdate {
+  if (desired.skipped) {
+    return desired;
+  }
+
   const targetName = normalizeFieldName(desired.field_name);
   if (!ALLOWED_PROJECT_FIELDS.includes(targetName as (typeof ALLOWED_PROJECT_FIELDS)[number])) {
     return {

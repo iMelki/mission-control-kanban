@@ -185,6 +185,31 @@ export function TaskCard({ task, onClick, isDragging, isOverlay, inkKey, isSavin
 
         <DependencyBadges blockedBy={task.blocked_by} blocking={task.blocking} />
 
+        {/* Flags the last GitHub sync left (docs/SYNC_FIELD_AUTHORITY.md sections 6 and 7). */}
+        {(task.sync_flags?.needs_evidence || task.sync_flags?.drift?.length || task.sync_flags?.removed_from_project) && (
+          <div data-sync-flags className="mb-3 flex flex-wrap gap-1.5">
+            {task.sync_flags?.needs_evidence && (
+              <span data-sync-flag="needs-evidence" title={task.sync_flags.needs_evidence} className={`rounded px-2 py-1 text-[10px] font-medium ${pillClass('warn')}`}>
+                Needs evidence
+              </span>
+            )}
+            {task.sync_flags?.drift?.length ? (
+              <span
+                data-sync-flag="drift"
+                title={task.sync_flags.drift.map((entry) => entry.reason).join(' ')}
+                className={`rounded px-2 py-1 text-[10px] font-medium ${pillClass('warn')}`}
+              >
+                GitHub drift
+              </span>
+            ) : null}
+            {task.sync_flags?.removed_from_project && (
+              <span data-sync-flag="removed" title={task.sync_flags.removed_from_project} className={`rounded px-2 py-1 text-[10px] font-medium ${pillClass('neutral')}`}>
+                Not on Project
+              </span>
+            )}
+          </div>
+        )}
+
         {(readiness || reviewMode || riskLevel) && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {readiness && (
