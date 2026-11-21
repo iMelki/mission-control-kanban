@@ -134,9 +134,43 @@ export interface Task {
   dispatch_blockers?: string[];
   blocked_by?: TaskDependencySummary[];
   blocking?: TaskDependencySummary[];
+  /** Append-only record of cleared fields (docs/SYNC_FIELD_AUTHORITY.md section 4). */
+  field_tombstones?: TaskFieldTombstone[];
+  /** Flags the last applied GitHub sync left on the card. */
+  sync_flags?: TaskSyncFlags;
   // Joined fields
   assigned_agent?: Agent;
   created_by_agent?: Agent;
+}
+
+export interface TaskSyncFlags {
+  /** Done or Review (or a close) without evidence; the card did not move. */
+  needs_evidence?: string;
+  /** Upstream values for local-owned keys that differ from local. */
+  drift?: Array<{ field: string; reason: string }>;
+  /** The Project item was missing from two consecutive complete reads. */
+  removed_from_project?: string;
+  /**
+   * A Done card whose contract is placeholder-only. Logged once per contract
+   * fingerprint; a changed contract is logged again.
+   */
+  placeholder_contract?: { fingerprint: string; reason: string; flagged_at: string };
+  sync_run_id?: string;
+  flagged_at?: string;
+}
+
+export interface TaskFieldTombstone {
+  id: string;
+  task_id: string;
+  /** For example `dispatch_metadata.allowed_file_scope`, `github_source.project_item_id` or `description`. */
+  field: string;
+  /** The full previous value. */
+  old_value: unknown;
+  /** `mck:user`, `agent:<id>`, or `github:<owner>/<repo>#<n>`. */
+  source: string;
+  sync_run_id?: string | null;
+  /** UTC, ISO 8601 with `Z`. */
+  cleared_at: string;
 }
 
 export interface Conversation {

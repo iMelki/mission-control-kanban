@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { NextRequest } from 'next/server';
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mck-github-sync-'));
 process.env.DATABASE_PATH = path.join(tmpDir, 'mission-control-test.db');
@@ -14,6 +15,8 @@ let syncLoadedGitHubProjectWorkspace: typeof import('../src/lib/github-project-s
 let projectWorkspaceMappings: typeof import('../src/lib/github-project-sync').GITHUB_PROJECT_WORKSPACE_MAPPINGS;
 let parseDispatchMetadata: typeof import('../src/lib/dispatch-contract').parseDispatchMetadata;
 let validateDispatchMetadata: typeof import('../src/lib/dispatch-contract').validateDispatchMetadata;
+let getTask: typeof import('../src/app/api/tasks/[id]/route').GET;
+let patchTask: typeof import('../src/app/api/tasks/[id]/route').PATCH;
 
 function resetDb() {
   closeDb();
@@ -34,6 +37,9 @@ test.before(async () => {
   projectWorkspaceMappings = syncModule.GITHUB_PROJECT_WORKSPACE_MAPPINGS;
   parseDispatchMetadata = dispatchContract.parseDispatchMetadata;
   validateDispatchMetadata = dispatchContract.validateDispatchMetadata;
+  const taskRoute = await import('../src/app/api/tasks/[id]/route');
+  getTask = taskRoute.GET;
+  patchTask = taskRoute.PATCH;
 });
 
 test.after(() => {
@@ -168,11 +174,25 @@ test('GitHub Project sync refreshes existing imported task dispatch metadata fro
   assert.equal(row?.status, 'in_progress');
   assert.equal(row?.priority, 'high');
   const metadata = parseDispatchMetadata(row?.dispatch_metadata);
-  const readiness = validateDispatchMetadata(metadata);
-  assert.equal(readiness.canDispatch, true);
-  assert.equal(metadata?.readiness, 'ready_for_agent');
   assert.equal(metadata?.risk_level, 'medium');
-  assert.deepEqual(metadata?.allowed_file_scope, ['src/lib/github-project-sync.ts', 'tests/github-project-sync-persistence.test.ts']);
+  assert.equal(metadata?.readiness, 'ready_for_agent');
+  assert.deepEqual(metadata?.acceptance_criteria, [
+    'Existing imported tasks receive repaired dispatch metadata.',
+    'Status is not churned backward when the task is already active.',
+  ]);
+  // allowed_file_scope, safety_rules and review_mode are local-owned: sync
+  // never writes them, even into an empty local value, and shows the upstream
+  // difference as drift (docs/SYNC_FIELD_AUTHORITY.md section 7, T12).
+  assert.equal(metadata?.allowed_file_scope, undefined);
+  assert.equal(metadata?.safety_rules, undefined);
+  assert.equal(metadata?.review_mode, undefined);
+  assert.equal(validateDispatchMetadata(metadata).canDispatch, false);
+  const driftFields = result.details.filter((detail) => detail.action === 'drift').map((detail) => detail.field);
+  assert.deepEqual(driftFields, [
+    'dispatch_metadata.allowed_file_scope',
+    'dispatch_metadata.review_mode',
+    'dispatch_metadata.safety_rules',
+  ]);
 });
 
 test('targeted GitHub Project sync mutates only one exact issue ref', async () => {
@@ -331,7 +351,8 @@ test('GitHub Project sync preserves locally authored dispatch contract fields wh
   const metadata = parseDispatchMetadata(row?.dispatch_metadata);
   assert.equal(metadata?.source_issue_url, localContract.source_issue_url);
   assert.equal(metadata?.target_repo, 'iMelki/mission-control-kanban');
-  assert.equal(metadata?.project_workstream, 'upstream-workstream');
+  // Local once set: the Project value never replaces it (T21).
+  assert.equal(metadata?.project_workstream, 'local-workstream');
   assert.deepEqual(metadata?.allowed_file_scope, localContract.allowed_file_scope);
   assert.deepEqual(metadata?.acceptance_criteria, localContract.acceptance_criteria);
   assert.deepEqual(metadata?.test_requirements, localContract.test_requirements);
@@ -342,4 +363,193 @@ test('GitHub Project sync preserves locally authored dispatch contract fields wh
   assert.equal(metadata?.review_mode, 'human_required');
   assert.equal(metadata?.risk_level, 'medium');
   assert.equal(validateDispatchMetadata(metadata).canDispatch, true);
+});
+
+// Generated Allowed File Scope defaults as live rows can hold them in an
+// array: the projects-ops default already split on commas by the old
+// normalizer, and the MemSys default kept as one item.
+const LEGACY_SPLIT_PROJECTS_OPS_SCOPE = [
+  'Owning repo issue',
+  'docs',
+  'scripts',
+  'and tests named by the task.',
+];
+const MEMSYS_SCOPE_DEFAULT = 'Owning repo issue; docs; scripts; and tests named by the task';
+
+function completeContractWithScope(allowedFileScope: unknown) {
+  return {
+    source_issue_url: 'https://github.com/iMelki/mission-control-kanban/issues/34',
+    target_repo: 'iMelki/mission-control-kanban',
+    project_workstream: 'local-workstream',
+    allowed_file_scope: allowedFileScope,
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:github-sync'],
+    risk_level: 'medium',
+    readiness: 'ready_for_agent',
+    review_mode: 'human_required',
+    impact: 'Local impact statement stays',
+    rollback_plan: 'Revert the local dispatch contract commit.',
+    safety_rules: ['Do not widen factory allowed paths from GitHub'],
+  };
+}
+
+function taskRouteContext(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+
+async function patchTaskDispatchMetadata(id: string, dispatchMetadata: unknown) {
+  const response = await patchTask(
+    new NextRequest(`http://127.0.0.1/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dispatch_metadata: dispatchMetadata }),
+    }),
+    taskRouteContext(id),
+  );
+  assert.equal(response.status, 200);
+  return response.json() as Promise<{ dispatch_metadata?: { allowed_file_scope?: string[] }; dispatch_ready: boolean }>;
+}
+
+test('task API strips array-form generated scope placeholders and keeps a bare docs scope', async () => {
+  seedWorkspaceAndTask();
+
+  for (const placeholderScope of [
+    LEGACY_SPLIT_PROJECTS_OPS_SCOPE,
+    [MEMSYS_SCOPE_DEFAULT],
+    [MEMSYS_SCOPE_DEFAULT.toUpperCase()],
+    ['Owning repo issue', 'docs', 'scripts', 'and tests named by the task'],
+  ]) {
+    const patched = await patchTaskDispatchMetadata('task-existing', completeContractWithScope(placeholderScope));
+    assert.equal(patched.dispatch_metadata?.allowed_file_scope, undefined, JSON.stringify(placeholderScope));
+    assert.equal(patched.dispatch_ready, false);
+
+    const fetched = await getTask(new NextRequest('http://127.0.0.1/api/tasks/task-existing'), taskRouteContext('task-existing'));
+    const body = await fetched.json() as { dispatch_metadata?: { allowed_file_scope?: string[] }; dispatch_ready: boolean };
+    assert.equal(body.dispatch_metadata?.allowed_file_scope, undefined);
+    assert.equal(body.dispatch_ready, false);
+  }
+
+  const superstring = await patchTaskDispatchMetadata(
+    'task-existing',
+    completeContractWithScope([...LEGACY_SPLIT_PROJECTS_OPS_SCOPE, 'src/**']),
+  );
+  assert.deepEqual(superstring.dispatch_metadata?.allowed_file_scope, ['src/**']);
+
+  for (const realScope of [['docs'], ['scripts'], ['docs', 'scripts']]) {
+    const patched = await patchTaskDispatchMetadata('task-existing', completeContractWithScope(realScope));
+    assert.deepEqual(patched.dispatch_metadata?.allowed_file_scope, realScope);
+    assert.equal(patched.dispatch_ready, true);
+  }
+});
+
+test('stored task row with a legacy split scope placeholder heals on read and on rewrite', async () => {
+  seedWorkspaceAndTask();
+  run(
+    'UPDATE tasks SET dispatch_metadata = ? WHERE id = ?',
+    [JSON.stringify(completeContractWithScope(LEGACY_SPLIT_PROJECTS_OPS_SCOPE)), 'task-existing'],
+  );
+
+  const legacyRow = queryOne<{ dispatch_metadata: string }>(
+    'SELECT dispatch_metadata FROM tasks WHERE id = ?',
+    ['task-existing'],
+  );
+  const healed = parseDispatchMetadata(legacyRow?.dispatch_metadata);
+  assert.equal(healed?.allowed_file_scope, undefined);
+  assert.equal(validateDispatchMetadata(healed).canDispatch, false);
+  assert.ok(validateDispatchMetadata(healed).missingFields.includes('allowed file scope'));
+
+  // Writing the normalized contract back stores no placeholder tokens.
+  await patchTaskDispatchMetadata('task-existing', JSON.parse(legacyRow!.dispatch_metadata));
+  const rewritten = queryOne<{ dispatch_metadata: string }>(
+    'SELECT dispatch_metadata FROM tasks WHERE id = ?',
+    ['task-existing'],
+  );
+  const stored = JSON.parse(rewritten!.dispatch_metadata) as Record<string, unknown>;
+  assert.equal(stored.allowed_file_scope, undefined);
+  assert.doesNotMatch(rewritten!.dispatch_metadata, /Owning repo issue|"docs"|"scripts"|named by the task/);
+  assert.equal(stored.target_repo, 'iMelki/mission-control-kanban');
+
+  // A real bare docs scope stored in a row survives the same read.
+  run(
+    'UPDATE tasks SET dispatch_metadata = ? WHERE id = ?',
+    [JSON.stringify(completeContractWithScope(['docs'])), 'task-existing'],
+  );
+  const docsRow = queryOne<{ dispatch_metadata: string }>(
+    'SELECT dispatch_metadata FROM tasks WHERE id = ?',
+    ['task-existing'],
+  );
+  assert.deepEqual(parseDispatchMetadata(docsRow?.dispatch_metadata)?.allowed_file_scope, ['docs']);
+});
+
+function syncItemWithBody(body: string) {
+  return {
+    id: 'PVTI_existing',
+    isArchived: false,
+    content: {
+      __typename: 'Issue',
+      number: 34,
+      title: 'Refreshed title',
+      body,
+      url: 'https://github.com/iMelki/mission-control-kanban/issues/34',
+      state: 'OPEN',
+      closed: false,
+      repository: {
+        name: 'mission-control-kanban',
+        nameWithOwner: 'iMelki/mission-control-kanban',
+        owner: { login: 'iMelki' },
+      },
+      labels: { nodes: [{ name: 'type:bug' }] },
+    },
+    fieldValues: {
+      nodes: [{ name: 'Ready for Agent', field: { name: 'Status' } }],
+    },
+  };
+}
+
+test('GitHub refresh rewrites a legacy split scope placeholder row and lets upstream fill it', async () => {
+  // Body without an Allowed File Scope section: the stored row is rewritten
+  // without the placeholder and the card is not dispatch-ready.
+  seedWorkspaceAndTask();
+  run(
+    'UPDATE tasks SET dispatch_metadata = ? WHERE id = ?',
+    [JSON.stringify(completeContractWithScope(LEGACY_SPLIT_PROJECTS_OPS_SCOPE)), 'task-existing'],
+  );
+  const emptyScopeResult = await syncLoadedGitHubProjectWorkspace(
+    'assistants',
+    { title: 'Assistants', allItems: [syncItemWithBody('A goal paragraph with no contract headings.')] },
+    { dryRun: false },
+  );
+  assert.equal(emptyScopeResult.updated, 1);
+  const emptyScopeRow = queryOne<{ dispatch_metadata: string }>(
+    'SELECT dispatch_metadata FROM tasks WHERE id = ?',
+    ['task-existing'],
+  );
+  assert.equal((JSON.parse(emptyScopeRow!.dispatch_metadata) as Record<string, unknown>).allowed_file_scope, undefined);
+  assert.doesNotMatch(emptyScopeRow!.dispatch_metadata, /Owning repo issue|"docs"|"scripts"|named by the task/);
+  assert.equal(validateDispatchMetadata(parseDispatchMetadata(emptyScopeRow?.dispatch_metadata)).canDispatch, false);
+
+  // Repaired body with a real scope: the placeholder-only local key is
+  // filled from upstream even though allowed_file_scope is local-only.
+  run(
+    'UPDATE tasks SET dispatch_metadata = ? WHERE id = ?',
+    [JSON.stringify(completeContractWithScope([MEMSYS_SCOPE_DEFAULT])), 'task-existing'],
+  );
+  const repairedResult = await syncLoadedGitHubProjectWorkspace(
+    'assistants',
+    {
+      title: 'Assistants',
+      allItems: [syncItemWithBody('## Allowed File Scope\n- src/lib/dispatch-contract.ts\n- docs')],
+    },
+    { dryRun: false },
+  );
+  assert.equal(repairedResult.updated, 1);
+  const repairedRow = queryOne<{ dispatch_metadata: string }>(
+    'SELECT dispatch_metadata FROM tasks WHERE id = ?',
+    ['task-existing'],
+  );
+  const repaired = parseDispatchMetadata(repairedRow?.dispatch_metadata);
+  // Repaired body with a real scope: allowed_file_scope is local-owned (T12),
+  // so sync never writes it from upstream, and shows the upstream difference as drift.
+  assert.equal(repaired?.allowed_file_scope, undefined);
+  assert.equal(validateDispatchMetadata(repaired).canDispatch, false);
 });

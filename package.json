@@ -33,7 +33,7 @@
     "test:sqlite-gc-finalizer": "node --test tests/sqlite-gc-finalizer.test.mjs",
     "test:action-review": "node --import tsx --test tests/action-review-contract.test.ts",
     "test:coverage-denominator": "node --test tests/coverage-denominator.test.mjs",
-    "test:github-sync": "node --import tsx --test tests/github-sync.test.ts tests/github-project-sync-persistence.test.ts",
+    "test:github-sync": "node --import tsx --test tests/github-sync.test.ts tests/github-project-sync-persistence.test.ts tests/sync-field-authority.test.ts",
     "test:file-path-containment": "node --import tsx --test tests/file-path-containment.test.ts",
     "test:file-reveal-exec": "node --import tsx --test tests/file-reveal-exec.test.ts",
     "test:agent-runtimes": "node --import tsx --test tests/agent-runtimes.test.ts",

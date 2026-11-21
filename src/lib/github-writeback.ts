@@ -6,6 +6,7 @@ import {
   REVIEW_MODE_LABELS,
   type DispatchMetadata,
 } from './dispatch-contract';
+import { hasDoneOrReviewEvidence, type StatusEvidence } from './status-evidence';
 import type {
   GitHubSourceIdentity,
   GitHubWritebackMode,
@@ -37,7 +38,15 @@ export interface GitHubWritebackTaskSnapshot {
   assigned_agent_name?: string | null;
   dispatch_metadata?: DispatchMetadata;
   dispatch_blockers?: string[];
+  /**
+   * Evidence that the work shipped (merged PR into main, or a closing comment
+   * naming what shipped). Without it, write-back refuses Status Done or Review.
+   */
+  status_evidence?: StatusEvidence[];
 }
+
+export const WRITEBACK_STATUS_REFUSAL_REASON =
+  'Refused: write-back never sets Project Status to Done or Review from the local column without evidence (a merged PR into main or a closing comment naming what shipped). docs/SYNC_FIELD_AUTHORITY.md section 6, rule 6.';
 
 export interface GitHubWritebackProjectUpdate {
   field_name: string;
@@ -216,9 +225,16 @@ function buildCommentBody(task: GitHubWritebackTaskSnapshot): string {
   ].join('\n');
 }
 
-function buildDesiredProjectUpdates(task: GitHubWritebackTaskSnapshot): GitHubWritebackProjectUpdate[] {
+export function buildDesiredProjectUpdates(task: GitHubWritebackTaskSnapshot): GitHubWritebackProjectUpdate[] {
+  // This is the only place write-back sets Project Status. A local Done or
+  // Review can never promote the Project without evidence (section 6, rule 6),
+  // and nothing here or in apply ever closes an issue (rule 2).
+  const promotesProject = task.status === 'done' || task.status === 'review';
+  const statusUpdate: GitHubWritebackProjectUpdate = promotesProject && !hasDoneOrReviewEvidence(task.status_evidence)
+    ? { field_name: 'Status', value: STATUS_LABELS[task.status], skipped: true, reason: WRITEBACK_STATUS_REFUSAL_REASON }
+    : { field_name: 'Status', value: STATUS_LABELS[task.status] };
   const updates: GitHubWritebackProjectUpdate[] = [
-    { field_name: 'Status', value: STATUS_LABELS[task.status] },
+    statusUpdate,
     { field_name: 'Agent', value: normalizeString(task.assigned_agent_name) ?? 'Human' },
   ];
 
@@ -397,6 +413,10 @@ function matchProjectField(
   fields: ProjectFieldNode[],
   desired: GitHubWritebackProjectUpdate
 ): GitHubWritebackProjectUpdate {
+  if (desired.skipped) {
+    return desired;
+  }
+
   const targetName = normalizeFieldName(desired.field_name);
   if (!ALLOWED_PROJECT_FIELDS.includes(targetName as (typeof ALLOWED_PROJECT_FIELDS)[number])) {
     return {
@@ -446,6 +466,93 @@ function matchProjectField(
     ...desired,
     skipped: true,
     reason: `Unsupported GitHub Project field type "${field.dataType ?? 'unknown'}"`,
+  };
+}
+
+interface IssueEvidenceQueryData {
+  repository?: {
+    issue?: {
+      closedByPullRequestsReferences?: {
+        nodes?: Array<{ url?: string | null; merged?: boolean | null; baseRefName?: string | null } | null>;
+      } | null;
+    } | null;
+  } | null;
+}
+
+export const WRITEBACK_EVIDENCE_LOAD_FAILED_PREFIX = 'Could not load status evidence for the linked issue';
+
+/**
+ * Server-side evidence for the Status guard in `buildDesiredProjectUpdates`
+ * (docs/SYNC_FIELD_AUTHORITY.md section 6, rules 2 and 6). It reads the same
+ * source Project sync uses for a linked main merge: the issue's
+ * `closedByPullRequestsReferences` (merged flag and base branch of each PR
+ * GitHub links as closing the issue). `isDoneOrReviewEvidence` then accepts
+ * only a merged PR into main or master, so a dev merge never qualifies.
+ * Closing comments are not read here (sync does not collect them either);
+ * that is a follow-up. Any failure returns no evidence, so the guard keeps
+ * refusing Done and Review.
+ */
+export async function loadIssueStatusEvidence(
+  githubSource: GitHubSourceIdentity,
+): Promise<{ evidence: StatusEvidence[]; warning?: string }> {
+  if (!getGitHubToken()) {
+    return { evidence: [], warning: `${WRITEBACK_EVIDENCE_LOAD_FAILED_PREFIX}: missing GH_GENERAL_TOKEN or GITHUB_TOKEN` };
+  }
+
+  try {
+    const data = await githubGraphQL<IssueEvidenceQueryData>(
+      `
+        query WritebackStatusEvidence($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            issue(number: $number) {
+              closedByPullRequestsReferences(first: 10, includeClosedPrs: true) {
+                nodes {
+                  url
+                  merged
+                  baseRefName
+                }
+              }
+            }
+          }
+        }
+      `,
+      {
+        owner: githubSource.repo_owner,
+        name: githubSource.repo_name,
+        number: githubSource.issue_number,
+      }
+    );
+    const nodes = data?.repository?.issue?.closedByPullRequestsReferences?.nodes ?? [];
+    const evidence = nodes.flatMap((node): StatusEvidence[] => {
+      if (!node || typeof node.baseRefName !== 'string') {
+        return [];
+      }
+      return [{ kind: 'merged_pr', base_ref: node.baseRefName, merged: node.merged === true, url: node.url ?? undefined }];
+    });
+    return { evidence };
+  } catch (error) {
+    return {
+      evidence: [],
+      warning: `${WRITEBACK_EVIDENCE_LOAD_FAILED_PREFIX}: ${error instanceof Error ? error.message : 'unknown error'}`,
+    };
+  }
+}
+
+/**
+ * Fill `status_evidence` on a snapshot from the server. Only a Done or Review
+ * card needs it. Whatever the snapshot carried before is replaced, so a
+ * caller can never supply its own evidence.
+ */
+export async function attachServerStatusEvidence(
+  task: GitHubWritebackTaskSnapshot,
+): Promise<{ task: GitHubWritebackTaskSnapshot; warnings: string[] }> {
+  if (task.status !== 'done' && task.status !== 'review') {
+    return { task: { ...task, status_evidence: [] }, warnings: [] };
+  }
+  const loaded = await loadIssueStatusEvidence(task.github_source);
+  return {
+    task: { ...task, status_evidence: loaded.evidence },
+    warnings: loaded.warning ? [loaded.warning] : [],
   };
 }
 

@@ -863,10 +863,10 @@ test('a not-saved (non-retryable) alert is moot once the card reaches the target
 test('status-changing planning routes stamp updated_at with ISO UTC (so ordering by updated_at holds)', () => {
   // Narrow source checks: these routes need a live planning session to exercise.
   const start = source('src/app/api/tasks/[id]/planning/route.ts');
-  assert.match(start, /status = 'planning', updated_at = \?\n\s+WHERE id = \?\n\s+`\)\.run\(sessionKey, JSON\.stringify\(messages\), new Date\(\)\.toISOString\(\), taskId\)/);
+  assert.match(start, /status = 'planning', updated_at = \?\r?\n\s+WHERE id = \?\r?\n\s+`\)\.run\(sessionKey, JSON\.stringify\(messages\), new Date\(\)\.toISOString\(\), taskId\)/);
   const answer = source('src/app/api/tasks/[id]/planning/answer/route.ts');
-  assert.match(answer, /status = 'inbox',\n\s+updated_at = \?\n/);
-  assert.match(answer, /JSON\.stringify\(parsed\.agents\),\n\s+new Date\(\)\.toISOString\(\),\n\s+taskId/);
+  assert.match(answer, /status = 'inbox',\r?\n\s+updated_at = \?\r?\n/);
+  assert.match(answer, /JSON\.stringify\(parsed\.agents\),\r?\n\s+new Date\(\)\.toISOString\(\),\r?\n\s+taskId/);
   const approve = source('src/app/api/tasks/[id]/planning/approve/route.ts');
   assert.match(approve, /status = 'inbox', updated_at = \?/);
 });
@@ -876,7 +876,7 @@ test('wiring without a practical jsdom path: page load/poll use applyServerTasks
   assert.match(page, /applyServerTasks\(tasksData\);/);
   assert.match(page, /applyServerTasks\(newTasks\);/);
   const modal = source('src/components/TaskModal.tsx');
-  assert.match(modal, /onTaskUpdated=\{\(updatedTask\) => \{\n\s+setCurrentTask\(updatedTask\);\n\s+setForm\(buildTaskFormState\(updatedTask\)\);\n\s+openedStatusRef\.current = buildTaskFormState\(updatedTask\)\.status;/);
+  assert.match(modal, /onTaskUpdated=\{\(updatedTask\) => \{\r?\n\s+setCurrentTask\(updatedTask\);\r?\n\s+setForm\(buildTaskFormState\(updatedTask\)\);\r?\n\s+openedStatusRef\.current = buildTaskFormState\(updatedTask\)\.status;/);
 });
 
 test('a newer confirmation from an earlier save survives the next move (stale report after it is ignored)', async () => {

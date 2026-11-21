@@ -6,6 +6,7 @@ import {
   OPENCLAW_PROTOCOL_VERSION,
   OpenClawClient,
   buildConnectParams,
+  errorFromGateway,
 } from '../src/lib/openclaw/client';
 
 test('OPENCLAW_PROTOCOL_VERSION is 4, matching openclaw@2026.9.7', () => {
@@ -150,6 +151,80 @@ test('connect frame after connect.challenge uses protocol 4 and client identity'
 
     await connected;
     assert.equal(client.isConnected(), true);
+  } finally {
+    client.disconnect();
+    globalThis.WebSocket = OriginalWebSocket;
+  }
+});
+
+test('errorFromGateway keeps a string gateway error.code', () => {
+  const forbidden = errorFromGateway({ code: 'FORBIDDEN', message: 'missing scope: operator.read' });
+  assert.equal(forbidden.message, 'missing scope: operator.read');
+  assert.equal(forbidden.code, 'FORBIDDEN');
+
+  const numeric = errorFromGateway({ code: 401, message: 'unauthorized' });
+  assert.equal(numeric.code, 401);
+
+  const trimmed = errorFromGateway({ code: '  FORBIDDEN  ', message: 'missing scope: operator.read' });
+  assert.equal(trimmed.code, 'FORBIDDEN');
+
+  const dropped = errorFromGateway({ code: '   ', message: 'blank code' });
+  assert.equal(dropped.message, 'blank code');
+  assert.equal('code' in dropped, false);
+});
+
+test('sessions.list rejection keeps a string gateway error.code', async () => {
+  const OriginalWebSocket = globalThis.WebSocket;
+  FakeWebSocket.instances = [];
+  // @ts-expect-error test double replaces the DOM/Node WebSocket
+  globalThis.WebSocket = FakeWebSocket;
+
+  const client = new OpenClawClient('ws://127.0.0.1:28789', 'test-token');
+  client.setAutoReconnect(false);
+
+  try {
+    const connected = client.connect();
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+
+    const ws = FakeWebSocket.instances[0];
+    ws.onmessage?.({
+      data: JSON.stringify({
+        type: 'event',
+        event: 'connect.challenge',
+        payload: { nonce: 'test-nonce', ts: 1737264000000 },
+      }),
+    });
+    const connectFrame = JSON.parse(ws.sent[0]) as { id: string };
+    ws.onmessage?.({
+      data: JSON.stringify({
+        type: 'res',
+        id: connectFrame.id,
+        ok: true,
+        payload: { type: 'hello-ok', protocol: 4 },
+      }),
+    });
+    await connected;
+
+    const listed = client.listSessions();
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+    const listFrame = JSON.parse(ws.sent[1]) as { id: string; method: string };
+    assert.equal(listFrame.method, 'sessions.list');
+
+    ws.onmessage?.({
+      data: JSON.stringify({
+        type: 'res',
+        id: listFrame.id,
+        ok: false,
+        error: { code: 'FORBIDDEN', message: 'missing scope: operator.read' },
+      }),
+    });
+
+    await assert.rejects(listed, (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.equal(err.message, 'missing scope: operator.read');
+      assert.equal((err as Error & { code?: string }).code, 'FORBIDDEN');
+      return true;
+    });
   } finally {
     client.disconnect();
     globalThis.WebSocket = OriginalWebSocket;

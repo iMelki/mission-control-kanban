@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, run } from '@/lib/db';
+import { queryOne, run, transaction } from '@/lib/db';
 import { broadcast } from '@/lib/events';
 import { getMissionControlUrl } from '@/lib/config';
 import {
@@ -12,9 +12,11 @@ import {
 import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib/github-task-import';
 import { normalizeAgentRuntimeType, normalizeDispatchEnabled, shouldAutoDispatchAgent } from '@/lib/agent-runtimes';
 import { listTaskDependencies } from '@/lib/task-dependencies';
+import { parseSyncFlags } from '@/lib/github-project-sync';
+import { listTaskFieldTombstones, recordFieldClears, tombstoneSourceForTaskApi } from '@/lib/field-tombstones';
 import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
 
-type TaskRow = Task & {
+type TaskRow = Omit<Task, 'sync_flags'> & {
   assigned_agent_name?: string;
   assigned_agent_emoji?: string;
   assigned_agent_runtime_type?: string | null;
@@ -28,10 +30,16 @@ type TaskRow = Task & {
   source_issue_number?: number | null;
   source_issue_url?: string | null;
   source_project_item_id?: string | null;
+  sync_flags?: string | null;
+  github_last_read_at?: string | null;
+  github_missing_reads?: number | null;
 };
 
 function decorateTask(task: TaskRow) {
   const {
+    sync_flags,
+    github_last_read_at: _lastRead,
+    github_missing_reads: _missingReads,
     dispatch_metadata,
     source_repo_owner,
     source_repo_name,
@@ -54,6 +62,7 @@ function decorateTask(task: TaskRow) {
     ...rest,
     github_source: githubSource,
     dispatch_metadata: dispatchMetadata,
+    sync_flags: parseSyncFlags(sync_flags),
     dispatch_ready: validation.canDispatch,
     dispatch_blockers: validation.blockers,
     assigned_agent: task.assigned_agent_id
@@ -96,6 +105,7 @@ export async function GET(
     return NextResponse.json({
       ...decorateTask(task),
       ...listTaskDependencies(id),
+      field_tombstones: listTaskFieldTombstones(id),
     });
   } catch (error) {
     console.error('Failed to fetch task:', error);
@@ -168,12 +178,24 @@ export async function PATCH(
     }
 
     const shouldClearGitHubSource = Object.prototype.hasOwnProperty.call(body, 'github_source') && body.github_source === null;
-    const derivedGitHubSource = shouldClearGitHubSource
+    const derivedFromBody = shouldClearGitHubSource
       ? null
       : deriveGitHubSourceIdentity({
           github_source: body.github_source,
           dispatch_metadata: body.dispatch_metadata,
         });
+    // An identity derived only from dispatch_metadata.source_issue_url has no
+    // Project item id. For the same issue, keep the stored one instead of
+    // blanking it (docs/SYNC_FIELD_AUTHORITY.md section 3, rule 2).
+    const derivedGitHubSource = derivedFromBody
+      && body.github_source === undefined
+      && !derivedFromBody.project_item_id
+      && existingGitHubSource?.project_item_id
+      && existingGitHubSource.repo_owner === derivedFromBody.repo_owner
+      && existingGitHubSource.repo_name === derivedFromBody.repo_name
+      && existingGitHubSource.issue_number === derivedFromBody.issue_number
+      ? { ...derivedFromBody, project_item_id: existingGitHubSource.project_item_id }
+      : derivedFromBody;
 
     if (shouldClearGitHubSource || derivedGitHubSource) {
       const duplicate = derivedGitHubSource
@@ -290,7 +312,31 @@ export async function PATCH(
     values.push(now);
     values.push(id);
 
-    run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
+    // docs/SYNC_FIELD_AUTHORITY.md section 4: dispatch_metadata is replaced as
+    // a whole object here (the in-app GitHub refresh saves through this route
+    // too), so every field that goes from non-empty to empty gets a tombstone
+    // in the same transaction as the UPDATE.
+    const fieldsBefore = {
+      description: existing.description,
+      dispatch_metadata: parseDispatchMetadata(existing.dispatch_metadata),
+      github_source: existingGitHubSource,
+    };
+    const fieldsAfter = {
+      description: body.description !== undefined ? body.description : existing.description,
+      dispatch_metadata: effectiveDispatchMetadata,
+      github_source: shouldClearGitHubSource || derivedGitHubSource ? derivedGitHubSource : existingGitHubSource,
+    };
+    transaction(() => {
+      recordFieldClears({
+        taskId: id,
+        before: fieldsBefore,
+        after: fieldsAfter,
+        source: tombstoneSourceForTaskApi(body.updated_by_agent_id),
+        context: `PATCH /api/tasks/${id}`,
+        clearedAt: new Date(now),
+      });
+      run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
+    });
 
     // Fetch updated task with all joined fields
     const task = queryOne<TaskRow>(
@@ -309,7 +355,9 @@ export async function PATCH(
       [id]
     );
 
-    const decoratedTask = task ? decorateTask(task) : null;
+    const decoratedTask = task
+      ? { ...decorateTask(task), field_tombstones: listTaskFieldTombstones(id) }
+      : null;
 
     // Broadcast task update via SSE
     if (decoratedTask) {
