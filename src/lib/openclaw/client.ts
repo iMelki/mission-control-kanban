@@ -33,10 +33,18 @@ export function buildConnectParams(token: string) {
   };
 }
 
-function errorFromGateway(error: { code?: number; message: string } | undefined): Error & { code?: number } {
-  const err = new Error(error?.message || 'OpenClaw request failed') as Error & { code?: number };
-  if (typeof error?.code === 'number' && Number.isFinite(error.code)) {
-    err.code = error.code;
+function isGatewayErrorCode(value: unknown): value is string | number {
+  return (typeof value === 'number' && Number.isFinite(value))
+    || (typeof value === 'string' && value.trim().length > 0);
+}
+
+/** Build an Error that preserves numeric or string gateway `error.code` values. */
+export function errorFromGateway(
+  error: { code?: unknown; message?: string } | undefined,
+): Error & { code?: string | number } {
+  const err = new Error(error?.message || 'OpenClaw request failed') as Error & { code?: string | number };
+  if (isGatewayErrorCode(error?.code)) {
+    err.code = typeof error.code === 'string' ? error.code.trim() : error.code;
   }
   return err;
 }

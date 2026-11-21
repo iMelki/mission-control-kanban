@@ -2,6 +2,7 @@ import {
   isGenericSyncPlaceholder,
   mergeDispatchMetadataFromUpstream,
   normalizeDispatchMetadata,
+  stripGeneratedScopePlaceholderTokens,
   type DispatchMetadata,
   type DispatchReadiness,
   type DispatchReviewMode,
@@ -95,10 +96,24 @@ function normalizeListValue(value: unknown): string[] | undefined {
     return undefined;
   }
 
-  return normalized.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
+  // Recognize a generated or generic placeholder on the unsplit GitHub
+  // Project field first. Splitting on ';' or ',' would otherwise turn
+  // "Owning repo issue; docs; scripts; and tests named by the task" into
+  // bare "docs" and "scripts", which are real allowed file scopes.
+  if (isGenericSyncPlaceholder(normalized)) {
+    return undefined;
+  }
+
+  const items = normalized.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
     const normalizedItem = item.replace(/^(?:\s*[-*]\s*\[[ xX]\]\s*|\s*[-*]\s*|\s*\d+\.\s*)/, '').trim();
     return normalizedItem ? [normalizedItem] : [];
   });
+
+  // Strip the generated default as a contiguous sequence first. Filtering
+  // placeholder tokens beforehand would drop "Owning repo issue" and leave
+  // bare "docs" and "scripts" behind.
+  const kept = stripGeneratedScopePlaceholderTokens(items).filter((item) => !isGenericSyncPlaceholder(item));
+  return kept.length > 0 ? kept : undefined;
 }
 
 function normalizeScalarSection(value: string | undefined): string | undefined {
@@ -499,8 +514,11 @@ export function buildTaskRefreshUpdateFromGitHubPreview(
       currentTask.github_source,
       preview.github_source,
     ) ?? null,
-    // Key-level merge: upstream non-empty non-placeholder keys refresh,
-    // local-only keys stay. See mergeDispatchMetadataFromUpstream.
+    // Key-level merge: upstream non-empty non-placeholder keys refresh.
+    // Sandbox and review controls (allowed_file_scope, safety_rules,
+    // review_mode) stay local-only when a substantive local value already
+    // exists; a missing or placeholder local key may still be filled.
+    // See mergeDispatchMetadataFromUpstream.
     dispatch_metadata: mergeDispatchMetadataFromUpstream(
       currentTask.dispatch_metadata,
       preview.dispatch_metadata,

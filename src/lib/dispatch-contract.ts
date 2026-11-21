@@ -99,22 +99,31 @@ export const RISK_LEVEL_LABELS: Record<DispatchRiskLevel, string> = {
 
 /**
  * Generic portfolio-repair default strings from iMelki/projects-ops (dev).
- * Matched EXACTLY after trim: no fuzzy matching, regex, or case folding.
- * Sources (file:line on projects-ops `dev`):
+ * Projects-ops entries are matched EXACTLY after trim: no fuzzy matching,
+ * regex, or case folding. Sources (file:line on projects-ops `dev`):
  *   scripts/Ensure-RepoIssueProjectVisibility.ps1
  *   scripts/Invoke-GitHubProjectMutation.ps1
- * MemSys-sourced strings, if they differ, are a follow-up.
+ * The two generated Allowed File Scope defaults (projects-ops comma form and
+ * MemSys semicolon form) are also on the exported list, and are matched as
+ * a whole string after NFKC, case-fold, collapsed whitespace, and an optional
+ * trailing period, never as split tokens.
  */
 export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   // Ensure-RepoIssueProjectVisibility.ps1:35 and Invoke-GitHubProjectMutation.ps1:49 (Impact)
   'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
   // Ensure-RepoIssueProjectVisibility.ps1:36 and Invoke-GitHubProjectMutation.ps1:50 (Allowed File Scope)
   'Owning repo issue, docs, scripts, and tests named by the task.',
-  // Comma-split pieces of that scope default (normalizeStringArray splits on commas)
+  // Comma-split pieces of that scope default that are not themselves real
+  // file scopes. Bare 'docs' and 'scripts' are real local scopes, so they
+  // stay off this list.
   'Owning repo issue',
-  'docs',
-  'scripts',
   'and tests named by the task.',
+  // MemSys default Allowed File Scope. Added to this exported list under
+  // section 5, rule 5 of docs/SYNC_FIELD_AUTHORITY.md. Both generated
+  // scope defaults are matched as a whole string after NFKC, case-fold,
+  // collapsed whitespace, and an optional trailing period, never as split
+  // tokens, so bare 'docs' and 'scripts' stay real scopes.
+  'Owning repo issue; docs; scripts; and tests named by the task',
   // Ensure-RepoIssueProjectVisibility.ps1:38 and Invoke-GitHubProjectMutation.ps1:52 (Acceptance Criteria)
   'Issue is present on the mapped GitHub Project.',
   // Ensure-RepoIssueProjectVisibility.ps1:39 and Invoke-GitHubProjectMutation.ps1:53
@@ -146,6 +155,73 @@ export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
 const GENERIC_SYNC_PLACEHOLDER_SET: ReadonlySet<string> = new Set(GENERIC_SYNC_PLACEHOLDER_STRINGS);
 
 /**
+ * Generated Allowed File Scope defaults (MemSys semicolon form and
+ * projects-ops comma form). Compared only as a whole string after
+ * `normalizeGenericSyncPlaceholderText`. Never tokenized, so bare 'docs'
+ * and 'scripts' stay real scopes.
+ */
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS = [
+  'Owning repo issue; docs; scripts; and tests named by the task',
+  'Owning repo issue, docs, scripts, and tests named by the task.',
+] as const;
+
+/**
+ * Unicode NFKC, then case-fold, then trim and collapse internal whitespace
+ * (including space around `;` or `,`) to a single canonical space or
+ * separator. A trailing period is optional.
+ */
+export function normalizeGenericSyncPlaceholderText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\s*;\s*/g, '; ')
+    .replace(/\s*,\s*/g, ', ')
+    .trim()
+    .replace(/\.+$/, '');
+}
+
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_NORMALIZED: ReadonlySet<string> = new Set(
+  GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS.map(normalizeGenericSyncPlaceholderText),
+);
+
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_SEQUENCES: readonly string[][] = Array.from(
+  new Map(
+    GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS.map((placeholder) => {
+      const tokens = normalizeGenericSyncPlaceholderText(placeholder)
+        .split(/[;,]/)
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0);
+      return [tokens.join('\0'), tokens] as const;
+    }),
+  ).values(),
+);
+
+/**
+ * Drop a generated Allowed File Scope default when it appears as a
+ * contiguous token sequence, including a superstring such as the MemSys
+ * default plus `; src/**`. Bare 'docs', 'scripts', and 'docs/**' stay.
+ */
+export function stripGeneratedScopePlaceholderTokens(items: readonly string[]): string[] {
+  const remaining = [...items];
+  const normalized = remaining.map((item) => normalizeGenericSyncPlaceholderText(item));
+
+  for (const sequence of GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_SEQUENCES) {
+    let index = 0;
+    while (index <= normalized.length - sequence.length) {
+      if (sequence.every((token, offset) => normalized[index + offset] === token)) {
+        remaining.splice(index, sequence.length);
+        normalized.splice(index, sequence.length);
+        continue;
+      }
+      index += 1;
+    }
+  }
+
+  return remaining;
+}
+
+/**
  * Split a dispatch string on the list separators used by portfolio-repair
  * joins (`; `, `;`, LF, CRLF), trimming each piece. Does not split on commas,
  * so the full Allowed File Scope default stays one token and is matched
@@ -160,9 +236,11 @@ export function splitGenericSyncPlaceholderTokens(value: string): string[] {
 
 /**
  * True when `value` is a known generic sync placeholder: an exact trimmed
- * item, or a `;` / LF / CRLF join whose every non-empty token is such an
- * item (any join or subset). Case is significant. Whitespace around
- * separators is ignored.
+ * item, a whole-string generated Allowed File Scope default after NFKC /
+ * case-fold / whitespace normalization with an optional trailing period,
+ * or a `;` / LF / CRLF join whose every non-empty token is an exact list
+ * item (any join or subset). Token matching stays case-sensitive and does
+ * not treat bare 'docs' or 'scripts' as placeholders.
  */
 export function isGenericSyncPlaceholder(value: unknown): boolean {
   if (typeof value !== 'string') {
@@ -174,6 +252,9 @@ export function isGenericSyncPlaceholder(value: unknown): boolean {
     return false;
   }
   if (GENERIC_SYNC_PLACEHOLDER_SET.has(trimmed)) {
+    return true;
+  }
+  if (GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_NORMALIZED.has(normalizeGenericSyncPlaceholderText(trimmed))) {
     return true;
   }
 
@@ -193,6 +274,16 @@ export function stripGenericSyncPlaceholders(value: unknown): unknown {
     const trimmed = value.trim();
     if (trimmed.length === 0 || isGenericSyncPlaceholder(trimmed)) {
       return undefined;
+    }
+
+    const listItems = trimmed.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
+      const itemTrimmed = item.trim();
+      return itemTrimmed ? [itemTrimmed] : [];
+    });
+    const withoutGeneratedScope = stripGeneratedScopePlaceholderTokens(listItems);
+    if (withoutGeneratedScope.length !== listItems.length) {
+      const keptScope = withoutGeneratedScope.filter((item) => !isGenericSyncPlaceholder(item));
+      return keptScope.length > 0 ? keptScope : undefined;
     }
 
     const tokens = splitGenericSyncPlaceholderTokens(trimmed);
@@ -243,15 +334,36 @@ function normalizeStringArray(value: unknown): string[] | undefined {
       const normalized = normalizeString(item);
       return normalized ? [normalized] : [];
     });
-    return items.length > 0 ? items : undefined;
+    // Same rules as the scalar path below. Stored rows written before the
+    // whole-string fix hold the generated scope default already split into
+    // items ('Owning repo issue', 'docs', 'scripts', ...), so strip that
+    // contiguous sequence first, then drop per-item placeholders (including
+    // a whole MemSys or projects-ops default kept as one item). Filtering
+    // per item first would leave bare 'docs' and 'scripts' behind. A bare
+    // ['docs'] or ['scripts'] array is a real file scope and stays.
+    const kept = stripGeneratedScopePlaceholderTokens(items).filter((item) => !isGenericSyncPlaceholder(item));
+    return kept.length > 0 ? kept : undefined;
   }
 
   if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    // Recognize a generated scope placeholder on the unsplit string first.
+    // Splitting on ';' or ',' would otherwise turn the MemSys or projects-ops
+    // default into bare 'docs' and 'scripts', which are real file scopes.
+    if (isGenericSyncPlaceholder(trimmed)) {
+      return undefined;
+    }
+
     const items = value.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
-      const trimmed = item.trim();
-      return trimmed ? [trimmed] : [];
+      const itemTrimmed = item.trim();
+      return itemTrimmed ? [itemTrimmed] : [];
     });
-    return items.length > 0 ? items : undefined;
+    const kept = stripGeneratedScopePlaceholderTokens(items).filter((item) => !isGenericSyncPlaceholder(item));
+    return kept.length > 0 ? kept : undefined;
   }
 
   return undefined;
@@ -330,17 +442,43 @@ function isNonEmptyDispatchValue(value: unknown): boolean {
 }
 
 /**
+ * Sandbox and review controls that GitHub refresh must not overwrite once a
+ * local non-empty, non-placeholder value exists. A later issue-body or
+ * project-field edit must not widen factory allowed paths, replace safety
+ * rules, or switch review mode while other required keys stay in place and
+ * `canDispatch` remains true. Missing, empty, or placeholder-only local
+ * values may still be filled from a repaired upstream body.
+ */
+export const LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH = [
+  'allowed_file_scope',
+  'safety_rules',
+  'review_mode',
+] as const satisfies ReadonlyArray<keyof DispatchMetadata>;
+
+function isLocalOnlyDispatchFieldOnRefresh(key: string): boolean {
+  return (LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH as readonly string[]).includes(key);
+}
+
+function hasSubstantiveLocalDispatchValue(value: unknown): boolean {
+  return isNonEmptyDispatchValue(stripGenericSyncPlaceholders(value));
+}
+
+/**
  * Key-level merge of upstream-derived dispatch metadata into a locally stored
- * contract.
+ * contract during GitHub refresh.
  *
  * Precedence: local edits win unless upstream explicitly provides a non-empty,
  * non-placeholder value. A value is non-empty when a trimmed string has length
  * and is not a known generic sync placeholder, an array has at least one
  * non-empty non-placeholder item (placeholder items are dropped first), or any
  * other non-null scalar is present. Missing, empty, or placeholder-only
- * upstream keys leave the local key unchanged. This applies to every key,
- * including locally authored contract fields such as `allowed_file_scope`,
- * `test_requirements`, and `rollback_plan`. `dispatch_ready` is not stored on
+ * upstream keys leave the local key unchanged.
+ *
+ * Sandbox and review controls listed in
+ * `LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH` are not overwritten when the local
+ * key already has a non-empty, non-placeholder value. If the local key is
+ * missing, empty, or placeholder-only, a substantive upstream value may still
+ * fill it (the repaired-issue-body path). `dispatch_ready` is not stored on
  * this object; callers recompute it from the merged result via
  * `validateDispatchMetadata`.
  */
@@ -357,6 +495,12 @@ export function mergeDispatchMetadataFromUpstream(
 
   const merged: Record<string, unknown> = { ...localRecord };
   for (const [key, value] of Object.entries(upstreamRecord)) {
+    if (
+      isLocalOnlyDispatchFieldOnRefresh(key)
+      && hasSubstantiveLocalDispatchValue(localRecord[key])
+    ) {
+      continue;
+    }
     const substantive = stripGenericSyncPlaceholders(value);
     if (isNonEmptyDispatchValue(substantive)) {
       merged[key] = substantive;
