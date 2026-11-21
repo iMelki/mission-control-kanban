@@ -11,7 +11,7 @@ import {
   normalizeGitHubProjectStatus,
   reconcileGitHubProjectStatus,
 } from '../src/lib/github-project-sync';
-import { GENERIC_SYNC_PLACEHOLDER_STRINGS, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, requiresDispatchContractBeforeWorkStarts, stripGenericSyncPlaceholders, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
+import { GENERIC_SYNC_PLACEHOLDER_STRINGS, LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH, isGenericSyncPlaceholder, mergeDispatchMetadataFromUpstream, normalizeDispatchMetadata, parseDispatchMetadata, requiresDispatchContractBeforeWorkStarts, serializeDispatchMetadata, stripGenericSyncPlaceholders, summarizeDispatchContract, validateDispatchMetadata } from '../src/lib/dispatch-contract';
 import {
   buildWritebackActivityMessage,
   planGitHubWriteback,
@@ -451,6 +451,226 @@ test('GitHub import preview can normalize required dispatch sections from GitHub
   assert.equal(response.dispatch_ready, true);
 });
 
+test('GitHub import preview treats a generated Allowed File Scope project field as empty', () => {
+  const otherwiseValidProjectFields = {
+    Repo: 'iMelki/mission-control-kanban',
+    Project: 'GitHub-native pipeline',
+    Readiness: 'Ready for Agent',
+    'Review Mode': 'Human Required',
+    Risk: 'Medium',
+    Impact: 'operator UX stays specific and non-placeholder',
+    'Project Item ID': 'PVTI_mock_scope_placeholder',
+    'Acceptance Criteria': '- Import preview is available in the UI\n- Operators can create a local task from it',
+    'Test Requirements': 'npm run test:github-sync\nManual import against localhost',
+    'Rollback / Fallback Plan': 'Disable the new modal and keep API routes intact.',
+    'Safety Rules': '- Do not write back to GitHub before the operator reviews the plan',
+  };
+
+  const issue = {
+    number: 31,
+    title: 'Backfill operator onboarding in MCK',
+    body: '## Goal\nMake the import flow usable for first-time operators.',
+    html_url: 'https://github.com/iMelki/mission-control-kanban/issues/31',
+  };
+  const repository = {
+    full_name: 'iMelki/mission-control-kanban',
+    name: 'mission-control-kanban',
+    owner: { login: 'iMelki' },
+  };
+
+  const generatedScopes = [
+    'Owning repo issue; docs; scripts; and tests named by the task',
+    'Owning repo issue, docs, scripts, and tests named by the task.',
+    '  OWNING  REPO  ISSUE;  DOCS;  SCRIPTS;  AND  TESTS  NAMED  BY  THE  TASK  ',
+  ];
+
+  for (const generatedScope of generatedScopes) {
+    const response = buildGitHubImportPreviewResponse({
+      request: {
+        issue,
+        repository,
+        project_fields: {
+          ...otherwiseValidProjectFields,
+          'Allowed File Scope': generatedScope,
+        },
+      },
+    });
+
+    assert.equal(
+      response.preview.dispatch_metadata?.allowed_file_scope,
+      undefined,
+      `generated scope ${JSON.stringify(generatedScope)} must not be stored as real file scope`,
+    );
+    assert.equal(response.dispatch_ready, false);
+    assert.ok(
+      response.dispatch_blockers.some((blocker) => /allowed file scope/i.test(blocker)),
+      'the unsplit generated scope must be treated as missing, not dispatchable',
+    );
+    assert.deepEqual(response.preview.dispatch_metadata?.acceptance_criteria, [
+      'Import preview is available in the UI',
+      'Operators can create a local task from it',
+    ]);
+  }
+
+  const realDocs = buildGitHubImportPreviewResponse({
+    request: {
+      issue,
+      repository,
+      project_fields: {
+        ...otherwiseValidProjectFields,
+        'Allowed File Scope': 'docs',
+      },
+    },
+  });
+  assert.deepEqual(realDocs.preview.dispatch_metadata?.allowed_file_scope, ['docs']);
+  assert.equal(realDocs.dispatch_ready, true);
+  assert.deepEqual(realDocs.dispatch_blockers, []);
+});
+
+const OTHERWISE_VALID_SCOPE_PROJECT_FIELDS = {
+  Repo: 'iMelki/mission-control-kanban',
+  Project: 'GitHub-native pipeline',
+  Readiness: 'Ready for Agent',
+  'Review Mode': 'Human Required',
+  Risk: 'Medium',
+  Impact: 'operator UX stays specific and non-placeholder',
+  'Project Item ID': 'PVTI_mock_scope_placeholder',
+  'Acceptance Criteria': '- Import preview is available in the UI\n- Operators can create a local task from it',
+  'Test Requirements': 'npm run test:github-sync\nManual import against localhost',
+  'Rollback / Fallback Plan': 'Disable the new modal and keep API routes intact.',
+  'Safety Rules': '- Do not write back to GitHub before the operator reviews the plan',
+};
+
+const OTHERWISE_VALID_SCOPE_ISSUE = {
+  number: 31,
+  title: 'Backfill operator onboarding in MCK',
+  body: '## Goal\nMake the import flow usable for first-time operators.',
+  html_url: 'https://github.com/iMelki/mission-control-kanban/issues/31',
+};
+
+const OTHERWISE_VALID_SCOPE_REPOSITORY = {
+  full_name: 'iMelki/mission-control-kanban',
+  name: 'mission-control-kanban',
+  owner: { login: 'iMelki' },
+};
+
+const OTHERWISE_COMPLETE_DISPATCH_CONTRACT = {
+  target_repo: 'iMelki/mission-control-kanban',
+  project_workstream: 'GitHub-native pipeline',
+  acceptance_criteria: ['Import preview is available in the UI', 'Operators can create a local task from it'],
+  test_requirements: ['npm run test:github-sync', 'Manual import against localhost'],
+  risk_level: 'medium' as const,
+  readiness: 'ready_for_agent' as const,
+  review_mode: 'human_required' as const,
+  impact: 'operator UX stays specific and non-placeholder',
+  rollback_plan: 'Disable the new modal and keep API routes intact.',
+  safety_rules: ['Do not write back to GitHub before the operator reviews the plan'],
+};
+
+function importPreviewForAllowedFileScope(scope: string) {
+  return buildGitHubImportPreviewResponse({
+    request: {
+      issue: OTHERWISE_VALID_SCOPE_ISSUE,
+      repository: OTHERWISE_VALID_SCOPE_REPOSITORY,
+      project_fields: {
+        ...OTHERWISE_VALID_SCOPE_PROJECT_FIELDS,
+        'Allowed File Scope': scope,
+      },
+    },
+  });
+}
+
+function contractFromAllowedFileScopeString(scope: string) {
+  return normalizeDispatchMetadata({
+    ...OTHERWISE_COMPLETE_DISPATCH_CONTRACT,
+    allowed_file_scope: scope,
+  });
+}
+
+const GENERATED_SCOPE_VARIANT_CASES = [
+  [
+    'a comma form with internal spaces or uppercase',
+    '  OWNING  REPO  ISSUE,  DOCS,  SCRIPTS,  AND  TESTS  NAMED  BY  THE  TASK.  ',
+  ],
+  [
+    'a comma form without a trailing period',
+    'Owning repo issue, docs, scripts, and tests named by the task',
+  ],
+  [
+    'a MemSys form with a trailing period',
+    'Owning repo issue; docs; scripts; and tests named by the task.',
+  ],
+] as const;
+
+for (const [label, scope] of GENERATED_SCOPE_VARIANT_CASES) {
+  test(`GitHub import preview treats ${label} as empty and not dispatchable`, () => {
+    const response = importPreviewForAllowedFileScope(scope);
+    assert.equal(response.preview.dispatch_metadata?.allowed_file_scope, undefined);
+    assert.equal(response.dispatch_ready, false);
+    assert.ok(response.dispatch_blockers.some((blocker) => /allowed file scope/i.test(blocker)));
+  });
+
+  test(`normalizeDispatchMetadata treats ${label} as empty and not dispatchable`, () => {
+    const normalized = contractFromAllowedFileScopeString(scope);
+    assert.equal(normalized?.allowed_file_scope, undefined);
+    const result = validateDispatchMetadata(normalized);
+    assert.equal(result.canDispatch, false);
+    assert.ok(result.missingFields.includes('allowed file scope'));
+  });
+}
+
+test('GitHub import preview keeps only src/** from a MemSys scope superstring', () => {
+  const response = importPreviewForAllowedFileScope(
+    'Owning repo issue; docs; scripts; and tests named by the task; src/**',
+  );
+  assert.deepEqual(response.preview.dispatch_metadata?.allowed_file_scope, ['src/**']);
+  assert.equal(response.dispatch_ready, true);
+  assert.deepEqual(response.dispatch_blockers, []);
+});
+
+test('normalizeDispatchMetadata keeps only src/** from a MemSys scope superstring', () => {
+  const normalized = contractFromAllowedFileScopeString(
+    'Owning repo issue; docs; scripts; and tests named by the task; src/**',
+  );
+  assert.deepEqual(normalized?.allowed_file_scope, ['src/**']);
+  assert.equal(validateDispatchMetadata(normalized).canDispatch, true);
+});
+
+test('GitHub import preview treats docs/** as a real file scope', () => {
+  const response = importPreviewForAllowedFileScope('docs/**');
+  assert.deepEqual(response.preview.dispatch_metadata?.allowed_file_scope, ['docs/**']);
+  assert.equal(response.dispatch_ready, true);
+  assert.deepEqual(response.dispatch_blockers, []);
+});
+
+test('normalizeDispatchMetadata treats docs/** as a real file scope', () => {
+  const normalized = contractFromAllowedFileScopeString('docs/**');
+  assert.deepEqual(normalized?.allowed_file_scope, ['docs/**']);
+  assert.equal(validateDispatchMetadata(normalized).canDispatch, true);
+});
+
+test('normalizeDispatchMetadata treats an exact MemSys scope string as empty', () => {
+  const memsysDefault = 'Owning repo issue; docs; scripts; and tests named by the task';
+  const normalized = contractFromAllowedFileScopeString(memsysDefault);
+  assert.equal(normalized?.allowed_file_scope, undefined);
+  const result = validateDispatchMetadata(normalized);
+  assert.equal(result.canDispatch, false);
+  assert.ok(result.missingFields.includes('allowed file scope'));
+
+  const rawContract = {
+    ...OTHERWISE_COMPLETE_DISPATCH_CONTRACT,
+    allowed_file_scope: memsysDefault,
+  };
+  const parsed = parseDispatchMetadata(rawContract);
+  assert.equal(parsed?.allowed_file_scope, undefined);
+  assert.equal(validateDispatchMetadata(parsed).canDispatch, false);
+
+  const serialized = serializeDispatchMetadata(rawContract as never);
+  assert.ok(serialized);
+  const reparsed = JSON.parse(serialized);
+  assert.equal(reparsed.allowed_file_scope, undefined);
+});
+
 test('GitHub import preview hydrates dispatch metadata from issue body headings', () => {
   const response = buildGitHubImportPreviewResponse({
     request: {
@@ -659,6 +879,7 @@ test('GitHub refresh patch updates imported task metadata without forcing status
         target_repo: 'iMelki/projects-ops',
         project_workstream: 'GitHub-native pipeline',
         allowed_file_scope: ['projects-ops/docs/**'],
+        test_requirements: ['npm run test:github-sync'],
       },
     }
   );
@@ -772,6 +993,210 @@ test('GitHub refresh patch applies non-empty upstream contract values and ignore
   assert.equal(merged?.rollback_plan, 'Revert the local change.');
   assert.equal(merged?.readiness, 'ready_for_agent');
   assert.equal(merged?.impact, 'Upstream impact is non-empty so it is applied');
+});
+
+test('GitHub refresh keeps allowed_file_scope, safety_rules and review_mode local-only', () => {
+  assert.deepEqual(
+    [...LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH],
+    ['allowed_file_scope', 'safety_rules', 'review_mode'],
+  );
+
+  const local = {
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'local-stream',
+    allowed_file_scope: ['src/lib/dispatch-contract.ts'],
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:github-sync'],
+    risk_level: 'high' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Local impact stays',
+    rollback_plan: 'Revert the local change.',
+    safety_rules: ['Do not widen factory allowed paths from GitHub'],
+  };
+
+  const before = validateDispatchMetadata(local);
+  assert.equal(before.canDispatch, true);
+
+  const overwritten = mergeDispatchMetadataFromUpstream(local, {
+    project_workstream: 'upstream-stream',
+    allowed_file_scope: ['**/*'],
+    safety_rules: ['none'],
+    review_mode: 'auto_checks_only',
+    impact: 'Upstream impact is applied',
+  });
+
+  // project_workstream and target_repo are fill-only (T21); non-empty local survives.
+  assert.equal(overwritten?.project_workstream, 'local-stream');
+  assert.equal(overwritten?.impact, 'Upstream impact is applied');
+  assert.deepEqual(overwritten?.allowed_file_scope, local.allowed_file_scope);
+  assert.deepEqual(overwritten?.safety_rules, local.safety_rules);
+  assert.equal(overwritten?.review_mode, 'human_required');
+  const afterOverwrite = validateDispatchMetadata(overwritten);
+  assert.equal(afterOverwrite.canDispatch, true);
+
+  // A missing or placeholder-only local key may still be filled from a repaired body.
+  const filled = mergeDispatchMetadataFromUpstream(
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'local-stream',
+      allowed_file_scope: ['Owning repo issue, docs, scripts, and tests named by the task.'],
+      acceptance_criteria: ['Local acceptance criterion stays'],
+      test_requirements: ['npm run test:github-sync'],
+      risk_level: 'high',
+      readiness: 'ready_for_agent',
+      impact: 'Local impact stays',
+      rollback_plan: 'Revert the local change.',
+    },
+    {
+      allowed_file_scope: ['src/lib/dispatch-contract.ts'],
+      safety_rules: ['Do not mutate GitHub in this test'],
+      review_mode: 'human_required',
+    },
+  );
+
+  // allowed_file_scope, safety_rules and review_mode are local-owned (T12):
+  // sync never writes them, even into an empty or placeholder local value.
+  assert.equal(filled?.allowed_file_scope, undefined);
+  assert.equal(filled?.safety_rules, undefined);
+  assert.equal(filled?.review_mode, undefined);
+  const afterFill = validateDispatchMetadata(filled);
+  assert.equal(afterFill.canDispatch, false);
+
+  const patch = buildTaskRefreshUpdateFromGitHubPreview(
+    {
+      title: 'Old title',
+      description: 'Old description',
+      priority: 'normal',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+      },
+      dispatch_metadata: local,
+    },
+    {
+      title: 'Refreshed memsys#991 title',
+      description: 'Issue body with widened sandbox and review controls.',
+      priority: 'high',
+      status: 'inbox',
+      workspace_id: 'default',
+      business_id: 'default',
+      github_source: {
+        repo_owner: 'iMelki',
+        repo_name: 'memsys',
+        issue_number: 991,
+        issue_url: 'https://github.com/iMelki/memsys/issues/991',
+        project_item_id: 'PVTI_local_only_controls',
+      },
+      dispatch_metadata: {
+        target_repo: 'iMelki/memsys',
+        project_workstream: 'upstream-stream',
+        allowed_file_scope: ['**/*'],
+        safety_rules: ['none'],
+        review_mode: 'auto_checks_only',
+      },
+    },
+  );
+
+  // project_workstream and target_repo are fill-only (T21); non-empty local survives.
+  assert.equal(patch.dispatch_metadata?.project_workstream, 'local-stream');
+  assert.deepEqual(patch.dispatch_metadata?.allowed_file_scope, local.allowed_file_scope);
+  assert.deepEqual(patch.dispatch_metadata?.safety_rules, local.safety_rules);
+  assert.equal(patch.dispatch_metadata?.review_mode, 'human_required');
+  assert.equal(validateDispatchMetadata(patch.dispatch_metadata).canDispatch, true);
+});
+
+test('local docs and scripts file scopes survive an upstream **/* refresh', () => {
+  const baseLocal = {
+    target_repo: 'iMelki/memsys',
+    project_workstream: 'local-stream',
+    acceptance_criteria: ['Local acceptance criterion stays'],
+    test_requirements: ['npm run test:github-sync'],
+    risk_level: 'high' as const,
+    readiness: 'ready_for_agent' as const,
+    review_mode: 'human_required' as const,
+    impact: 'Local impact stays',
+    rollback_plan: 'Revert the local change.',
+    safety_rules: ['Do not widen factory allowed paths from GitHub'],
+  };
+
+  for (const scope of [['docs'], ['scripts']] as const) {
+    const local = {
+      ...baseLocal,
+      allowed_file_scope: [...scope],
+    };
+    const merged = mergeDispatchMetadataFromUpstream(local, {
+      allowed_file_scope: ['**/*'],
+    });
+    assert.deepEqual(merged?.allowed_file_scope, [...scope]);
+    assert.equal(validateDispatchMetadata(merged).canDispatch, true);
+  }
+
+  assert.equal(isGenericSyncPlaceholder('docs'), false);
+  assert.equal(isGenericSyncPlaceholder('scripts'), false);
+});
+
+test('a genuine allowed_file_scope placeholder may still be filled from upstream', () => {
+  const genuinePlaceholder = 'Owning repo issue, docs, scripts, and tests named by the task.';
+  assert.equal(isGenericSyncPlaceholder(genuinePlaceholder), true);
+
+  const filled = mergeDispatchMetadataFromUpstream(
+    {
+      target_repo: 'iMelki/memsys',
+      project_workstream: 'local-stream',
+      allowed_file_scope: [genuinePlaceholder],
+      acceptance_criteria: ['Local acceptance criterion stays'],
+      test_requirements: ['npm run test:github-sync'],
+      risk_level: 'high',
+      readiness: 'ready_for_agent',
+      review_mode: 'human_required',
+      impact: 'Local impact stays',
+      rollback_plan: 'Revert the local change.',
+    },
+    {
+      allowed_file_scope: ['**/*'],
+    },
+  );
+
+  // allowed_file_scope is local-owned (T12): sync never writes it from upstream.
+  assert.equal(filled?.allowed_file_scope, undefined);
+});
+
+test('the MemSys default allowed_file_scope string is a whole-string placeholder', () => {
+  const memsysDefault = 'Owning repo issue; docs; scripts; and tests named by the task';
+  assert.equal(GENERIC_SYNC_PLACEHOLDER_STRINGS.includes(memsysDefault), true);
+  assert.equal(isGenericSyncPlaceholder(memsysDefault), true);
+  assert.equal(isGenericSyncPlaceholder(memsysDefault.toLowerCase()), true);
+  assert.equal(isGenericSyncPlaceholder(memsysDefault.toUpperCase()), true);
+  assert.equal(
+    isGenericSyncPlaceholder('  Owning  repo  issue;  docs;  scripts;  and  tests  named  by  the  task  '),
+    true,
+  );
+  assert.equal(
+    isGenericSyncPlaceholder('Owning repo issue;docs;scripts;and tests named by the task'),
+    true,
+  );
+  assert.equal(
+    isGenericSyncPlaceholder('Owning repo issue;\u00a0docs; scripts; and tests named by the task'),
+    true,
+  );
+  assert.equal(isGenericSyncPlaceholder('docs'), false);
+  assert.deepEqual(
+    mergeDispatchMetadataFromUpstream(
+      { allowed_file_scope: ['docs'] },
+      { allowed_file_scope: ['**/*'] },
+    )?.allowed_file_scope,
+    ['docs'],
+  );
+
+  const filled = mergeDispatchMetadataFromUpstream(
+    { allowed_file_scope: [memsysDefault.toUpperCase()] },
+    { allowed_file_scope: ['**/*'] },
+  );
+  // allowed_file_scope is local-owned (T12): sync never writes it from upstream.
+  assert.equal(filled?.allowed_file_scope, undefined);
 });
 
 test('GitHub refresh patch keeps canDispatch false when a required contract field is missing locally and upstream', () => {
@@ -1063,9 +1488,10 @@ test('#114 first-item-only shape is not dispatchable', () => {
   assert.ok(result.missingFields.includes('impact'));
   assert.ok(result.missingFields.includes('rollback/fallback plan'));
 
-  // After MCK splits the scope default on commas, 'Owning repo issue' and
-  // 'and tests named by the task.' are placeholders, but 'docs' and 'scripts'
-  // are real scopes (kanban#227) and are kept.
+  // A stored row that already holds the scope default split on commas is
+  // the same generated default as a contiguous item sequence, so the array
+  // path strips the whole sequence and the field is missing. Bare 'docs'
+  // and 'scripts' on their own stay real scopes (see below).
   const commaSplitScope = validateDispatchMetadata({
     ...firstItemOnly,
     allowed_file_scope: [
@@ -1076,8 +1502,8 @@ test('#114 first-item-only shape is not dispatchable', () => {
     ],
   });
   assert.equal(commaSplitScope.canDispatch, false);
-  assert.ok(!commaSplitScope.missingFields.includes('allowed file scope'));
-  assert.deepEqual(stripGenericSyncPlaceholders(['Owning repo issue', 'docs', 'scripts', 'and tests named by the task.']), ['docs', 'scripts']);
+  assert.ok(commaSplitScope.missingFields.includes('allowed file scope'));
+  assert.ok(commaSplitScope.missingFields.includes('acceptance criteria'));
 
   assert.equal(isGenericSyncPlaceholder('Issue is present on the mapped GitHub Project.'), true);
   assert.equal(isGenericSyncPlaceholder('Owning repo issue'), true);

@@ -99,22 +99,32 @@ export const RISK_LEVEL_LABELS: Record<DispatchRiskLevel, string> = {
 
 /**
  * Generic portfolio-repair default strings from iMelki/projects-ops (dev).
- * Matched after `normalizePlaceholderText` on both sides (NFKC, casefold,
- * whitespace collapse, bullets and trailing punctuation); no fuzzy matching.
- * Sources (file:line on projects-ops `dev`):
+ * Projects-ops entries are matched after `normalizePlaceholderText`
+ * on both sides (NFKC, case-fold, whitespace collapse, bullets, and
+ * trailing punctuation); no fuzzy matching. Sources (file:line on projects-ops `dev`):
  *   scripts/Ensure-RepoIssueProjectVisibility.ps1
  *   scripts/Invoke-GitHubProjectMutation.ps1
- * MemSys-sourced strings, if they differ, are a follow-up.
+ * The two generated Allowed File Scope defaults (projects-ops comma form and
+ * MemSys semicolon form) are also on the exported list, and are matched as
+ * a whole string after NFKC, case-fold, collapsed whitespace, and an optional
+ * trailing period, never as split tokens.
  */
 export const GENERIC_SYNC_PLACEHOLDER_STRINGS = [
   // Ensure-RepoIssueProjectVisibility.ps1:35 and Invoke-GitHubProjectMutation.ps1:49 (Impact)
   'Keeps repository work visible in the mapped operator cockpit and MCK sync.',
   // Ensure-RepoIssueProjectVisibility.ps1:36 and Invoke-GitHubProjectMutation.ps1:50 (Allowed File Scope)
   'Owning repo issue, docs, scripts, and tests named by the task.',
-  // Comma-split pieces of that scope default (normalizeStringArray splits on commas).
-  // 'docs' and 'scripts' are real scopes and are not on this list (kanban#227).
+  // Comma-split pieces of that scope default that are not themselves real
+  // file scopes. Bare 'docs' and 'scripts' are real local scopes, so they
+  // stay off this list (kanban#227).
   'Owning repo issue',
   'and tests named by the task.',
+  // MemSys default Allowed File Scope. Added to this exported list under
+  // section 5, rule 5 of docs/SYNC_FIELD_AUTHORITY.md. Both generated
+  // scope defaults are matched as a whole string after NFKC, case-fold,
+  // collapsed whitespace, and an optional trailing period, never as split
+  // tokens, so bare 'docs' and 'scripts' stay real scopes.
+  'Owning repo issue; docs; scripts; and tests named by the task',
   // Ensure-RepoIssueProjectVisibility.ps1:38 and Invoke-GitHubProjectMutation.ps1:52 (Acceptance Criteria)
   'Issue is present on the mapped GitHub Project.',
   // Ensure-RepoIssueProjectVisibility.ps1:39 and Invoke-GitHubProjectMutation.ps1:53
@@ -173,6 +183,73 @@ function isPlaceholderToken(token: string): boolean {
 }
 
 /**
+ * Generated Allowed File Scope defaults (MemSys semicolon form and
+ * projects-ops comma form). Compared only as a whole string after
+ * `normalizeGenericSyncPlaceholderText`. Never tokenized, so bare 'docs'
+ * and 'scripts' stay real scopes.
+ */
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS = [
+  'Owning repo issue; docs; scripts; and tests named by the task',
+  'Owning repo issue, docs, scripts, and tests named by the task.',
+] as const;
+
+/**
+ * Unicode NFKC, then case-fold, then trim and collapse internal whitespace
+ * (including space around `;` or `,`) to a single canonical space or
+ * separator. A trailing period is optional.
+ */
+export function normalizeGenericSyncPlaceholderText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\s*;\s*/g, '; ')
+    .replace(/\s*,\s*/g, ', ')
+    .trim()
+    .replace(/\.+$/, '');
+}
+
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_NORMALIZED: ReadonlySet<string> = new Set(
+  GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS.map(normalizeGenericSyncPlaceholderText),
+);
+
+const GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_SEQUENCES: readonly string[][] = Array.from(
+  new Map(
+    GENERIC_SYNC_PLACEHOLDER_WHOLE_STRINGS.map((placeholder) => {
+      const tokens = normalizeGenericSyncPlaceholderText(placeholder)
+        .split(/[;,]/)
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0);
+      return [tokens.join('\0'), tokens] as const;
+    }),
+  ).values(),
+);
+
+/**
+ * Drop a generated Allowed File Scope default when it appears as a
+ * contiguous token sequence, including a superstring such as the MemSys
+ * default plus `; src/**`. Bare 'docs', 'scripts', and 'docs/**' stay.
+ */
+export function stripGeneratedScopePlaceholderTokens(items: readonly string[]): string[] {
+  const remaining = [...items];
+  const normalized = remaining.map((item) => normalizeGenericSyncPlaceholderText(item));
+
+  for (const sequence of GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_SEQUENCES) {
+    let index = 0;
+    while (index <= normalized.length - sequence.length) {
+      if (sequence.every((token, offset) => normalized[index + offset] === token)) {
+        remaining.splice(index, sequence.length);
+        normalized.splice(index, sequence.length);
+        continue;
+      }
+      index += 1;
+    }
+  }
+
+  return remaining;
+}
+
+/**
  * Split a dispatch string on the list separators used by portfolio-repair
  * joins (`; `, `;`, LF, CRLF), trimming each piece. Does not split on commas,
  * so the full Allowed File Scope default stays one token and is matched
@@ -187,8 +264,10 @@ export function splitGenericSyncPlaceholderTokens(value: string): string[] {
 
 /**
  * True when `value` is a known generic sync placeholder: an item equal after
- * `normalizePlaceholderText`, or a `;` / LF / CRLF join whose every non-empty
- * token is such an item (any join or subset).
+ * `normalizePlaceholderText`, a whole-string generated Allowed File Scope
+ * default after NFKC / case-fold / whitespace normalization with an optional
+ * trailing period, or a `;` / LF / CRLF join whose every non-empty token is
+ * such an item (any join or subset). Bare 'docs' or 'scripts' stay real scopes.
  */
 export function isGenericSyncPlaceholder(value: unknown): boolean {
   if (typeof value !== 'string') {
@@ -200,6 +279,9 @@ export function isGenericSyncPlaceholder(value: unknown): boolean {
     return false;
   }
   if (isPlaceholderToken(trimmed)) {
+    return true;
+  }
+  if (GENERIC_SYNC_PLACEHOLDER_WHOLE_STRING_NORMALIZED.has(normalizeGenericSyncPlaceholderText(trimmed))) {
     return true;
   }
 
@@ -282,6 +364,16 @@ export function stripGenericSyncPlaceholders(value: unknown): unknown {
     const trimmed = value.trim();
     if (trimmed.length === 0 || isGenericSyncPlaceholder(trimmed)) {
       return undefined;
+    }
+
+    const listItems = trimmed.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
+      const itemTrimmed = item.trim();
+      return itemTrimmed ? [itemTrimmed] : [];
+    });
+    const withoutGeneratedScope = stripGeneratedScopePlaceholderTokens(listItems);
+    if (withoutGeneratedScope.length !== listItems.length) {
+      const keptScope = withoutGeneratedScope.filter((item) => !isGenericSyncPlaceholder(item));
+      return keptScope.length > 0 ? keptScope : undefined;
     }
 
     const tokens = splitGenericSyncPlaceholderTokens(trimmed);
@@ -369,11 +461,47 @@ function normalizeStringArray(value: unknown): string[] | undefined {
   }
 
   if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
     const items = value.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
-      const trimmed = item.trim();
-      return trimmed ? [trimmed] : [];
+      const itemTrimmed = item.trim();
+      return itemTrimmed ? [itemTrimmed] : [];
     });
     return items.length > 0 ? items : undefined;
+  }
+
+  return undefined;
+}
+
+function normalizeAllowedFileScope(value: unknown): string[] | undefined {
+  if (isExplicitUpstreamListClear(value)) {
+    return [UPSTREAM_CLEAR_SIGNAL];
+  }
+
+  if (Array.isArray(value)) {
+    const items = value.flatMap((item) => {
+      const normalized = normalizeString(item);
+      return normalized ? [normalized] : [];
+    });
+    const kept = stripGeneratedScopePlaceholderTokens(items).filter((item) => !isGenericSyncPlaceholder(item));
+    return kept.length > 0 ? kept : undefined;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || isGenericSyncPlaceholder(trimmed)) {
+      return undefined;
+    }
+
+    const items = value.replaceAll(';', ',').split(',').flatMap((chunk) => chunk.split(String.fromCharCode(10))).flatMap((item) => {
+      const itemTrimmed = item.trim();
+      return itemTrimmed ? [itemTrimmed] : [];
+    });
+    const kept = stripGeneratedScopePlaceholderTokens(items).filter((item) => !isGenericSyncPlaceholder(item));
+    return kept.length > 0 ? kept : undefined;
   }
 
   return undefined;
@@ -389,7 +517,7 @@ export function normalizeDispatchMetadata(input: unknown): DispatchMetadata | un
     source_issue_url: normalizeString(candidate.source_issue_url),
     target_repo: normalizeString(candidate.target_repo),
     project_workstream: normalizeString(candidate.project_workstream),
-    allowed_file_scope: normalizeStringArray(candidate.allowed_file_scope),
+    allowed_file_scope: normalizeAllowedFileScope(candidate.allowed_file_scope),
     acceptance_criteria: normalizeStringArray(candidate.acceptance_criteria),
     test_requirements: normalizeStringArray(candidate.test_requirements),
     risk_level: normalizeString(candidate.risk_level) as DispatchRiskLevel | undefined,
@@ -452,6 +580,8 @@ function isNonEmptyDispatchValue(value: unknown): boolean {
 }
 
 /**
+
+/**
  * Explicit upstream clear signal (docs/SYNC_FIELD_AUTHORITY.md section 4,
  * rule 5). An empty value, a missing heading or a placeholder is never a
  * clear. Only a section or field whose whole trimmed value is exactly this
@@ -510,6 +640,11 @@ function upstreamAsksToClear(key: string, value: unknown): boolean {
  * factory `allowedPaths`, so an issue editor must never be able to change it.
  */
 export const LOCAL_OWNED_DISPATCH_KEYS = ['allowed_file_scope', 'safety_rules', 'review_mode'] as const;
+/**
+ * Sandbox and review controls that GitHub refresh must not overwrite.
+ * Retained for backwards compatibility with call sites from kanban#227.
+ */
+export const LOCAL_ONLY_DISPATCH_FIELDS_ON_REFRESH = LOCAL_OWNED_DISPATCH_KEYS;
 export type LocalOwnedDispatchKey = (typeof LOCAL_OWNED_DISPATCH_KEYS)[number];
 const LOCAL_OWNED_DISPATCH_KEY_SET: ReadonlySet<string> = new Set(LOCAL_OWNED_DISPATCH_KEYS);
 
@@ -575,7 +710,10 @@ export function mergeDispatchMetadataFromUpstreamDetailed(
       const upstreamValue = isNonEmptyDispatchValue(substantive)
         ? (normalizeDispatchMetadata({ [key]: substantive }) as Record<string, unknown> | undefined)?.[key]
         : undefined;
-      if (upstreamAsksToClear(key, value) ? localHasValue : upstreamValue !== undefined && !sameDispatchValue(upstreamValue, localValue)) {
+      const upstreamDiffers = upstreamAsksToClear(key, value)
+        ? localHasValue
+        : upstreamValue !== undefined && (!localHasValue || !sameDispatchValue(upstreamValue, localValue));
+      if (upstreamDiffers) {
         drift.push({
           field: `dispatch_metadata.${key}`,
           reason: `Upstream ${upstreamAsksToClear(key, value) ? 'asks to clear' : 'differs on'} local-owned field ${key}; sync never writes it. Change it in MCK if intended.`,
