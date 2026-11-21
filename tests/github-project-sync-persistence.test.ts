@@ -174,11 +174,25 @@ test('GitHub Project sync refreshes existing imported task dispatch metadata fro
   assert.equal(row?.status, 'in_progress');
   assert.equal(row?.priority, 'high');
   const metadata = parseDispatchMetadata(row?.dispatch_metadata);
-  const readiness = validateDispatchMetadata(metadata);
-  assert.equal(readiness.canDispatch, true);
-  assert.equal(metadata?.readiness, 'ready_for_agent');
   assert.equal(metadata?.risk_level, 'medium');
-  assert.deepEqual(metadata?.allowed_file_scope, ['src/lib/github-project-sync.ts', 'tests/github-project-sync-persistence.test.ts']);
+  assert.equal(metadata?.readiness, 'ready_for_agent');
+  assert.deepEqual(metadata?.acceptance_criteria, [
+    'Existing imported tasks receive repaired dispatch metadata.',
+    'Status is not churned backward when the task is already active.',
+  ]);
+  // allowed_file_scope, safety_rules and review_mode are local-owned: sync
+  // never writes them, even into an empty local value, and shows the upstream
+  // difference as drift (docs/SYNC_FIELD_AUTHORITY.md section 7, T12).
+  assert.equal(metadata?.allowed_file_scope, undefined);
+  assert.equal(metadata?.safety_rules, undefined);
+  assert.equal(metadata?.review_mode, undefined);
+  assert.equal(validateDispatchMetadata(metadata).canDispatch, false);
+  const driftFields = result.details.filter((detail) => detail.action === 'drift').map((detail) => detail.field);
+  assert.deepEqual(driftFields, [
+    'dispatch_metadata.allowed_file_scope',
+    'dispatch_metadata.review_mode',
+    'dispatch_metadata.safety_rules',
+  ]);
 });
 
 test('targeted GitHub Project sync mutates only one exact issue ref', async () => {
@@ -337,7 +351,8 @@ test('GitHub Project sync preserves locally authored dispatch contract fields wh
   const metadata = parseDispatchMetadata(row?.dispatch_metadata);
   assert.equal(metadata?.source_issue_url, localContract.source_issue_url);
   assert.equal(metadata?.target_repo, 'iMelki/mission-control-kanban');
-  assert.equal(metadata?.project_workstream, 'upstream-workstream');
+  // Local once set: the Project value never replaces it (T21).
+  assert.equal(metadata?.project_workstream, 'local-workstream');
   assert.deepEqual(metadata?.allowed_file_scope, localContract.allowed_file_scope);
   assert.deepEqual(metadata?.acceptance_criteria, localContract.acceptance_criteria);
   assert.deepEqual(metadata?.test_requirements, localContract.test_requirements);
@@ -533,6 +548,8 @@ test('GitHub refresh rewrites a legacy split scope placeholder row and lets upst
     ['task-existing'],
   );
   const repaired = parseDispatchMetadata(repairedRow?.dispatch_metadata);
-  assert.deepEqual(repaired?.allowed_file_scope, ['src/lib/dispatch-contract.ts', 'docs']);
-  assert.equal(validateDispatchMetadata(repaired).canDispatch, true);
+  // Repaired body with a real scope: allowed_file_scope is local-owned (T12),
+  // so sync never writes it from upstream, and shows the upstream difference as drift.
+  assert.equal(repaired?.allowed_file_scope, undefined);
+  assert.equal(validateDispatchMetadata(repaired).canDispatch, false);
 });

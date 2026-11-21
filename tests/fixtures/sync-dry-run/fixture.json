@@ -1,0 +1,112 @@
+{
+  "workspace": {
+    "id": "memsys",
+    "name": "MemSys",
+    "slug": "memsys",
+    "github_project_owner": "iMelki",
+    "github_project_number": 12,
+    "github_project_title": "MemSys"
+  },
+  "tasks": [
+    {
+      "id": "fixture-local-contract",
+      "title": "Card with a locally authored contract",
+      "description": "Local body",
+      "status": "in_progress",
+      "source_issue_number": 991,
+      "source_project_item_id": "PVTI_991",
+      "dispatch_metadata": {
+        "target_repo": "iMelki/memsys",
+        "project_workstream": "MemSys",
+        "allowed_file_scope": ["src/memsys/hindsight.py", "tests/test_hindsight.py"],
+        "acceptance_criteria": ["Hindsight recall keeps the local contract"],
+        "test_requirements": ["pytest tests/test_hindsight.py"],
+        "risk_level": "medium",
+        "readiness": "ready_for_agent",
+        "review_mode": "human_required",
+        "impact": "Keeps MemSys recall stable",
+        "rollback_plan": "Revert the hindsight change.",
+        "safety_rules": ["Do not touch the palace store"]
+      }
+    },
+    {
+      "id": "fixture-review-no-evidence",
+      "title": "Card the Project marks Review with only a dev merge",
+      "description": "Body",
+      "status": "testing",
+      "source_issue_number": 992,
+      "source_project_item_id": "PVTI_992",
+      "dispatch_metadata": { "target_repo": "iMelki/memsys", "readiness": "needs_grooming" }
+    },
+    {
+      "id": "fixture-explicit-clear",
+      "title": "Card whose issue asks to clear its rollback plan",
+      "description": "Body",
+      "status": "inbox",
+      "source_issue_number": 993,
+      "source_project_item_id": "PVTI_993",
+      "dispatch_metadata": { "target_repo": "iMelki/memsys", "rollback_plan": "Old rollback", "readiness": "needs_grooming" }
+    }
+  ],
+  "project": {
+    "title": "MemSys",
+    "allItems": [
+      {
+        "id": null,
+        "isArchived": false,
+        "content": {
+          "__typename": "Issue", "number": 991, "title": "Hindsight recall", "url": "https://github.com/iMelki/memsys/issues/991",
+          "state": "OPEN", "closed": false,
+          "body": "## Allowed File Scope\nOwning repo issue, docs, scripts, and tests named by the task.\n\n## Safety Rules\nDo not mutate external upstream repos.\n\n## Test Requirements\n\n## Rollback / Fallback Plan\n   ",
+          "repository": { "name": "memsys", "nameWithOwner": "iMelki/memsys", "owner": { "login": "iMelki" } },
+          "labels": { "nodes": [] }
+        },
+        "fieldValues": { "nodes": [ { "name": "In Progress", "field": { "name": "Status" } }, { "name": "  ", "field": { "name": "Impact" } } ] }
+      },
+      {
+        "id": "PVTI_992",
+        "isArchived": false,
+        "content": {
+          "__typename": "Issue", "number": 992, "title": "Review without evidence", "url": "https://github.com/iMelki/memsys/issues/992",
+          "state": "OPEN", "closed": false, "body": "Goal only.",
+          "repository": { "name": "memsys", "nameWithOwner": "iMelki/memsys", "owner": { "login": "iMelki" } },
+          "labels": { "nodes": [] }
+        },
+        "fieldValues": { "nodes": [ { "name": "Review", "field": { "name": "Status" } } ] }
+      },
+      {
+        "id": "PVTI_pr_1200",
+        "isArchived": false,
+        "content": {
+          "__typename": "PullRequest", "number": 1200, "title": "Dev-only merge", "url": "https://github.com/iMelki/memsys/pull/1200",
+          "state": "MERGED", "merged": true, "baseRefName": "dev",
+          "repository": { "nameWithOwner": "iMelki/memsys" },
+          "closingIssuesReferences": { "nodes": [ { "number": 992, "repository": { "nameWithOwner": "iMelki/memsys" } } ] }
+        },
+        "fieldValues": { "nodes": [] }
+      },
+      {
+        "id": "PVTI_993",
+        "isArchived": false,
+        "content": {
+          "__typename": "Issue", "number": 993, "title": "Explicit clear", "url": "https://github.com/iMelki/memsys/issues/993",
+          "state": "OPEN", "closed": false, "body": "## Rollback / Fallback Plan\nMCK-CLEAR",
+          "repository": { "name": "memsys", "nameWithOwner": "iMelki/memsys", "owner": { "login": "iMelki" } },
+          "labels": { "nodes": [] }
+        },
+        "fieldValues": { "nodes": [ { "name": "Todo", "field": { "name": "Status" } } ] }
+      },
+      {
+        "id": "PVTI_994",
+        "isArchived": false,
+        "content": {
+          "__typename": "Issue", "number": 994, "title": "Open issue with no card", "url": "https://github.com/iMelki/memsys/issues/994",
+          "state": "OPEN", "closed": false, "body": "Goal only.",
+          "repository": { "name": "memsys", "nameWithOwner": "iMelki/memsys", "owner": { "login": "iMelki" } },
+          "labels": { "nodes": [] }
+        },
+        "fieldValues": { "nodes": [ { "name": "Todo", "field": { "name": "Status" } }, { "name": "Ready for Agent", "field": { "name": "Readiness" } } ] }
+      }
+    ]
+  }
+}

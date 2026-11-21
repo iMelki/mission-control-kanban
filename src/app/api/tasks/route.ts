@@ -12,8 +12,9 @@ import { deriveGitHubSourceIdentity, normalizeGitHubSourceIdentity } from '@/lib
 import type { Task, CreateTaskRequest, Agent } from '@/lib/types';
 import { normalizeAgentRuntimeType, normalizeDispatchEnabled } from '@/lib/agent-runtimes';
 import { listTaskDependenciesForTasks } from '@/lib/task-dependencies';
+import { parseSyncFlags } from '@/lib/github-project-sync';
 
-type TaskRow = Task & {
+type TaskRow = Omit<Task, 'sync_flags'> & {
   assigned_agent_name?: string;
   assigned_agent_emoji?: string;
   assigned_agent_runtime_type?: string | null;
@@ -26,10 +27,16 @@ type TaskRow = Task & {
   source_issue_number?: number | null;
   source_issue_url?: string | null;
   source_project_item_id?: string | null;
+  sync_flags?: string | null;
+  github_last_read_at?: string | null;
+  github_missing_reads?: number | null;
 };
 
 function decorateTask(task: TaskRow) {
   const {
+    sync_flags,
+    github_last_read_at: _lastRead,
+    github_missing_reads: _missingReads,
     dispatch_metadata,
     source_repo_owner,
     source_repo_name,
@@ -52,6 +59,7 @@ function decorateTask(task: TaskRow) {
     ...rest,
     github_source: githubSource,
     dispatch_metadata: dispatchMetadata,
+    sync_flags: parseSyncFlags(sync_flags),
     dispatch_ready: validation.canDispatch,
     dispatch_blockers: validation.blockers,
     assigned_agent: task.assigned_agent_id

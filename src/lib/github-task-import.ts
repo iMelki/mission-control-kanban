@@ -1,6 +1,11 @@
 import {
   isGenericSyncPlaceholder,
-  mergeDispatchMetadataFromUpstream,
+  isExplicitUpstreamListClear,
+  mergeDispatchMetadataFromUpstreamDetailed,
+  normalizePlaceholderText,
+  stripGenericSyncPlaceholders,
+  UPSTREAM_CLEAR_SIGNAL,
+  type DispatchMetadataMergeDrift,
   normalizeDispatchMetadata,
   stripGeneratedScopePlaceholderTokens,
   type DispatchMetadata,
@@ -78,6 +83,9 @@ function normalizeLabel(label: GitHubLabel): string | undefined {
 }
 
 function normalizeListSection(value: string | undefined): string[] | undefined {
+  if (isExplicitUpstreamListClear(value)) {
+    return [UPSTREAM_CLEAR_SIGNAL];
+  }
   if (!value) {
     return undefined;
   }
@@ -91,6 +99,11 @@ function normalizeListSection(value: string | undefined): string[] | undefined {
 }
 
 function normalizeListValue(value: unknown): string[] | undefined {
+  // Recognize an explicit clear on the raw value before splitting on
+  // commas, semicolons, or newlines. Empty or unparsable input is not a clear.
+  if (isExplicitUpstreamListClear(value)) {
+    return [UPSTREAM_CLEAR_SIGNAL];
+  }
   const normalized = normalizeString(typeof value === 'number' ? String(value) : value);
   if (!normalized) {
     return undefined;
@@ -387,6 +400,47 @@ export function deriveGitHubSourceIdentity(input: {
   return issueUrl ? parseGitHubIssueUrl(issueUrl) : undefined;
 }
 
+/**
+ * docs/SYNC_FIELD_AUTHORITY.md section 3, rule 5 (T19): an explicit Project
+ * field beats a parsed body section. The body only fills a key whose Project
+ * field is empty or placeholder-only.
+ */
+function preferProjectField<T>(projectValue: T | undefined, bodyValue: T | undefined): T | undefined {
+  const projectSubstantive = stripGenericSyncPlaceholders(projectValue);
+  const hasProjectValue = Array.isArray(projectSubstantive)
+    ? projectSubstantive.length > 0
+    : typeof projectSubstantive === 'string'
+      ? projectSubstantive.trim().length > 0
+      : projectSubstantive !== undefined && projectSubstantive !== null;
+  return hasProjectValue ? projectValue : bodyValue ?? projectValue;
+}
+
+/** Default titles the sync and the preview write when an issue has none. */
+export const DEFAULT_GITHUB_ISSUE_TITLES = ['Untitled GitHub issue', 'Untitled GitHub issue import'] as const;
+const DEFAULT_GITHUB_ISSUE_TITLE_SET: ReadonlySet<string> = new Set(
+  DEFAULT_GITHUB_ISSUE_TITLES.map((title) => normalizePlaceholderText(title)),
+);
+
+/**
+ * Section 5, rule 7 (T20): an empty, default or placeholder-only title never
+ * replaces a local title.
+ */
+export function isPlaceholderTitle(value: unknown): boolean {
+  if (typeof value !== 'string') {
+    return true;
+  }
+  const normalized = normalizePlaceholderText(value);
+  return normalized.length === 0 || DEFAULT_GITHUB_ISSUE_TITLE_SET.has(normalized) || isGenericSyncPlaceholder(value);
+}
+
+/** Section 5, rule 7 (T20): an empty or placeholder-only body never replaces local. */
+export function isPlaceholderBody(value: unknown): boolean {
+  if (typeof value !== 'string') {
+    return true;
+  }
+  return normalizePlaceholderText(value).length === 0 || isGenericSyncPlaceholder(value);
+}
+
 function buildGitHubImportPreview(input: GitHubImportPreviewRequest): GitHubImportPreviewTask {
   const labels = (input.issue.labels ?? []).flatMap((label) => {
     const normalized = normalizeLabel(label);
@@ -429,24 +483,30 @@ function buildGitHubImportPreview(input: GitHubImportPreviewRequest): GitHubImpo
     source_issue_url: issueUrl,
     target_repo: targetRepo,
     project_workstream: projectWorkstream,
-    allowed_file_scope: normalizeListSection(
-      extractHeadingSection(issueBody, ['Allowed File Scope', 'Allowed Files', 'File Scope'])
-    ) ?? normalizeListValue(firstProjectFieldValue(projectFields, ['Allowed File Scope', 'Allowed Files', 'File Scope', 'Scope'])),
-    acceptance_criteria: normalizeListSection(
-      extractHeadingSection(issueBody, ['Acceptance Criteria', 'Definition of Done', 'Success Criteria'])
-    ) ?? normalizeListValue(firstProjectFieldValue(projectFields, ['Acceptance Criteria', 'Definition of Done', 'Success Criteria'])),
-    test_requirements: normalizeListSection(
-      extractHeadingSection(issueBody, ['Test Requirements', 'Validation', 'Verification'])
-    ) ?? normalizeListValue(firstProjectFieldValue(projectFields, ['Test Requirements', 'Validation', 'Verification', 'Tests'])),
+    allowed_file_scope: preferProjectField(
+      normalizeListValue(firstProjectFieldValue(projectFields, ['Allowed File Scope', 'Allowed Files', 'File Scope', 'Scope'])),
+      normalizeListSection(extractHeadingSection(issueBody, ['Allowed File Scope', 'Allowed Files', 'File Scope'])),
+    ),
+    acceptance_criteria: preferProjectField(
+      normalizeListValue(firstProjectFieldValue(projectFields, ['Acceptance Criteria', 'Definition of Done', 'Success Criteria'])),
+      normalizeListSection(extractHeadingSection(issueBody, ['Acceptance Criteria', 'Definition of Done', 'Success Criteria'])),
+    ),
+    test_requirements: preferProjectField(
+      normalizeListValue(firstProjectFieldValue(projectFields, ['Test Requirements', 'Validation', 'Verification', 'Tests'])),
+      normalizeListSection(extractHeadingSection(issueBody, ['Test Requirements', 'Validation', 'Verification'])),
+    ),
     risk_level: riskLevel,
     readiness,
     review_mode: reviewMode,
     impact,
-    rollback_plan: extractHeadingSection(issueBody, ['Rollback', 'Rollback / Fallback Plan', 'Rollback / Fallback', 'Fallback Plan'])
-      ?? firstProjectFieldValue(projectFields, ['Rollback / Fallback Plan', 'Rollback / Fallback', 'Rollback', 'Fallback Plan', 'Fallback']),
-    safety_rules: normalizeListSection(
-      extractHeadingSection(issueBody, ['Safety Rules', 'Guardrails'])
-    ) ?? normalizeListValue(firstProjectFieldValue(projectFields, ['Safety Rules', 'Guardrails'])),
+    rollback_plan: preferProjectField(
+      firstProjectFieldValue(projectFields, ['Rollback / Fallback Plan', 'Rollback / Fallback', 'Rollback', 'Fallback Plan', 'Fallback']),
+      extractHeadingSection(issueBody, ['Rollback', 'Rollback / Fallback Plan', 'Rollback / Fallback', 'Fallback Plan']),
+    ),
+    safety_rules: preferProjectField(
+      normalizeListValue(firstProjectFieldValue(projectFields, ['Safety Rules', 'Guardrails'])),
+      normalizeListSection(extractHeadingSection(issueBody, ['Safety Rules', 'Guardrails'])),
+    ),
   });
 
   const githubSource = issueUrl && issueNumber && repoOwner && repoName
@@ -500,28 +560,46 @@ export function buildGitHubImportPreviewResponse(input: {
   };
 }
 
+export interface GitHubTaskRefreshPlan {
+  update: UpdateTaskRequest;
+  /** `dispatch_metadata.<key>` names the upstream explicitly cleared. */
+  explicit_clears: string[];
+  /** Upstream values for local-owned keys that differ from local; not applied. */
+  local_owned_drift: DispatchMetadataMergeDrift[];
+}
+
+export function buildTaskRefreshPlanFromGitHubPreview(
+  currentTask: Pick<Task, 'title' | 'description' | 'priority' | 'github_source' | 'dispatch_metadata'>,
+  preview: GitHubImportPreviewTask
+): GitHubTaskRefreshPlan {
+  // Key-level merge: upstream non-empty non-placeholder keys refresh,
+  // local keys stay. See mergeDispatchMetadataFromUpstreamDetailed.
+  const dispatch = mergeDispatchMetadataFromUpstreamDetailed(
+    currentTask.dispatch_metadata,
+    preview.dispatch_metadata,
+  );
+
+  return {
+    update: {
+      title: isPlaceholderTitle(preview.title) ? currentTask.title : preview.title,
+      description: isPlaceholderBody(preview.description) ? currentTask.description : preview.description,
+      priority: preview.priority ?? currentTask.priority,
+      // Subfield-level merge: absent, empty, or placeholder upstream subfields
+      // never wipe a non-empty local subfield; non-empty upstream subfields refresh.
+      github_source: mergeGitHubSourceFromUpstream(
+        currentTask.github_source,
+        preview.github_source,
+      ) ?? null,
+      dispatch_metadata: dispatch.merged,
+    },
+    explicit_clears: dispatch.explicit_clears,
+    local_owned_drift: dispatch.local_owned_drift,
+  };
+}
+
 export function buildTaskRefreshUpdateFromGitHubPreview(
   currentTask: Pick<Task, 'title' | 'description' | 'priority' | 'github_source' | 'dispatch_metadata'>,
   preview: GitHubImportPreviewTask
 ): UpdateTaskRequest {
-  return {
-    title: preview.title || currentTask.title,
-    description: preview.description ?? currentTask.description,
-    priority: preview.priority ?? currentTask.priority,
-    // Subfield-level merge: absent, empty, or placeholder upstream subfields
-    // never wipe a non-empty local subfield; non-empty upstream subfields refresh.
-    github_source: mergeGitHubSourceFromUpstream(
-      currentTask.github_source,
-      preview.github_source,
-    ) ?? null,
-    // Key-level merge: upstream non-empty non-placeholder keys refresh.
-    // Sandbox and review controls (allowed_file_scope, safety_rules,
-    // review_mode) stay local-only when a substantive local value already
-    // exists; a missing or placeholder local key may still be filled.
-    // See mergeDispatchMetadataFromUpstream.
-    dispatch_metadata: mergeDispatchMetadataFromUpstream(
-      currentTask.dispatch_metadata,
-      preview.dispatch_metadata,
-    ),
-  };
+  return buildTaskRefreshPlanFromGitHubPreview(currentTask, preview).update;
 }
