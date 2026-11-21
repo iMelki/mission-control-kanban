@@ -10,11 +10,23 @@ const OPERATOR_SCOPES = ['operator.read', 'operator.write'];
 /** Current OpenClaw gateway protocol (openclaw@2026.9.7 PROTOCOL_VERSION). */
 export const OPENCLAW_PROTOCOL_VERSION = 4;
 
+/**
+ * Mission Control Kanban talks to the gateway only from its Node server
+ * (API routes), over loopback, with the shared gateway token and no device
+ * identity. The gateway (openclaw 2026.11.x, ws-connection connect-policy)
+ * clears every requested scope for a token-auth client without a device
+ * identity, so sessions.list then fails with "missing scope: operator.read".
+ * The one exception for that shape is a local backend client:
+ * client.id 'gateway-client' with client.mode 'backend', connecting from
+ * loopback with no browser Origin header and a valid shared secret
+ * (shouldSkipLocalBackendSelfPairing). Identify as exactly that, so the
+ * requested operator scopes are kept without pairing or a new credential.
+ */
 export const OPENCLAW_CLIENT_IDENTITY = {
   id: 'gateway-client',
   version: '1.0.0',
-  platform: 'web',
-  mode: 'ui',
+  platform: 'node',
+  mode: 'backend',
 } as const;
 
 export function buildConnectParams(token: string) {

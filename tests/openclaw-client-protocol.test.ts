@@ -23,13 +23,36 @@ test('buildConnectParams sends protocol 4 and the client identity fields', () =>
   assert.deepEqual(params.client, {
     id: 'gateway-client',
     version: '1.0.0',
-    platform: 'web',
-    mode: 'ui',
+    platform: 'node',
+    mode: 'backend',
   });
   assert.deepEqual(params.client, { ...OPENCLAW_CLIENT_IDENTITY });
   assert.equal(params.role, 'operator');
   assert.deepEqual(params.scopes, ['operator.read', 'operator.write']);
   assert.deepEqual(params.auth, { token: 'test-token' });
+});
+
+// Regression: "missing scope: operator.read" on /api/openclaw/status.
+// openclaw 2026.11.x keeps the requested scopes of a token-auth client that
+// has no device identity only when it is a local backend client
+// (client.id 'gateway-client' + client.mode 'backend', loopback, no Origin).
+// Any other id/mode (the old 'ui' mode included) gets its scopes cleared, and
+// sessions.list is then refused. This mirrors that gateway rule so a future
+// identity edit cannot silently bring the error back.
+function gatewayKeepsTokenScopesWithoutDevice(client: { id: string; mode: string }): boolean {
+  return client.id === 'gateway-client' && client.mode === 'backend';
+}
+
+test('client identity is the local backend shape the gateway keeps scopes for', () => {
+  const params = buildConnectParams('test-token');
+  assert.equal(gatewayKeepsTokenScopesWithoutDevice(params.client), true);
+  assert.ok(params.scopes.includes('operator.read'), 'sessions.list needs operator.read');
+  assert.equal('device' in params, false);
+});
+
+test('the previous ui mode is the shape whose scopes the gateway clears', () => {
+  assert.equal(gatewayKeepsTokenScopesWithoutDevice({ id: 'gateway-client', mode: 'ui' }), false);
+  assert.notEqual(OPENCLAW_CLIENT_IDENTITY.mode, 'ui');
 });
 
 type FakeListener = ((event?: unknown) => void) | null;
@@ -109,10 +132,11 @@ test('connect frame after connect.challenge uses protocol 4 and client identity'
     assert.deepEqual(frame.params.client, {
       id: 'gateway-client',
       version: '1.0.0',
-      platform: 'web',
-      mode: 'ui',
+      platform: 'node',
+      mode: 'backend',
     });
     assert.equal(frame.params.role, 'operator');
+    assert.equal('device' in frame.params, false, 'backend client must not send a device identity');
     assert.deepEqual(frame.params.scopes, ['operator.read', 'operator.write']);
     assert.deepEqual(frame.params.auth, { token: 'test-token' });
 
